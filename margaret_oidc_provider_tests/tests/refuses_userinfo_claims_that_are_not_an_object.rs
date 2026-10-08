@@ -4,9 +4,9 @@ use margaret_oidc_provider_tests::unserved_provider::UnservedProvider;
 use margaret_oidc_provider_tests::userinfo_grant_of::userinfo_grant_of;
 use margaret_registered_claims::claims_merge_error::ClaimsMergeError;
 
-#[test]
-fn refuses_userinfo_claims_that_are_not_an_object() {
-    let provider = UnservedProvider::create();
+#[tokio::test]
+async fn refuses_userinfo_claims_that_are_not_an_object() {
+    let provider = UnservedProvider::create().await;
     let endpoint = UserinfoEndpoint::create(provider.secret_store, provider.issuance);
 
     assert!(matches!(

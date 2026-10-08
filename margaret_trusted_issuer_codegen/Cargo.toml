@@ -15,6 +15,7 @@ margaret_attributes = { workspace = true }
 margaret_declaration_anchor = { workspace = true }
 margaret_generated_module = { workspace = true }
 margaret_https_url = { workspace = true }
+margaret_item_naming_argument = { workspace = true }
 margaret_oidc_discovery = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_umbrella_path = { workspace = true }

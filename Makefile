@@ -9,6 +9,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_attribute_arguments \
 	-p margaret_attributes \
 	-p margaret_attributes_tests \
+	-p margaret_authorization_grants \
 	-p margaret_authorization_server_client \
 	-p margaret_authorization_server_client_tests \
 	-p margaret_bearer_token_verification \
@@ -41,20 +42,17 @@ COVERAGE_PACKAGES := \
 	-p margaret_issuer_directory \
 	-p margaret_issuer_directory_tests \
 	-p margaret_issuer_key_set \
+	-p margaret_issuer_key_set_tests \
 	-p margaret_issuer_metadata \
 	-p margaret_issuer_request \
 	-p margaret_item_naming_argument \
 	-p margaret_jose_parameters \
 	-p margaret_jwks_codegen \
-	-p margaret_jwks_file_secret_storage \
-	-p margaret_jwks_file_secret_storage_tests \
 	-p margaret_jwks_keygen \
 	-p margaret_jwks_keygen_tests \
 	-p margaret_jwks_roller \
 	-p margaret_jwks_roller_server \
 	-p margaret_jwks_roller_tests \
-	-p margaret_jwks_secret_storage_selection \
-	-p margaret_jwks_secret_storage_selection_tests \
 	-p margaret_jwks_secret_store \
 	-p margaret_jwks_secret_store_tests \
 	-p margaret_jws_verification \
@@ -68,6 +66,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_oauth_client \
 	-p margaret_oauth_client_codegen \
 	-p margaret_oauth_vocabulary \
+	-p margaret_oauth_vocabulary_codegen \
 	-p margaret_oidc_discovery \
 	-p margaret_oidc_provider \
 	-p margaret_oidc_provider_codegen \
@@ -77,11 +76,6 @@ COVERAGE_PACKAGES := \
 	-p margaret_openid_conformance_tests \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
-	-p margaret_provider_state_postgres \
-	-p margaret_provider_state_storage \
-	-p margaret_provider_state_storage_selection \
-	-p margaret_provider_state_storage_selection_tests \
-	-p margaret_provider_state_storage_tests \
 	-p margaret_registered_claims \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_method \
@@ -103,12 +97,12 @@ COVERAGE_PACKAGES := \
 	-p margaret_spiffe_svid_server \
 	-p margaret_spiffe_svid_server_tests \
 	-p margaret_spiffe_svid_tests \
-	-p margaret_storage_uri \
 	-p margaret_subject_token_exchange \
 	-p margaret_subject_token_exchange_tests \
 	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
 	-p margaret_tag_codegen \
+	-p margaret_tag_codegen_tests \
 	-p margaret_token_digest \
 	-p margaret_token_exchange_client \
 	-p margaret_token_exchange_client_tests \
@@ -131,7 +125,6 @@ COVERAGE_PACKAGES := \
 	-p margaret_websocket_session \
 	-p margaret_websocket_tests
 COVERAGE_EXCLUDED_PACKAGES := \
-	--exclude-from-report margaret_example \
 	--exclude-from-report margaret_codegen_collisions_and_diamonds_fixture \
 	--exclude-from-report margaret_codegen_copy_console_arguments_fixture \
 	--exclude-from-report margaret_codegen_environment_variable_inputs_fixture \
@@ -147,6 +140,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_codegen_websocket_fixture \
 	--exclude-from-report margaret_codegen_websocket_peer_identity_fixture \
 	--exclude-from-report margaret_composite_foreign_key_model_fixture \
+	--exclude-from-report margaret_example \
 	--exclude-from-report margaret_self_referential_model_fixture \
 	--exclude-from-report margaret_spiffe_http_client_fixture
 GENERATED_CODE_PACKAGES := \
@@ -164,8 +158,8 @@ GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_route_parameter_values_fixture \
 	-p margaret_codegen_websocket_fixture \
 	-p margaret_codegen_websocket_peer_identity_fixture \
-	-p margaret_example \
 	-p margaret_composite_foreign_key_model_fixture \
+	-p margaret_example \
 	-p margaret_self_referential_model_fixture \
 	-p margaret_spiffe_http_client_fixture
 RUNTIME_PACKAGES := \
@@ -176,6 +170,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_asset_bag_codegen \
 	-p margaret_attribute_arguments \
 	-p margaret_attributes \
+	-p margaret_authorization_grants \
 	-p margaret_authorization_server_client \
 	-p margaret_bearer_token_verification \
 	-p margaret_client_credentials \
@@ -206,11 +201,9 @@ RUNTIME_PACKAGES := \
 	-p margaret_item_naming_argument \
 	-p margaret_jose_parameters \
 	-p margaret_jwks_codegen \
-	-p margaret_jwks_file_secret_storage \
 	-p margaret_jwks_keygen \
 	-p margaret_jwks_roller \
 	-p margaret_jwks_roller_server \
-	-p margaret_jwks_secret_storage_selection \
 	-p margaret_jwks_secret_store \
 	-p margaret_jws_verification \
 	-p margaret_jwt_verification \
@@ -221,14 +214,12 @@ RUNTIME_PACKAGES := \
 	-p margaret_oauth_client \
 	-p margaret_oauth_client_codegen \
 	-p margaret_oauth_vocabulary \
+	-p margaret_oauth_vocabulary_codegen \
 	-p margaret_oidc_discovery \
 	-p margaret_oidc_provider \
 	-p margaret_oidc_provider_codegen \
 	-p margaret_oidc_sign_in \
 	-p margaret_peer_identity \
-	-p margaret_provider_state_postgres \
-	-p margaret_provider_state_storage \
-	-p margaret_provider_state_storage_selection \
 	-p margaret_registered_claims \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_method \
@@ -243,7 +234,6 @@ RUNTIME_PACKAGES := \
 	-p margaret_spiffe_svid_bundle \
 	-p margaret_spiffe_svid_client \
 	-p margaret_spiffe_svid_server \
-	-p margaret_storage_uri \
 	-p margaret_subject_token_exchange \
 	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
@@ -275,13 +265,9 @@ RUNTIME_LINTS := \
 	-D clippy::unimplemented \
 	-D clippy::unwrap-used
 
-POSTGRES_FEATURES := \
-	--features margaret_oidc_provider_tests/tests_that_use_postgres \
-	--features margaret_provider_state_storage_selection_tests/tests_that_use_postgres \
-	--features margaret_provider_state_storage_tests/tests_that_use_postgres \
-	--features margaret_schema_postgres_tests/tests_that_use_postgres
+POSTGRES_FEATURES := --features margaret_schema_postgres_tests/tests_that_use_postgres
 
-POSTGRES_TESTS := package(margaret_schema_postgres_tests) | (package(margaret_oidc_provider_tests) & test(/^postgres_provider/)) | (package(margaret_provider_state_storage_tests) & test(/^postgres_state/)) | (package(margaret_provider_state_storage_selection_tests) & test(/^postgres_/))
+POSTGRES_TESTS := package(margaret_schema_postgres_tests)
 
 POSTGRES_IMAGE_NAME := postgres
 POSTGRES_IMAGE_TAG := 18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
@@ -342,6 +328,7 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_attribute_arguments=100 \
 		--gated margaret_attributes=100 \
 		--gated margaret_attributes_tests=100 \
+		--gated margaret_authorization_grants=100 \
 		--gated margaret_authorization_server_client=100 \
 		--gated margaret_authorization_server_client_tests=100 \
 		--gated margaret_bearer_token_verification=100 \
@@ -374,20 +361,17 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_issuer_directory=100 \
 		--gated margaret_issuer_directory_tests=100 \
 		--gated margaret_issuer_key_set=100 \
+		--gated margaret_issuer_key_set_tests=100 \
 		--gated margaret_issuer_metadata=100 \
 		--gated margaret_issuer_request=100 \
 		--gated margaret_item_naming_argument=100 \
 		--gated margaret_jose_parameters=100 \
 		--gated margaret_jwks_codegen=100 \
-		--gated margaret_jwks_file_secret_storage=100 \
-		--gated margaret_jwks_file_secret_storage_tests=100 \
 		--gated margaret_jwks_keygen=100 \
 		--gated margaret_jwks_keygen_tests=100 \
 		--gated margaret_jwks_roller=100 \
 		--gated margaret_jwks_roller_server=100 \
 		--gated margaret_jwks_roller_tests=100 \
-		--gated margaret_jwks_secret_storage_selection=100 \
-		--gated margaret_jwks_secret_storage_selection_tests=100 \
 		--gated margaret_jwks_secret_store=100 \
 		--gated margaret_jwks_secret_store_tests=100 \
 		--gated margaret_jws_verification=100 \
@@ -401,6 +385,7 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_oauth_client=100 \
 		--gated margaret_oauth_client_codegen=100 \
 		--gated margaret_oauth_vocabulary=100 \
+		--gated margaret_oauth_vocabulary_codegen=100 \
 		--gated margaret_oidc_discovery=100 \
 		--gated margaret_oidc_provider=100 \
 		--gated margaret_oidc_provider_codegen=100 \
@@ -410,11 +395,6 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_openid_conformance_tests=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
-		--gated margaret_provider_state_postgres=100 \
-		--gated margaret_provider_state_storage=100 \
-		--gated margaret_provider_state_storage_selection=100 \
-		--gated margaret_provider_state_storage_selection_tests=100 \
-		--gated margaret_provider_state_storage_tests=100 \
 		--gated margaret_registered_claims=100 \
 		--gated margaret_request_binding_codegen=100 \
 		--gated margaret_route_method=100 \
@@ -436,12 +416,12 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_spiffe_svid_server=100 \
 		--gated margaret_spiffe_svid_server_tests=100 \
 		--gated margaret_spiffe_svid_tests=100 \
-		--gated margaret_storage_uri=100 \
 		--gated margaret_subject_token_exchange=100 \
 		--gated margaret_subject_token_exchange_tests=100 \
 		--gated margaret_syn_type_peeling=100 \
 		--gated margaret_sync_holder=100 \
 		--gated margaret_tag_codegen=100 \
+		--gated margaret_tag_codegen_tests=100 \
 		--gated margaret_token_digest=100 \
 		--gated margaret_token_exchange_client=100 \
 		--gated margaret_token_exchange_client_tests=100 \

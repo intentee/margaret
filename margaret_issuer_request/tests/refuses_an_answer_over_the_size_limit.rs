@@ -9,7 +9,7 @@ use margaret_http_tests::fixture_client_builder::fixture_client_builder;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_http_tests::tls_fixture::TlsFixture;
-use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
+use margaret_issuer_request::issuer_answer::IssuerAnswer;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_issuer_request::issuer_response_max_bytes::ISSUER_RESPONSE_MAX_BYTES;
 use margaret_route_method::route_method::RouteMethod;
@@ -42,7 +42,7 @@ async fn refuses_an_answer_over_the_size_limit() {
 
     assert!(matches!(
         answer,
-        Err(IssuerExchangeError::Oversized {
+        Ok(IssuerAnswer::Oversized {
             max_bytes: ISSUER_RESPONSE_MAX_BYTES
         })
     ));

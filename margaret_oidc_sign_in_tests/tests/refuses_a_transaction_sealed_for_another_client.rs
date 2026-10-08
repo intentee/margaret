@@ -14,12 +14,11 @@ use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
 use margaret_oidc_discovery::authorization_response_issuer::AuthorizationResponseIssuer;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
-use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
 use margaret_oidc_sign_in::sign_in_refusal::SignInRefusal;
-use margaret_oidc_sign_in_tests::begin_sign_in::begin_sign_in;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::callback_request::callback_request;
 use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
+use margaret_oidc_sign_in_tests::fixture_sign_in_flow::fixture_sign_in_flow;
 use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
@@ -33,11 +32,11 @@ async fn refuses_a_transaction_sealed_for_another_client() {
         AdvertisedEndpoint::Unadvertised,
     ));
 
-    let another_client = SignInFlow::create(
+    let another_client = fixture_sign_in_flow(
         Arc::new(AuthorizationServerClient::with_client_secret_basic(
             fixture.server.request_client(),
             metadata,
-            Arc::new(TrustedIssuer::create(
+            Arc::new(TrustedIssuer::polled(
                 Arc::new(IssuerKeySet::awaiting()),
                 localhost_trust(),
             )),
@@ -46,10 +45,10 @@ async fn refuses_a_transaction_sealed_for_another_client() {
         )),
         Arc::clone(&fixture.roller),
     );
-    let SignInBeginning::Redirected(sealed) = begin_sign_in(&fixture.flow).await else {
+    let SignInBeginning::Redirected(sealed) = fixture.flow.begin().await else {
         panic!("the sign-in redirects to the authorization endpoint");
     };
-    let SignInBeginning::Redirected(expected) = begin_sign_in(&another_client).await else {
+    let SignInBeginning::Redirected(expected) = another_client.begin().await else {
         panic!("the sign-in of another client redirects to the authorization endpoint");
     };
     let sealed = BegunSignIn::of(&sealed);

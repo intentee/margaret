@@ -24,7 +24,7 @@ fn describes_every_sign_in_refusal() {
             found: "other".to_string(),
         },
         SignInRefusal::CodeMissing,
-        SignInRefusal::IdTokenRejected(JwtRejection::Jws(JwsRejection::MissingKeyId {
+        SignInRefusal::IdTokenRejected(JwtRejection::Jws(JwsRejection::KeyIdRequired {
             candidates: 2,
         })),
         SignInRefusal::IssuerMismatch {
@@ -39,12 +39,12 @@ fn describes_every_sign_in_refusal() {
             None,
         )),
         SignInRefusal::TransactionMissing,
-        SignInRefusal::TransactionRejected(JwtRejection::Jws(JwsRejection::MissingKeyId {
+        SignInRefusal::TransactionRejected(JwtRejection::Jws(JwsRejection::KeyIdRequired {
             candidates: 2,
         })),
     ]
     .map(|refusal| refusal.to_string());
-    let missing_key_id = JwsRejection::MissingKeyId { candidates: 2 }.to_string();
+    let key_id_required = JwsRejection::KeyIdRequired { candidates: 2 }.to_string();
 
     assert_eq!(
         described,
@@ -57,7 +57,7 @@ fn describes_every_sign_in_refusal() {
             "the id token was issued to the authorized party 'other' instead of this client"
                 .to_string(),
             "the authorization response carries no authorization code".to_string(),
-            format!("the id token is rejected: {missing_key_id}"),
+            format!("the id token is rejected: {key_id_required}"),
             "the authorization response was issued by 'https://attacker.example' instead of the trusted issuer".to_string(),
             "the authorization response does not name its issuer although the issuer advertises it".to_string(),
             "the id token does not carry the nonce of the sign-in".to_string(),
@@ -65,7 +65,7 @@ fn describes_every_sign_in_refusal() {
             "the authorization server refused to exchange the authorization code: invalid_grant"
                 .to_string(),
             "the browser presents no sign-in transaction".to_string(),
-            format!("the sign-in transaction is rejected: {missing_key_id}"),
+            format!("the sign-in transaction is rejected: {key_id_required}"),
         ]
     );
 }

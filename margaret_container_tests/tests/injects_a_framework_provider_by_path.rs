@@ -98,7 +98,7 @@ fn refuses_to_inject_a_token_issuer_client_into_a_request_site() {
         &[
             framework_provider(FrameworkInjectionRole::Unmarked, "FrameworkStore"),
             FrameworkProvider {
-                enablement: FrameworkEnablement::Always,
+                enablement: FrameworkEnablement::Declared,
                 ..issuer_client()
             },
         ],

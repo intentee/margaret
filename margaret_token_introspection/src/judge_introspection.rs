@@ -9,8 +9,9 @@ use oauth2::basic::BasicTokenType;
 use serde::de::DeserializeOwned;
 
 use margaret_oauth_vocabulary::client_id::ClientId;
-use margaret_oauth_vocabulary::oauth_vocabulary_error::OAuthVocabularyError;
+use margaret_oauth_vocabulary::client_id_parsing::ClientIdParsing;
 use margaret_oauth_vocabulary::scope::Scope;
+use margaret_oauth_vocabulary::scope_parsing::ScopeParsing;
 use margaret_token_trust::token_trust::TokenTrust;
 
 use crate::extension_members::ExtensionMembers;
@@ -67,29 +68,34 @@ fn judged<TClaims: DeserializeOwned>(
 ) -> ControlFlow<IntrospectionRejection, IntrospectedToken<TClaims>> {
     admitted(introspection, trust, now)?;
 
-    let client_id = match introspection
-        .client_id()
-        .map(|client_id| client_id.as_str().parse::<ClientId>())
-        .transpose()
-    {
-        Ok(client_id) => client_id,
-        Err(source) => {
-            return ControlFlow::Break(IntrospectionRejection::MalformedClientId { source });
-        }
+    let client_id = match introspection.client_id() {
+        None => None,
+        Some(client_id) => match ClientId::parse(client_id.as_str()) {
+            ClientIdParsing::Accepted(client_id) => Some(client_id),
+            ClientIdParsing::Rejected(rejection) => {
+                return ControlFlow::Break(IntrospectionRejection::MalformedClientId { rejection });
+            }
+        },
     };
-    let scopes = match introspection
-        .scopes()
-        .map(|scopes| {
-            scopes
-                .iter()
-                .map(|scope| scope.as_str().parse::<Scope>())
-                .collect::<Result<BTreeSet<Scope>, OAuthVocabularyError>>()
-        })
-        .transpose()
-    {
-        Ok(scopes) => scopes,
-        Err(source) => {
-            return ControlFlow::Break(IntrospectionRejection::MalformedScope { source });
+    let scopes = match introspection.scopes() {
+        None => None,
+        Some(introspected) => {
+            let mut scopes = BTreeSet::new();
+
+            for scope in introspected {
+                match Scope::parse(scope.as_str()) {
+                    ScopeParsing::Accepted(scope) => {
+                        scopes.insert(scope);
+                    }
+                    ScopeParsing::Rejected(rejection) => {
+                        return ControlFlow::Break(IntrospectionRejection::MalformedScope {
+                            rejection,
+                        });
+                    }
+                }
+            }
+
+            Some(scopes)
         }
     };
 

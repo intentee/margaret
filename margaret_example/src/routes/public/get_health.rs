@@ -5,11 +5,12 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::app_name::AppName;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/health", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/health", server = "public")]
 pub struct GetHealth {
     app_name: Arc<AppName>,
 }

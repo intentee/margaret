@@ -1,6 +1,11 @@
+use std::sync::Arc;
+
 use serde_json::json;
 
+use margaret_accepted_clients::registered_code_grant::RegisteredCodeGrant;
 use margaret_accepted_clients_tests::asserting_client::AssertingClient;
+use margaret_accepted_clients_tests::fixture_client_assertions::FixtureClientAssertions;
+use margaret_oidc_provider_tests::fixture_authorization_grants::FixtureAuthorizationGrants;
 use margaret_oidc_provider_tests::fixture_clients::FixtureClients;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::service_client::SERVICE_CLIENT;
@@ -11,10 +16,16 @@ use margaret_oidc_provider_tests::service_privileges::SERVICE_PRIVILEGES;
 async fn awaits_the_signing_keys_of_a_client() {
     let fixture = ProviderFixture::serving(
         FixtureClients {
-            asserting: vec![AssertingClient::awaiting_its_keys(
-                SERVICE_CLIENT,
-                SERVICE_PRIVILEGES,
-            )],
+            asserting: vec![
+                AssertingClient::awaiting_its_keys(
+                    SERVICE_CLIENT,
+                    SERVICE_PRIVILEGES,
+                    Arc::new(FixtureClientAssertions::default()),
+                    RegisteredCodeGrant::Withheld,
+                )
+                .await,
+            ],
+            grants: Arc::new(FixtureAuthorizationGrants::undisturbed()),
             public: Vec::new(),
         },
         Vec::new(),

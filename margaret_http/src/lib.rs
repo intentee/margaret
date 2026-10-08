@@ -83,6 +83,7 @@ pub mod route_reference;
 mod route_resolution;
 mod routed_handler;
 pub mod router;
+pub mod router_error;
 mod send_stall_limited_stream;
 pub mod server;
 pub mod server_origin;

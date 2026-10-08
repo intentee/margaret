@@ -1,4 +1,3 @@
-use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -12,6 +11,20 @@ use margaret_http_uploaded_file::upload_config::UploadConfig;
 
 use crate::server_assembly::ServerAssembly;
 use crate::server_service::ServerService;
+use crate::server_uploads::ServerUploads;
+
+fn upload_config(
+    matches: &ArgMatches,
+    uploads: ServerUploads,
+) -> Result<UploadConfig, CommandOutcome> {
+    match uploads {
+        ServerUploads::Accepted { directory_argument } => matches
+            .get_one::<PathBuf>(directory_argument)
+            .map(|directory| UploadConfig::enabled(directory.clone()))
+            .ok_or(CommandOutcome::Failed),
+        ServerUploads::Refused => Ok(UploadConfig::Disabled),
+    }
+}
 
 /// # Errors
 ///
@@ -26,8 +39,7 @@ pub fn serve_application(
         address_argument,
         routes,
         transport,
-        upload_dir_argument,
-        uploads_argument,
+        uploads,
     } in servers
     {
         let Some(address) = matches.get_one::<String>(address_argument).cloned() else {
@@ -37,15 +49,7 @@ pub fn serve_application(
             Ok(server_routes) => server_routes,
             Err(error) => return Err(report_failure(error)),
         };
-        let upload_config = if matches.get_flag(uploads_argument) {
-            UploadConfig::enabled(
-                matches
-                    .get_one::<String>(upload_dir_argument)
-                    .map_or_else(env::temp_dir, PathBuf::from),
-            )
-        } else {
-            UploadConfig::Disabled
-        };
+        let upload_config = upload_config(matches, uploads)?;
 
         server_services.push(ServerService::new(
             Arc::new(Server::new(
@@ -64,42 +68,44 @@ pub fn serve_application(
 #[cfg(test)]
 mod tests {
     use std::iter;
+    use std::path::PathBuf;
 
     use clap::Arg;
-    use clap::ArgAction;
     use clap::ArgMatches;
     use clap::Command;
 
     use margaret_console::command_outcome::CommandOutcome;
-    use margaret_http::matchit::InsertError;
     use margaret_http::route_entry::RouteEntry;
     use margaret_http::router::Router;
+    use margaret_http::router_error::RouterError;
     use margaret_http::server_routes::ServerRoutes;
     use margaret_http::transport_config::TransportConfig;
 
+    use margaret_http_uploaded_file::upload_config::UploadConfig;
+
     use super::serve_application;
+    use super::upload_config;
     use crate::server_assembly::ServerAssembly;
+    use crate::server_uploads::ServerUploads;
 
     fn matches(arguments: &[&str]) -> ArgMatches {
         Command::new("test")
             .arg(Arg::new("public-addr").long("public-addr"))
             .arg(
-                Arg::new("public-uploads")
-                    .long("public-uploads")
-                    .action(ArgAction::SetTrue),
+                Arg::new("public-upload-dir")
+                    .long("public-upload-dir")
+                    .value_parser(clap::value_parser!(PathBuf)),
             )
-            .arg(Arg::new("public-upload-dir").long("public-upload-dir"))
             .try_get_matches_from(iter::once("test").chain(arguments.iter().copied()))
             .expect("the test arguments parse")
     }
 
-    fn public_assembly(routes: Result<ServerRoutes, InsertError>) -> ServerAssembly {
+    fn public_assembly(routes: Result<ServerRoutes, RouterError>) -> ServerAssembly {
         ServerAssembly {
             address_argument: "public-addr",
             routes,
             transport: TransportConfig::Plain,
-            upload_dir_argument: "public-upload-dir",
-            uploads_argument: "public-uploads",
+            uploads: ServerUploads::Refused,
         }
     }
 
@@ -118,30 +124,50 @@ mod tests {
         assert_eq!(server_services.len(), 1);
     }
 
-    #[test]
-    fn enables_uploads_into_a_configured_directory() {
-        let outcome = serve_application(
-            &matches(&[
-                "--public-addr",
-                "127.0.0.1:0",
-                "--public-uploads",
-                "--public-upload-dir",
-                "/tmp/margaret-uploads",
-            ]),
-            vec![public_assembly(Ok(empty_routes()))],
-        );
+    const ACCEPTED_UPLOADS: ServerUploads = ServerUploads::Accepted {
+        directory_argument: "public-upload-dir",
+    };
 
-        assert!(outcome.is_ok());
+    #[test]
+    fn accepts_uploads_into_the_declared_directory() {
+        assert_eq!(
+            upload_config(
+                &matches(&["--public-upload-dir", "/srv/margaret-uploads"]),
+                ACCEPTED_UPLOADS
+            ),
+            Ok(UploadConfig::enabled(PathBuf::from(
+                "/srv/margaret-uploads"
+            )))
+        );
     }
 
     #[test]
-    fn enables_uploads_into_the_temporary_directory_by_default() {
+    fn reports_failure_when_the_upload_directory_of_an_accepting_server_is_missing() {
+        assert_eq!(
+            upload_config(&matches(&[]), ACCEPTED_UPLOADS),
+            Err(CommandOutcome::Failed)
+        );
+    }
+
+    #[test]
+    fn refuses_uploads_of_a_server_without_upload_routes() {
+        assert_eq!(
+            upload_config(&matches(&[]), ServerUploads::Refused),
+            Ok(UploadConfig::Disabled)
+        );
+    }
+
+    #[test]
+    fn reports_failure_when_an_accepting_server_lacks_its_upload_directory() {
         let outcome = serve_application(
-            &matches(&["--public-addr", "127.0.0.1:0", "--public-uploads"]),
-            vec![public_assembly(Ok(empty_routes()))],
+            &matches(&["--public-addr", "127.0.0.1:0"]),
+            vec![ServerAssembly {
+                uploads: ACCEPTED_UPLOADS,
+                ..public_assembly(Ok(empty_routes()))
+            }],
         );
 
-        assert!(outcome.is_ok());
+        assert_eq!(outcome.err(), Some(CommandOutcome::Failed));
     }
 
     #[test]

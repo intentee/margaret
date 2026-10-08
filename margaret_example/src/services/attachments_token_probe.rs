@@ -10,8 +10,8 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
 
-use crate::auth::attachments_resource::ATTACHMENTS_RESOURCE;
 use crate::margaret::oauth_clients::blog::ClientCredentials;
+use crate::margaret::resource_tokens::attachments::AUDIENCE;
 
 #[service]
 pub struct AttachmentsTokenProbe {
@@ -35,7 +35,7 @@ impl AttachmentsTokenProbe {
         match self
             .client_credentials
             .access_token(&TokenTarget {
-                audience: TargetAudience::Audience(ATTACHMENTS_RESOURCE.to_string()),
+                audience: TargetAudience::Audience(AUDIENCE.to_string()),
                 scopes: BTreeSet::new(),
             })
             .await

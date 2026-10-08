@@ -99,7 +99,7 @@ mod tests {
     #[test]
     fn rejects_a_struct_anchoring_two_declarations() {
         assert!(matches!(
-            anchored("#[issues_tokens]\n#[trusts_oidc_issuer(auth)]\npub struct Issuer;\n"),
+            anchored("#[issues_tokens]\n#[verifies_tokens_from_issuer(auth)]\npub struct Issuer;\n"),
             Err(DeclarationAnchorError::SharedAnchor { declarations, path })
                 if declarations == 2 && path == "crate::Issuer"
         ));

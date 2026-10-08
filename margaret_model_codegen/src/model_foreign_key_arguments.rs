@@ -2,7 +2,9 @@ use syn::Path;
 
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attribute_arguments::format_path::format_path;
+use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
+use margaret_attributes::indexed_item::IndexedItem;
 use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 use margaret_model::on_delete::OnDelete;
 
@@ -19,7 +21,12 @@ pub(crate) struct ModelForeignKeyArguments {
 }
 
 impl ModelForeignKeyArguments {
-    pub(crate) fn parse(arguments: &AttributeArgs, model: &str) -> Result<Self, ModelCodegenError> {
+    pub(crate) fn parse(
+        arguments: &AttributeArgs,
+        index: &AttributeIndex,
+        item: &IndexedItem,
+        model: &str,
+    ) -> Result<Self, ModelCodegenError> {
         arguments.interpret(|reader| {
             let ModelColumnList { columns } = ModelColumnList::read(
                 reader,
@@ -34,7 +41,11 @@ impl ModelForeignKeyArguments {
                     model: model.to_string(),
                 })?;
 
-            let on_delete = match OnDeleteArgument::of(reader.take_path("on_delete")?) {
+            let on_delete = match OnDeleteArgument::of(
+                index,
+                item,
+                reader.take_path(ItemNamingArgument::OnDelete.key())?,
+            ) {
                 OnDeleteArgument::Known(on_delete) => on_delete,
                 OnDeleteArgument::Unknown(path) => {
                     return Err(ModelCodegenError::UnknownModelForeignKeyOnDeleteAction {
@@ -61,15 +72,24 @@ mod tests {
     use margaret_attribute_arguments::attribute_args::AttributeArgs;
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attribute_arguments::format_path::format_path;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_model::on_delete::OnDelete;
 
     use crate::model_codegen_error::ModelCodegenError;
     use crate::model_foreign_key_arguments::ModelForeignKeyArguments;
 
     fn parse(attribute: &Attribute) -> Result<ModelForeignKeyArguments, ModelCodegenError> {
+        let indexed = IndexedSource::new(
+            "use margaret::framework::model::on_delete::OnDelete;\n\nstruct Model;\n",
+        );
         let arguments = AttributeArgs::from_attribute(attribute).expect("the arguments parse");
 
-        ModelForeignKeyArguments::parse(&arguments, "crate::Model")
+        ModelForeignKeyArguments::parse(
+            &arguments,
+            &indexed.index,
+            indexed.item("Model"),
+            "crate::Model",
+        )
     }
 
     #[test]
@@ -95,7 +115,7 @@ mod tests {
                 #[foreign_key(
                     columns = [hash],
                     references = crate::Metadata,
-                    on_delete = cascade
+                    on_delete = OnDelete::Cascade
                 )]
             ))
             .expect("the foreign key arguments resolve")
@@ -121,12 +141,12 @@ mod tests {
                 #[foreign_key(
                     columns = [hash],
                     references = crate::Metadata,
-                    on_delete = detonate
+                    on_delete = OnDelete::Detonate
                 )]
             ))
             .expect_err("an unknown action is rejected"),
             ModelCodegenError::UnknownModelForeignKeyOnDeleteAction { ref action, .. }
-                if action == "detonate"
+                if action == "OnDelete::Detonate"
         ));
     }
 

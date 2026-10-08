@@ -6,5 +6,6 @@ pub mod fixture_client_id;
 pub mod fixture_client_secret;
 pub mod localhost_discovery_metadata;
 pub mod localhost_trust;
+pub mod rfc_7636_verifier;
 pub mod secret_basic_authentication;
 pub mod userinfo_echo_handler;

@@ -5,6 +5,7 @@ use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
 use margaret_console_argument_codegen::console_argument_read::console_argument_read;
 use margaret_environment_variable_codegen::environment_variable_read::environment_variable_read;
 
+use crate::route_url_read::route_url_read;
 use crate::serve_input::ServeInput;
 
 #[must_use]
@@ -12,6 +13,7 @@ pub fn serve_input_read(input: &ServeInput) -> TokenStream {
     match input {
         ServeInput::ConsoleArgument(argument) => console_argument_read(argument),
         ServeInput::EnvironmentVariable(variable) => environment_variable_read(variable),
+        ServeInput::RouteUrl(route) => route_url_read(route),
         ServeInput::SpiffeHttpClient => {
             let spiffe_http_client = spiffe_http_client_ident();
 
@@ -29,6 +31,7 @@ mod tests {
     use margaret_input_weaving::input_value::InputValue;
     use margaret_input_weaving::weaving_kind::WeavingKind;
 
+    use crate::route_url_input::RouteUrlInput;
     use crate::serve_input::ServeInput;
 
     use super::serve_input_read;
@@ -70,6 +73,17 @@ mod tests {
                 value: value(),
             }))
             .contains("margaret::framework::environment_variable::read_required::read_required")
+        );
+    }
+
+    #[test]
+    fn a_route_url_composes_the_url_from_the_server_origin() {
+        assert!(
+            collapsed(&ServeInput::RouteUrl(RouteUrlInput {
+                path: "/callback".to_string(),
+                server: "public".to_string(),
+            }))
+            .starts_with("margaret::framework::http::build_url::build_url(&origin_public")
         );
     }
 

@@ -7,6 +7,7 @@ use aws_lc_rs::error::Unspecified;
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 
 use crate::key_id::KeyId;
+use crate::key_selection::KeySelection;
 
 #[derive(Debug)]
 pub enum JwsRejection {
@@ -21,8 +22,11 @@ pub enum JwsRejection {
     HeaderMalformed {
         source: serde_json::Error,
     },
-    MissingKeyId {
+    KeyIdRequired {
         candidates: usize,
+    },
+    NoKeyForAlgorithm {
+        algorithm: JwsAlgorithm,
     },
     NotCompactJws,
     PayloadBase64 {
@@ -37,6 +41,7 @@ pub enum JwsRejection {
     },
     SignatureMismatch {
         algorithm: JwsAlgorithm,
+        selection: KeySelection,
         source: Unspecified,
     },
     UnknownKeyId {
@@ -65,9 +70,13 @@ impl Display for JwsRejection {
             Self::HeaderMalformed { source } => {
                 write!(formatter, "the token header is not a jws header: {source}")
             }
-            Self::MissingKeyId { candidates } => write!(
+            Self::KeyIdRequired { candidates } => write!(
                 formatter,
                 "the token header names no key id, and {candidates} keys of the set verify its algorithm instead of exactly one"
+            ),
+            Self::NoKeyForAlgorithm { algorithm } => write!(
+                formatter,
+                "the token header names no key id, and no key of the set verifies {algorithm}"
             ),
             Self::NotCompactJws => {
                 write!(
@@ -87,7 +96,9 @@ impl Display for JwsRejection {
                 formatter,
                 "the token signature has {found} octets where its key produces {expected}"
             ),
-            Self::SignatureMismatch { algorithm, source } => write!(
+            Self::SignatureMismatch {
+                algorithm, source, ..
+            } => write!(
                 formatter,
                 "the token {algorithm} signature does not match its key: {source}"
             ),
@@ -111,6 +122,7 @@ mod tests {
 
     use super::JwsRejection;
     use crate::key_id::KeyId;
+    use crate::key_selection::KeySelection;
 
     fn base64_error() -> base64ct::Error {
         Base64UrlUnpadded::decode_vec("!!!").expect_err("the fixture is not base64url")
@@ -130,7 +142,10 @@ mod tests {
             JwsRejection::HeaderMalformed {
                 source: serde_json::from_str::<u8>("x").expect_err("the fixture is not json"),
             },
-            JwsRejection::MissingKeyId { candidates: 2 },
+            JwsRejection::KeyIdRequired { candidates: 2 },
+            JwsRejection::NoKeyForAlgorithm {
+                algorithm: JwsAlgorithm::Es512,
+            },
             JwsRejection::NotCompactJws,
             JwsRejection::PayloadBase64 {
                 source: base64_error(),
@@ -144,6 +159,7 @@ mod tests {
             },
             JwsRejection::SignatureMismatch {
                 algorithm: JwsAlgorithm::Ps256,
+                selection: KeySelection::ByKeyId,
                 source: Unspecified,
             },
             JwsRejection::UnknownKeyId {
@@ -168,16 +184,20 @@ mod tests {
         );
         assert_eq!(
             described[5],
+            "the token header names no key id, and no key of the set verifies ES512"
+        );
+        assert_eq!(
+            described[6],
             "the token is not a compact jws of three segments"
         );
-        assert!(described[6].contains("payload segment is not valid base64url"));
-        assert!(described[7].contains("signature segment is not valid base64url"));
+        assert!(described[7].contains("payload segment is not valid base64url"));
+        assert!(described[8].contains("signature segment is not valid base64url"));
         assert_eq!(
-            described[8],
+            described[9],
             "the token signature has 3 octets where its key produces 64"
         );
-        assert!(described[9].starts_with("the token PS256 signature does not match its key: "));
-        assert!(described[10].contains("'absent'"));
-        assert!(described[11].contains("'none'"));
+        assert!(described[10].starts_with("the token PS256 signature does not match its key: "));
+        assert!(described[11].contains("'absent'"));
+        assert!(described[12].contains("'none'"));
     }
 }

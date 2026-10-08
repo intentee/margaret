@@ -17,6 +17,10 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
         source.push_str("#[rustfmt::skip]\npub mod token_issuance;\n");
     }
 
+    if features.contains(GeneratedFeature::ResourceTokens) {
+        source.push_str("#[rustfmt::skip]\npub mod resource_tokens;\n");
+    }
+
     if features.contains(GeneratedFeature::Jwks) {
         source.push_str("#[rustfmt::skip]\npub mod jwks;\n");
     }

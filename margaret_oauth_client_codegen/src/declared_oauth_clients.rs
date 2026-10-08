@@ -15,7 +15,7 @@ impl<'index> DeclaredOAuthClients<'index> {
     pub fn read(index: &'index AttributeIndex) -> Result<Self, OAuthClientCodegenError> {
         let mut clients = Vec::new();
 
-        for matched in index.select_framework_attribute(FrameworkAttribute::OAuthClient) {
+        for matched in index.select_framework_attribute(FrameworkAttribute::ActsAsOAuthClient) {
             clients.push(OAuthClientDeclaration::read(index, &matched)?);
         }
 

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use oauth2::AuthorizationCode;
 use oauth2::EmptyExtraTokenFields;
-use oauth2::PkceCodeVerifier;
 use oauth2::RedirectUrl;
 use oauth2::TokenResponse;
 use serde_json::Value;
@@ -11,6 +10,7 @@ use url::Url;
 
 use margaret_authorization_server_client::endpoint_outcome::EndpointOutcome;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
+use margaret_authorization_server_client_tests::rfc_7636_verifier::rfc_7636_verifier;
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::method_handler::MethodHandler;
@@ -36,7 +36,7 @@ async fn exchanges_an_authorization_code() {
         .client(secret_basic_authentication())
         .exchange_authorization_code::<EmptyExtraTokenFields>(
             AuthorizationCode::new("SplxlOBeZQQYbYS6WxSbIA".to_string()),
-            PkceCodeVerifier::new("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".to_string()),
+            &rfc_7636_verifier(),
             RedirectUrl::from_url(
                 Url::parse("https://client.example/callback").expect("the callback is a url"),
             ),

@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use margaret_https_url::https_url_error::HttpsUrlError;
+use margaret_https_url::https_url_rejection::HttpsUrlRejection;
 use margaret_oidc_discovery::metadata_endpoint::MetadataEndpoint;
 use margaret_oidc_discovery::provider_metadata::ProviderMetadata;
 use margaret_oidc_discovery::provider_metadata_parsing::ProviderMetadataParsing;
@@ -23,7 +23,7 @@ fn rejects_a_plaintext(endpoint: MetadataEndpoint) -> bool {
 
     matches!(
         ProviderMetadata::parse(document.to_string().as_bytes(), issuer),
-        ProviderMetadataParsing::Rejected(ProviderMetadataRejection::Endpoint { endpoint: rejected, source: HttpsUrlError::NotHttps { .. } })
+        ProviderMetadataParsing::Rejected(ProviderMetadataRejection::Endpoint { endpoint: rejected, rejection: HttpsUrlRejection::NotHttps { .. } })
             if rejected == endpoint
     )
 }

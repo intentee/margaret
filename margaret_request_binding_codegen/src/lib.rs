@@ -3,13 +3,12 @@ pub mod authenticated_user_challenge;
 pub mod authenticated_user_provider;
 pub mod authenticated_user_providers;
 pub mod authenticated_user_requirement;
+mod bearer_token_marker;
 mod bearer_token_parameter;
 pub mod binding_context;
 pub mod binding_reads_request;
 pub mod binding_registries;
 pub mod binding_roots;
-pub mod binding_serve_inputs;
-pub mod binding_shadows_request;
 mod bound_bearer_tokens;
 pub mod bound_parameter;
 pub mod captured_provider;
@@ -40,6 +39,7 @@ pub mod request_binding;
 pub mod request_binding_error;
 pub mod request_injectable;
 pub mod request_input_source;
+mod request_inputs;
 pub mod responder_content;
 mod route_parameter_arguments;
 pub mod route_parameter_binder;
@@ -63,22 +63,18 @@ mod tests {
     use margaret_container::framework_enablement::FrameworkEnablement;
     use margaret_container::framework_injection_role::FrameworkInjectionRole;
     use margaret_container::framework_provider::FrameworkProvider;
-    use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
     use margaret_injection_codegen::process_method::process_method;
-    use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
     use margaret_route_parameter_codegen::route_path::RoutePath;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_tag_codegen::tag_pool::TagPool;
+    use margaret_tag_codegen_tests::collected_tags::collected_tags;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
-    use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
 
-    use crate::authenticated_user_application::AuthenticatedUserApplication;
     use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
     use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
     use crate::binding_context::BindingContext;
     use crate::binding_registries::BindingRegistries;
-    use crate::binding_serve_inputs::binding_serve_inputs;
+    use crate::binding_roots::binding_roots;
     use crate::bound_parameter::BoundParameter;
     use crate::classify_parameters::classify_parameters;
     use crate::extraction_context::ExtractionContext;
@@ -109,16 +105,12 @@ struct User;
             .bindings
     }
 
-    fn missing_path() -> CanonicalPath {
-        CanonicalPath::new(vec!["crate".to_string(), "Missing".to_string()])
-    }
-
     fn trusted_issuer_provider(tag: &str) -> FrameworkProvider {
         let path: Path = syn::parse_str(tag).expect("the tag path parses");
 
         FrameworkProvider {
             construction: FrameworkConstruction::Unit,
-            enablement: FrameworkEnablement::Always,
+            enablement: FrameworkEnablement::Declared,
             injection: FrameworkInjectionRole::TrustedIssuer(
                 Tag::from_path(&path).expect("the tag is a plain name"),
             ),
@@ -136,7 +128,7 @@ struct User;
 
         FrameworkProvider {
             construction: FrameworkConstruction::Unit,
-            enablement: FrameworkEnablement::Always,
+            enablement: FrameworkEnablement::Declared,
             injection: FrameworkInjectionRole::OAuthClient(
                 Tag::from_path(&path).expect("the tag is a plain name"),
             ),
@@ -181,12 +173,7 @@ struct User;
         BindingRegistries::collect(
             index,
             views,
-            &TagPool::collect(
-                index,
-                &DeclaredTrusts::read(index).expect("the trusts are read"),
-                &DeclaredOAuthClients::read(index).expect("the oauth clients are read"),
-            )
-            .expect("the tags are collected"),
+            &collected_tags(index),
             &trusted_issuer_bindings(),
         )
     }
@@ -664,60 +651,22 @@ impl SessionUserProvider {
             .first()
             .map(|provider| provider.application.clone())
             .expect("the provider is registered");
-        let names: Vec<String> = binding_serve_inputs(
-            &RequestBinding::AuthenticatedUser {
-                application,
-                requirement: AuthenticatedUserRequirement::Required,
-            },
-            &bindings,
-        )
-        .expect("the provider dependency has planned console arguments")
-        .iter()
-        .map(|argument| argument.name().to_string())
+        let roots: Vec<CanonicalPath> = binding_roots(&RequestBinding::AuthenticatedUser {
+            application,
+            requirement: AuthenticatedUserRequirement::Required,
+        })
+        .into_iter()
+        .cloned()
         .collect();
+        let names: Vec<String> = bindings
+            .serve_inputs(&roots)
+            .expect("the provider dependency has planned console arguments")
+            .iter()
+            .map(|argument| argument.input.name().to_string())
+            .collect();
 
         assert_eq!(names, vec!["realm".to_string()]);
-        assert!(
-            binding_serve_inputs(&RequestBinding::CurrentRequest, &bindings)
-                .expect("the current request has no container-backed arguments")
-                .is_empty()
-        );
-    }
-
-    #[test]
-    fn rejects_container_backed_bindings_absent_from_the_container_plan() {
-        let bindings = empty_bindings();
-        let authenticated_user = RequestBinding::AuthenticatedUser {
-            application: AuthenticatedUserApplication {
-                challenge: AuthenticatedUserChallenge::Unchallenged,
-                concrete: missing_path(),
-                field: "missing".to_string(),
-                injects_peer_spiffe_id: false,
-                injects_routes: false,
-                injects_views: false,
-                model: missing_path(),
-                wrapper: format_ident!("Missing"),
-            },
-            requirement: AuthenticatedUserRequirement::Required,
-        };
-        let bound = RequestBinding::BoundRouteParameter {
-            binder_field: "missing".to_string(),
-            binder_provider: missing_path(),
-            path_key: "id".to_string(),
-        };
-        let injectable = RequestBinding::Injectable {
-            dependency: InjectedDependency {
-                concrete: missing_path(),
-                field: "missing".to_string(),
-            },
-        };
-
-        for binding in [authenticated_user, bound, injectable] {
-            let error = binding_serve_inputs(&binding, &bindings)
-                .expect_err("the binding must belong to the same container plan");
-
-            assert!(error.to_string().contains("crate::Missing"));
-        }
+        assert!(binding_roots(&RequestBinding::CurrentRequest).is_empty());
     }
 
     #[test]
@@ -734,7 +683,8 @@ impl SessionUserProvider {
             "pubstructSessionUserProvider{pubinner:std::sync::Arc<crate::SessionUserProvider>,}"
         ));
         assert!(source.contains("typeUser=crate::User;"));
-        assert!(source.contains("self.inner.infer(request)"));
+        assert!(source.contains("letargument_1=request;"));
+        assert!(source.contains("self.inner.infer(argument_1)"));
     }
 
     #[test]
@@ -749,7 +699,7 @@ impl SessionUserProvider {
             .split_whitespace()
             .collect();
 
-        assert!(source.contains("self.inner.infer(request).await"));
+        assert!(source.contains("self.inner.infer(argument_1).await"));
     }
 
     #[test]
@@ -791,7 +741,7 @@ impl SessionUserProvider {
 use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 
-#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]
+#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]
 struct PartnerIssuer;
 
 struct Claims;
@@ -833,10 +783,10 @@ struct Claims;
     const PARTNER_CLIENTS: &str = "\
 use margaret::framework::token_introspection::introspected_token::IntrospectedToken;
 
-#[oauth_client(partner_client, authentication = private_key_jwt, client_id = \"partner\", issuer = partner)]
+#[acts_as_oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]
 struct PartnerClient;
 
-#[oauth_client(second_client, authentication = private_key_jwt, client_id = \"second\", issuer = partner)]
+#[acts_as_oauth_client(second_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"second\", issuer = partner)]
 struct SecondClient;
 ";
 
@@ -871,7 +821,7 @@ struct SecondClient;
             "pubmargaret_oauth_clients_partner_client_authorization_server_client:std::sync::Arc<margaret::framework::authorization_server_client::authorization_server_client::AuthorizationServerClient>,"
         ));
         assert!(source.contains(
-            "lettoken=matchmargaret::framework::token_introspection::introspect_bearer_token::introspect_bearer_token::<crate::Claims>(request.inputs.server.authorization(),self.margaret_oauth_clients_partner_client_authorization_server_client.as_ref(),).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),};"
+            "letargument_1=matchmargaret::framework::token_introspection::introspect_bearer_token::introspect_bearer_token::<crate::Claims>(request.inputs.server.authorization(),self.margaret_oauth_clients_partner_client_authorization_server_client.as_ref(),).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),};"
         ));
         assert!(!source.contains("route_bearer_token"));
     }
@@ -882,17 +832,7 @@ struct SecondClient;
             introspection_rejection(
                 "#[bearer_token(issuer = partner)] token: Option<IntrospectedToken<Claims>>"
             )
-            .ends_with("must be `client = <tag>`")
-        );
-    }
-
-    #[test]
-    fn rejects_an_introspected_bearer_token_of_an_unknown_client() {
-        assert!(
-            introspection_rejection(
-                "#[bearer_token(client = missing_client)] token: Option<IntrospectedToken<Claims>>"
-            )
-            .contains("references the tag 'missing_client', which no oauth client declares")
+            .ends_with("an IntrospectedToken names `client = <tag>`")
         );
     }
 
@@ -913,16 +853,6 @@ struct SecondClient;
                 "#[bearer_token(client = partner_client)] token: Option<IntrospectedToken<Vec<u8>>>"
             )
             .contains("which is not a named type without generic arguments")
-        );
-    }
-
-    #[test]
-    fn rejects_introspected_bearer_token_arguments_that_do_not_parse() {
-        assert_eq!(
-            introspection_rejection(
-                "#[bearer_token(= partner_client)] token: Option<IntrospectedToken<Claims>>"
-            ),
-            "failed to read a binding attribute: arguments of attribute 'bearer_token' could not be parsed: expected an expression"
         );
     }
 
@@ -956,18 +886,14 @@ struct SecondClient;
         .index;
 
         assert!(matches!(
-                    BindingRegistries::collect(
-                        &index,
-                        ViewsAvailability::Available,
-                        &TagPool::collect(
-        &index,
-        &DeclaredTrusts::read(&index).expect("the trusts are read"),
-        &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-        ).expect("the tags are collected"),
-                        &empty_bindings(),
-                    ),
-                    Err(RequestBindingError::UnplannedOAuthClient { ref client, .. }) if client == "partner_client"
-                ));
+            BindingRegistries::collect(
+                &index,
+                ViewsAvailability::Available,
+                &collected_tags(&index),
+                &empty_bindings(),
+            ),
+            Err(RequestBindingError::UnplannedOAuthClient { ref client, .. }) if client == "partner_client"
+        ));
     }
 
     #[test]
@@ -982,7 +908,7 @@ struct SecondClient;
     fn binds_a_bearer_token_to_the_trusted_issuer_of_its_jwks_endpoint() {
         assert!(verifies_with(
             &registries_for(&format!(
-                "#[provides_jwks_endpoint(auth, audience = \"api\", issuer = \"https://auth.example\", jwks_uri = \"https://auth.example/jwks\")]\nstruct AuthEndpoint;\n\n{}",
+                "#[verifies_tokens_from_issuer(auth, audience = \"api\", issuer = \"https://auth.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://auth.example/jwks\"))]\nstruct AuthEndpoint;\n\n{}",
                 bearer_provider(
                     "#[bearer_token(issuer = auth)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
                 )
@@ -1008,15 +934,15 @@ struct SecondClient;
             "letbearer_token=matchmargaret::framework::bearer_token_verification::route_bearer_token::route_bearer_token(request.inputs.server.authorization(),&[self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()],).map_err(margaret::framework::anyhow::Error::from){::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Refused(response))=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Routed(routed))=>routed,::std::result::Result::Err(error)=>return::std::result::Result::Err(error),};"
         ));
         assert!(source.contains(
-            "lettoken=matchbearer_token.admit::<crate::Claims,margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile>(self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),};"
+            "letargument_2=matchbearer_token.admit::<crate::Claims,margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile>(self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),};"
         ));
-        assert!(source.contains("self.inner.infer(request,token)"));
+        assert!(source.contains("self.inner.infer(argument_1,argument_2)"));
     }
 
     #[test]
     fn resolves_the_bearer_token_type_and_claims_through_use_statements() {
         let source = wrapper_source(&registries_for(
-            "use margaret::framework::jwt_verification::access_token_profile;\nuse margaret::framework::jwt_verification::verified_jwt;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<verified_jwt::VerifiedJwt<Claims, access_token_profile::AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::jwt_verification::access_token_profile;\nuse margaret::framework::jwt_verification::verified_jwt;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<verified_jwt::VerifiedJwt<Claims, access_token_profile::AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         ));
 
         assert!(source.contains(
@@ -1027,7 +953,7 @@ struct SecondClient;
     #[test]
     fn resolves_the_introspected_token_type_and_claims_through_use_statements() {
         let source = wrapper_source(&registries_for(
-            "use margaret::framework::token_introspection::introspected_token;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]\nstruct PartnerIssuer;\n\n#[oauth_client(partner_client, authentication = private_key_jwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(client = partner_client)] token: Option<introspected_token::IntrospectedToken<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::token_introspection::introspected_token;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[acts_as_oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(client = partner_client)] token: Option<introspected_token::IntrospectedToken<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         ));
 
         assert!(source.contains(
@@ -1036,43 +962,16 @@ struct SecondClient;
     }
 
     #[test]
-    fn rejects_a_bearer_token_without_an_issuer() {
-        assert!(
-            bearer_rejection(
-                "#[bearer_token] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
-            )
-            .ends_with("must be `issuer = <tag>`")
-        );
-    }
-
-    #[test]
-    fn propagates_malformed_bearer_token_arguments() {
-        assert!(
-            bearer_rejection(
-                "#[bearer_token(= 5)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
-            )
-            .contains("could not be parsed")
-        );
-    }
-
-    #[test]
-    fn rejects_a_bearer_token_of_an_undeclared_issuer() {
-        assert!(
-            bearer_rejection(
-                "#[bearer_token(issuer = undeclared)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
-            )
-            .ends_with("references the tag 'undeclared', which no trusted issuer declares")
-        );
-    }
-
-    #[test]
-    fn rejects_a_bearer_token_of_a_tag_that_names_no_trusted_issuer() {
+    fn rejects_a_verified_bearer_token_introspected_by_a_client() {
         assert!(
             rejection_for(&format!(
-                "#[singleton]\n#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n\n{}",
-                bearer_provider("#[bearer_token(issuer = logged)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>")
+                "{}{}",
+                bearer_provider(
+                    "#[bearer_token(client = partner_client)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
+                ),
+                "#[acts_as_oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n"
             ))
-            .ends_with("references the tag 'logged', which is a middleware handler, not a trusted issuer")
+            .ends_with("a VerifiedJwt names `issuer = <tag>` or `resource = <tag>`, an IntrospectedToken names `client = <tag>`")
         );
     }
 
@@ -1181,7 +1080,7 @@ struct SecondClient;
     #[test]
     fn routes_the_bearer_token_among_the_trusted_issuers_of_one_provider() {
         let source = wrapper_source(&registries_for(&format!(
-            "#[trusts_oidc_issuer(upstream, audience = \"api\", issuer = \"https://upstream.example\")]\nstruct UpstreamIssuer;\n\n{}",
+            "#[verifies_tokens_from_issuer(upstream, audience = \"api\", issuer = \"https://upstream.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct UpstreamIssuer;\n\n{}",
             bearer_provider(&format!(
                 "{PARTNER_TOKEN}, #[bearer_token(issuer = upstream)] upstream: Option<VerifiedJwt<Claims, IdTokenProfile>>"
             ))
@@ -1195,7 +1094,7 @@ struct SecondClient;
             "&[self.margaret_trusted_issuers_partner_trusted_issuer.as_ref(),self.margaret_trusted_issuers_upstream_trusted_issuer.as_ref()],"
         ));
         assert!(source.contains(
-            "letupstream=matchbearer_token.admit::<crate::Claims,margaret::framework::jwt_verification::id_token_profile::IdTokenProfile>(self.margaret_trusted_issuers_upstream_trusted_issuer.as_ref())"
+            "letargument_2=matchbearer_token.admit::<crate::Claims,margaret::framework::jwt_verification::id_token_profile::IdTokenProfile>(self.margaret_trusted_issuers_upstream_trusted_issuer.as_ref())"
         ));
     }
 
@@ -1235,12 +1134,7 @@ struct SecondClient;
         let rejection = BindingRegistries::collect(
             &index,
             ViewsAvailability::Available,
-            &TagPool::collect(
-                &index,
-                &DeclaredTrusts::read(&index).expect("the trusts are read"),
-                &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-            )
-            .expect("the tags are collected"),
+            &collected_tags(&index),
             &empty_bindings(),
         )
         .err()
@@ -1299,6 +1193,35 @@ struct SecondClient;
     }
 
     #[test]
+    fn binds_a_parameter_to_a_local_named_after_its_position() {
+        let indexed = IndexedSource::new(&provider_source(&format!(
+            "{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] _caller: User) -> anyhow::Result<Response> {{}}\n}}\n",
+            bearer_provider(PARTNER_TOKEN)
+        )));
+        let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
+            .expect("the binding registries are collected");
+        let item = indexed.item("Page");
+        let route_path = RoutePath::parse("/");
+        let holders: Vec<String> = classify_parameters(
+            &indexed.index,
+            item,
+            process_method(item).expect("the responder has a #[process] method"),
+            &BindingContext::Responder {
+                route_path: &route_path,
+                server: "public",
+                subject: "responder 'Page'",
+            },
+            &registries,
+        )
+        .expect("the responder binds")
+        .iter()
+        .map(|parameter| parameter.holder.to_string())
+        .collect();
+
+        assert_eq!(holders, ["argument_1"]);
+    }
+
+    #[test]
     fn refuses_to_inject_a_trusted_issuer_into_a_handshake() {
         let indexed = IndexedSource::new(
             "struct Room;\n\nimpl Room {\n    #[process]\n    fn build(trusted_issuer: std::sync::Arc<crate::margaret::trusted_issuers::partner::TrustedIssuer>) -> anyhow::Result<Self> {}\n}\n",
@@ -1343,15 +1266,10 @@ struct SecondClient;
     #[test]
     fn collects_the_console_arguments_of_the_trusted_issuer_a_bearer_provider_verifies() {
         let index = IndexedSource::new(&provider_source(&format!(
-            "use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;\nuse margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\n\nstruct Claims;\n\n#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]\nstruct PartnerIssuer;\n\n#[singleton]\nstruct PartnerSettings;\n\nimpl PartnerSettings {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+            "use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;\nuse margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\n\nstruct Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[singleton]\nstruct PartnerSettings;\n\nimpl PartnerSettings {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )))
         .index;
-        let tags = TagPool::collect(
-            &index,
-            &DeclaredTrusts::read(&index).expect("the trusts are read"),
-            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-        )
-        .expect("the tags are collected");
+        let tags = collected_tags(&index);
         let bindings = render_container(
             &index,
             &scan(&index).expect("the console arguments are scanned"),
@@ -1373,54 +1291,23 @@ struct SecondClient;
         let registries =
             BindingRegistries::collect(&index, ViewsAvailability::Available, &tags, &bindings)
                 .expect("the binding registries are collected");
-        let names: Vec<String> = binding_serve_inputs(
-            &RequestBinding::AuthenticatedUser {
-                application: registries.providers()[0].application.clone(),
-                requirement: AuthenticatedUserRequirement::Required,
-            },
-            &bindings,
-        )
-        .expect("the trusted issuer has planned console arguments")
-        .iter()
-        .map(|argument| argument.name().to_string())
+        let roots: Vec<CanonicalPath> = binding_roots(&RequestBinding::AuthenticatedUser {
+            application: registries.providers()[0].application.clone(),
+            requirement: AuthenticatedUserRequirement::Required,
+        })
+        .into_iter()
+        .cloned()
         .collect();
+        let names: Vec<String> = bindings
+            .serve_inputs(&roots)
+            .expect("the trusted issuer has planned console arguments")
+            .iter()
+            .map(|argument| argument.input.name().to_string())
+            .collect();
 
         assert_eq!(names, vec!["audience".to_string()]);
     }
 
-    #[test]
-    fn rejects_a_trusted_issuer_absent_from_the_container_plan() {
-        let index = IndexedSource::new(&provider_source(SESSION_PROVIDER)).index;
-        let bindings = render_container(
-            &index,
-            &scan(&index).expect("the console arguments are scanned"),
-            &[],
-            &DeclaredTokenIssuance::Absent,
-        )
-        .expect("the container renders")
-        .bindings;
-        let mut application = registries_for(SESSION_PROVIDER).providers()[0]
-            .application
-            .clone();
-
-        application.challenge = AuthenticatedUserChallenge::Bearer {
-            trusted_issuers: vec![InjectedDependency {
-                concrete: missing_path(),
-                field: "missing".to_string(),
-            }],
-        };
-
-        let error = binding_serve_inputs(
-            &RequestBinding::AuthenticatedUser {
-                application,
-                requirement: AuthenticatedUserRequirement::Required,
-            },
-            &bindings,
-        )
-        .expect_err("the trusted issuer must belong to the same container plan");
-
-        assert!(error.to_string().contains("crate::Missing"));
-    }
     #[test]
     fn rejects_a_provider_that_reads_the_request_body() {
         assert!(

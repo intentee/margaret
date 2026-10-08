@@ -42,6 +42,20 @@ pub enum OidcProviderCodegenError {
     #[error("no route serves the discovery document")]
     MissingDiscoveryRoute,
 
+    #[error(
+        "a route serves the consent endpoint, but no admitted client grants authorization codes an end user could consent to"
+    )]
+    UnconsumedConsentRoute,
+
+    #[error("the {endpoint} is routed, but no admitted client {capability}")]
+    UnconsumedEndpointRoute {
+        capability: &'static str,
+        endpoint: ProviderEndpoint,
+    },
+
+    #[error("the {endpoint} is routed, but the provider admits no oauth client")]
+    EndpointRouteWithoutAdmittedClients { endpoint: ProviderEndpoint },
+
     #[error("the {endpoint} is served at '{path}', which has route parameters")]
     ParameterizedEndpointRoute {
         endpoint: ProviderEndpoint,

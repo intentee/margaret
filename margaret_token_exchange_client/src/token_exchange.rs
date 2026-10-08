@@ -10,6 +10,7 @@ use margaret_authorization_server_client::form_parameter::FormParameter;
 use margaret_authorization_server_client::token_target::TokenTarget;
 use margaret_oauth_vocabulary::grant_type::GrantType;
 use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
+use margaret_oauth_vocabulary::subject_token_type_parsing::SubjectTokenTypeParsing;
 
 use crate::exchanged_token::ExchangedToken;
 use crate::issued_token_type_fields::IssuedTokenTypeFields;
@@ -21,9 +22,8 @@ fn exchanged(
 ) -> ExchangedToken {
     match &response.extra_fields().issued_token_type {
         Some(issued_token_type)
-            if issued_token_type
-                .parse::<SubjectTokenType>()
-                .is_ok_and(|parsed| parsed == SubjectTokenType::AccessToken) =>
+            if SubjectTokenType::parse(issued_token_type)
+                == SubjectTokenTypeParsing::Accepted(SubjectTokenType::AccessToken) =>
         {
             ExchangedToken::Exchanged(response.access_token().clone())
         }

@@ -1,5 +1,4 @@
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
-use margaret_provider_state_storage::assertion_refusal::AssertionRefusal;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[derive(Debug)]
@@ -10,7 +9,7 @@ pub enum ClientRefusal {
         exp: NumericDate,
         limit: NumericDate,
     },
-    AssertionRefused(AssertionRefusal),
+    AssertionReplayed,
     AssertionRejected(JwtRejection),
     AssertionRequired,
     AssertionTypeMissing,

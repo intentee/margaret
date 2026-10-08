@@ -6,6 +6,7 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::forms::patch_article_form::PatchArticleForm;
 use crate::models::article::Article;
@@ -14,7 +15,7 @@ use crate::stores::article_store::ArticleStore;
 #[singleton]
 #[responds_to_http(
     max_body_bytes = 8_388_608,
-    method = "patch",
+    method = RouteMethod::Patch,
     path = "/articles/{article}",
     server = "public"
 )]

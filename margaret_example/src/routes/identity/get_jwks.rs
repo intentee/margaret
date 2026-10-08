@@ -5,11 +5,12 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::margaret::jwks::PublicJwksHandler;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/.well-known/jwks.json", server = "identity")]
+#[responds_to_http(method = RouteMethod::Get, path = "/.well-known/jwks.json", server = "identity")]
 pub struct GetJwks {
     public_jwks_handler: Arc<PublicJwksHandler>,
 }

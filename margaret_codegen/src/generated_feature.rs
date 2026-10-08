@@ -9,6 +9,7 @@ pub(crate) enum GeneratedFeature {
     Middleware,
     OAuthClients,
     OidcProvider,
+    ResourceTokens,
     Schema,
     Serves,
     TokenIssuance,

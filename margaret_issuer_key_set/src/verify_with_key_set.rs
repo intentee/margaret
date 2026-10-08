@@ -1,6 +1,7 @@
 use serde::de::DeserializeOwned;
 
 use margaret_jws_verification::jws_rejection::JwsRejection;
+use margaret_jws_verification::key_selection::KeySelection;
 use margaret_jwt_verification::jwt_profile::JwtProfile;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
@@ -27,8 +28,15 @@ pub(crate) fn verify_with_key_set<TClaims: DeserializeOwned, TProfile: JwtProfil
 
     match jwt.verify(key_set, now) {
         JwtVerification::Rejected(
-            rejection @ JwtRejection::Jws(JwsRejection::UnknownKeyId { .. }),
-        ) => KeySetVerification::UnknownKey {
+            rejection @ JwtRejection::Jws(
+                JwsRejection::NoKeyForAlgorithm { .. }
+                | JwsRejection::SignatureMismatch {
+                    selection: KeySelection::SoleKeyOfAlgorithm,
+                    ..
+                }
+                | JwsRejection::UnknownKeyId { .. },
+            ),
+        ) => KeySetVerification::KeysPossiblyRotated {
             fetched_at: *fetched_at,
             rejection,
         },

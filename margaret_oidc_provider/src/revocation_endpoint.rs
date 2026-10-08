@@ -5,12 +5,12 @@ use chrono::Utc;
 use oauth2::basic::BasicErrorResponseType;
 
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
+use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
+use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
-use margaret_provider_state_storage::refresh_revocation::RefreshRevocation;
-use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::token_digest::TokenDigest;
 use margaret_validation::validation_result::ValidationResult;
@@ -27,9 +27,9 @@ fn revoked_or_invalid() -> Response {
 
 pub struct RevocationEndpoint {
     clients: Arc<AcceptedClients>,
+    grants: Arc<dyn StoresAuthorizationGrants>,
     resources: &'static [&'static str],
     secret_store: Arc<JwksSecretStore>,
-    state: Arc<dyn StoresProviderState>,
 }
 
 impl RevocationEndpoint {
@@ -37,21 +37,22 @@ impl RevocationEndpoint {
     pub fn create(
         clients: Arc<AcceptedClients>,
         secret_store: Arc<JwksSecretStore>,
-        state: Arc<dyn StoresProviderState>,
+        grants: Arc<dyn StoresAuthorizationGrants>,
         resources: &'static [&'static str],
     ) -> Self {
         Self {
             clients,
+            grants,
             resources,
             secret_store,
-            state,
         }
     }
 
     /// # Errors
     ///
-    /// Returns `ProviderError::State` when the client assertion cannot be spent or the refresh
-    /// token families cannot be reached.
+    /// Returns `ProviderError::ClientAuthentication` when the client assertion cannot be
+    /// remembered, and `ProviderError::FindRefreshToken` or `ProviderError::RevokeRefreshFamily`
+    /// when the application cannot reach the refresh token families.
     pub async fn respond(
         &self,
         request: &Request,
@@ -73,13 +74,12 @@ impl RevocationEndpoint {
             &self.clients,
             request,
             &client_authentication,
-            self.state.as_ref(),
             NumericDate::from(now),
         )
         .await?
         {
             ControlFlow::Break(refusal) => return Ok(refusal),
-            ControlFlow::Continue(registered) => registered.client(),
+            ControlFlow::Continue(registered) => &registered.client,
         };
 
         if let JwtVerification::Verified(_) =
@@ -93,17 +93,29 @@ impl RevocationEndpoint {
             ));
         }
 
-        self.state
-            .revoke_refresh_token(TokenDigest::of(&token), client.client_id)
+        match self
+            .grants
+            .find_refresh_token(TokenDigest::of(&token))
             .await
-            .map_err(ProviderError::State)
-            .map(|revocation| match revocation {
-                RefreshRevocation::ForeignClient => oauth_error(
-                    400,
-                    BasicErrorResponseType::InvalidGrant,
-                    "the refresh token was issued to another client",
-                ),
-                RefreshRevocation::Revoked | RefreshRevocation::Unknown => revoked_or_invalid(),
-            })
+            .map_err(ProviderError::FindRefreshToken)?
+        {
+            RefreshTokenLookup::Current { family, record }
+                if record.client_id == client.client_id =>
+            {
+                self.grants
+                    .revoke_refresh_family(family)
+                    .await
+                    .map_err(ProviderError::RevokeRefreshFamily)
+                    .map(|()| revoked_or_invalid())
+            }
+            RefreshTokenLookup::Current { .. } => Ok(oauth_error(
+                400,
+                BasicErrorResponseType::InvalidGrant,
+                "the refresh token was issued to another client",
+            )),
+            RefreshTokenLookup::Superseded { .. } | RefreshTokenLookup::Unknown => {
+                Ok(revoked_or_invalid())
+            }
+        }
     }
 }

@@ -27,7 +27,7 @@ fn catalog_runtime_provider() -> FrameworkProvider {
             method: "new".to_string(),
             outcome: ConstructorOutcome::Infallible,
         },
-        enablement: FrameworkEnablement::Always,
+        enablement: FrameworkEnablement::Declared,
         injection: FrameworkInjectionRole::Unmarked,
         provided: CanonicalPath::new(vec!["crate".to_string(), "CatalogRuntime".to_string()]),
     }

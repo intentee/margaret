@@ -4,7 +4,6 @@ use std::sync::Arc;
 use oauth2::AuthorizationCode;
 use oauth2::EmptyExtraTokenFields;
 use oauth2::ExtraTokenFields;
-use oauth2::PkceCodeVerifier;
 use oauth2::RedirectUrl;
 use oauth2::StandardTokenIntrospectionResponse;
 use oauth2::StandardTokenResponse;
@@ -20,6 +19,7 @@ use margaret_authorization_server_client::form_parameter::FormParameter;
 use margaret_authorization_server_client::target_audience::TargetAudience;
 use margaret_authorization_server_client::token_target::TokenTarget;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
+use margaret_authorization_server_client_tests::rfc_7636_verifier::rfc_7636_verifier;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::echo_wrapping::EchoWrapping;
@@ -104,7 +104,9 @@ async fn authenticates_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(ClientAuthentication::PrivateKeyJwt(rolled_roller(secret)))
+        .client(ClientAuthentication::PrivateKeyJwt(
+            rolled_roller(secret).await,
+        ))
         .client_credentials(&TokenTarget {
             audience: TargetAudience::Unspecified,
             scopes: BTreeSet::new(),
@@ -134,7 +136,9 @@ async fn authenticates_a_grant_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(ClientAuthentication::PrivateKeyJwt(rolled_roller(secret)))
+        .client(ClientAuthentication::PrivateKeyJwt(
+            rolled_roller(secret).await,
+        ))
         .request_grant::<EmptyExtraTokenFields>(
             GrantType::TokenExchange,
             vec![FormParameter {
@@ -164,10 +168,12 @@ async fn authenticates_a_code_exchange_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(ClientAuthentication::PrivateKeyJwt(rolled_roller(secret)))
+        .client(ClientAuthentication::PrivateKeyJwt(
+            rolled_roller(secret).await,
+        ))
         .exchange_authorization_code::<EmptyExtraTokenFields>(
             AuthorizationCode::new("SplxlOBeZQQYbYS6WxSbIA".to_string()),
-            PkceCodeVerifier::new("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".to_string()),
+            &rfc_7636_verifier(),
             RedirectUrl::from_url(
                 Url::parse("https://client.example/callback").expect("the callback is a url"),
             ),
@@ -190,7 +196,9 @@ async fn authenticates_an_introspection_with_private_key_jwt() {
     let server = echo_server("/introspect", EchoWrapping::ActiveIntrospection).await;
 
     let outcome = server
-        .client(ClientAuthentication::PrivateKeyJwt(rolled_roller(secret)))
+        .client(ClientAuthentication::PrivateKeyJwt(
+            rolled_roller(secret).await,
+        ))
         .introspect::<EchoFields>("opaque-token")
         .await;
 

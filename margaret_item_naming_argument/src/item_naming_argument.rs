@@ -2,30 +2,63 @@ use crate::named_item::NamedItem;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ItemNamingArgument {
+    ClientAuthentication,
+    Consent,
     ForeignKeyReferences,
     FormRequestSource,
+    IdTokenSigning,
+    Keys,
+    OnDelete,
+    RedirectRoute,
+    RedirectRoutes,
+    RouteMethod,
+    Signing,
     TickBehavior,
     TickInterval,
     UserModel,
+    WebSocketResponse,
 }
 
 impl ItemNamingArgument {
     #[must_use]
     pub fn key(self) -> &'static str {
         match self {
+            Self::ClientAuthentication => "authentication",
+            Self::Consent => "consent",
             Self::ForeignKeyReferences => "references",
             Self::FormRequestSource => "from",
+            Self::IdTokenSigning => "id_token_signing",
+            Self::Keys => "keys",
+            Self::OnDelete => "on_delete",
+            Self::RedirectRoute => "redirect_route",
+            Self::RedirectRoutes => "redirect_routes",
+            Self::RouteMethod => "method",
+            Self::Signing => "signing",
             Self::TickBehavior => "behavior",
             Self::TickInterval => "interval",
             Self::UserModel => "user_model",
+            Self::WebSocketResponse => "response",
         }
     }
 
     #[must_use]
     pub fn named_item(self) -> NamedItem {
         match self {
-            Self::ForeignKeyReferences | Self::UserModel => NamedItem::Type,
-            Self::FormRequestSource | Self::TickBehavior | Self::TickInterval => NamedItem::Value,
+            Self::ForeignKeyReferences
+            | Self::RedirectRoute
+            | Self::RedirectRoutes
+            | Self::UserModel => NamedItem::Type,
+            Self::ClientAuthentication
+            | Self::Consent
+            | Self::FormRequestSource
+            | Self::IdTokenSigning
+            | Self::Keys
+            | Self::OnDelete
+            | Self::RouteMethod
+            | Self::Signing
+            | Self::TickBehavior
+            | Self::TickInterval
+            | Self::WebSocketResponse => NamedItem::Value,
         }
     }
 }
@@ -36,27 +69,37 @@ mod tests {
     use crate::named_item::NamedItem;
 
     #[test]
-    fn a_model_argument_names_a_type() {
+    fn an_argument_naming_a_model_or_a_route_names_a_type() {
         assert_eq!(
             [
                 ItemNamingArgument::ForeignKeyReferences,
+                ItemNamingArgument::RedirectRoute,
+                ItemNamingArgument::RedirectRoutes,
                 ItemNamingArgument::UserModel,
             ]
             .map(ItemNamingArgument::named_item),
-            [NamedItem::Type, NamedItem::Type]
+            [NamedItem::Type; 4]
         );
     }
 
     #[test]
-    fn a_request_input_or_tick_timer_argument_names_a_value() {
+    fn an_argument_naming_a_framework_value_names_a_value() {
         assert_eq!(
             [
+                ItemNamingArgument::ClientAuthentication,
+                ItemNamingArgument::Consent,
                 ItemNamingArgument::FormRequestSource,
+                ItemNamingArgument::IdTokenSigning,
+                ItemNamingArgument::Keys,
+                ItemNamingArgument::OnDelete,
+                ItemNamingArgument::RouteMethod,
+                ItemNamingArgument::Signing,
                 ItemNamingArgument::TickBehavior,
                 ItemNamingArgument::TickInterval,
+                ItemNamingArgument::WebSocketResponse,
             ]
             .map(ItemNamingArgument::named_item),
-            [NamedItem::Value, NamedItem::Value, NamedItem::Value]
+            [NamedItem::Value; 11]
         );
     }
 }

@@ -22,6 +22,7 @@ uuid = { workspace = true, features = ["v4"] }
 [dev-dependencies]
 margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
 margaret_jws_verification = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [[test]]
 name = "main"

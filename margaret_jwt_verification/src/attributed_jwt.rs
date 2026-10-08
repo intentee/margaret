@@ -3,7 +3,9 @@ use std::ops::ControlFlow;
 
 use serde_json::Value;
 
+use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 use margaret_jws_verification::compact_jws::CompactJws;
+use margaret_jws_verification::parameter_value::ParameterValue;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 
 use crate::jwt_profile::JwtProfile;
@@ -17,6 +19,11 @@ pub struct AttributedJwt<'token> {
 }
 
 impl AttributedJwt<'_> {
+    #[must_use]
+    pub fn algorithm(&self) -> &ParameterValue<JwsAlgorithm> {
+        self.jws.alg()
+    }
+
     #[must_use]
     pub fn profile<TProfile: JwtProfile>(&self) -> JwtProfiling<'_, TProfile> {
         match TProfile::TOKEN_TYPE.check(self.jws.typ()) {

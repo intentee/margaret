@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
+use chrono::Utc;
+use url::Url;
 use uuid::Uuid;
 
-use margaret_provider_state_storage::decided_authorization::DecidedAuthorization;
-use margaret_provider_state_storage::pending_authorization::PendingAuthorization;
-use margaret_provider_state_storage::pending_decision::PendingDecision;
-use margaret_provider_state_storage::pending_verdict::PendingVerdict;
-use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
+use margaret_authorization_grants::issued_code::IssuedCode;
+use margaret_authorization_grants::pending_authorization::PendingAuthorization;
+use margaret_authorization_grants::pending_authorization_take::PendingAuthorizationTake;
+use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
+use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::random_token::random_token;
 use margaret_token_digest::token_digest::TokenDigest;
 use margaret_token_issuance::token_issuance::TokenIssuance;
@@ -19,62 +21,65 @@ use crate::provider_error::ProviderError;
 use crate::redirection::Redirection;
 
 pub struct ConsentEndpoint {
+    grants: Arc<dyn StoresAuthorizationGrants>,
     issuance: TokenIssuance,
-    state: Arc<dyn StoresProviderState>,
 }
 
 impl ConsentEndpoint {
     #[must_use]
-    pub fn create(state: Arc<dyn StoresProviderState>, issuance: TokenIssuance) -> Self {
-        Self { issuance, state }
+    pub fn create(grants: Arc<dyn StoresAuthorizationGrants>, issuance: TokenIssuance) -> Self {
+        Self { grants, issuance }
     }
 
     /// # Errors
     ///
-    /// Returns `ProviderError::State` when the pending authorization cannot be decided.
+    /// Returns `ProviderError::TakePendingAuthorization` when the application cannot take the
+    /// pending authorization, and `ProviderError::IssueCode` when it cannot store the approved
+    /// code.
     pub async fn decide(
         &self,
         id: Uuid,
         end_user: &AuthenticatedEndUser,
         decision: ConsentDecision,
     ) -> Result<ConsentOutcome, ProviderError> {
-        let code = random_token();
-        let verdict = match decision {
-            ConsentDecision::Approved => PendingVerdict::Approved {
-                code: TokenDigest::of(&code),
-            },
-            ConsentDecision::Denied => PendingVerdict::Denied,
-        };
-
-        self.state
-            .decide_pending_authorization(
-                id,
-                PendingDecision {
-                    subject: end_user.subject,
-                    verdict,
-                },
-            )
+        let now = NumericDate::from(Utc::now());
+        let PendingAuthorization { grant, state, .. } = match self
+            .grants
+            .take_pending_authorization(id)
             .await
-            .map_err(ProviderError::State)
-            .map(|decided| match decided {
-                DecidedAuthorization::Approved(pending) => {
-                    ConsentOutcome::Redirected(self.redirection(*pending).code(&code))
-                }
-                DecidedAuthorization::Denied(pending) => ConsentOutcome::Redirected(
-                    self.redirection(*pending)
-                        .error(AuthorizationError::AccessDenied),
-                ),
-                DecidedAuthorization::Unknown => ConsentOutcome::Unknown,
-            })
+            .map_err(ProviderError::TakePendingAuthorization)?
+        {
+            PendingAuthorizationTake::Taken(pending)
+                if pending.expires_at > now && pending.grant.subject == end_user.subject =>
+            {
+                *pending
+            }
+            PendingAuthorizationTake::Absent | PendingAuthorizationTake::Taken(_) => {
+                return Ok(ConsentOutcome::Unknown);
+            }
+        };
+        let redirection = self.redirection(grant.redirect_uri.clone(), state);
+
+        match decision {
+            ConsentDecision::Approved => {
+                let code = random_token();
+
+                self.grants
+                    .issue_code(TokenDigest::of(&code), IssuedCode::issued_at(now, grant))
+                    .await
+                    .map_err(ProviderError::IssueCode)
+                    .map(|()| ConsentOutcome::Redirected(redirection.code(&code)))
+            }
+            ConsentDecision::Denied => Ok(ConsentOutcome::Redirected(
+                redirection.error(AuthorizationError::AccessDenied),
+            )),
+        }
     }
 
-    fn redirection(
-        &self,
-        PendingAuthorization { grant, state }: PendingAuthorization,
-    ) -> Redirection {
+    fn redirection(&self, redirect_uri: Url, state: Option<String>) -> Redirection {
         Redirection {
             issuer: self.issuance.issuer,
-            redirect_uri: grant.redirect_uri,
+            redirect_uri,
             state,
         }
     }

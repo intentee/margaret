@@ -3,7 +3,7 @@ use thiserror::Error;
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_declaration_anchor::declaration_anchor_error::DeclarationAnchorError;
-use margaret_https_url::https_url_error::HttpsUrlError;
+use margaret_https_url::https_url_rejection::HttpsUrlRejection;
 use margaret_registered_claims::registered_claims_error::RegisteredClaimsError;
 
 #[derive(Debug, Error)]
@@ -35,55 +35,53 @@ pub enum TrustedIssuerCodegenError {
         second: String,
     },
 
-    #[error("the audience #[{attribute}] declares on '{anchor}' is malformed: {source}")]
-    MalformedAudience {
-        anchor: String,
-        attribute: &'static str,
-        #[source]
-        source: RegisteredClaimsError,
-    },
+    #[error("#[verifies_tokens_from_issuer] on '{anchor}' declares an empty audience")]
+    EmptyAudience { anchor: String },
 
-    #[error("the issuer #[{attribute}] declares on '{anchor}' is malformed: {source}")]
+    #[error(
+        "the issuer #[verifies_tokens_from_issuer] declares on '{anchor}' is malformed: {source}"
+    )]
     MalformedIssuer {
         anchor: String,
-        attribute: &'static str,
         #[source]
         source: RegisteredClaimsError,
     },
 
-    #[error("the jwks_uri #[provides_jwks_endpoint] declares on '{anchor}' is rejected: {source}")]
+    #[error(
+        "the jwks_uri #[verifies_tokens_from_issuer] declares on '{anchor}' is rejected: {rejection}"
+    )]
     MalformedJwksUri {
         anchor: String,
-        #[source]
-        source: HttpsUrlError,
+        rejection: HttpsUrlRejection,
     },
 
-    #[error("#[{attribute}] on '{anchor}' names a tag that is not a single plain name")]
-    MalformedTag {
-        anchor: String,
-        attribute: &'static str,
-    },
+    #[error(
+        "#[verifies_tokens_from_issuer] on '{anchor}' names a tag that is not a single plain name"
+    )]
+    MalformedTag { anchor: String },
 
-    #[error("#[{attribute}] on '{anchor}' does not declare the audience of the trusted tokens")]
-    MissingAudience {
-        anchor: String,
-        attribute: &'static str,
-    },
+    #[error(
+        "#[verifies_tokens_from_issuer] on '{anchor}' does not declare the audience of the verified tokens"
+    )]
+    MissingAudience { anchor: String },
 
-    #[error("#[{attribute}] on '{anchor}' does not declare the issuer of the trusted tokens")]
-    MissingIssuer {
-        anchor: String,
-        attribute: &'static str,
-    },
+    #[error(
+        "#[verifies_tokens_from_issuer] on '{anchor}' does not declare the issuer of the verified tokens"
+    )]
+    MissingIssuer { anchor: String },
 
-    #[error("#[provides_jwks_endpoint] on '{anchor}' does not declare the jwks_uri of the issuer")]
+    #[error(
+        "#[verifies_tokens_from_issuer] on '{anchor}' does not declare where the keys of the issuer come from as a variant of margaret::framework::trusted_issuer::issuer_keys::IssuerKeys"
+    )]
+    MissingIssuerKeys { anchor: String },
+
+    #[error(
+        "#[verifies_tokens_from_issuer] on '{anchor}' publishes its keys without declaring their jwks_uri"
+    )]
     MissingJwksUri { anchor: String },
 
-    #[error("#[{attribute}] on '{anchor}' does not name a tag")]
-    MissingTag {
-        anchor: String,
-        attribute: &'static str,
-    },
+    #[error("#[verifies_tokens_from_issuer] on '{anchor}' does not name a tag")]
+    MissingTag { anchor: String },
 
     #[error(
         "the issuer '{issuer}' is trusted for the audience '{audience}' by both '{first}' and '{second}', so its tokens have no single addressee"
@@ -94,4 +92,9 @@ pub enum TrustedIssuerCodegenError {
         issuer: String,
         second: String,
     },
+
+    #[error(
+        "#[verifies_tokens_from_issuer] on '{anchor}' declares the keys '{written}', which is not a variant of margaret::framework::trusted_issuer::issuer_keys::IssuerKeys"
+    )]
+    UnknownIssuerKeys { anchor: String, written: String },
 }

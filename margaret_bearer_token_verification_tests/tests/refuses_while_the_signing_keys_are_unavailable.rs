@@ -14,7 +14,7 @@ use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 async fn refuses_while_the_signing_keys_are_unavailable() {
     let secret = JwksSecret::fresh(SigningCurve::P256, &FixtureRsaSigningKeys::default())
         .expect("a fresh secret");
-    let trusted_issuer = TrustedIssuer::create(Arc::new(IssuerKeySet::awaiting()), fixture_trust());
+    let trusted_issuer = TrustedIssuer::polled(Arc::new(IssuerKeySet::awaiting()), fixture_trust());
     let token = TestClaims {
         sub: "subject".to_string(),
     }

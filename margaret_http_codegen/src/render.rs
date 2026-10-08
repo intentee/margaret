@@ -14,7 +14,6 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::fold_layers::fold_layers;
 use margaret_request_binding_codegen::authenticated_user_application::AuthenticatedUserApplication;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
-use margaret_request_binding_codegen::binding_shadows_request::binding_shadows_request;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
@@ -35,7 +34,7 @@ use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::route_content::RouteContent;
 use crate::route_group::RouteGroup;
-use crate::route_method_tokens::route_method_tokens;
+use crate::route_methods::ROUTE_METHODS;
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
     injects_routes(&route.arguments)
@@ -89,9 +88,7 @@ fn allocate_handler_names(route: &HttpRoute) -> HandlerNames {
     let mut allocator = NameAllocator::new();
 
     for argument in &route.arguments {
-        if binding_shadows_request(&argument.binding) {
-            allocator.reserve(&argument.holder.to_string());
-        }
+        allocator.reserve(&argument.holder.to_string());
     }
 
     let request_binding = if route
@@ -108,12 +105,6 @@ fn allocate_handler_names(route: &HttpRoute) -> HandlerNames {
         RouteContent::Unread { .. } => format_ident!("_body"),
     };
     let content_local = format_ident!("{}", allocator.allocate("content").field());
-
-    for argument in &route.arguments {
-        if matches!(argument.binding, RequestBinding::CurrentRequest) {
-            allocator.reserve(&argument.holder.to_string());
-        }
-    }
 
     let responder_binding = format_ident!("{}", allocator.allocate("responder").field());
     let routes_local = format_ident!("{}", allocator.allocate("routes").field());
@@ -448,8 +439,8 @@ fn route_entries<'handler>(
                         #function(container, #routes_param, #views_argument)
                     };
 
-                    match (&route.content, &route.name) {
-                        (RouteContent::Read { method, .. }, _) => {
+                    match &route.content {
+                        RouteContent::Read { method, .. } => {
                             let method = content_method_tokens(*method);
 
                             quote! {
@@ -459,27 +450,24 @@ fn route_entries<'handler>(
                                 )
                             }
                         }
-                        (
-                            RouteContent::Unread {
-                                method: RouteMethod::Get,
-                            },
-                            Some(name),
-                        ) => quote! {
-                            margaret::framework::http::method_handler::MethodHandler::forwardable(
-                                #name,
-                                #handler_call,
-                            )
-                        },
-                        (RouteContent::Unread { method }, _) => {
-                            let method = route_method_tokens(*method);
-
-                            quote! {
-                                margaret::framework::http::method_handler::MethodHandler::head(
-                                    #method,
+                        RouteContent::Unread { method } => match &route.name {
+                            Some(name) if matches!(method, RouteMethod::Get) => quote! {
+                                margaret::framework::http::method_handler::MethodHandler::forwardable(
+                                    #name,
                                     #handler_call,
                                 )
+                            },
+                            Some(_) | None => {
+                                let method = ROUTE_METHODS.tokens(*method);
+
+                                quote! {
+                                    margaret::framework::http::method_handler::MethodHandler::head(
+                                        #method,
+                                        #handler_call,
+                                    )
+                                }
                             }
-                        }
+                        },
                     }
                 })
                 .collect::<Vec<TokenStream>>();
@@ -539,7 +527,7 @@ fn server_module(
     let inner_return = quote! {
         ::std::result::Result<
             margaret::framework::http::server_routes::ServerRoutes,
-            margaret::framework::http::matchit::InsertError,
+            margaret::framework::http::router_error::RouterError,
         >
     };
     let body = quote! { #router };

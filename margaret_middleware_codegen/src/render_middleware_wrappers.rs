@@ -8,7 +8,6 @@ use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
-use margaret_request_binding_codegen::binding_shadows_request::binding_shadows_request;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
@@ -48,9 +47,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     let mut allocator = NameAllocator::new();
 
     for parameter in parameters {
-        if binding_shadows_request(&parameter.binding) {
-            allocator.reserve(&parameter.holder.to_string());
-        }
+        allocator.reserve(&parameter.holder.to_string());
     }
 
     let request_binding = if parameters
@@ -61,12 +58,6 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     } else {
         format_ident!("_request")
     };
-
-    for parameter in parameters {
-        if matches!(parameter.binding, RequestBinding::CurrentRequest) {
-            allocator.reserve(&parameter.holder.to_string());
-        }
-    }
 
     let next_binding = if parameters
         .iter()

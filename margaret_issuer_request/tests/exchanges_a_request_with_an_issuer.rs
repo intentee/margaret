@@ -16,6 +16,7 @@ use margaret_http_tests::fixture_client_builder::fixture_client_builder;
 use margaret_http_tests::form_echo_handler::FormEchoHandler;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::tls_fixture::TlsFixture;
+use margaret_issuer_request::issuer_answer::IssuerAnswer;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_route_method::content_method::ContentMethod;
 
@@ -50,7 +51,9 @@ async fn exchanges_a_request_with_an_issuer() {
     );
     *request.body_mut() = Some(b"grant_type=client_credentials".as_slice().into());
 
-    let answer = client.exchange(request).await.expect("the issuer answers");
+    let Ok(IssuerAnswer::Received(answer)) = client.exchange(request).await else {
+        panic!("the issuer answers");
+    };
 
     server.stop().await;
 

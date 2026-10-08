@@ -35,6 +35,7 @@ mod model_index_arguments;
 mod model_primary_key_arguments;
 mod model_unique_arguments;
 mod numeric_digits;
+pub mod on_delete_actions;
 mod on_delete_argument;
 mod redundant_index;
 mod resolve_declared_columns;
@@ -468,9 +469,11 @@ struct S {
     fn rejects_an_unknown_on_delete_action() {
         assert!(
             error_message(&with_author(
-                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = purge)]\n    author: Author,\n}\n",
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = margaret::framework::model::on_delete::OnDelete::Purge)]\n    author: Author,\n}\n",
             ))
-            .contains("unknown ON DELETE action")
+            .contains(
+                "declares the ON DELETE action 'margaret::framework::model::on_delete::OnDelete::Purge'"
+            )
         );
     }
 

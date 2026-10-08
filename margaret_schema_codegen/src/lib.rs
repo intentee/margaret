@@ -1,10 +1,8 @@
-pub mod framework_tables;
 pub mod render_schema;
 
 mod column_check_tokens;
 mod column_default_tokens;
 mod column_type_tokens;
-mod on_delete_tokens;
 mod render;
 
 #[cfg(test)]
@@ -12,7 +10,6 @@ mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_model_codegen::models::models;
 
-    use crate::framework_tables::FrameworkTables;
     use crate::render_schema::render_schema;
 
     const ARTICLE: &str = "\
@@ -41,7 +38,7 @@ struct Author {
         let indexed = IndexedSource::new(lib_source);
         let models = models(&indexed.index).expect("the models resolve");
 
-        render_schema(&models, FrameworkTables::Unused)
+        render_schema(&models)
             .to_source()
             .split_whitespace()
             .collect()
@@ -49,30 +46,6 @@ struct Author {
 
     fn with_author(referencing: &str) -> String {
         format!("{AUTHOR_MODEL}\n{referencing}")
-    }
-
-    fn schema_source_with_provider_state(lib_source: &str) -> String {
-        let indexed = IndexedSource::new(lib_source);
-        let models = models(&indexed.index).expect("the models resolve");
-
-        render_schema(&models, FrameworkTables::OidcProviderState)
-            .to_source()
-            .split_whitespace()
-            .collect()
-    }
-
-    #[test]
-    fn appends_the_provider_state_tables_to_the_model_tables() {
-        assert!(schema_source_with_provider_state(ARTICLE).contains(
-            ".into_iter().chain(margaret::framework::provider_state_postgres::provider_state_tables::provider_state_tables()).collect()"
-        ));
-    }
-
-    #[test]
-    fn declares_only_the_provider_state_tables_without_models() {
-        assert!(schema_source_with_provider_state("").contains(
-            "tables:margaret::framework::provider_state_postgres::provider_state_tables::provider_state_tables(),"
-        ));
     }
 
     #[test]
@@ -278,7 +251,7 @@ struct Second {
     #[test]
     fn generates_a_foreign_key_on_delete_action() {
         let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = cascade)]\n    author: Author,\n}\n",
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = margaret::framework::model::on_delete::OnDelete::Cascade)]\n    author: Author,\n}\n",
         ));
 
         assert!(
@@ -400,7 +373,7 @@ struct Second {
     #[test]
     fn generates_a_composite_foreign_key_from_a_model_attribute() {
         let source = schema_source(
-            "#[model(table = \"fragment_metadata\")]\n#[primary_key(columns = [partition, hash])]\nstruct FragmentMetadata {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n\n#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata, on_delete = cascade)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
+            "#[model(table = \"fragment_metadata\")]\n#[primary_key(columns = [partition, hash])]\nstruct FragmentMetadata {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n\n#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata, on_delete = margaret::framework::model::on_delete::OnDelete::Cascade)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
         );
 
         assert!(source.contains(
@@ -431,7 +404,7 @@ struct Second {
     #[test]
     fn generates_on_delete_restrict() {
         let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = restrict)]\n    author: Author,\n}\n",
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = margaret::framework::model::on_delete::OnDelete::Restrict)]\n    author: Author,\n}\n",
         ));
 
         assert!(
@@ -442,7 +415,7 @@ struct Second {
     #[test]
     fn generates_on_delete_set_null() {
         let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = set_null)]\n    author: Option<Author>,\n}\n",
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = margaret::framework::model::on_delete::OnDelete::SetNull)]\n    author: Option<Author>,\n}\n",
         ));
 
         assert!(
@@ -453,7 +426,7 @@ struct Second {
     #[test]
     fn generates_on_delete_set_default() {
         let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = set_default)]\n    author: Author,\n}\n",
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = margaret::framework::model::on_delete::OnDelete::SetDefault)]\n    author: Author,\n}\n",
         ));
 
         assert!(

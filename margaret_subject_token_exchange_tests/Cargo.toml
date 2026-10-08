@@ -15,6 +15,7 @@ margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
+margaret_oauth_vocabulary = { workspace = true }
 margaret_subject_token_exchange = { workspace = true }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 margaret_token_trust = { workspace = true }
@@ -25,7 +26,6 @@ uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 margaret_jws_verification = { workspace = true }
-margaret_oauth_vocabulary = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_token_exchange_client = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

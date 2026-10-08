@@ -3,17 +3,14 @@ use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
+use margaret_attributes::tag::Tag;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_injection_codegen::optional_parameter::OptionalParameter;
 use margaret_syn_type_peeling::generic_argument_pair::GenericArgumentPair;
 use margaret_syn_type_peeling::paired_generic_arguments::paired_generic_arguments;
 use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
-use margaret_tag_codegen::read_bearer_token_client::read_bearer_token_client;
-use margaret_tag_codegen::read_bearer_token_issuer::read_bearer_token_issuer;
-use margaret_tag_codegen::tag_expectation::TagExpectation;
-use margaret_tag_codegen::tag_pool::TagPool;
+use margaret_tag_codegen::bearer_token_addressee::BearerTokenAddressee;
 
 use crate::bound_bearer_tokens::BoundBearerTokens;
 use crate::plain_type_resolution::PlainTypeResolution;
@@ -22,13 +19,12 @@ use crate::request_binding_error::RequestBindingError;
 use crate::request_injectable::RequestInjectable;
 
 pub(crate) struct BearerTokenParameter<'classified> {
-    pub(crate) attribute: &'classified IndexedAttribute,
+    pub(crate) addressee: &'classified BearerTokenAddressee,
     pub(crate) container_bindings: &'classified ContainerBindings,
     pub(crate) index: &'classified AttributeIndex,
     pub(crate) item: &'classified IndexedItem,
     pub(crate) position: usize,
     pub(crate) subject: &'classified str,
-    pub(crate) tags: &'classified TagPool<'classified>,
 }
 
 impl BearerTokenParameter<'_> {
@@ -93,19 +89,16 @@ impl BearerTokenParameter<'_> {
         claims: &Type,
         bound_bearer_tokens: &mut BoundBearerTokens,
     ) -> Result<RequestBinding, RequestBindingError> {
-        let site = self.site();
-        let client = read_bearer_token_client(self.attribute.args()?, &site)?;
-
-        self.tags
-            .resolve(&client, TagExpectation::OAuthClient, &site)?;
-
+        let BearerTokenAddressee::Client(client) = self.addressee else {
+            return Err(self.mismatched_addressee());
+        };
         let claims = self.claims(claims)?;
 
         bound_bearer_tokens.bind_introspected(self.subject)?;
 
         let authorization_server =
             self.container_bindings
-                .oauth_client(&client)
+                .oauth_client(client)
                 .ok_or_else(|| RequestBindingError::UnplannedOAuthClient {
                     subject: self.subject.to_string(),
                     parameter: self.position.to_string(),
@@ -116,6 +109,13 @@ impl BearerTokenParameter<'_> {
             authorization_server,
             claims,
         })
+    }
+
+    fn mismatched_addressee(&self) -> RequestBindingError {
+        RequestBindingError::MismatchedBearerTokenAddressee {
+            subject: self.subject.to_string(),
+            parameter: self.position.to_string(),
+        }
     }
 
     fn profile(&self, profile: &Type) -> Result<CanonicalPath, RequestBindingError> {
@@ -136,10 +136,6 @@ impl BearerTokenParameter<'_> {
         }
     }
 
-    fn site(&self) -> String {
-        format!("argument #{} of {}", self.position, self.subject)
-    }
-
     fn verified_jwt(
         &self,
         GenericArgumentPair {
@@ -148,24 +144,22 @@ impl BearerTokenParameter<'_> {
         }: GenericArgumentPair,
         bound_bearer_tokens: &mut BoundBearerTokens,
     ) -> Result<RequestBinding, RequestBindingError> {
-        let site = self.site();
-        let issuer = read_bearer_token_issuer(self.attribute.args()?, &site)?;
-
-        self.tags
-            .resolve(&issuer, TagExpectation::TrustedIssuer, &site)?;
-
+        let addressee: &Tag = match self.addressee {
+            BearerTokenAddressee::Client(_) => return Err(self.mismatched_addressee()),
+            BearerTokenAddressee::Issuer(tag) | BearerTokenAddressee::Resource(tag) => tag,
+        };
         let claims = self.claims(claims)?;
         let profile = self.profile(profile)?;
 
-        bound_bearer_tokens.bind_verified_jwt(&issuer, self.subject)?;
+        bound_bearer_tokens.bind_verified_jwt(addressee, self.subject)?;
 
         let trusted_issuer = self
             .container_bindings
-            .trusted_issuer(&issuer)
+            .trusted_issuer(addressee)
             .ok_or_else(|| RequestBindingError::UnplannedTrustedIssuer {
                 subject: self.subject.to_string(),
                 parameter: self.position.to_string(),
-                issuer: issuer.to_string(),
+                issuer: addressee.to_string(),
             })?;
 
         Ok(RequestBinding::BearerToken {

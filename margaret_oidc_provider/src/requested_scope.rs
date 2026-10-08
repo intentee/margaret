@@ -6,6 +6,7 @@ use oauth2::basic::BasicErrorResponseType;
 use margaret_http::response::Response;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_oauth_vocabulary::scope_list::ScopeList;
+use margaret_oauth_vocabulary::scope_list_parsing::ScopeListParsing;
 
 use crate::oauth_error::oauth_error;
 
@@ -24,9 +25,11 @@ pub(crate) enum RequestedScope {
 
 impl RequestedScope {
     pub(crate) fn of(scope: Option<&str>) -> ControlFlow<Response, Self> {
-        match scope.map(str::parse::<ScopeList>) {
-            Some(Ok(ScopeList { scopes })) => ControlFlow::Continue(Self::Narrowed(scopes)),
-            Some(Err(_)) => ControlFlow::Break(invalid_scope()),
+        match scope.map(ScopeList::parse) {
+            Some(ScopeListParsing::Accepted(ScopeList { scopes })) => {
+                ControlFlow::Continue(Self::Narrowed(scopes))
+            }
+            Some(ScopeListParsing::Rejected(_)) => ControlFlow::Break(invalid_scope()),
             None => ControlFlow::Continue(Self::Granted),
         }
     }

@@ -1,19 +1,20 @@
 use std::sync::Arc;
 
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
-use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller_server::jwks_roller::JwksRoller;
+use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
 
-#[test]
-fn jwks_roller_rotates_the_secret_it_publishes_when_run() {
+#[tokio::test]
+async fn jwks_roller_rotates_the_secret_it_publishes_when_run() {
     let roller = JwksRoller::create(
-        Arc::new(MemoryJwksSecretStorage),
+        Arc::new(FixtureSigningKeys::empty()),
         Arc::new(FixtureRsaSigningKeys::default()),
     )
+    .await
     .expect("the first secret is rolled and published");
     let initial = roller.jwks_secret_holder().get();
 
-    roller.run().expect("the secret rotates");
+    roller.run().await.expect("the secret rotates");
 
     let rotated = roller.jwks_secret_holder().get();
 

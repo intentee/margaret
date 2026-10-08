@@ -33,32 +33,23 @@ mod tests {
             .bindings
     }
 
-    fn empty_bindings() -> ContainerBindings {
-        bindings_for(&IndexedSource::new("").index)
-    }
-
     fn generated(lib_source: &str) -> ViewsArtifacts {
         let index = IndexedSource::new(lib_source).index;
         let bindings = bindings_for(&index);
 
-        let plan = ViewsPlan::build(&index, &bindings).expect("the views are planned");
+        let plan = ViewsPlan::build(&index).expect("the views are planned");
 
         render_views(plan, &bindings)
     }
 
     fn rejection_for(lib_source: &str) -> ViewsCodegenError {
-        ViewsPlan::build(&IndexedSource::new(lib_source).index, &empty_bindings())
+        ViewsPlan::build(&IndexedSource::new(lib_source).index)
             .map(drop)
             .expect_err("the invalid view is rejected")
     }
 
     fn rejection(lib_source: &str) -> String {
         rejection_for(lib_source).to_string()
-    }
-
-    #[test]
-    fn rejects_a_view_absent_from_the_container_plan() {
-        assert!(rejection(VALID_VIEW).contains("crate::CardLayout"));
     }
 
     fn formatted(modules: Vec<GeneratedModuleTokens>) -> String {
@@ -103,13 +94,16 @@ impl Banner {
 ";
 
     #[test]
-    fn records_a_view_serve_input_and_reads_the_preconstructed_view() {
+    fn retains_a_view_with_a_serve_input_and_reads_it_preconstructed() {
         let artifacts = generated(CONSOLE_ARGUMENT_VIEW);
+        let retained_roots: Vec<String> = artifacts
+            .retained_roots
+            .iter()
+            .map(ToString::to_string)
+            .collect();
         let source = formatted(artifacts.modules);
-        let slot = artifacts.serve_inputs.len();
 
-        assert_eq!(slot, 1);
-        assert_eq!(artifacts.serve_inputs[0].name(), "title");
+        assert_eq!(retained_roots, ["crate::Banner"]);
         assert!(source.contains("banner: container.banner()"));
         assert!(!source.contains("serve_input_"));
     }

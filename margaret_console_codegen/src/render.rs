@@ -4,11 +4,13 @@ use quote::quote;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::serve_input_binding::ServeInputBinding;
+use margaret_container::slotted_serve_input::SlottedServeInput;
 use margaret_http_codegen::http_server::HttpServer;
+use margaret_http_codegen::server_origin_source::ServerOriginSource;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
+use margaret_http_codegen::server_uploads::ServerUploads;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 use margaret_serve_input_codegen::has_spiffe_http_client::has_spiffe_http_client;
-use margaret_serve_input_codegen::serve_input::ServeInput;
 use margaret_serve_input_codegen::serve_input_read::serve_input_read;
 use margaret_serve_input_codegen::serve_input_registration::serve_input_registration;
 
@@ -41,30 +43,55 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
         Some(description) => quote! { .about(#description) },
         None => quote! {},
     };
-    let arguments = command.serve_inputs.iter().map(serve_input_registration);
+    let arguments = command
+        .serve_inputs
+        .iter()
+        .map(|slotted| serve_input_registration(&slotted.input));
 
     quote! {
         .subcommand(clap::Command::new(#name)#about #(#arguments)*)
     }
 }
 
-fn serve_registration(http_servers: &[HttpServer], serve_inputs: &[ServeInput]) -> TokenStream {
+fn serve_registration(
+    http_servers: &[HttpServer],
+    serve_inputs: &[SlottedServeInput],
+) -> TokenStream {
     let spiffe_secured = serves_spiffe(http_servers);
-    let svid_active = spiffe_secured || has_spiffe_http_client(serve_inputs);
-    let service_arguments = serve_inputs.iter().map(serve_input_registration);
+    let svid_active =
+        spiffe_secured || has_spiffe_http_client(serve_inputs.iter().map(|slotted| &slotted.input));
+    let service_arguments = serve_inputs
+        .iter()
+        .map(|slotted| serve_input_registration(&slotted.input));
     let http_server_arguments = http_servers.iter().map(|server| {
         let address_argument = server.address_argument();
-        let url_argument = server.url_argument();
-        let uploads_argument = server.uploads_argument();
-        let upload_dir_argument = server.upload_dir_argument();
+        let url_argument = match server.origin() {
+            ServerOriginSource::Argument => {
+                let url_argument = server.url_argument();
+
+                quote! {
+                    .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true).value_parser(clap::value_parser!(margaret::framework::http::server_origin::ServerOrigin)))
+                }
+            }
+            ServerOriginSource::Issuer { .. } => quote! {},
+        };
+        let upload_dir_argument = match server.uploads() {
+            ServerUploads::Accepted => {
+                let upload_dir_argument = server.upload_dir_argument();
+
+                quote! {
+                    .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(true).value_parser(clap::value_parser!(::std::path::PathBuf)))
+                }
+            }
+            ServerUploads::Refused => quote! {},
+        };
         let transport_argument =
             spiffe_secured.then(|| transport_argument_registration(server));
 
         quote! {
             .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
-            .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true).value_parser(clap::value_parser!(margaret::framework::http::server_origin::ServerOrigin)))
-            .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
-            .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
+            #url_argument
+            #upload_dir_argument
             #transport_argument
         }
     });
@@ -85,7 +112,7 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
     let matches_binding = if command
         .serve_inputs
         .iter()
-        .any(ServeInput::reads_clap_matches)
+        .any(|slotted| slotted.input.reads_clap_matches())
     {
         quote! { matches }
     } else {
@@ -94,13 +121,16 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
     let values: Vec<ServeInputBinding> = command
         .serve_inputs
         .iter()
-        .zip(&command.serve_input_slots)
-        .map(|(argument, slot)| ServeInputBinding {
+        .map(|SlottedServeInput { input, slot }| ServeInputBinding {
             slot: *slot,
-            value: serve_input_read(argument),
+            value: serve_input_read(input),
         })
         .collect();
-    let construction = bindings.construction_invocation(&command.accessor.to_string(), &values);
+    let construction = bindings.construction_invocation(
+        &command.construction_root,
+        &command.accessor.to_string(),
+        &values,
+    );
     let accessor_access = quote! {
         (match #construction {
             Ok(value) => value,
@@ -184,14 +214,14 @@ pub(crate) fn render(
     serves: bool,
     has_models: bool,
     http_servers: &[HttpServer],
-    serve_inputs: &[ServeInput],
+    serve_inputs: &[SlottedServeInput],
     bindings: &ContainerBindings,
 ) -> TokenStream {
     let dispatches_asynchronously = serves
         || commands.iter().any(|command| {
             command.takes_token
                 || command.is_async
-                || bindings.construction_is_async(&command.accessor.to_string())
+                || bindings.construction_is_async(&command.construction_root)
         });
     let run_asyncness = if dispatches_asynchronously {
         quote! { async }

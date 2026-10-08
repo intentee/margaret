@@ -4,21 +4,29 @@ use std::sync::Arc;
 use url::Url;
 
 use margaret_https_url::https_url::HttpsUrl;
+use margaret_https_url::https_url_parsing::HttpsUrlParsing;
 
 use crate::advertised_endpoint::AdvertisedEndpoint;
 use crate::authorization_response_issuer::AuthorizationResponseIssuer;
 use crate::metadata_endpoint::MetadataEndpoint;
+use crate::provider_endpoints::ProviderEndpoints;
 use crate::provider_metadata_document::ProviderMetadataDocument;
 use crate::provider_metadata_parsing::ProviderMetadataParsing;
 use crate::provider_metadata_rejection::ProviderMetadataRejection;
+use crate::served_endpoint::ServedEndpoint;
 
 fn https_endpoint(
     endpoint: MetadataEndpoint,
     declared: &str,
 ) -> ControlFlow<ProviderMetadataRejection, Url> {
-    match declared.parse::<HttpsUrl>() {
-        Ok(url) => ControlFlow::Continue(Url::from(url)),
-        Err(source) => ControlFlow::Break(ProviderMetadataRejection::Endpoint { endpoint, source }),
+    match HttpsUrl::parse(declared) {
+        HttpsUrlParsing::Accepted(url) => ControlFlow::Continue(Url::from(url)),
+        HttpsUrlParsing::Rejected(rejection) => {
+            ControlFlow::Break(ProviderMetadataRejection::Endpoint {
+                endpoint,
+                rejection,
+            })
+        }
     }
 }
 
@@ -31,6 +39,18 @@ fn advertised_endpoint(
             https_endpoint(endpoint, &declared).map_continue(AdvertisedEndpoint::Advertised)
         }
         None => ControlFlow::Continue(AdvertisedEndpoint::Unadvertised),
+    }
+}
+
+fn served_endpoint(
+    endpoint: MetadataEndpoint,
+    served: ServedEndpoint,
+) -> ControlFlow<ProviderMetadataRejection, AdvertisedEndpoint> {
+    match served {
+        ServedEndpoint::Served(url) => {
+            https_endpoint(endpoint, url).map_continue(AdvertisedEndpoint::Advertised)
+        }
+        ServedEndpoint::Unserved => ControlFlow::Continue(AdvertisedEndpoint::Unadvertised),
     }
 }
 
@@ -52,6 +72,31 @@ pub struct ProviderMetadata {
 }
 
 impl ProviderMetadata {
+    #[must_use]
+    pub fn of_endpoints(endpoints: &ProviderEndpoints) -> ProviderMetadataParsing {
+        match Self::from_endpoints(endpoints) {
+            ControlFlow::Continue(metadata) => {
+                ProviderMetadataParsing::Accepted(Arc::new(metadata))
+            }
+            ControlFlow::Break(rejection) => ProviderMetadataParsing::Rejected(rejection),
+        }
+    }
+
+    #[must_use]
+    pub fn parse(document: &[u8], issuer: &'static str) -> ProviderMetadataParsing {
+        match serde_json::from_slice(document) {
+            Ok(document) => match Self::from_document(document, issuer) {
+                ControlFlow::Continue(metadata) => {
+                    ProviderMetadataParsing::Accepted(Arc::new(metadata))
+                }
+                ControlFlow::Break(rejection) => ProviderMetadataParsing::Rejected(rejection),
+            },
+            Err(source) => {
+                ProviderMetadataParsing::Rejected(ProviderMetadataRejection::Malformed { source })
+            }
+        }
+    }
+
     fn from_document(
         ProviderMetadataDocument {
             authorization_endpoint,
@@ -93,18 +138,32 @@ impl ProviderMetadata {
         })
     }
 
-    #[must_use]
-    pub fn parse(document: &[u8], issuer: &'static str) -> ProviderMetadataParsing {
-        match serde_json::from_slice(document) {
-            Ok(document) => match Self::from_document(document, issuer) {
-                ControlFlow::Continue(metadata) => {
-                    ProviderMetadataParsing::Accepted(Arc::new(metadata))
-                }
-                ControlFlow::Break(rejection) => ProviderMetadataParsing::Rejected(rejection),
-            },
-            Err(source) => {
-                ProviderMetadataParsing::Rejected(ProviderMetadataRejection::Malformed { source })
-            }
-        }
+    fn from_endpoints(
+        ProviderEndpoints {
+            authorization,
+            introspection,
+            jwks,
+            token,
+            userinfo,
+            ..
+        }: &ProviderEndpoints,
+    ) -> ControlFlow<ProviderMetadataRejection, Self> {
+        ControlFlow::Continue(Self {
+            authorization_endpoint: served_endpoint(
+                MetadataEndpoint::AuthorizationEndpoint,
+                *authorization,
+            )?,
+            authorization_response_issuer: AuthorizationResponseIssuer::Advertised,
+            introspection_endpoint: served_endpoint(
+                MetadataEndpoint::IntrospectionEndpoint,
+                *introspection,
+            )?,
+            jwks_uri: https_endpoint(MetadataEndpoint::JwksUri, jwks)?,
+            token_endpoint: AdvertisedEndpoint::Advertised(https_endpoint(
+                MetadataEndpoint::TokenEndpoint,
+                token,
+            )?),
+            userinfo_endpoint: served_endpoint(MetadataEndpoint::UserinfoEndpoint, *userinfo)?,
+        })
     }
 }

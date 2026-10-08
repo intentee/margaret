@@ -1,5 +1,9 @@
+mod authorization_endpoint_url_module_name;
+pub mod authorization_endpoint_url_path;
 pub mod derive_provider_endpoints;
+pub mod derived_endpoint;
 pub mod derived_provider_endpoints;
+mod endpoint_routes;
 pub mod oidc_provider_codegen_error;
 pub mod oidc_provider_item;
 pub mod oidc_provider_item_path;
@@ -7,6 +11,7 @@ pub mod oidc_provider_module_name;
 pub mod provider_endpoint;
 mod provider_endpoints_module_name;
 pub mod provider_endpoints_path;
+pub mod reject_unadmitted_endpoint_routes;
 pub mod render_oidc_provider;
 pub mod render_provider_endpoints;
 pub mod subject_token_exchanger_path;

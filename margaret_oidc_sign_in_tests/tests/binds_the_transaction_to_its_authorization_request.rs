@@ -6,14 +6,13 @@ use serde_json::Value;
 
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
-use margaret_oidc_sign_in_tests::begin_sign_in::begin_sign_in;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
 
 #[tokio::test]
 async fn binds_the_transaction_to_its_authorization_request() {
     let fixture = SignInFixture::start(secret_basic_authentication()).await;
-    let SignInBeginning::Redirected(response) = begin_sign_in(&fixture.flow).await else {
+    let SignInBeginning::Redirected(response) = fixture.flow.begin().await else {
         panic!("the sign-in redirects to the authorization endpoint");
     };
     let begun = BegunSignIn::of(&response);
@@ -30,9 +29,9 @@ async fn binds_the_transaction_to_its_authorization_request() {
         &Base64UrlUnpadded::decode_vec(payload).expect("the payload is base64url"),
     )
     .expect("the transaction claims are json");
-    let verifier = transaction["pkce_verifier"]
+    let verifier = transaction["code_verifier"]
         .as_str()
-        .expect("the transaction holds the pkce verifier");
+        .expect("the transaction holds the code verifier");
 
     assert_eq!(
         PkceCodeChallenge::from_code_verifier_sha256(&PkceCodeVerifier::new(verifier.to_string()))
@@ -41,5 +40,21 @@ async fn binds_the_transaction_to_its_authorization_request() {
     );
     assert_eq!(transaction["nonce"], begun.authorization_parameter("nonce"));
     assert_eq!(transaction["state"], begun.authorization_parameter("state"));
-    assert_eq!(transaction["callback"], "https://client.example/callback");
+    assert_eq!(
+        transaction
+            .as_object()
+            .expect("the transaction claims are an object")
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<&str>>(),
+        [
+            "aud",
+            "code_verifier",
+            "exp",
+            "iat",
+            "iss",
+            "nonce",
+            "state"
+        ]
+    );
 }

@@ -212,7 +212,7 @@ pub enum ModelCodegenError {
     },
 
     #[error(
-        "foreign key field '{field}' of model '{model}' has an unknown ON DELETE action '{action}'; valid actions are cascade, restrict, set_null, set_default"
+        "foreign key field '{field}' of model '{model}' declares the ON DELETE action '{action}'; declare one of margaret::framework::model::on_delete::OnDelete::{{Cascade, Restrict, SetDefault, SetNull}}, or omit on_delete for no action"
     )]
     UnknownOnDeleteAction {
         action: String,
@@ -390,7 +390,7 @@ pub enum ModelCodegenError {
     DuplicateModelForeignKey { columns: String, model: String },
 
     #[error(
-        "the foreign key on model '{model}' has an unknown ON DELETE action '{action}'; valid actions are cascade, restrict, set_null, set_default"
+        "the foreign key on model '{model}' declares the ON DELETE action '{action}'; declare one of margaret::framework::model::on_delete::OnDelete::{{Cascade, Restrict, SetDefault, SetNull}}, or omit on_delete for no action"
     )]
     UnknownModelForeignKeyOnDeleteAction { action: String, model: String },
 

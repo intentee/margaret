@@ -1,12 +1,11 @@
 use margaret_oauth_vocabulary::resource_scope::ResourceScope;
+use margaret_oauth_vocabulary::resource_scope_parsing::ResourceScopeParsing;
+use margaret_oauth_vocabulary::resource_scope_rejection::ResourceScopeRejection;
 
 #[test]
 fn rejects_openid_as_a_resource_scope() {
     assert_eq!(
-        "openid"
-            .parse::<ResourceScope>()
-            .expect_err("openid grants no resource")
-            .to_string(),
-        "the openid scope asks for an identity, so it cannot grant access to a resource"
+        ResourceScope::parse("openid"),
+        ResourceScopeParsing::Rejected(ResourceScopeRejection::Openid)
     );
 }

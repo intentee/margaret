@@ -1,14 +1,18 @@
+use margaret_oauth_vocabulary::code_challenge_rejection::CodeChallengeRejection;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum AuthorizationError {
     AccessDenied,
     ConflictingPromptValues,
     ConsentRequired,
     LoginRequired,
-    MalformedCodeChallenge,
+    MalformedCodeChallenge(CodeChallengeRejection),
     MalformedMaxAge,
     MalformedScope,
     MissingCodeChallenge,
     MissingCodeChallengeMethod,
+    RequestNotSupported,
+    RequestUriNotSupported,
     ScopeNotGranted,
     UnsupportedCodeChallengeMethod,
     UnsupportedPromptValue,
@@ -22,8 +26,11 @@ impl AuthorizationError {
             Self::ConflictingPromptValues => "the prompt value none cannot be combined with others",
             Self::ConsentRequired => "the end-user has to consent, which needs an interaction",
             Self::LoginRequired => "the end-user has to authenticate, which needs an interaction",
-            Self::MalformedCodeChallenge => {
-                "the code challenge is not a base64url encoded sha-256 digest"
+            Self::MalformedCodeChallenge(CodeChallengeRejection::NotBase64Url) => {
+                "the code challenge is not base64url encoded"
+            }
+            Self::MalformedCodeChallenge(CodeChallengeRejection::WrongDigestLength) => {
+                "the code challenge is not a sha-256 digest"
             }
             Self::MalformedMaxAge => "the max_age parameter is not a number of seconds",
             Self::MalformedScope => "the scope parameter is not a list of scope tokens",
@@ -31,6 +38,8 @@ impl AuthorizationError {
             Self::MissingCodeChallengeMethod => {
                 "the code challenge method defaults to plain, which is not supported"
             }
+            Self::RequestNotSupported => "request objects are not supported",
+            Self::RequestUriNotSupported => "request objects passed by reference are not supported",
             Self::ScopeNotGranted => "the scope includes a scope the client may not request",
             Self::UnsupportedCodeChallengeMethod => "the code challenge method has to be S256",
             Self::UnsupportedPromptValue => {
@@ -44,7 +53,7 @@ impl AuthorizationError {
         match self {
             Self::AccessDenied => "access_denied",
             Self::ConflictingPromptValues
-            | Self::MalformedCodeChallenge
+            | Self::MalformedCodeChallenge(_)
             | Self::MalformedMaxAge
             | Self::MissingCodeChallenge
             | Self::MissingCodeChallengeMethod
@@ -53,6 +62,8 @@ impl AuthorizationError {
             Self::ConsentRequired => "consent_required",
             Self::LoginRequired => "login_required",
             Self::MalformedScope | Self::ScopeNotGranted => "invalid_scope",
+            Self::RequestNotSupported => "request_not_supported",
+            Self::RequestUriNotSupported => "request_uri_not_supported",
             Self::UnsupportedResponseType => "unsupported_response_type",
         }
     }

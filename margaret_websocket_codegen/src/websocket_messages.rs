@@ -18,7 +18,7 @@ pub(crate) fn websocket_messages(
             return Err(WebSocketCodegenError::MessageNotAStruct { message });
         }
 
-        let kind = MessageKind::parse(matched.args()?, &message)?;
+        let kind = MessageKind::parse(matched.args()?, index, item, &message)?;
 
         messages.push(WebSocketMessage {
             kind,

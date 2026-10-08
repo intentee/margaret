@@ -1,9 +1,10 @@
-use margaret::framework::macros::provides_jwks_endpoint;
+use margaret::framework::macros::verifies_tokens_from_issuer;
+use margaret::framework::trusted_issuer::issuer_keys::IssuerKeys;
 
-#[provides_jwks_endpoint(
+#[verifies_tokens_from_issuer(
     partner,
     audience = "fixture",
     issuer = "https://partner.fixture",
-    jwks_uri = "https://partner.fixture/.well-known/jwks.json"
+    keys = IssuerKeys::Published(jwks_uri = "https://partner.fixture/.well-known/jwks.json"),
 )]
 pub struct PartnerEndpoint;

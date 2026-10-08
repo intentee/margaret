@@ -4,24 +4,25 @@ use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
 
-use crate::jwks_secret_storage::JwksSecretStorage;
 use crate::persisted::persisted;
 use crate::roller_error::RollerError;
+use crate::stores_signing_keys::StoresSigningKeys;
 
 /// # Errors
 ///
 /// Returns `RollerError::KeyGeneration` when the next key cannot be generated, and
-/// `RollerError::SecretPersist` when the rotated secret cannot be persisted.
-pub fn roll(
-    storage: &dyn JwksSecretStorage,
+/// `RollerError::DocumentSerialization` or `RollerError::SecretPersist` when the rotated secret
+/// cannot be stored.
+pub async fn roll(
+    storage: &dyn StoresSigningKeys,
     holder: &JwksSecretHolder,
     rsa_keys: &dyn ProvidesRsaSigningKeys,
 ) -> Result<Arc<JwksSecret>, RollerError> {
-    let rotated = holder
+    let next = holder
         .get()
         .rotate(rsa_keys)
-        .map_err(RollerError::KeyGeneration)
-        .and_then(|next| persisted(storage, next))?;
+        .map_err(RollerError::KeyGeneration)?;
+    let rotated = persisted(storage, next).await?;
 
     holder.set(rotated.clone());
 

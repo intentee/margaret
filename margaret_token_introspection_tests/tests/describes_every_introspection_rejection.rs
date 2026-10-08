@@ -1,7 +1,8 @@
 use chrono::DateTime;
 use chrono::Utc;
 
-use margaret_oauth_vocabulary::oauth_vocabulary_error::OAuthVocabularyError;
+use margaret_oauth_vocabulary::client_id_rejection::ClientIdRejection;
+use margaret_oauth_vocabulary::scope_rejection::ScopeRejection;
 use margaret_token_introspection::introspection_rejection::IntrospectionRejection;
 
 fn instant(seconds: i64) -> DateTime<Utc> {
@@ -24,10 +25,10 @@ fn describes_every_introspection_rejection() {
             found: "https://attacker.example".to_string(),
         },
         IntrospectionRejection::MalformedClientId {
-            source: OAuthVocabularyError::ClientIdInvisibleCharacter,
+            rejection: ClientIdRejection::InvisibleCharacter,
         },
         IntrospectionRejection::MalformedScope {
-            source: OAuthVocabularyError::ScopeCharacter,
+            rejection: ScopeRejection::Character,
         },
         IntrospectionRejection::NotYetValid {
             nbf: instant(30),

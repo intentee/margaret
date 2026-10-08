@@ -33,14 +33,14 @@ fn reconcile_authority(
         None => None,
     };
 
-    match (target_authority, host) {
-        (Some(target), Some(host)) if *target != host => {
+    match host {
+        Some(host) if target_authority.is_some_and(|target| *target != host) => {
             RequestOutcome::Rejected(RequestRejection::AuthorityMismatch)
         }
-        (None, None) if requires_host(version) => {
+        None if target_authority.is_none() && requires_host(version) => {
             RequestOutcome::Rejected(RequestRejection::MissingHost)
         }
-        _ => RequestOutcome::Parsed(()),
+        Some(_) | None => RequestOutcome::Parsed(()),
     }
 }
 

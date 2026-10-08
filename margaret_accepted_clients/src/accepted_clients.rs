@@ -11,18 +11,18 @@ use margaret_jwt_verification::jwt_presentation::JwtPresentation;
 use margaret_jwt_verification::presented_jwt::PresentedJwt;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 use margaret_oauth_vocabulary::jwt_bearer_client_assertion_type::JWT_BEARER_CLIENT_ASSERTION_TYPE;
-use margaret_provider_state_storage::assertion_spending::AssertionSpending;
-use margaret_provider_state_storage::provider_state_error::ProviderStateError;
-use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::token_digest::TokenDigest;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
+use crate::accepted_clients_error::AcceptedClientsError;
+use crate::assertion_memory::AssertionMemory;
 use crate::assertion_subject::AssertionSubject;
 use crate::client_assertion_max_lifetime::CLIENT_ASSERTION_MAX_LIFETIME;
 use crate::client_authentication_outcome::ClientAuthenticationOutcome;
 use crate::client_authentication_parameters::ClientAuthenticationParameters;
 use crate::client_refusal::ClientRefusal;
+use crate::registered_authentication::RegisteredAuthentication;
 use crate::registered_client::RegisteredClient;
 
 pub struct AcceptedClients {
@@ -36,7 +36,7 @@ impl AcceptedClients {
         Self {
             clients: clients
                 .into_iter()
-                .map(|registered| (registered.client().client_id, registered))
+                .map(|registered| (registered.client.client_id, registered))
                 .collect(),
             issuer: issuance.issuer,
         }
@@ -44,7 +44,8 @@ impl AcceptedClients {
 
     /// # Errors
     ///
-    /// Returns `ProviderStateError` when the provider state cannot spend the client assertion.
+    /// Returns `AcceptedClientsError::RememberClientAssertion` when the application cannot remember
+    /// the client assertion.
     pub async fn authenticate(
         &self,
         authorization: &RequestAuthorization,
@@ -53,34 +54,33 @@ impl AcceptedClients {
             client_assertion_type,
             client_id,
         }: &ClientAuthenticationParameters,
-        state: &dyn StoresProviderState,
         now: NumericDate,
-    ) -> Result<ClientAuthenticationOutcome<'_>, ProviderStateError> {
+    ) -> Result<ClientAuthenticationOutcome<'_>, AcceptedClientsError> {
         if !matches!(authorization, RequestAuthorization::Absent) {
             return Ok(ClientAuthenticationOutcome::Refused(
                 ClientRefusal::HeaderAuthentication,
             ));
         }
 
-        match (client_assertion, client_assertion_type) {
-            (None, None) => Ok(self.public_client(client_id.as_deref())),
-            (Some(_), None) => Ok(ClientAuthenticationOutcome::Refused(
-                ClientRefusal::AssertionTypeMissing,
-            )),
-            (None, Some(_)) => Ok(ClientAuthenticationOutcome::Refused(
-                ClientRefusal::AssertionMissing,
-            )),
-            (Some(_), Some(assertion_type))
-                if assertion_type != JWT_BEARER_CLIENT_ASSERTION_TYPE =>
-            {
-                Ok(ClientAuthenticationOutcome::Refused(
-                    ClientRefusal::UnsupportedAssertionType,
-                ))
-            }
-            (Some(assertion), Some(_)) => {
-                self.asserted_client(assertion, client_id.as_deref(), state, now)
-                    .await
-            }
+        match client_assertion {
+            None => match client_assertion_type {
+                None => Ok(self.public_client(client_id.as_deref())),
+                Some(_) => Ok(ClientAuthenticationOutcome::Refused(
+                    ClientRefusal::AssertionMissing,
+                )),
+            },
+            Some(assertion) => match client_assertion_type {
+                None => Ok(ClientAuthenticationOutcome::Refused(
+                    ClientRefusal::AssertionTypeMissing,
+                )),
+                Some(assertion_type) if assertion_type != JWT_BEARER_CLIENT_ASSERTION_TYPE => Ok(
+                    ClientAuthenticationOutcome::Refused(ClientRefusal::UnsupportedAssertionType),
+                ),
+                Some(_) => {
+                    self.asserted_client(assertion, client_id.as_deref(), now)
+                        .await
+                }
+            },
         }
     }
 
@@ -93,9 +93,8 @@ impl AcceptedClients {
         &self,
         assertion: &str,
         form_client_id: Option<&str>,
-        state: &dyn StoresProviderState,
         now: NumericDate,
-    ) -> Result<ClientAuthenticationOutcome<'_>, ProviderStateError> {
+    ) -> Result<ClientAuthenticationOutcome<'_>, AcceptedClientsError> {
         let presented = match PresentedJwt::present(assertion) {
             JwtPresentation::Presented(presented) => presented,
             JwtPresentation::Rejected(rejection) => {
@@ -117,8 +116,13 @@ impl AcceptedClients {
                 ClientRefusal::UnknownClient,
             ));
         };
-        let RegisteredClient::Confidential {
-            client, key_set, ..
+        let RegisteredClient {
+            authentication:
+                RegisteredAuthentication::PrivateKeyJwt {
+                    assertions, keys, ..
+                },
+            client,
+            ..
         } = registered
         else {
             return Ok(ClientAuthenticationOutcome::Refused(
@@ -140,7 +144,7 @@ impl AcceptedClients {
             claims: AssertionSubject { sub },
             registered: claims,
             ..
-        } = match key_set
+        } = match keys
             .verify::<AssertionSubject, ClientAssertionProfile>(&attributed, now)
             .await
         {
@@ -178,14 +182,17 @@ impl AcceptedClients {
             ));
         };
 
-        match state
-            .spend_client_assertion(client.client_id, TokenDigest::of(&jti), claims.exp, now)
-            .await?
-        {
-            AssertionSpending::Refused(refusal) => Ok(ClientAuthenticationOutcome::Refused(
-                ClientRefusal::AssertionRefused(refusal),
+        match assertions
+            .remember_client_assertion(client.client_id, TokenDigest::of(&jti), claims.exp, now)
+            .await
+            .map_err(|source| AcceptedClientsError::RememberClientAssertion {
+                client_id: client.client_id,
+                source,
+            })? {
+            AssertionMemory::First => Ok(ClientAuthenticationOutcome::Authenticated(registered)),
+            AssertionMemory::Seen => Ok(ClientAuthenticationOutcome::Refused(
+                ClientRefusal::AssertionReplayed,
             )),
-            AssertionSpending::Spent => Ok(ClientAuthenticationOutcome::Authenticated(registered)),
         }
     }
 
@@ -195,12 +202,16 @@ impl AcceptedClients {
         };
 
         match self.find(client_id) {
-            Some(registered @ RegisteredClient::Public(_)) => {
-                ClientAuthenticationOutcome::Authenticated(registered)
-            }
-            Some(RegisteredClient::Confidential { .. }) => {
-                ClientAuthenticationOutcome::Refused(ClientRefusal::AssertionRequired)
-            }
+            Some(
+                registered @ RegisteredClient {
+                    authentication: RegisteredAuthentication::None,
+                    ..
+                },
+            ) => ClientAuthenticationOutcome::Authenticated(registered),
+            Some(RegisteredClient {
+                authentication: RegisteredAuthentication::PrivateKeyJwt { .. },
+                ..
+            }) => ClientAuthenticationOutcome::Refused(ClientRefusal::AssertionRequired),
             None => ClientAuthenticationOutcome::Refused(ClientRefusal::UnknownClient),
         }
     }

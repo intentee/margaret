@@ -1,10 +1,7 @@
 use margaret_registered_claims::audience::Audience;
-use margaret_registered_claims::registered_claims_error::RegisteredClaimsError;
+use margaret_registered_claims::audience_parsing::AudienceParsing;
 
 #[test]
 fn rejects_an_empty_audience() {
-    assert!(matches!(
-        "".parse::<Audience>(),
-        Err(RegisteredClaimsError::AudienceEmpty)
-    ));
+    assert_eq!(Audience::parse(""), AudienceParsing::Empty);
 }

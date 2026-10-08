@@ -39,6 +39,9 @@ pub(crate) async fn discover_key_set_location(
         IssuerDocument::Failed(failure) => {
             DiscoveredKeySetLocation::Failed(DiscoveryFailure::Exchange(failure))
         }
+        IssuerDocument::Oversized { max_bytes } => {
+            DiscoveredKeySetLocation::Failed(DiscoveryFailure::Oversized { max_bytes })
+        }
         IssuerDocument::UnexpectedStatus(status) => {
             DiscoveredKeySetLocation::Failed(DiscoveryFailure::Status(status))
         }

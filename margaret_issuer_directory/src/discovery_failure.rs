@@ -11,6 +11,7 @@ use margaret_oidc_discovery::provider_metadata_rejection::ProviderMetadataReject
 pub(crate) enum DiscoveryFailure {
     Exchange(IssuerExchangeError),
     MetadataRejected(ProviderMetadataRejection),
+    Oversized { max_bytes: usize },
     Status(StatusCode),
 }
 
@@ -24,6 +25,9 @@ impl Display for DiscoveryFailure {
             Self::MetadataRejected(rejection) => {
                 write!(formatter, "the provider metadata is rejected: {rejection}")
             }
+            Self::Oversized { max_bytes } => {
+                write!(formatter, "the provider metadata exceeds {max_bytes} bytes")
+            }
             Self::Status(status) => write!(
                 formatter,
                 "the issuer answered the discovery request with status {status}"
@@ -36,7 +40,7 @@ impl Display for DiscoveryFailure {
 mod tests {
     use reqwest::StatusCode;
 
-    use margaret_https_url::https_url_error::HttpsUrlError;
+    use margaret_https_url::https_url_rejection::HttpsUrlRejection;
     use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
     use margaret_oidc_discovery::metadata_endpoint::MetadataEndpoint;
     use margaret_oidc_discovery::provider_metadata_rejection::ProviderMetadataRejection;
@@ -46,27 +50,33 @@ mod tests {
     #[test]
     fn describes_every_failure() {
         let described = [
-            DiscoveryFailure::Exchange(IssuerExchangeError::Oversized { max_bytes: 16 }),
+            DiscoveryFailure::Exchange(IssuerExchangeError::Transport(
+                reqwest::Client::new()
+                    .get("not a url")
+                    .build()
+                    .expect_err("a relative url is not requestable"),
+            )),
             DiscoveryFailure::MetadataRejected(ProviderMetadataRejection::Endpoint {
                 endpoint: MetadataEndpoint::JwksUri,
-                source: HttpsUrlError::NotHttps {
+                rejection: HttpsUrlRejection::NotHttps {
                     scheme: "http".to_string(),
                 },
             }),
+            DiscoveryFailure::Oversized { max_bytes: 16 },
             DiscoveryFailure::Status(StatusCode::NOT_FOUND),
         ]
         .map(|failure| failure.to_string());
 
-        assert_eq!(
-            described[0],
-            "the provider metadata could not be fetched: the issuer answered with more than 16 bytes"
-        );
+        assert!(described[0].starts_with(
+            "the provider metadata could not be fetched: the issuer could not be reached: "
+        ));
         assert_eq!(
             described[1],
             "the provider metadata is rejected: the provider jwks_uri is rejected: the url uses the 'http' scheme instead of https"
         );
+        assert_eq!(described[2], "the provider metadata exceeds 16 bytes");
         assert_eq!(
-            described[2],
+            described[3],
             "the issuer answered the discovery request with status 404 Not Found"
         );
     }

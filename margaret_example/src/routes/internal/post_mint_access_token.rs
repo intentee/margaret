@@ -7,6 +7,7 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::margaret::jwks::MintAccessTokenHandler;
 use crate::system_clock::SystemClock;
@@ -14,7 +15,7 @@ use crate::system_clock::SystemClock;
 #[singleton]
 #[responds_to_http(
     max_body_bytes = 8_388_608,
-    method = "post",
+    method = RouteMethod::Post,
     path = "/.well-known/mint",
     server = "internal"
 )]

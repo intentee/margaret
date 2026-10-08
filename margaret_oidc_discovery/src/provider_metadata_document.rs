@@ -26,6 +26,8 @@ pub struct ProviderMetadataDocument {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt_values_supported: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_uri_parameter_supported: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response_modes_supported: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response_types_supported: Option<Vec<String>>,

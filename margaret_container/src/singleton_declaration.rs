@@ -11,27 +11,51 @@ fn framework_path(segments: &[&str]) -> CanonicalPath {
     )
 }
 
-#[derive(Clone, Copy)]
-pub(crate) enum SingletonDeclaration {
-    ExchangesSubjectTokens,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SingletonDeclaration {
+    ExchangesTokensFrom,
+    RemembersClientAssertions,
+    StoresAuthorizationGrants,
+    StoresSigningKeys,
 }
 
 impl SingletonDeclaration {
-    pub(crate) const ALL: [Self; 1] = [Self::ExchangesSubjectTokens];
+    pub(crate) const ALL: [Self; 4] = [
+        Self::ExchangesTokensFrom,
+        Self::RemembersClientAssertions,
+        Self::StoresAuthorizationGrants,
+        Self::StoresSigningKeys,
+    ];
 
     pub(crate) fn attribute(self) -> FrameworkAttribute {
         match self {
-            Self::ExchangesSubjectTokens => FrameworkAttribute::ExchangesSubjectTokens,
+            Self::ExchangesTokensFrom => FrameworkAttribute::ExchangesTokensFrom,
+            Self::RemembersClientAssertions => FrameworkAttribute::RemembersClientAssertions,
+            Self::StoresAuthorizationGrants => FrameworkAttribute::StoresAuthorizationGrants,
+            Self::StoresSigningKeys => FrameworkAttribute::StoresSigningKeys,
         }
     }
 
     pub(crate) fn required_trait(self) -> CanonicalPath {
         match self {
-            Self::ExchangesSubjectTokens => framework_path(&[
+            Self::ExchangesTokensFrom => framework_path(&[
                 "subject_token_exchange",
                 "exchanges_subject_tokens",
                 "ExchangesSubjectTokens",
             ]),
+            Self::RemembersClientAssertions => framework_path(&[
+                "accepted_clients",
+                "remembers_client_assertions",
+                "RemembersClientAssertions",
+            ]),
+            Self::StoresAuthorizationGrants => framework_path(&[
+                "authorization_grants",
+                "stores_authorization_grants",
+                "StoresAuthorizationGrants",
+            ]),
+            Self::StoresSigningKeys => {
+                framework_path(&["jwks_roller", "stores_signing_keys", "StoresSigningKeys"])
+            }
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::ops::ControlFlow;
+
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
 use p256::ecdsa::signature::Signer;
@@ -48,8 +50,10 @@ fn ec_verification_material(
     curve: SigningCurve,
     point: &[u8],
 ) -> Result<VerificationMaterial, JwksKeyError> {
-    VerificationMaterial::from_ec_point(curve.curve(), point)
-        .map_err(|source| JwksKeyError::VerificationKeyRejected { source })
+    match VerificationMaterial::from_ec_point(curve.curve(), point) {
+        ControlFlow::Continue(material) => Ok(material),
+        ControlFlow::Break(source) => Err(JwksKeyError::VerificationKeyRejected { source }),
+    }
 }
 
 fn with_pem(
@@ -255,8 +259,8 @@ mod tests {
     fn reports_a_point_that_is_not_on_the_curve() {
         let point = [4; 65];
         let rejection = VerificationMaterial::from_ec_point(Curve::P256, &point)
-            .map(drop)
-            .expect_err("the point is not on the curve");
+            .break_value()
+            .expect("the point is not on the curve");
 
         assert!(matches!(
             ec_verification_material(SigningCurve::P256, &point),

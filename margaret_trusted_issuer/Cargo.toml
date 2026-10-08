@@ -11,6 +11,7 @@ publish.workspace = true
 
 [dependencies]
 margaret_issuer_key_set = { workspace = true }
+margaret_jwks_secret_store = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_token_trust = { workspace = true }

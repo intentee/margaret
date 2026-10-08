@@ -98,7 +98,7 @@ impl TrustedRepositoryIssuer {
     }
 
     fn trusted_issuer(&self, key_set: Arc<IssuerKeySet>, audience: &'static str) -> TrustedIssuer {
-        TrustedIssuer::create(
+        TrustedIssuer::polled(
             key_set,
             TokenTrust {
                 audience,

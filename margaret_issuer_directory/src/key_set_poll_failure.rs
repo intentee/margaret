@@ -13,6 +13,7 @@ use crate::discovery_failure::DiscoveryFailure;
 pub(crate) enum KeySetPollFailure {
     Discovery(DiscoveryFailure),
     DocumentExchange(IssuerExchangeError),
+    DocumentOversized { max_bytes: usize },
     DocumentRejected(KeySetDocumentRejection),
     DocumentStatus(StatusCode),
 }
@@ -27,6 +28,9 @@ impl Display for KeySetPollFailure {
                 formatter,
                 "the key set document could not be fetched: {failure}"
             ),
+            Self::DocumentOversized { max_bytes } => {
+                write!(formatter, "the key set document exceeds {max_bytes} bytes")
+            }
             Self::DocumentRejected(rejection) => {
                 write!(formatter, "the key set document is rejected: {rejection}")
             }
@@ -52,7 +56,13 @@ mod tests {
     fn describes_every_failure() {
         let described = [
             KeySetPollFailure::Discovery(DiscoveryFailure::Status(StatusCode::NOT_FOUND)),
-            KeySetPollFailure::DocumentExchange(IssuerExchangeError::Oversized { max_bytes: 16 }),
+            KeySetPollFailure::DocumentExchange(IssuerExchangeError::Transport(
+                reqwest::Client::new()
+                    .get("not a url")
+                    .build()
+                    .expect_err("a relative url is not requestable"),
+            )),
+            KeySetPollFailure::DocumentOversized { max_bytes: 16 },
             KeySetPollFailure::DocumentRejected(KeySetDocumentRejection::Malformed {
                 source: serde_json::from_str::<u8>("x").expect_err("not json"),
             }),
@@ -64,13 +74,13 @@ mod tests {
             described[0],
             "the key set could not be located: the issuer answered the discovery request with status 404 Not Found"
         );
+        assert!(described[1].starts_with(
+            "the key set document could not be fetched: the issuer could not be reached: "
+        ));
+        assert_eq!(described[2], "the key set document exceeds 16 bytes");
+        assert!(described[3].starts_with("the key set document is rejected: "));
         assert_eq!(
-            described[1],
-            "the key set document could not be fetched: the issuer answered with more than 16 bytes"
-        );
-        assert!(described[2].starts_with("the key set document is rejected: "));
-        assert_eq!(
-            described[3],
+            described[4],
             "the issuer answered the key set request with status 503 Service Unavailable"
         );
     }

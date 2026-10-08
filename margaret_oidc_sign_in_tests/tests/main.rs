@@ -12,6 +12,7 @@ mod refuses_a_response_without_the_advertised_issuer;
 mod refuses_a_transaction_sealed_for_another_client;
 mod refuses_an_id_token_that_is_not_a_jws;
 mod refuses_userinfo_of_another_subject;
+mod rejects_a_callback_that_is_not_a_url;
 mod relays_a_denied_authorization;
 mod relays_a_refused_code_exchange;
 mod relays_a_refused_userinfo_request;

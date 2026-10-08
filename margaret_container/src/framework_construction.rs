@@ -14,9 +14,5 @@ pub enum FrameworkConstruction {
         method: String,
         outcome: ConstructorOutcome,
     },
-    Resolved {
-        dependencies: Vec<FrameworkDependency>,
-        resolver: CanonicalPath,
-    },
     Unit,
 }

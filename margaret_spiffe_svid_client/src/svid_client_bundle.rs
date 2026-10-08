@@ -5,6 +5,7 @@ use rustls::ClientConfig;
 use trzcina::Service;
 use trzcina::ServiceBundle;
 
+use margaret_spiffe_svid::svid_crypto_provider::svid_crypto_provider;
 use margaret_spiffe_svid::svid_service::SvidService;
 use margaret_spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams;
 use margaret_spiffe_svid::svid_side_params::SvidSideParams;
@@ -19,24 +20,28 @@ pub struct SvidClientBundle {
 }
 
 impl SvidClientBundle {
-    #[must_use]
+    /// # Errors
+    ///
+    /// Returns `SvidError::ProtocolVersions` when the svid crypto provider supports none of the
+    /// safe default tls versions.
     pub fn new(
         SvidServiceBundleParams {
             spiffe_trust_domain,
             spire_agent_addr,
         }: SvidServiceBundleParams,
-    ) -> Self {
+    ) -> Result<Self, SvidError> {
         let svid_service = SvidService::new(spire_agent_addr);
-        let svid_client_side = SvidClientSide::new(SvidSideParams {
+
+        SvidClientSide::new(SvidSideParams {
+            crypto_provider: svid_crypto_provider(),
             root_cert_store_holder: svid_service.root_cert_store_holder(),
             spiffe_trust_domain,
             svid_certified_key_holder: svid_service.svid_certified_key_holder(),
-        });
-
-        Self {
+        })
+        .map(|svid_client_side| Self {
             svid_client_side,
             svid_service,
-        }
+        })
     }
 
     #[must_use]

@@ -1,6 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use crate::module_sign_in::ModuleSignIn;
+
 #[derive(Clone, Copy)]
 pub enum OAuthClientItem {
     AuthorizationServerClient,
@@ -32,6 +34,14 @@ impl OAuthClientItem {
             Self::TokenExchange => quote! {
                 margaret::framework::token_exchange_client::token_exchange::TokenExchange
             },
+        }
+    }
+
+    #[must_use]
+    pub fn is_available_to(self, sign_in: &ModuleSignIn) -> bool {
+        match self {
+            Self::SignInFlow => matches!(sign_in, ModuleSignIn::Available { .. }),
+            Self::AuthorizationServerClient | Self::ClientCredentials | Self::TokenExchange => true,
         }
     }
 

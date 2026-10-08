@@ -20,7 +20,7 @@ async fn reports_an_unavailable_authorization_server() {
         AuthorizationServerClient::with_client_secret_basic(
             Arc::new(IssuerRequestClient::create().expect("the issuer request client builds")),
             Arc::clone(&metadata),
-            Arc::new(TrustedIssuer::create(
+            Arc::new(TrustedIssuer::polled(
                 Arc::new(IssuerKeySet::awaiting()),
                 localhost_trust(),
             )),

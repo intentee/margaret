@@ -5,17 +5,18 @@ use tokio_util::sync::CancellationToken;
 use trzcina::ServiceBundle as _;
 
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
-use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
 use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
+use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
 
 #[tokio::test(start_paused = true)]
 async fn jwks_roller_server_bundle_rotates_its_secret_one_interval_after_it_starts() {
     let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
         rsa_keys: Arc::new(FixtureRsaSigningKeys::default()),
-        storage: Arc::new(MemoryJwksSecretStorage),
+        storage: Arc::new(FixtureSigningKeys::empty()),
     })
+    .await
     .expect("the first secret is rolled and published");
     let jwks_secret_holder = bundle.jwks_secret_holder();
     let initial = jwks_secret_holder.get();

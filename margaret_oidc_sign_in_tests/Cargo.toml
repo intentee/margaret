@@ -11,6 +11,7 @@ chrono = { workspace = true, features = ["clock"] }
 cookie = { workspace = true }
 form_urlencoded = { workspace = true }
 http = { workspace = true }
+margaret_authorization_server_client = { workspace = true }
 margaret_authorization_server_client_tests = { path = "../margaret_authorization_server_client_tests" }
 margaret_http = { workspace = true }
 margaret_http_tests = { path = "../margaret_http_tests" }
@@ -29,7 +30,6 @@ url = { workspace = true }
 
 [dev-dependencies]
 base64ct = { workspace = true, features = ["alloc"] }
-margaret_authorization_server_client = { workspace = true }
 margaret_issuer_metadata = { workspace = true }
 margaret_issuer_request = { workspace = true }
 margaret_jose_parameters = { workspace = true }

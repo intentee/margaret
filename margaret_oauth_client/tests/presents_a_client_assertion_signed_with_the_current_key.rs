@@ -10,9 +10,9 @@ use margaret_oauth_client::client_authentication::ClientAuthentication;
 use margaret_oauth_client::presented_client_authentication::PresentedClientAuthentication;
 use margaret_registered_claims::numeric_date::NumericDate;
 
-#[test]
-fn presents_a_client_assertion_signed_with_the_current_key() {
-    let roller = fixture_roller();
+#[tokio::test]
+async fn presents_a_client_assertion_signed_with_the_current_key() {
+    let roller = fixture_roller().await;
     let PresentedClientAuthentication::Assertion(assertion) =
         ClientAuthentication::PrivateKeyJwt(Arc::clone(&roller)).presented_to(
             "https://issuer.example",

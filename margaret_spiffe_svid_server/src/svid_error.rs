@@ -10,6 +10,12 @@ pub enum SvidError {
         source: VerifierBuilderError,
     },
 
+    #[error("the svid crypto provider supports none of the safe default tls versions: {source}")]
+    ProtocolVersions {
+        #[source]
+        source: rustls::Error,
+    },
+
     #[error("the configured spiffe trust domain is not a valid trust domain: {source}")]
     TrustDomain {
         #[source]

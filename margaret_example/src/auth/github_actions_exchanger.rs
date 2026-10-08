@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use margaret::framework::jwt_verification::id_token_profile::IdTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 use margaret::framework::macros::constructor;
-use margaret::framework::macros::exchanges_subject_tokens;
+use margaret::framework::macros::exchanges_tokens_from;
 use margaret::framework::macros::singleton;
 use margaret::framework::subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectTokens;
 use margaret::framework::subject_token_exchange::subject_token_exchange::SubjectTokenExchange;
@@ -16,7 +16,7 @@ use crate::auth::github_actions_claims::GithubActionsClaims;
 use crate::auth::trusted_workflow::TrustedWorkflow;
 
 #[singleton]
-#[exchanges_subject_tokens(issuer = github_actions)]
+#[exchanges_tokens_from(issuer = github_actions)]
 pub struct GithubActionsExchanger {
     trusted_workflow: Arc<TrustedWorkflow>,
 }

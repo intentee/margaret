@@ -5,6 +5,7 @@ use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::server_origin_ident::server_origin_ident;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
@@ -12,11 +13,12 @@ use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
+use margaret_http_codegen::server_origin_source::ServerOriginSource;
+use margaret_http_codegen::server_uploads::ServerUploads;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
 use crate::first_tick::FirstTick;
 use crate::runner_outcome::RunnerOutcome;
-use crate::served_origin_check::ServedOriginCheck;
 use crate::service_kind::ServiceKind;
 use crate::service_plan::ServicePlan;
 use crate::service_unit::ServiceUnit;
@@ -103,18 +105,15 @@ fn svid_identity_prelude(
     });
 
     quote! {
-        if let ::std::result::Result::Err(error) =
-            margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider()
-        {
-            return margaret::framework::console::report_failure::report_failure(error);
-        }
-
-        let spiffe_bundle = #bundle_constructor::new(
+        let spiffe_bundle = match #bundle_constructor::new(
             margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams {
                 spiffe_trust_domain: #spiffe_trust_domain,
                 spire_agent_addr: #spire_agent_addr,
             },
-        );
+        ) {
+            Ok(bundle) => bundle,
+            Err(error) => return margaret::framework::console::report_failure::report_failure(error),
+        };
 
         #server_config
         #client_readiness
@@ -156,63 +155,76 @@ fn bundle_registration(
     }
 }
 
-fn origin_checks(server: &HttpServer, served_origin_checks: &[ServedOriginCheck]) -> TokenStream {
-    let origin_variable = format_ident!("origin_{}", server.name());
-    let checks = served_origin_checks
-        .iter()
-        .filter(|check| check.server == server.name())
-        .map(|check| {
-            let endpoints = path_tokens(&check.endpoints);
+fn served_routes(servers: &[HttpServer]) -> TokenStream {
+    if servers.is_empty() {
+        return TokenStream::new();
+    }
 
-            quote! {
-                if let ::std::result::Result::Err(error) = #endpoints.served_by(#origin_variable) {
-                    return ::std::result::Result::Err(
-                        margaret::framework::console::report_failure::report_failure(error),
-                    );
-                }
+    let origins = servers.iter().map(|server| {
+        let origin = server_origin_ident(server.name());
+        let serialization = match server.origin() {
+            ServerOriginSource::Argument => {
+                let origin_read = required_flag_read(
+                    &quote! { margaret::framework::http::server_origin::ServerOrigin },
+                    &server.url_argument(),
+                    &quote! { value.origin.ascii_serialization() },
+                    &failed_outcome(),
+                );
+
+                quote! { #origin_read }
             }
-        });
+            ServerOriginSource::Issuer { endpoints } => {
+                let endpoints = path_tokens(endpoints);
 
-    quote! { #(#checks)* }
+                quote! { #endpoints.issuer_origin }
+            }
+        };
+
+        quote! {
+            let #origin: ::std::sync::Arc<str> = ::std::sync::Arc::from(#serialization);
+        }
+    });
+    let origin_arguments = servers.iter().map(|server| {
+        let origin = server_origin_ident(server.name());
+
+        quote! { ::std::sync::Arc::clone(&#origin) }
+    });
+
+    quote! {
+        #(#origins)*
+
+        let routes = ::std::sync::Arc::new(
+            super::routes::Routes::from_origins(#(#origin_arguments),*),
+        );
+    }
 }
 
 fn server_registration(
     servers: &[HttpServer],
     has_views: bool,
     activation: SpiffeActivation,
-    served_origin_checks: &[ServedOriginCheck],
 ) -> TokenStream {
-    let origins = servers.iter().map(|server| {
-        let origin_variable = format_ident!("origin_{}", server.name());
-        let origin_read = required_flag_read(
-            &quote! { margaret::framework::http::server_origin::ServerOrigin },
-            &server.url_argument(),
-            &quote! { value },
-            &failed_registration(),
-        );
-        let checks = origin_checks(server, served_origin_checks);
-
-        quote! {
-            let #origin_variable: &margaret::framework::http::server_origin::ServerOrigin = #origin_read;
-            #checks
-        }
-    });
-
-    let origin_arguments = servers.iter().map(|server| {
-        let origin_variable = format_ident!("origin_{}", server.name());
-
-        quote! { ::std::sync::Arc::from(#origin_variable.origin.ascii_serialization()) }
-    });
-
     let views_argument = has_views.then(|| quote! { , &views });
     let assemblies = servers.iter().map(|server| {
         let function_name = server.function_name();
         let address_argument = server.address_argument();
-        let uploads_argument = server.uploads_argument();
-        let upload_dir_argument = server.upload_dir_argument();
+        let uploads = match server.uploads() {
+            ServerUploads::Accepted => {
+                let directory_argument = server.upload_dir_argument();
+
+                quote! {
+                    margaret::framework::service::server_uploads::ServerUploads::Accepted {
+                        directory_argument: #directory_argument,
+                    }
+                }
+            }
+            ServerUploads::Refused => {
+                quote! { margaret::framework::service::server_uploads::ServerUploads::Refused }
+            }
+        };
         let transport = transport_expression(server, activation.server_active);
         let routes = quote! {
-            super::http::#function_name::#function_name(container, &routes #views_argument)
+            super::http::#function_name::#function_name(container, routes #views_argument)
         };
 
         quote! {
@@ -220,8 +232,7 @@ fn server_registration(
                 address_argument: #address_argument,
                 routes: #routes,
                 transport: #transport,
-                upload_dir_argument: #upload_dir_argument,
-                uploads_argument: #uploads_argument,
+                uploads: #uploads,
             }
         }
     });
@@ -236,11 +247,6 @@ fn server_registration(
     let register_server = gated_registration(&quote! { server_service }, activation.client_active);
 
     quote! {
-        #(#origins)*
-
-        let routes = ::std::sync::Arc::new(
-            super::routes::Routes::from_origins(#(#origin_arguments),*),
-        );
         #views_setup
         let servers = #assemblies;
 
@@ -327,20 +333,10 @@ fn ticker_adapter(
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
     let interval = path_tokens(interval);
-    let runner = format_ident!("{}", unit.runner);
     let missed_tick_behavior_method = missed_tick_behavior_method(behavior);
     let first_tick_timing_method = first_tick_timing_method(first_tick);
-    let (token_binding, arguments) = if unit.takes_token {
-        (quote! { cancellation_token }, quote! { cancellation_token })
-    } else {
-        (quote! { _cancellation_token }, quote! {})
-    };
-    let call = if unit.is_async {
-        quote! { self.inner.#runner(#arguments).await }
-    } else {
-        quote! { self.inner.#runner(#arguments) }
-    };
-    let outcome = runner_result(unit, &call);
+    let token_binding = token_binding(unit);
+    let outcome = runner_outcome(unit);
 
     quote! {
         struct #name {
@@ -368,21 +364,35 @@ fn ticker_adapter(
     }
 }
 
-fn service_adapter(unit: &ServiceUnit) -> TokenStream {
-    let name = adapter_ident(unit);
-    let concrete = path_tokens(&unit.concrete_path);
-    let runner = format_ident!("{}", unit.runner);
-    let (token_binding, arguments) = if unit.takes_token {
-        (quote! { cancellation_token }, quote! { cancellation_token })
+fn token_binding(unit: &ServiceUnit) -> TokenStream {
+    if unit.takes_token {
+        quote! { cancellation_token }
     } else {
-        (quote! { _cancellation_token }, quote! {})
+        quote! { _cancellation_token }
+    }
+}
+
+fn runner_outcome(unit: &ServiceUnit) -> TokenStream {
+    let runner = format_ident!("{}", unit.runner);
+    let arguments = if unit.takes_token {
+        quote! { cancellation_token }
+    } else {
+        quote! {}
     };
     let call = if unit.is_async {
         quote! { self.inner.#runner(#arguments).await }
     } else {
         quote! { self.inner.#runner(#arguments) }
     };
-    let outcome = runner_result(unit, &call);
+
+    runner_result(unit, &call)
+}
+
+fn service_adapter(unit: &ServiceUnit) -> TokenStream {
+    let name = adapter_ident(unit);
+    let concrete = path_tokens(&unit.concrete_path);
+    let token_binding = token_binding(unit);
+    let outcome = runner_outcome(unit);
 
     quote! {
         struct #name {
@@ -423,13 +433,12 @@ fn register_servers_definition(
     servers: &[HttpServer],
     has_views: bool,
     activation: SpiffeActivation,
-    served_origin_checks: &[ServedOriginCheck],
 ) -> TokenStream {
     if servers.is_empty() {
         return TokenStream::new();
     }
 
-    let body = server_registration(servers, has_views, activation, served_origin_checks);
+    let body = server_registration(servers, has_views, activation);
     let spiffe_server_parameter = activation
         .server_active
         .then(|| quote! { spiffe_server_config: &::std::sync::Arc<margaret::framework::spiffe_svid::rustls::ServerConfig>, });
@@ -446,6 +455,7 @@ fn register_servers_definition(
             manager: &mut trzcina::ServiceManager,
             matches: &clap::ArgMatches,
             container: &super::container::Container,
+            routes: &::std::sync::Arc<super::routes::Routes>,
             #spiffe_server_parameter
             #spiffe_client_parameter
         ) -> ::std::result::Result<
@@ -477,6 +487,7 @@ fn register_servers_invocation(
             &mut manager,
             matches,
             container,
+            &routes,
             #spiffe_server_argument
             #spiffe_client_argument
         ) {
@@ -490,7 +501,6 @@ pub fn render_services(
     servers: &[HttpServer],
     has_views: bool,
     bindings: &ContainerBindings,
-    served_origin_checks: &[ServedOriginCheck],
 ) -> GeneratedModuleTokens {
     let activation = SpiffeActivation {
         client_active: plan.has_spiffe_http_client,
@@ -504,10 +514,11 @@ pub fn render_services(
         .map(|unit| registration(unit, bindings, activation.client_active));
     let identity_prelude = svid_identity_prelude(activation);
     let bundle_registration = bundle_registration(activation);
-    let register_servers =
-        register_servers_definition(servers, has_views, activation, served_origin_checks);
+    let served_routes = served_routes(servers);
+    let register_servers = register_servers_definition(servers, has_views, activation);
     let server_registration = register_servers_invocation(servers, activation);
-    let construction_invocation = bindings.serve_invocation(&plan.construction_arguments);
+    let construction_invocation =
+        bindings.serve_invocation(&plan.construction_arguments, &plan.served_roots);
     let construction = quote! {
         let container = match #construction_invocation {
             Ok(container) => container,
@@ -537,6 +548,7 @@ pub fn render_services(
             cancellation_token: tokio_util::sync::CancellationToken,
         ) -> margaret::framework::console::command_outcome::CommandOutcome {
             #identity_prelude
+            #served_routes
             #prelude
             #construction
 

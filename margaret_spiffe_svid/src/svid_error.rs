@@ -1,15 +1,7 @@
-use std::sync::Arc;
-
-use rustls::crypto::CryptoProvider;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum SvidError {
-    #[error(
-        "a rustls crypto provider is already installed; Margaret installs the process-wide provider itself"
-    )]
-    CryptoProviderAlreadyInstalled { installed: Arc<CryptoProvider> },
-
     #[error("the x509 context carries no ca bundle for trust domain '{trust_domain}'")]
     MissingCaBundle { trust_domain: String },
 

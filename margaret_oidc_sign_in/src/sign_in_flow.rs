@@ -5,8 +5,6 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use oauth2::CsrfToken;
-use oauth2::PkceCodeChallenge;
-use oauth2::PkceCodeVerifier;
 use oauth2::RedirectUrl;
 use oauth2::TokenResponse;
 use serde::de::DeserializeOwned;
@@ -32,7 +30,9 @@ use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::sign_in_transaction_profile::SignInTransactionProfile;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
-use margaret_oauth_vocabulary::scope::Scope;
+use margaret_oauth_vocabulary::code_challenge::CodeChallenge;
+use margaret_oauth_vocabulary::code_verifier::CodeVerifier;
+use margaret_oauth_vocabulary::openid_scope::OPENID_SCOPE;
 use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::equal_in_constant_time::equal_in_constant_time;
@@ -44,8 +44,8 @@ use crate::id_token_claims::IdTokenClaims;
 use crate::id_token_fields::IdTokenFields;
 use crate::sign_in_beginning::SignInBeginning;
 use crate::sign_in_completion::SignInCompletion;
+use crate::sign_in_flow_error::SignInFlowError;
 use crate::sign_in_refusal::SignInRefusal;
-use crate::sign_in_request::SignInRequest;
 use crate::signed_in::SignedIn;
 use crate::transaction_cookie::TransactionCookie;
 use crate::userinfo_claims::UserinfoClaims;
@@ -55,16 +55,18 @@ fn rejected_id_token<TIdClaims>(rejection: JwtRejection) -> SignInCompletion<TId
     SignInCompletion::Refused(SignInRefusal::IdTokenRejected(rejection))
 }
 
-fn requested_scopes(scopes: &BTreeSet<Scope>) -> Vec<oauth2::Scope> {
-    iter::once(Scope::openid())
-        .chain(scopes.iter().cloned())
-        .collect::<BTreeSet<Scope>>()
-        .iter()
-        .map(oauth2::Scope::from)
+fn requested_scopes(scopes: &[&str]) -> Vec<oauth2::Scope> {
+    iter::once(OPENID_SCOPE)
+        .chain(scopes.iter().copied())
+        .collect::<BTreeSet<&str>>()
+        .into_iter()
+        .map(|scope| oauth2::Scope::new(scope.to_string()))
         .collect()
 }
 
 pub struct SignInFlow {
+    callback: RedirectUrl,
+    requested_scopes: Vec<oauth2::Scope>,
     roller: Arc<JwksRoller>,
     server: Arc<AuthorizationServerClient>,
     transaction_cookie: TransactionCookie,
@@ -72,42 +74,50 @@ pub struct SignInFlow {
 }
 
 impl SignInFlow {
-    #[must_use]
-    pub fn create(server: Arc<AuthorizationServerClient>, roller: Arc<JwksRoller>) -> Self {
+    /// # Errors
+    ///
+    /// Returns `SignInFlowError::MalformedCallback` when the callback is not a url.
+    pub fn create(
+        server: Arc<AuthorizationServerClient>,
+        roller: Arc<JwksRoller>,
+        callback: String,
+        scopes: &[&str],
+    ) -> Result<Self, SignInFlowError> {
         let transaction_issuance = TokenIssuance {
             audience: server.client_id,
             issuer: server.trusted_issuer.trust.issuer,
         };
 
-        Self {
-            roller,
-            transaction_cookie: TransactionCookie::of(&transaction_issuance),
-            server,
-            transaction_issuance,
-        }
+        RedirectUrl::new(callback.clone())
+            .map(|callback| Self {
+                callback,
+                requested_scopes: requested_scopes(scopes),
+                roller,
+                transaction_cookie: TransactionCookie::of(&transaction_issuance),
+                server,
+                transaction_issuance,
+            })
+            .map_err(|source| SignInFlowError::MalformedCallback { callback, source })
     }
 
-    pub async fn begin(
-        &self,
-        SignInRequest { callback, scopes }: SignInRequest,
-    ) -> SignInBeginning {
-        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+    pub async fn begin(&self) -> SignInBeginning {
+        let code_verifier = CodeVerifier::generate();
+        let code_challenge = CodeChallenge::of(&code_verifier);
         let nonce = CsrfToken::new(random_token());
         let state = CsrfToken::new(random_token());
         let transaction = SignInTransactionClaims {
-            callback: callback.clone(),
+            code_verifier,
             nonce: nonce.secret().clone(),
-            pkce_verifier: pkce_verifier.into_secret(),
             state: state.secret().clone(),
         };
 
         match self
             .server
             .authorization_url(AuthorizationRequest {
+                code_challenge,
                 nonce: nonce.into_secret(),
-                pkce_challenge,
-                redirect_uri: RedirectUrl::from_url(callback),
-                scopes: requested_scopes(&scopes),
+                redirect_uri: self.callback.clone(),
+                scopes: self.requested_scopes.clone(),
                 state,
             })
             .await
@@ -155,8 +165,8 @@ impl SignInFlow {
             .server
             .exchange_authorization_code::<IdTokenFields>(
                 code,
-                PkceCodeVerifier::new(transaction.pkce_verifier),
-                RedirectUrl::from_url(transaction.callback),
+                &transaction.code_verifier,
+                self.callback.clone(),
             )
             .await
         {

@@ -57,7 +57,7 @@ impl CiIssuer {
 
         publish(&key_set, &secret);
 
-        let trusted_issuer = TrustedIssuer::create(
+        let trusted_issuer = TrustedIssuer::polled(
             key_set,
             TokenTrust {
                 audience,

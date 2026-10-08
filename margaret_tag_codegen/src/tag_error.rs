@@ -51,11 +51,10 @@ pub enum TagError {
     #[error("{site} must reference exactly one tag by its plain name")]
     MalformedReference { site: String },
 
-    #[error("{site} must be `issuer = <tag>`")]
+    #[error(
+        "{site} must be exactly one of `client = <tag>`, `issuer = <tag>` or `resource = <tag>`"
+    )]
     MalformedBearerToken { site: String },
-
-    #[error("{site} must be `client = <tag>`")]
-    MalformedIntrospectedBearerToken { site: String },
 
     #[error(
         "the oauth clients '{first}' and '{second}' both identify as '{client_id}' at the issuer '{issuer}', so the issuer cannot tell them apart"
@@ -67,8 +66,47 @@ pub enum TagError {
         second: String,
     },
 
+    #[error(
+        "the oauth clients '{first}' and '{second}' both act as the admitted client '{admitted}', so the provider cannot tell them apart"
+    )]
+    DuplicateOwnClient {
+        admitted: String,
+        first: String,
+        second: String,
+    },
+
+    #[error(
+        "{site} acts as the admitted client '{admitted}', which redirects to more than one route, so its sign-in cannot tell which route to return to"
+    )]
+    AmbiguousOwnRedirectRoute { admitted: String, site: String },
+
+    #[error(
+        "{site} acts as the admitted client '{admitted}', which does not verify its assertions with ClientKeys::Own"
+    )]
+    OwnClientOfPublishedKeys { admitted: String, site: String },
+
+    #[error(
+        "the resource '{tag}' declared by '{anchor}' is never used: no admitted client is granted it and no bearer token is addressed to it"
+    )]
+    UnconsumedResourceIssuance { anchor: String, tag: String },
+
+    #[error(
+        "the admitted client '{tag}' declared by '{anchor}' verifies its assertions with ClientKeys::Own, but no #[acts_as_oauth_client(admitted_as = {tag})] signs them"
+    )]
+    UnconsumedOwnKeys { anchor: String, tag: String },
+
     #[error("{site} names the issuer '{issuer}', which publishes no discovery document")]
     OAuthClientIssuerNotDiscovered { issuer: String, site: String },
+
+    #[error(
+        "the subject token exchanger '{concrete}' is never used: no admitted client may exchange tokens"
+    )]
+    UnconsumedSubjectTokenExchanger { concrete: String },
+
+    #[error(
+        "the admitted client '{client}' may exchange tokens, but no #[exchanges_tokens_from] exchanger accepts any subject token"
+    )]
+    MissingSubjectTokenExchanger { client: String },
 
     #[error("the subject token exchanger '{concrete}' must name its issuer as `issuer = <tag>`")]
     MalformedSubjectTokenExchangerIssuer { concrete: String },

@@ -15,7 +15,7 @@ pub(crate) fn jwks_framework_services(bindings: &ContainerBindings) -> Vec<Frame
         .map(|binding| FrameworkService {
             concrete_path: roller.clone(),
             field_name: binding.field_name.clone(),
-            is_async: false,
+            is_async: true,
             kind: FrameworkServiceKind::Ticker {
                 first_tick: FirstTick::AfterInterval,
                 interval: jwks_roll_interval_path(),

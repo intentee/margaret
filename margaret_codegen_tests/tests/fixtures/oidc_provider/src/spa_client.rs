@@ -1,14 +1,13 @@
-use margaret::framework::macros::accepts_oauth_client;
+use margaret::framework::accepted_clients::consent_policy::ConsentPolicy;
+use margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning;
+use margaret::framework::macros::admits_oauth_client;
+use margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;
 
-#[accepts_oauth_client(
-    authentication = none,
-    authorization_code(
-        consent = implicit,
-        id_token_signing = elliptic_curve,
-        redirect_uris = ["http://127.0.0.1:8080/callback"],
-        scopes = ["openid"]
-    ),
+#[admits_oauth_client(
+    spa_app,
+    authentication = ClientAuthenticationMethod::None,
+    authorization_code(consent = ConsentPolicy::Implicit, id_token_signing = IdTokenSigning::EllipticCurve, redirect_uris = ["http://127.0.0.1:8080/callback"], scopes = ["openid"]),
     client_id = "spa",
-    resources = ["reports"]
+    resources = [reports],
 )]
 pub struct SpaClient;

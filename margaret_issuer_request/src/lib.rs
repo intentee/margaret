@@ -1,3 +1,4 @@
+pub mod issuer_answer;
 pub mod issuer_document;
 pub mod issuer_exchange_error;
 pub mod issuer_request_client;

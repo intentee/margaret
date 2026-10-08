@@ -4,13 +4,14 @@ use margaret::framework::http_uploaded_file::uploaded_files::UploadedFiles;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::models::article::Article;
 
 #[singleton]
 #[responds_to_http(
     max_body_bytes = 8_388_608,
-    method = "post",
+    method = RouteMethod::Post,
     path = "/articles/{article}/cover",
     server = "public"
 )]

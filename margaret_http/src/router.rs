@@ -1,8 +1,8 @@
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use http::Method;
-use matchit::InsertError;
 use matchit::MatchError;
 
 use margaret_route_method::route_method::RouteMethod;
@@ -14,17 +14,26 @@ use crate::route_entry::RouteEntry;
 use crate::route_handler::RouteHandler;
 use crate::route_resolution::RouteResolution;
 use crate::routed_handler::RoutedHandler;
+use crate::router_error::RouterError;
 use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
-fn method_handlers(handlers: Vec<MethodHandler>) -> HashMap<RouteMethod, RouteHandler> {
+fn method_handlers(
+    path: &'static str,
+    handlers: Vec<MethodHandler>,
+) -> Result<HashMap<RouteMethod, RouteHandler>, RouterError> {
     let mut by_method = HashMap::with_capacity(handlers.len());
 
     for RoutedHandler { handler, method } in handlers.into_iter().map(MethodHandler::into_routed) {
-        by_method.insert(method, handler);
+        match by_method.entry(method) {
+            Entry::Occupied(_) => return Err(RouterError::DuplicateMethod { method, path }),
+            Entry::Vacant(slot) => {
+                slot.insert(handler);
+            }
+        }
     }
 
-    by_method
+    Ok(by_method)
 }
 
 enum RouteTarget {
@@ -42,14 +51,15 @@ pub struct Router {
 impl Router {
     /// # Errors
     ///
-    /// Returns `InsertError` propagated from the work it performs.
-    pub fn build(entries: Vec<RouteEntry>) -> Result<Self, InsertError> {
+    /// Returns `RouterError::Path` when two entries claim the same path, and
+    /// `RouterError::DuplicateMethod` when one path answers a method twice.
+    pub fn build(entries: Vec<RouteEntry>) -> Result<Self, RouterError> {
         let mut matcher: matchit::Router<RouteTarget> = matchit::Router::new();
 
         for entry in entries {
             match entry {
                 RouteEntry::Http { handlers, path } => {
-                    matcher.insert(path, RouteTarget::Http(method_handlers(handlers)))?;
+                    matcher.insert(path, RouteTarget::Http(method_handlers(path, handlers)?))?;
                 }
                 RouteEntry::WebSocket {
                     middleware,

@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use oauth2::CsrfToken;
-use oauth2::PkceCodeChallenge;
-use oauth2::PkceCodeVerifier;
 use oauth2::RedirectUrl;
 use oauth2::Scope;
 use url::Url;
@@ -11,9 +9,11 @@ use url::Url;
 use margaret_authorization_server_client::authorization_request::AuthorizationRequest;
 use margaret_authorization_server_client::authorization_url::AuthorizationUrl;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
+use margaret_authorization_server_client_tests::rfc_7636_verifier::rfc_7636_verifier;
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::static_handler::StaticHandler;
+use margaret_oauth_vocabulary::code_challenge::CodeChallenge;
 use margaret_route_method::route_method::RouteMethod;
 
 #[tokio::test]
@@ -30,15 +30,12 @@ async fn builds_an_authorization_url() {
         ),
     )
     .await;
-    let pkce_challenge = PkceCodeChallenge::from_code_verifier_sha256(&PkceCodeVerifier::new(
-        "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".to_string(),
-    ));
 
     let built = server
         .client(secret_basic_authentication())
         .authorization_url(AuthorizationRequest {
+            code_challenge: CodeChallenge::of(&rfc_7636_verifier()),
             nonce: "n-0S6_WzA2Mj".to_string(),
-            pkce_challenge,
             redirect_uri: RedirectUrl::from_url(
                 Url::parse("https://client.example/callback").expect("the callback is a url"),
             ),

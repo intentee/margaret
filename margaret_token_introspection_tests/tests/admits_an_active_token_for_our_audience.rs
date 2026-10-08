@@ -43,13 +43,8 @@ async fn admits_an_active_token_for_our_audience() {
     );
     assert_eq!(client_id.as_ref().map(ClientId::as_str), Some("uploader"));
     assert_eq!(
-        scopes,
-        Some(
-            "artifacts:read artifacts:write"
-                .parse::<ScopeList>()
-                .expect("the scopes are scope tokens")
-                .scopes
-        )
+        scopes.map(|scopes| ScopeList { scopes }.to_string()),
+        Some("artifacts:read artifacts:write".to_string())
     );
     assert_eq!(subject.as_deref(), Some("subject"));
     assert_eq!(username.as_deref(), Some("ci"));

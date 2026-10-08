@@ -18,7 +18,7 @@ fn rejects_a_subject_token_exchanger_on_a_non_struct() {
     assert!(matches!(
         error("exchanger_not_a_struct"),
         ContainerError::DeclarationNotAStruct {
-            attribute: "exchanges_subject_tokens",
+            attribute: "exchanges_tokens_from",
             ..
         }
     ));
@@ -29,7 +29,7 @@ fn rejects_a_subject_token_exchanger_that_is_also_a_service() {
     assert!(matches!(
         error("exchanger_conflicting_role"),
         ContainerError::ConflictingDeclarationRole {
-            attribute: "exchanges_subject_tokens",
+            attribute: "exchanges_tokens_from",
             ..
         }
     ));
@@ -40,7 +40,7 @@ fn rejects_a_subject_token_exchanger_without_a_singleton() {
     assert!(matches!(
         error("exchanger_without_singleton"),
         ContainerError::DeclarationRequiresSingleton {
-            attribute: "exchanges_subject_tokens",
+            attribute: "exchanges_tokens_from",
             ..
         }
     ));

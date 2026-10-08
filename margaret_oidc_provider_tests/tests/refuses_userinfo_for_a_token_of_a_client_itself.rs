@@ -14,9 +14,9 @@ use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 
-#[test]
-fn refuses_userinfo_for_a_token_of_a_client_itself() {
-    let provider = UnservedProvider::create();
+#[tokio::test]
+async fn refuses_userinfo_for_a_token_of_a_client_itself() {
+    let provider = UnservedProvider::create().await;
     let issuer = provider.issuance.issuer.to_string();
     let issued_at = NumericDate::from(Utc::now());
     let access_token = provider

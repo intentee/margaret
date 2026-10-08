@@ -50,18 +50,20 @@ impl DeclaredColumnCheck {
         model: &str,
         field: &str,
     ) -> Result<Self, ModelCodegenError> {
-        match (byte_length, minimum) {
-            (None, None) => Ok(DeclaredColumnCheck::NotDeclared),
-            (None, Some(minimum)) => Ok(DeclaredColumnCheck::Minimum { minimum }),
-            (Some(0), None) => Err(ModelCodegenError::ByteLengthMustBePositive {
+        match byte_length {
+            None => Ok(match minimum {
+                None => DeclaredColumnCheck::NotDeclared,
+                Some(minimum) => DeclaredColumnCheck::Minimum { minimum },
+            }),
+            Some(_) if minimum.is_some() => Err(ModelCodegenError::ConflictingColumnChecks {
                 field: field.to_string(),
                 model: model.to_string(),
             }),
-            (Some(length), None) => Ok(DeclaredColumnCheck::ByteLength { length }),
-            (Some(_), Some(_)) => Err(ModelCodegenError::ConflictingColumnChecks {
+            Some(0) => Err(ModelCodegenError::ByteLengthMustBePositive {
                 field: field.to_string(),
                 model: model.to_string(),
             }),
+            Some(length) => Ok(DeclaredColumnCheck::ByteLength { length }),
         }
     }
 

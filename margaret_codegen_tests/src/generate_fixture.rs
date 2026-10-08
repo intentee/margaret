@@ -19,6 +19,5 @@ pub fn generate_fixture(name: &str) -> Result<GeneratedCode, CodegenError> {
         &CrateRoot::new("crate", source_directory),
         None,
         &assets_directory,
-        ".",
     )
 }

@@ -21,8 +21,12 @@ use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
+use margaret_jwt_verification::attributed_jwt::AttributedJwt;
 use margaret_jwt_verification::expected_audience::ExpectedAudience;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
+use margaret_jwt_verification::jwt_profile::JwtProfile;
+use margaret_jwt_verification::jwt_profiling::JwtProfiling;
+use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
 use margaret_registered_claims::audience_claim::AudienceClaim;
@@ -164,6 +168,22 @@ impl JwksSecretStore {
             &self.issuance.expectation(),
             NumericDate::from(now),
         )
+    }
+
+    #[must_use]
+    pub fn verify_own_jwt<TClaims: DeserializeOwned, TProfile: JwtProfile>(
+        &self,
+        jwt: &AttributedJwt<'_>,
+        now: NumericDate,
+    ) -> JwtVerification<TClaims, TProfile> {
+        match jwt.profile::<TProfile>() {
+            JwtProfiling::Profiled(profiled) => {
+                profiled.verify(self.roller.jwks_secret_holder().get().key_set(), now)
+            }
+            JwtProfiling::Rejected(rejection) => {
+                JwtVerification::Rejected(JwtRejection::Type(rejection))
+            }
+        }
     }
 
     #[must_use]

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use serde_json::json;
 
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
+use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 use margaret_http::content_handler::ContentHandler;
 use margaret_http::content_responder::content_responder;
 use margaret_http::handler_future::HandlerFuture;
@@ -17,14 +18,13 @@ use margaret_http::route_entry::RouteEntry;
 use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_jwks_roller_server::public_jwks_handler::PublicJwksHandler;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
+use margaret_oidc_discovery::provider_endpoints::ProviderEndpoints;
 use margaret_oidc_provider::introspection_endpoint::IntrospectionEndpoint;
-use margaret_oidc_provider::provider_endpoints::ProviderEndpoints;
 use margaret_oidc_provider::provider_metadata_handler::ProviderMetadataHandler;
 use margaret_oidc_provider::revocation_endpoint::RevocationEndpoint;
 use margaret_oidc_provider::token_endpoint::TokenEndpoint;
 use margaret_oidc_provider::userinfo_authentication::UserinfoAuthentication;
 use margaret_oidc_provider::userinfo_endpoint::UserinfoEndpoint;
-use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 use margaret_route_method::content_method::ContentMethod;
 use margaret_route_method::route_method::RouteMethod;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
@@ -141,11 +141,11 @@ fn userinfo(endpoint: Arc<UserinfoEndpoint>) -> Arc<dyn HeadHandler> {
 
 pub struct ProviderParts {
     pub clients: Arc<AcceptedClients>,
+    pub grants: Arc<dyn StoresAuthorizationGrants>,
     pub endpoints: ProviderEndpoints,
     pub issuance: TokenIssuance,
     pub roller: Arc<JwksRoller>,
     pub secret_store: Arc<JwksSecretStore>,
-    pub state: Arc<dyn StoresProviderState>,
 }
 
 impl ProviderParts {
@@ -171,7 +171,6 @@ impl ProviderParts {
                 introspection(Arc::new(IntrospectionEndpoint::create(
                     Arc::clone(&self.clients),
                     Arc::clone(&self.secret_store),
-                    Arc::clone(&self.state),
                 ))),
             ),
             head_route(
@@ -183,7 +182,7 @@ impl ProviderParts {
                 revocation(Arc::new(RevocationEndpoint::create(
                     Arc::clone(&self.clients),
                     Arc::clone(&self.secret_store),
-                    Arc::clone(&self.state),
+                    Arc::clone(&self.grants),
                     FIXTURE_ACCEPTED_RESOURCES,
                 ))),
             ),
@@ -191,7 +190,6 @@ impl ProviderParts {
                 FIXTURE_ENDPOINT_PATHS.token,
                 token(Arc::new(TokenEndpoint::create(
                     Arc::clone(&self.clients),
-                    Arc::clone(&self.state),
                     Arc::new(SubjectTokenExchangers::create(exchangers)),
                     Arc::clone(&self.secret_store),
                     self.issuance,

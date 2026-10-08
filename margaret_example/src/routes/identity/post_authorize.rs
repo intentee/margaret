@@ -7,6 +7,7 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::oidc_provider::authorization_request::AuthorizationRequest;
+use margaret::framework::route_method::route_method::RouteMethod;
 use margaret::framework::validation::validation_result::ValidationResult;
 
 use crate::margaret::oidc_provider::AuthorizationEndpoint;
@@ -18,7 +19,7 @@ use crate::routes::identity::authorization_page::authorization_page;
 #[singleton]
 #[responds_to_http(
     max_body_bytes = 8_388_608,
-    method = "post",
+    method = RouteMethod::Post,
     path = "/authorize",
     server = "identity"
 )]

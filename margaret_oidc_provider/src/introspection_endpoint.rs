@@ -12,6 +12,7 @@ use oauth2::basic::BasicTokenType;
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
 use margaret_accepted_clients::confidential_privileges::ConfidentialPrivileges;
 use margaret_accepted_clients::introspection_permission::IntrospectionPermission;
+use margaret_accepted_clients::registered_authentication::RegisteredAuthentication;
 use margaret_accepted_clients::registered_client::RegisteredClient;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
@@ -19,7 +20,6 @@ use margaret_identity_session::resource_access_token_claims::ResourceAccessToken
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
-use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_validation::validation_result::ValidationResult;
@@ -69,26 +69,21 @@ fn active_introspection<TProfile>(
 pub struct IntrospectionEndpoint {
     clients: Arc<AcceptedClients>,
     secret_store: Arc<JwksSecretStore>,
-    state: Arc<dyn StoresProviderState>,
 }
 
 impl IntrospectionEndpoint {
     #[must_use]
-    pub fn create(
-        clients: Arc<AcceptedClients>,
-        secret_store: Arc<JwksSecretStore>,
-        state: Arc<dyn StoresProviderState>,
-    ) -> Self {
+    pub fn create(clients: Arc<AcceptedClients>, secret_store: Arc<JwksSecretStore>) -> Self {
         Self {
             clients,
             secret_store,
-            state,
         }
     }
 
     /// # Errors
     ///
-    /// Returns `ProviderError::State` when the client assertion cannot be spent.
+    /// Returns `ProviderError::ClientAuthentication` when the client assertion cannot be
+    /// remembered.
     pub async fn respond(
         &self,
         request: &Request,
@@ -110,7 +105,6 @@ impl IntrospectionEndpoint {
             &self.clients,
             request,
             &client_authentication,
-            self.state.as_ref(),
             NumericDate::from(now),
         )
         .await?
@@ -118,13 +112,17 @@ impl IntrospectionEndpoint {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(registered) => registered,
         };
-        let RegisteredClient::Confidential {
-            client,
-            privileges:
-                ConfidentialPrivileges {
-                    introspection: IntrospectionPermission::Permitted,
+        let RegisteredClient {
+            authentication:
+                RegisteredAuthentication::PrivateKeyJwt {
+                    privileges:
+                        ConfidentialPrivileges {
+                            introspection: IntrospectionPermission::Permitted,
+                            ..
+                        },
                     ..
                 },
+            client,
             ..
         } = registered
         else {

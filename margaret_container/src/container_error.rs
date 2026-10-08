@@ -58,6 +58,20 @@ pub enum ContainerError {
     MissingTokenIssuance { provider: String },
 
     #[error(
+        "the framework provider '{provider}' needs a singleton declared with #[{attribute}], but none is declared"
+    )]
+    MissingDeclaredSingleton {
+        attribute: &'static str,
+        provider: String,
+    },
+
+    #[error("more than one singleton is declared with #[{attribute}]: {paths}")]
+    AmbiguousDeclaredSingleton {
+        attribute: &'static str,
+        paths: String,
+    },
+
+    #[error(
         "parameter '{parameter}' of singleton '{singleton}' injects '{provider}', which only the framework may inject"
     )]
     FrameworkOnlyProvider {
@@ -112,9 +126,22 @@ pub enum ContainerError {
     #[error("the container plan does not contain provider '{path}'")]
     MissingPlannedProvider { path: String },
 
+    #[error(
+        "the framework provider '{provider}' depends on '{dependency}', which no framework provider provides"
+    )]
+    UndeclaredFrameworkDependency {
+        provider: String,
+        dependency: String,
+    },
+
+    #[error(
+        "the singleton '{path}' is never used: no route, service, ticker, console command, websocket session or middleware reaches it"
+    )]
+    UnconsumedSingleton { path: String },
+
+    #[error("'{path}' is never used, so the declaration that requires it is never used either")]
+    UnconsumedDeclaration { path: String },
+
     #[error("the container plan does not contain the serve inputs of '{path}'")]
     MissingProviderServeInputs { path: String },
-
-    #[error("the container plan does not contain serve input slot '{key}'")]
-    MissingServeInputSlot { key: String },
 }

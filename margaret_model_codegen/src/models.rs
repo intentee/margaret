@@ -331,8 +331,13 @@ fn defer_foreign_key(
         }
     };
 
-    let ForeignKeyArguments { on_delete } =
-        ForeignKeyArguments::parse(foreign_key_arguments, model, &field_name)?;
+    let ForeignKeyArguments { on_delete } = ForeignKeyArguments::parse(
+        foreign_key_arguments,
+        attribute_index,
+        item,
+        model,
+        &field_name,
+    )?;
 
     let DeclaredColumnType {
         base: after_option,
@@ -340,7 +345,7 @@ fn defer_foreign_key(
         nullable,
     } = DeclaredColumnType::of(attribute_index, item, field.ty());
 
-    let (target_type, indirected) = match peel_standard_wrapper(
+    let peeled = peel_standard_wrapper(
         attribute_index,
         item,
         after_option,
@@ -349,10 +354,9 @@ fn defer_foreign_key(
             StandardLibraryItem::Box,
             StandardLibraryItem::Rc,
         ],
-    ) {
-        Some(inner) => (inner, true),
-        None => (after_option, false),
-    };
+    );
+    let indirected = peeled.is_some();
+    let target_type = peeled.unwrap_or(after_option);
 
     let rust_type = field.ty().to_token_stream().to_string();
 
@@ -443,75 +447,71 @@ fn collect_model_columns(
         )?;
         let index = resolve_field_index(field, model)?;
 
-        if matches!(index, FieldIndex::Absent) {
-        } else if column_attribute.is_none() {
+        if !matches!(index, FieldIndex::Absent) && column_attribute.is_none() {
             return Err(ModelCodegenError::IndexRequiresColumn {
                 field: field_display(field.identifier()),
                 model: model.to_string(),
             });
         }
 
-        match (column_attribute, foreign_key_attribute) {
-            (None, None) => {
-                return Err(ModelCodegenError::UnattributedField {
+        let Some(column_attribute) = column_attribute else {
+            return Err(match foreign_key_attribute {
+                None => ModelCodegenError::UnattributedField {
                     field: field_display(field.identifier()),
                     model: model.to_string(),
-                });
-            }
-            (None, Some(_)) => {
-                return Err(ModelCodegenError::ForeignKeyRequiresColumn {
+                },
+                Some(_) => ModelCodegenError::ForeignKeyRequiresColumn {
                     field: field_display(field.identifier()),
                     model: model.to_string(),
-                });
-            }
-            (Some(column_attribute), foreign_key_attribute) => {
-                let column_arguments = ColumnArguments::parse(
-                    column_attribute.args()?,
+                },
+            });
+        };
+
+        let column_arguments = ColumnArguments::parse(
+            column_attribute.args()?,
+            model,
+            &field_display(field.identifier()),
+        )?;
+
+        match foreign_key_attribute {
+            None => {
+                let ScalarColumn { column, unique } = resolve_scalar_column(
+                    column_arguments,
+                    field,
                     model,
-                    &field_display(field.identifier()),
+                    table,
+                    &mut collected.seen_columns,
+                    ColumnTypeContext {
+                        attribute_index,
+                        item,
+                        validated_enums,
+                    },
                 )?;
 
-                match foreign_key_attribute {
-                    None => {
-                        let ScalarColumn { column, unique } = resolve_scalar_column(
-                            column_arguments,
-                            field,
-                            model,
-                            table,
-                            &mut collected.seen_columns,
-                            ColumnTypeContext {
-                                attribute_index,
-                                item,
-                                validated_enums,
-                            },
-                        )?;
-
-                        if unique {
-                            collected.unique_constraints.push(ResolvedUniqueConstraint {
-                                columns: vec![column.name.clone()],
-                            });
-                        }
-
-                        index.extend(
-                            &mut collected.indexes,
-                            vec![column.name.clone()],
-                            table,
-                            model,
-                        )?;
-                        collected.scalar_columns.push(column);
-                    }
-                    Some(foreign_key_attribute) => {
-                        collected.deferred_foreign_keys.push(defer_foreign_key(
-                            column_arguments,
-                            index,
-                            field,
-                            foreign_key_attribute.args()?,
-                            model,
-                            attribute_index,
-                            item,
-                        )?);
-                    }
+                if unique {
+                    collected.unique_constraints.push(ResolvedUniqueConstraint {
+                        columns: vec![column.name.clone()],
+                    });
                 }
+
+                index.extend(
+                    &mut collected.indexes,
+                    vec![column.name.clone()],
+                    table,
+                    model,
+                )?;
+                collected.scalar_columns.push(column);
+            }
+            Some(foreign_key_attribute) => {
+                collected.deferred_foreign_keys.push(defer_foreign_key(
+                    column_arguments,
+                    index,
+                    field,
+                    foreign_key_attribute.args()?,
+                    model,
+                    attribute_index,
+                    item,
+                )?);
             }
         }
     }
@@ -531,18 +531,20 @@ fn resolve_primary_key<'columns>(
         .filter(|column| column.primary_key)
         .collect();
 
-    match (declarations.as_slice(), flagged.as_slice()) {
-        ([], []) => Ok(Vec::new()),
-        ([], [column]) => Ok(vec![*column]),
-        ([], _) => Err(
-            ModelCodegenError::CompositePrimaryKeyRequiresModelDeclaration {
-                model: model.to_string(),
-            },
-        ),
-        ([_], [_, ..]) => Err(ModelCodegenError::ConflictingPrimaryKeyDeclarations {
+    match declarations.as_slice() {
+        [] => match flagged.as_slice() {
+            [] => Ok(Vec::new()),
+            [column] => Ok(vec![*column]),
+            _ => Err(
+                ModelCodegenError::CompositePrimaryKeyRequiresModelDeclaration {
+                    model: model.to_string(),
+                },
+            ),
+        },
+        [_] if !flagged.is_empty() => Err(ModelCodegenError::ConflictingPrimaryKeyDeclarations {
             model: model.to_string(),
         }),
-        ([declaration], []) => {
+        [declaration] => {
             let ModelPrimaryKeyArguments { columns } =
                 ModelPrimaryKeyArguments::parse(declaration.args()?, model)?;
 
@@ -553,7 +555,7 @@ fn resolve_primary_key<'columns>(
                 model,
             )
         }
-        (_, _) => Err(ModelCodegenError::DuplicateModelPrimaryKey {
+        _ => Err(ModelCodegenError::DuplicateModelPrimaryKey {
             model: model.to_string(),
         }),
     }
@@ -608,7 +610,7 @@ fn collect_model_foreign_keys(
             columns,
             on_delete,
             references: declared_references,
-        } = ModelForeignKeyArguments::parse(attribute.args()?, model)?;
+        } = ModelForeignKeyArguments::parse(attribute.args()?, attribute_index, item, model)?;
 
         let references = format_path(&declared_references);
         let target_path = attribute_index

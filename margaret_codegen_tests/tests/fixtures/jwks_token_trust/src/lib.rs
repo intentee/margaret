@@ -8,4 +8,5 @@ pub mod issuer;
 pub mod partner_auditor;
 pub mod partner_auditor_provider;
 pub mod partner_endpoint;
+pub mod signing_key_store;
 pub mod token_audit;

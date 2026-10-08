@@ -17,6 +17,7 @@ margaret_spiffe_svid_client = { workspace = true }
 margaret_spiffe_svid_server = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
+thiserror = { workspace = true }
 trzcina = { workspace = true }
 
 [lints]

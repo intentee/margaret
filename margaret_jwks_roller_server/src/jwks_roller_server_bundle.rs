@@ -10,8 +10,8 @@ use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
 use margaret_jwks_roller::initial_secret::initial_secret;
-use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::roll::roll;
+use margaret_jwks_roller::stores_signing_keys::StoresSigningKeys;
 
 use crate::jwks_curve::JWKS_CURVE;
 use crate::jwks_document_holder::JwksDocumentHolder;
@@ -30,7 +30,7 @@ pub struct JwksRollerServerBundle {
     jwks_document_holder: JwksDocumentHolder,
     jwks_secret_holder: JwksSecretHolder,
     rsa_keys: Arc<dyn ProvidesRsaSigningKeys>,
-    storage: Arc<dyn JwksSecretStorage>,
+    storage: Arc<dyn StoresSigningKeys>,
 }
 
 impl JwksRollerServerBundle {
@@ -39,10 +39,11 @@ impl JwksRollerServerBundle {
     /// Returns `JwksRollerServerError::SecretRoll` when the first secret cannot be loaded,
     /// generated or persisted, and `JwksRollerServerError::DocumentSerialization` when its public
     /// document cannot be serialized.
-    pub fn new(
+    pub async fn new(
         JwksRollerServerBundleParams { rsa_keys, storage }: JwksRollerServerBundleParams,
     ) -> Result<Self, JwksRollerServerError> {
         let secret = initial_secret(storage.as_ref(), JWKS_CURVE, rsa_keys.as_ref())
+            .await
             .map_err(JwksRollerServerError::SecretRoll)?;
 
         published_document(&secret).map(|document| Self {
@@ -71,12 +72,13 @@ impl JwksRollerServerBundle {
     /// # Errors
     ///
     /// Returns `JwksRollerServerError::SecretRoll` or `JwksRollerServerError::DocumentSerialization`.
-    pub fn roll_and_publish(&self) -> Result<(), JwksRollerServerError> {
+    pub async fn roll_and_publish(&self) -> Result<(), JwksRollerServerError> {
         roll(
             self.storage.as_ref(),
             &self.jwks_secret_holder,
             self.rsa_keys.as_ref(),
         )
+        .await
         .map_err(JwksRollerServerError::SecretRoll)
         .and_then(|rolled| published_document(&rolled))
         .map(|document| self.jwks_document_holder.set(document))

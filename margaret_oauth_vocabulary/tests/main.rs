@@ -1,5 +1,6 @@
 mod accepts_a_scope_token;
 mod accepts_a_visible_client_id;
+mod describes_every_resource_scope_rejection;
 mod encodes_the_rfc_6749_example_client_credentials;
 mod keeps_the_client_secret_out_of_its_debug_output;
 mod names_every_subject_token_type;

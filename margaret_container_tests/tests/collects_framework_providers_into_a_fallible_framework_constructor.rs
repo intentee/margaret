@@ -44,7 +44,7 @@ fn container_source() -> String {
             method: "create".to_string(),
             outcome: ConstructorOutcome::Fallible,
         },
-        enablement: FrameworkEnablement::Always,
+        enablement: FrameworkEnablement::Declared,
         injection: FrameworkInjectionRole::Unmarked,
         provided: path("Directory"),
     };

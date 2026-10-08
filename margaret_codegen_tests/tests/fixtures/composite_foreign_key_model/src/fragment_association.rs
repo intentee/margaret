@@ -1,4 +1,5 @@
 use margaret::framework::macros::model;
+use margaret::framework::model::on_delete::OnDelete;
 
 use crate::fragment_metadata::FragmentMetadata;
 
@@ -9,7 +10,7 @@ use crate::fragment_metadata::FragmentMetadata;
 #[foreign_key(
     columns = [partition, hash],
     references = FragmentMetadata,
-    on_delete = cascade
+    on_delete = OnDelete::Cascade
 )]
 pub struct FragmentAssociation {
     #[column]

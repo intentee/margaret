@@ -14,10 +14,9 @@ pub struct UnservedProvider {
 }
 
 impl UnservedProvider {
-    #[must_use]
-    pub fn create() -> Self {
+    pub async fn create() -> Self {
         let issuance = provider_issuance();
-        let roller = fixture_roller();
+        let roller = fixture_roller().await;
 
         Self {
             secret_store: Arc::new(JwksSecretStore::create(Arc::clone(&roller), issuance)),

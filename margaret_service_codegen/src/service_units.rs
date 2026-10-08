@@ -5,12 +5,9 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
-use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::matched_attribute::MatchedAttribute;
-use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
-use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
-use margaret_injection_codegen::request_binding_marker::request_binding_marker;
+use margaret_injection_codegen::runner_signature::RunnerSignature;
 use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
 use crate::first_tick::FirstTick;
@@ -41,32 +38,6 @@ fn canonical_attribute_path(
     })
 }
 
-fn validate_runner(
-    index: &AttributeIndex,
-    item: &IndexedItem,
-    runner: &IndexedMethod,
-    path: &str,
-) -> Result<(), ServiceCodegenError> {
-    for view in parameters(runner) {
-        if let Some(name) = request_binding_marker(view.attributes) {
-            return Err(ServiceCodegenError::RunnerRequestBinding {
-                path: path.to_string(),
-                parameter: view.holder.to_string(),
-                marker: name.name().to_string(),
-            });
-        }
-
-        if !is_cancellation_token(index, item, view.declared) {
-            return Err(ServiceCodegenError::RunnerArgument {
-                path: path.to_string(),
-                parameter: view.holder.to_string(),
-            });
-        }
-    }
-
-    Ok(())
-}
-
 fn build_unit(
     matched: &MatchedAttribute,
     index: &AttributeIndex,
@@ -88,9 +59,22 @@ fn build_unit(
 
     let runner = process_method(item)?;
 
-    validate_runner(index, item, runner, &path)?;
-
-    let takes_token = runner_takes_token(index, item, runner);
+    let takes_token = match RunnerSignature::of(index, item, runner) {
+        RunnerSignature::Accepted { takes_token } => takes_token,
+        RunnerSignature::RejectedArgument { parameter } => {
+            return Err(ServiceCodegenError::RunnerArgument {
+                path,
+                parameter: parameter.to_string(),
+            });
+        }
+        RunnerSignature::RejectedRequestBinding { marker, parameter } => {
+            return Err(ServiceCodegenError::RunnerRequestBinding {
+                path,
+                parameter: parameter.to_string(),
+                marker: marker.name().to_string(),
+            });
+        }
+    };
     let kind = match role {
         Role::Service => ServiceKind::Service,
         Role::Ticker => {
@@ -149,12 +133,6 @@ fn has_conflicting_roles(item: &IndexedItem, role: Role) -> bool {
     others
         .iter()
         .any(|other| item.has_framework_attribute(*other))
-}
-
-fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, method: &IndexedMethod) -> bool {
-    parameters(method)
-        .iter()
-        .any(|view| is_cancellation_token(index, item, view.declared))
 }
 
 pub(crate) fn service_units(

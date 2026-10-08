@@ -3,11 +3,12 @@ use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::forms::reader_preferences_cookie::ReaderPreferencesCookie;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/preferences", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/preferences", server = "public")]
 pub struct GetPreferences;
 
 impl GetPreferences {

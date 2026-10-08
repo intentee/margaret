@@ -3,7 +3,6 @@ use thiserror::Error;
 
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
-use margaret_container::container_error::ContainerError;
 use margaret_injection_codegen::injection_error::InjectionError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
@@ -15,12 +14,6 @@ pub enum HttpCodegenError {
     AttributeArguments {
         #[from]
         source: AttributeArgumentsError,
-    },
-
-    #[error(transparent)]
-    Container {
-        #[from]
-        source: ContainerError,
     },
 
     #[error("failed to index the crate: {source}")]
@@ -54,9 +47,9 @@ pub enum HttpCodegenError {
     MissingHttpMethod { responder: String },
 
     #[error(
-        "responder '{responder}' declares the HTTP method '{method}'; a route responds to one of \"get\", \"post\", \"put\", \"delete\", \"patch\" or \"query\""
+        "responder '{responder}' declares the HTTP method '{written}', which is not a variant of margaret::framework::route_method::route_method::RouteMethod"
     )]
-    UnsupportedHttpMethod { responder: String, method: String },
+    UnknownHttpMethod { responder: String, written: String },
 
     #[error(
         "responder '{responder}' responds to GET and reads the request body; a GET request carries no content a route may read"
@@ -153,4 +146,23 @@ pub enum HttpCodegenError {
         "responder '{responder}' names the server '{server}', which must be a snake_case identifier usable as a `routes` accessor"
     )]
     InvalidServerName { responder: String, server: String },
+
+    #[error(
+        "the oauth client '{client}' redirects to '{route}', which responds to no HTTP request"
+    )]
+    RedirectRouteNotRouted { client: String, route: String },
+
+    #[error(
+        "the oauth client '{client}' redirects to '{route}', which does not respond to RouteMethod::Get"
+    )]
+    RedirectRouteNotGet { client: String, route: String },
+
+    #[error(
+        "the oauth client '{client}' redirects to '{route}', whose path '{path}' has parameters a redirect cannot fill"
+    )]
+    ParameterizedRedirectRoute {
+        client: String,
+        path: String,
+        route: String,
+    },
 }

@@ -1,10 +1,12 @@
+use crate::derived_endpoint::DerivedEndpoint;
+
 pub struct DerivedProviderEndpoints {
-    pub authorization: String,
-    pub introspection: String,
+    pub authorization: DerivedEndpoint,
+    pub introspection: DerivedEndpoint,
     pub issuer_origin: String,
     pub jwks: String,
-    pub revocation: String,
+    pub revocation: DerivedEndpoint,
     pub server: String,
     pub token: String,
-    pub userinfo: String,
+    pub userinfo: DerivedEndpoint,
 }

@@ -46,6 +46,19 @@ impl ProviderEndpoint {
     }
 }
 
+impl ProviderEndpoint {
+    #[must_use]
+    pub fn capability(self) -> &'static str {
+        match self {
+            Self::Authorization => "grants authorization codes",
+            Self::Introspection => "introspects tokens",
+            Self::Revocation => "is granted refresh tokens",
+            Self::Userinfo => "requests the openid scope with authorization codes",
+            Self::Discovery | Self::Jwks | Self::Token => "is admitted",
+        }
+    }
+}
+
 impl Display for ProviderEndpoint {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         formatter.write_str(match self {
@@ -57,5 +70,35 @@ impl Display for ProviderEndpoint {
             Self::Token => "token endpoint",
             Self::Userinfo => "userinfo endpoint",
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProviderEndpoint;
+
+    #[test]
+    fn describes_the_capability_each_endpoint_serves() {
+        assert_eq!(
+            [
+                ProviderEndpoint::Authorization,
+                ProviderEndpoint::Discovery,
+                ProviderEndpoint::Introspection,
+                ProviderEndpoint::Jwks,
+                ProviderEndpoint::Revocation,
+                ProviderEndpoint::Token,
+                ProviderEndpoint::Userinfo,
+            ]
+            .map(ProviderEndpoint::capability),
+            [
+                "grants authorization codes",
+                "is admitted",
+                "introspects tokens",
+                "is admitted",
+                "is granted refresh tokens",
+                "is admitted",
+                "requests the openid scope with authorization codes",
+            ]
+        );
     }
 }

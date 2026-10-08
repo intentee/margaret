@@ -18,15 +18,20 @@ pub enum TokenIssuanceCodegenError {
     #[error(transparent)]
     AttributeArguments(#[from] AttributeArgumentsError),
 
+    #[error(
+        "the resource audience '{audience}' is declared by both '{first}' and '{second}', so its tokens have no single resource"
+    )]
+    DuplicateResourceAudience {
+        audience: String,
+        first: String,
+        second: String,
+    },
+
     #[error(transparent)]
     Index(#[from] AttributeError),
 
-    #[error("the audience '#[issues_tokens]' declares on '{anchor}' is malformed: {source}")]
-    MalformedAudience {
-        anchor: String,
-        #[source]
-        source: RegisteredClaimsError,
-    },
+    #[error("#[issues_tokens] on '{anchor}' declares an empty audience")]
+    EmptyAudience { anchor: String },
 
     #[error("the issuer '#[issues_tokens]' declares on '{anchor}' is malformed: {source}")]
     MalformedIssuer {
@@ -38,6 +43,34 @@ pub enum TokenIssuanceCodegenError {
     #[error("#[issues_tokens] on '{anchor}' does not declare the audience of the tokens")]
     MissingAudience { anchor: String },
 
+    #[error("#[issues_resource_tokens] on '{anchor}' declares an empty audience")]
+    EmptyResourceAudience { anchor: String },
+
+    #[error("#[issues_resource_tokens] on '{anchor}' names a tag that is not a single plain name")]
+    MalformedResourceTag { anchor: String },
+
+    #[error("#[issues_tokens] on '{anchor}' names a tag that is not a single plain name")]
+    MalformedTag { anchor: String },
+
     #[error("#[issues_tokens] on '{anchor}' does not declare the issuer of the tokens")]
     MissingIssuer { anchor: String },
+
+    #[error("#[issues_resource_tokens] on '{anchor}' does not declare the audience of the tokens")]
+    MissingResourceAudience { anchor: String },
+
+    #[error("#[issues_resource_tokens] on '{anchor}' does not name a tag")]
+    MissingResourceTag { anchor: String },
+
+    #[error("#[issues_tokens] on '{anchor}' does not name a tag")]
+    MissingTag { anchor: String },
+
+    #[error(
+        "#[issues_resource_tokens] on '{anchor}' declares the audience '{audience}', which addresses the tokens of the sessions instead"
+    )]
+    ResourceAudienceOfSessions { anchor: String, audience: String },
+
+    #[error(
+        "#[issues_resource_tokens] on '{anchor}' declares resource tokens, but no #[issues_tokens] declares the issuer that signs them"
+    )]
+    ResourceWithoutTokenIssuance { anchor: String },
 }

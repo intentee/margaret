@@ -6,8 +6,8 @@ use syn::ext::IdentExt;
 use margaret_attributes::tag::Tag;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
-use crate::declared_trust::DeclaredTrust;
 use crate::declared_trusts::DeclaredTrusts;
+use crate::own_trust::OwnTrust;
 use crate::trusted_issuer_constant::TrustedIssuerConstant;
 use crate::trusted_issuer_group::TrustedIssuerGroup;
 use crate::trusted_issuer_item::TrustedIssuerItem;
@@ -50,14 +50,29 @@ fn constant_module(
     )
 }
 
-fn token_trust_module(trust: &DeclaredTrust, issuer: &str) -> GeneratedModuleTokens {
-    let audience = trust.audience.as_str();
-
+fn token_trust_module(tag: &Tag, audience: &str, issuer: &str) -> GeneratedModuleTokens {
     constant_module(
-        &trust.tag,
+        tag,
         TrustedIssuerConstant::TokenTrust,
         &quote! { audience: #audience, issuer: #issuer, },
     )
+}
+
+fn own_modules(
+    OwnTrust {
+        audience,
+        issuer,
+        tag,
+    }: &OwnTrust,
+) -> [GeneratedModuleTokens; 2] {
+    [
+        trust_module(
+            tag,
+            &[TrustedIssuerItem::TrustedIssuer],
+            &[TrustedIssuerConstant::TokenTrust],
+        ),
+        token_trust_module(tag, audience.as_str(), issuer.as_str()),
+    ]
 }
 
 fn group_modules(group: &TrustedIssuerGroup) -> Vec<GeneratedModuleTokens> {
@@ -131,17 +146,21 @@ fn group_modules(group: &TrustedIssuerGroup) -> Vec<GeneratedModuleTokens> {
     modules.extend(
         group
             .members()
-            .map(|trust| token_trust_module(trust, issuer)),
+            .map(|trust| token_trust_module(&trust.tag, trust.audience.as_str(), issuer)),
     );
 
     modules
 }
 
 #[must_use]
-pub fn render_trusted_issuers(trusts: &DeclaredTrusts) -> Vec<GeneratedModuleTokens> {
+pub fn render_trusted_issuers(
+    trusts: &DeclaredTrusts,
+    own_trusts: &[OwnTrust],
+) -> Vec<GeneratedModuleTokens> {
     let mut tags: Vec<&Tag> = trusts
         .bindings()
         .map(|binding| &binding.trust.tag)
+        .chain(own_trusts.iter().map(|own| own.tag))
         .collect();
 
     tags.sort_by_key(ToString::to_string);
@@ -157,27 +176,39 @@ pub fn render_trusted_issuers(trusts: &DeclaredTrusts) -> Vec<GeneratedModuleTok
     )];
 
     modules.extend(trusts.groups.iter().flat_map(group_modules));
+    modules.extend(own_trusts.iter().flat_map(own_modules));
 
     modules
 }
 
 #[cfg(test)]
 mod tests {
+    use quote::format_ident;
+
+    use margaret_attributes::tag::Tag;
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+    use margaret_registered_claims::audience::Audience;
+    use margaret_registered_claims::audience_parsing::AudienceParsing;
+    use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
     use super::render_trusted_issuers;
     use crate::declared_trusts::DeclaredTrusts;
+    use crate::own_trust::OwnTrust;
 
-    const SHARED_ISSUER: &str = "#[trusts_oidc_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\")]\npub struct Beta;\n#[trusts_oidc_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\")]\npub struct Alpha;\n";
+    const SHARED_ISSUER: &str = "#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n";
 
-    const JWKS_ENDPOINT: &str = "#[provides_jwks_endpoint(ci, audience = \"deploy\", issuer = \"https://ci.example\", jwks_uri = \"https://ci.example/jwks\")]\npub struct Ci;\n";
+    const JWKS_ENDPOINT: &str = "#[verifies_tokens_from_issuer(ci, audience = \"deploy\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://ci.example/jwks\"))]\npub struct Ci;\n";
 
     fn module_source(lib_source: &str, name: &str) -> String {
+        rendered_source(lib_source, &[], name)
+    }
+
+    fn rendered_source(lib_source: &str, own_trusts: &[OwnTrust], name: &str) -> String {
         let indexed = IndexedSource::new(lib_source);
         let trusts = DeclaredTrusts::read(&indexed.index).expect("the trusts are read");
 
-        render_trusted_issuers(&trusts)
+        render_trusted_issuers(&trusts, own_trusts)
             .into_iter()
             .find(|module: &GeneratedModuleTokens| module.name() == name)
             .expect("the module is generated")
@@ -247,10 +278,54 @@ mod tests {
     fn names_the_module_of_a_raw_identifier_tag_without_its_prefix() {
         assert_eq!(
             module_source(
-                "#[trusts_oidc_issuer(r#async, audience = \"a\", issuer = \"https://issuer.example\")]\npub struct Async;\n",
+                "#[verifies_tokens_from_issuer(r#async, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Async;\n",
                 "trusted_issuers"
             ),
             "pub mod r#async;\n"
         );
+    }
+
+    fn own_source(audience: &Audience, name: &str) -> String {
+        let issuer: IssuerIdentifier = "https://issuer.example"
+            .parse()
+            .expect("the issuer is an https url");
+        let tag = Tag::from_ident(format_ident!("attachments"));
+
+        rendered_source(
+            JWKS_ENDPOINT,
+            &[OwnTrust {
+                audience,
+                issuer: &issuer,
+                tag: &tag,
+            }],
+            name,
+        )
+    }
+
+    #[test]
+    fn declares_an_own_trust_beside_the_declared_trusts() {
+        assert!(matches!(
+            Audience::parse("attachments"),
+            AudienceParsing::Accepted(audience)
+                if own_source(&audience, "trusted_issuers") == "pub mod attachments;\npub mod ci;\n"
+        ));
+    }
+
+    #[test]
+    fn exports_only_the_trusted_issuer_of_an_own_trust() {
+        assert!(matches!(
+            Audience::parse("attachments"),
+            AudienceParsing::Accepted(audience)
+                if own_source(&audience, "trusted_issuers/attachments") == "pub mod token_trust;\npub use margaret::framework::trusted_issuer::trusted_issuer::TrustedIssuer;\n"
+        ));
+    }
+
+    #[test]
+    fn renders_the_token_trust_of_an_own_trust() {
+        assert!(matches!(
+            Audience::parse("attachments"),
+            AudienceParsing::Accepted(audience)
+                if own_source(&audience, "trusted_issuers/attachments/token_trust") == "pub const TOKEN_TRUST: margaret::framework::token_trust::token_trust::TokenTrust = margaret::framework::token_trust::token_trust::TokenTrust {\n    audience: \"attachments\",\n    issuer: \"https://issuer.example\",\n};\n"
+        ));
     }
 }

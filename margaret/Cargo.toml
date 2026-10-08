@@ -16,6 +16,7 @@ anyhow = { workspace = true, optional = true }
 margaret_accepted_clients = { workspace = true, optional = true }
 margaret_access_token_minter = { workspace = true, optional = true }
 margaret_asset_bag = { workspace = true, optional = true }
+margaret_authorization_grants = { workspace = true, optional = true }
 margaret_authorization_server_client = { workspace = true, optional = true }
 margaret_bearer_token_verification = { workspace = true, optional = true }
 margaret_client_credentials = { workspace = true, optional = true }
@@ -33,11 +34,9 @@ margaret_issuer_key_set = { workspace = true, optional = true }
 margaret_issuer_metadata = { workspace = true, optional = true }
 margaret_issuer_request = { workspace = true, optional = true }
 margaret_jose_parameters = { workspace = true, optional = true }
-margaret_jwks_file_secret_storage = { workspace = true, optional = true }
 margaret_jwks_keygen = { workspace = true, optional = true }
 margaret_jwks_roller = { workspace = true, optional = true }
 margaret_jwks_roller_server = { workspace = true, optional = true }
-margaret_jwks_secret_storage_selection = { workspace = true, optional = true }
 margaret_jwks_secret_store = { workspace = true, optional = true }
 margaret_jws_verification = { workspace = true, optional = true }
 margaret_jwt_verification = { workspace = true, optional = true }
@@ -45,12 +44,10 @@ margaret_macros = { workspace = true, optional = true }
 margaret_model = { workspace = true, optional = true }
 margaret_oauth_client = { workspace = true, optional = true }
 margaret_oauth_vocabulary = { workspace = true, optional = true }
+margaret_oidc_discovery = { workspace = true, optional = true }
 margaret_oidc_provider = { workspace = true, optional = true }
 margaret_oidc_sign_in = { workspace = true, optional = true }
 margaret_peer_identity = { workspace = true, optional = true }
-margaret_provider_state_postgres = { workspace = true, optional = true }
-margaret_provider_state_storage = { workspace = true, optional = true }
-margaret_provider_state_storage_selection = { workspace = true, optional = true }
 margaret_registered_claims = { workspace = true, optional = true }
 margaret_route_method = { workspace = true, optional = true }
 margaret_route_parameter_binding = { workspace = true, optional = true }
@@ -61,6 +58,7 @@ margaret_spiffe_svid_client = { workspace = true, optional = true }
 margaret_spiffe_svid_server = { workspace = true, optional = true }
 margaret_subject_token_exchange = { workspace = true, optional = true }
 margaret_sync_holder = { workspace = true, optional = true }
+margaret_token_digest = { workspace = true, optional = true }
 margaret_token_exchange_client = { workspace = true, optional = true }
 margaret_token_introspection = { workspace = true, optional = true }
 margaret_token_issuance = { workspace = true, optional = true }
@@ -81,6 +79,7 @@ runtime = [
     "dep:margaret_accepted_clients",
     "dep:margaret_access_token_minter",
     "dep:margaret_asset_bag",
+    "dep:margaret_authorization_grants",
     "dep:margaret_authorization_server_client",
     "dep:margaret_bearer_token_verification",
     "dep:margaret_client_credentials",
@@ -97,11 +96,9 @@ runtime = [
     "dep:margaret_issuer_metadata",
     "dep:margaret_issuer_request",
     "dep:margaret_jose_parameters",
-    "dep:margaret_jwks_file_secret_storage",
     "dep:margaret_jwks_keygen",
     "dep:margaret_jwks_roller",
     "dep:margaret_jwks_roller_server",
-    "dep:margaret_jwks_secret_storage_selection",
     "dep:margaret_jwks_secret_store",
     "dep:margaret_jws_verification",
     "dep:margaret_jwt_verification",
@@ -109,12 +106,10 @@ runtime = [
     "dep:margaret_model",
     "dep:margaret_oauth_client",
     "dep:margaret_oauth_vocabulary",
+    "dep:margaret_oidc_discovery",
     "dep:margaret_oidc_provider",
     "dep:margaret_oidc_sign_in",
     "dep:margaret_peer_identity",
-    "dep:margaret_provider_state_postgres",
-    "dep:margaret_provider_state_storage",
-    "dep:margaret_provider_state_storage_selection",
     "dep:margaret_registered_claims",
     "dep:margaret_route_method",
     "dep:margaret_route_parameter_binding",
@@ -125,6 +120,7 @@ runtime = [
     "dep:margaret_spiffe_svid_server",
     "dep:margaret_subject_token_exchange",
     "dep:margaret_sync_holder",
+    "dep:margaret_token_digest",
     "dep:margaret_token_exchange_client",
     "dep:margaret_token_introspection",
     "dep:margaret_token_issuance",

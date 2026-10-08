@@ -114,7 +114,7 @@ impl IssuerKeySet {
         let snapshot = self.snapshot();
 
         match verify_with_key_set(&jwt, &snapshot.holding, now) {
-            KeySetVerification::UnknownKey {
+            KeySetVerification::KeysPossiblyRotated {
                 fetched_at,
                 rejection,
             } if fetched_at.elapsed() >= ISSUER_FETCH_SPACING => {

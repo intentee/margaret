@@ -15,7 +15,6 @@ use margaret_oidc_provider_tests::margaret_client::MargaretClient;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
 use margaret_oidc_sign_in::sign_in_refusal::SignInRefusal;
-use margaret_oidc_sign_in::sign_in_request::SignInRequest;
 use margaret_oidc_sign_in::userinfo_fetch::UserinfoFetch;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::callback_request::callback_request;
@@ -64,17 +63,8 @@ async fn sign_in_at_suite(
             .expect("the suite client secret is not empty"),
     )
     .await;
-    let flow = client.sign_in_flow();
-    let SignInBeginning::Redirected(beginning) = flow
-        .begin(SignInRequest {
-            callback: Url::parse(SUITE_CLIENT_CALLBACK).expect("the suite callback is a url"),
-            scopes: BTreeSet::from([
-                "email".parse().expect("the scope is a scope token"),
-                "openid".parse().expect("the scope is a scope token"),
-            ]),
-        })
-        .await
-    else {
+    let flow = client.sign_in_flow(SUITE_CLIENT_CALLBACK, &["email", "openid"]);
+    let SignInBeginning::Redirected(beginning) = flow.begin().await else {
         panic!("the sign-in redirects to the suite");
     };
     let begun = BegunSignIn::of(&beginning);
@@ -227,7 +217,7 @@ const EXPECTATIONS: [ModuleExpectation; 14] = [
             refused_id_token(outcome, |rejection| {
                 matches!(
                     rejection,
-                    JwtRejection::Jws(JwsRejection::MissingKeyId { .. })
+                    JwtRejection::Jws(JwsRejection::KeyIdRequired { .. })
                 )
             })
         },

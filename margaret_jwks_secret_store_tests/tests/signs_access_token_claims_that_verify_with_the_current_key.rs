@@ -11,9 +11,9 @@ struct DemoClaims {
     name: String,
 }
 
-#[test]
-fn signs_access_token_claims_that_verify_with_the_current_key() {
-    let store = rolled_store(fresh_p256_secret());
+#[tokio::test]
+async fn signs_access_token_claims_that_verify_with_the_current_key() {
+    let store = rolled_store(fresh_p256_secret()).await;
     let signed = store
         .sign_access_token(&json!({ "name": "demo" }), unix_time(500))
         .expect("the claims are signed");

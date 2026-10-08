@@ -10,9 +10,6 @@ use quote::quote;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
 use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
-use margaret_input_weaving::owned_weave::owned_weave;
-use margaret_serve_input_codegen::serve_input::ServeInput;
-use margaret_serve_input_codegen::serve_input_key::ServeInputKey;
 
 use crate::bootstrap_arguments_literal::bootstrap_arguments_literal;
 use crate::bootstrap_arguments_module::bootstrap_arguments_module;
@@ -23,8 +20,9 @@ use crate::dependency_kind::DependencyKind;
 use crate::framework_injection_role::FrameworkInjectionRole;
 use crate::injected_dependency::InjectedDependency;
 use crate::provider_binding::ProviderBinding;
-use crate::provider_serve_inputs::ProviderServeInputs;
 use crate::serve_input_binding::ServeInputBinding;
+use crate::slotted_serve_input::SlottedServeInput;
+use crate::unify_serve_inputs::unify_serve_inputs;
 
 fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
     let module = bootstrap_arguments_module(function);
@@ -33,19 +31,12 @@ fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
     quote! { super::container::build::#module::#arguments_type }
 }
 
-struct SlottedServeInput {
-    input: ServeInput,
-    slot: usize,
-}
-
 pub struct ContainerBindings {
-    asynchronous_constructions: BTreeSet<String>,
-    concrete_providers: BTreeMap<CanonicalPath, ProviderServeInputs>,
+    asynchronous_constructions: BTreeSet<CanonicalPath>,
+    concrete_providers: BTreeMap<CanonicalPath, Arc<[SlottedServeInput]>>,
     direct_dependencies: BTreeMap<CanonicalPath, BTreeSet<CanonicalPath>>,
-    inputs: Arc<[ServeInput]>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
     serve_input_naming: ServeInputNaming,
-    slots: Arc<BTreeMap<ServeInputKey, usize>>,
 }
 
 impl ContainerBindings {
@@ -57,7 +48,7 @@ impl ContainerBindings {
 
         for entry in plan.planned_entries() {
             if entry.is_async {
-                asynchronous_constructions.insert(entry.provider.field_name.clone());
+                asynchronous_constructions.insert(entry.key.clone());
             }
 
             if plan.injectable(&entry.key) {
@@ -72,10 +63,7 @@ impl ContainerBindings {
             }
             concrete_providers.insert(
                 entry.provider.concrete_path.clone(),
-                ProviderServeInputs {
-                    inputs: Arc::clone(&entry.serve_inputs),
-                    slots: Arc::clone(&entry.serve_input_slots),
-                },
+                Arc::clone(&entry.serve_inputs),
             );
             direct_dependencies.insert(
                 entry.provider.concrete_path.clone(),
@@ -93,10 +81,8 @@ impl ContainerBindings {
             asynchronous_constructions,
             concrete_providers,
             direct_dependencies,
-            inputs: plan.inputs(),
             providers,
             serve_input_naming: plan.serve_input_naming(),
-            slots: plan.slots(),
         }
     }
 
@@ -108,13 +94,9 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn all_serve_inputs(&self) -> &[ServeInput] {
-        &self.inputs
-    }
-
-    #[must_use]
     pub fn construction_invocation(
         &self,
+        root: &CanonicalPath,
         field_name: &str,
         arguments: &[ServeInputBinding],
     ) -> TokenStream {
@@ -122,7 +104,7 @@ impl ContainerBindings {
         let literal = bootstrap_arguments_literal(&bootstrap_arguments_path(&function), arguments);
         let invocation = quote! { super::container::build::#function(#literal) };
 
-        if self.asynchronous_constructions.contains(field_name) {
+        if self.construction_is_async(root) {
             quote! { #invocation.await }
         } else {
             invocation
@@ -130,8 +112,8 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn construction_is_async(&self, field_name: &str) -> bool {
-        self.asynchronous_constructions.contains(field_name)
+    pub fn construction_is_async(&self, root: &CanonicalPath) -> bool {
+        self.asynchronous_constructions.contains(root)
     }
 
     #[must_use]
@@ -143,19 +125,6 @@ impl ContainerBindings {
         self.direct_dependencies
             .get(concrete_path)
             .is_some_and(|dependencies| dependencies.contains(provider_key))
-    }
-
-    /// # Errors
-    ///
-    /// Returns `ContainerError` propagated from the work it performs.
-    pub fn injected_serve_inputs(
-        &self,
-        dependency: &InjectedDependency,
-    ) -> Result<Vec<ServeInput>, ContainerError> {
-        Ok(self
-            .provider_serve_inputs(&dependency.concrete)?
-            .inputs
-            .to_vec())
     }
 
     #[must_use]
@@ -176,12 +145,13 @@ impl ContainerBindings {
     pub fn provider_serve_inputs(
         &self,
         concrete_path: &CanonicalPath,
-    ) -> Result<&ProviderServeInputs, ContainerError> {
-        self.concrete_providers.get(concrete_path).ok_or_else(|| {
-            ContainerError::MissingProviderServeInputs {
+    ) -> Result<&[SlottedServeInput], ContainerError> {
+        self.concrete_providers
+            .get(concrete_path)
+            .map(AsRef::as_ref)
+            .ok_or_else(|| ContainerError::MissingProviderServeInputs {
                 path: concrete_path.to_string(),
-            }
-        })
+            })
     }
 
     #[must_use]
@@ -196,83 +166,38 @@ impl ContainerBindings {
 
     /// # Errors
     ///
-    /// Returns `ContainerError::MissingServeInputSlot`.
-    pub fn serve_input_slot(&self, key: &ServeInputKey) -> Result<usize, ContainerError> {
-        self.slots
-            .get(key)
-            .copied()
-            .ok_or_else(|| ContainerError::MissingServeInputSlot {
-                key: format!("{key:?}"),
-            })
-    }
-
-    /// # Errors
-    ///
-    /// Returns `ContainerError` propagated from the work it performs.
-    pub fn serve_input_union(
-        &self,
-        inputs: &[ServeInput],
-    ) -> Result<Vec<ServeInput>, ContainerError> {
-        let mut seen: BTreeSet<ServeInputKey> = BTreeSet::new();
-        let mut unified: Vec<SlottedServeInput> = Vec::new();
-
-        for input in inputs {
-            let key = input.slot_key();
-
-            if seen.insert(key.clone()) {
-                unified.push(SlottedServeInput {
-                    input: input.clone(),
-                    slot: self.serve_input_slot(&key)?,
-                });
-            }
-        }
-
-        unified.sort_by_key(|slotted| slotted.slot);
-
-        Ok(unified.into_iter().map(|slotted| slotted.input).collect())
-    }
-
-    /// # Errors
-    ///
-    /// Returns `ContainerError` propagated from the work it performs.
-    pub fn serve_input_weaves_owned(
-        &self,
-        inputs: &[ServeInput],
-    ) -> Result<Vec<TokenStream>, ContainerError> {
-        inputs.iter().map(|input| self.materialize(input)).collect()
-    }
-
-    /// # Errors
-    ///
     /// Returns `ContainerError` propagated from the work it performs.
     pub fn serve_inputs(
         &self,
         roots: &[CanonicalPath],
-        woven: &[ServeInput],
-    ) -> Result<Vec<ServeInput>, ContainerError> {
-        let mut collected: Vec<ServeInput> = Vec::new();
+    ) -> Result<Vec<SlottedServeInput>, ContainerError> {
+        let provided = roots
+            .iter()
+            .map(|root| self.provider_serve_inputs(root))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        for root in roots {
-            collected.extend_from_slice(&self.provider_serve_inputs(root)?.inputs);
-        }
-
-        collected.extend_from_slice(woven);
-
-        self.serve_input_union(&collected)
+        Ok(unify_serve_inputs(provided.into_iter().flatten()))
     }
 
     #[must_use]
-    pub fn serve_invocation(&self, arguments: &[ServeInputBinding]) -> TokenStream {
+    pub fn serve_invocation(
+        &self,
+        arguments: &[ServeInputBinding],
+        served_roots: &[CanonicalPath],
+    ) -> TokenStream {
         let literal = bootstrap_arguments_literal(
             &bootstrap_arguments_path(&format_ident!("serve")),
             arguments,
         );
         let invocation = quote! { super::container::build::serve(#literal) };
 
-        if self.asynchronous_constructions.is_empty() {
-            invocation
-        } else {
+        if served_roots
+            .iter()
+            .any(|root| self.construction_is_async(root))
+        {
             quote! { #invocation.await }
+        } else {
+            invocation
         }
     }
 
@@ -281,13 +206,6 @@ impl ContainerBindings {
         self.provider_in_role(|role| {
             matches!(role, FrameworkInjectionRole::TrustedIssuer(trusted) if trusted == issuer)
         })
-    }
-
-    fn materialize(&self, input: &ServeInput) -> Result<TokenStream, ContainerError> {
-        let slot = self.serve_input_slot(&input.slot_key())?;
-        let ident = self.serve_input_naming.ident(slot);
-
-        Ok(owned_weave(&input.weaving(), &quote! { #ident }, false))
     }
 
     fn provider_in_role(

@@ -1,8 +1,7 @@
-use std::str::FromStr;
-
 use url::Url;
 
-use crate::https_url_error::HttpsUrlError;
+use crate::https_url_parsing::HttpsUrlParsing;
+use crate::https_url_rejection::HttpsUrlRejection;
 
 const HTTPS_SCHEME: &str = "https";
 
@@ -12,6 +11,17 @@ pub struct HttpsUrl {
 }
 
 impl HttpsUrl {
+    #[must_use]
+    pub fn parse(original: &str) -> HttpsUrlParsing {
+        match Url::parse(original) {
+            Ok(url) if url.scheme() == HTTPS_SCHEME => HttpsUrlParsing::Accepted(Self { url }),
+            Ok(url) => HttpsUrlParsing::Rejected(HttpsUrlRejection::NotHttps {
+                scheme: url.scheme().to_string(),
+            }),
+            Err(source) => HttpsUrlParsing::Rejected(HttpsUrlRejection::Malformed(source)),
+        }
+    }
+
     #[must_use]
     pub fn as_str(&self) -> &str {
         self.url.as_str()
@@ -29,71 +39,64 @@ impl From<HttpsUrl> for Url {
     }
 }
 
-impl FromStr for HttpsUrl {
-    type Err = HttpsUrlError;
-
-    fn from_str(original: &str) -> Result<Self, Self::Err> {
-        let url = Url::parse(original).map_err(|source| HttpsUrlError::Malformed { source })?;
-
-        if url.scheme() == HTTPS_SCHEME {
-            Ok(Self { url })
-        } else {
-            Err(HttpsUrlError::NotHttps {
-                scheme: url.scheme().to_string(),
-            })
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use url::Url;
 
     use super::HttpsUrl;
-    use crate::https_url_error::HttpsUrlError;
+    use crate::https_url_parsing::HttpsUrlParsing;
+    use crate::https_url_rejection::HttpsUrlRejection;
 
     #[test]
     fn accepts_an_https_url_in_its_canonical_form() {
-        let url: HttpsUrl = "https://issuer.example"
-            .parse()
-            .expect("the url uses https");
-
-        assert_eq!(url.as_str(), "https://issuer.example/");
+        assert!(matches!(
+            HttpsUrl::parse("https://issuer.example"),
+            HttpsUrlParsing::Accepted(url) if url.as_str() == "https://issuer.example/"
+        ));
     }
 
     #[test]
     fn converts_into_the_url_it_validated() {
-        let url: HttpsUrl = "https://issuer.example/jwks.json"
-            .parse()
-            .expect("the url uses https");
-
-        assert_eq!(Url::from(url.clone()), *url.url());
+        assert!(matches!(
+            HttpsUrl::parse("https://issuer.example/jwks.json"),
+            HttpsUrlParsing::Accepted(url) if Url::from(url.clone()) == *url.url()
+        ));
     }
 
     #[test]
     fn rejects_a_plaintext_url() {
         assert_eq!(
-            "http://issuer.example"
-                .parse::<HttpsUrl>()
-                .expect_err("the url does not use https")
-                .to_string(),
-            "the url uses the 'http' scheme instead of https"
+            HttpsUrl::parse("http://issuer.example"),
+            HttpsUrlParsing::Rejected(HttpsUrlRejection::NotHttps {
+                scheme: "http".to_string()
+            })
         );
     }
 
     #[test]
     fn rejects_a_relative_reference() {
-        let error = "/jwks.json"
-            .parse::<HttpsUrl>()
-            .expect_err("a relative reference is not a url");
-
         assert_eq!(
-            error.to_string(),
-            "the url is malformed: relative URL without a base"
+            HttpsUrl::parse("/jwks.json"),
+            HttpsUrlParsing::Rejected(HttpsUrlRejection::Malformed(
+                url::ParseError::RelativeUrlWithoutBase
+            ))
         );
-        assert!(matches!(
-            error,
-            HttpsUrlError::Malformed { source } if source == url::ParseError::RelativeUrlWithoutBase
-        ));
+    }
+
+    #[test]
+    fn describes_every_rejection() {
+        assert_eq!(
+            [
+                HttpsUrlRejection::Malformed(url::ParseError::RelativeUrlWithoutBase),
+                HttpsUrlRejection::NotHttps {
+                    scheme: "http".to_string(),
+                },
+            ]
+            .map(|rejection| rejection.to_string()),
+            [
+                "the url is malformed: relative URL without a base",
+                "the url uses the 'http' scheme instead of https",
+            ]
+        );
     }
 }

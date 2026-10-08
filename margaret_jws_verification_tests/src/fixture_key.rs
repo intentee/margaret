@@ -115,6 +115,7 @@ impl FixtureKey {
         VerificationKey::new(
             KeyId::new(self.kid.clone()),
             VerificationMaterial::from_ec_point(self.curve, self.key_pair.public_key().as_ref())
+                .continue_value()
                 .expect("the fixture public key verifies"),
         )
     }

@@ -19,10 +19,5 @@ pub fn render_http(plan: HttpPlan, bindings: &ContainerBindings) -> HttpArtifact
     modules.extend(render_routes(&plan.table, &plan.servers));
     modules.extend(render_forwarders(&plan.table, &plan.servers));
 
-    HttpArtifacts::new(
-        modules,
-        plan.servers,
-        plan.server_serve_inputs,
-        plan.retained_roots,
-    )
+    HttpArtifacts::new(modules, plan.servers, plan.retained_roots)
 }

@@ -1,9 +1,4 @@
-use margaret::framework::macros::oauth_client;
+use margaret::framework::macros::acts_as_oauth_client;
 
-#[oauth_client(
-    blog,
-    authentication = private_key_jwt,
-    client_id = "blog",
-    issuer = margaret
-)]
+#[acts_as_oauth_client(blog, admitted_as = blog_app)]
 pub struct BlogClient;

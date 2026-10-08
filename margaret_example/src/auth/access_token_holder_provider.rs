@@ -19,7 +19,7 @@ impl AccessTokenHolderProvider {
     #[infer_from_request]
     pub fn infer_access_token_holder(
         &self,
-        #[bearer_token(issuer = auth)] token: Option<
+        #[bearer_token(issuer = provider)] token: Option<
             VerifiedJwt<AccessTokenClaims, AccessTokenProfile>,
         >,
     ) -> anyhow::Result<AuthenticatedUserOutcome<AccessTokenHolder>> {

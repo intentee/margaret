@@ -1,4 +1,4 @@
 use margaret::framework::macros::issues_tokens;
 
-#[issues_tokens(audience = "fixture", issuer = "https://issuer.fixture")]
+#[issues_tokens(provider, audience = "fixture", issuer = "https://issuer.fixture")]
 pub struct Issuer;

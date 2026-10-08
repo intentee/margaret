@@ -1,24 +1,32 @@
+use std::future::ready;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use futures_util::TryFutureExt;
-use futures_util::future;
-use oauth2::PkceCodeChallenge;
-use oauth2::PkceCodeVerifier;
+use futures_util::TryFutureExt as _;
 use oauth2::basic::BasicErrorResponseType;
 use url::Url;
+use uuid::Uuid;
 
 use margaret_accepted_clients::accepted_client::AcceptedClient;
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
-use margaret_accepted_clients::authorization_code_grant::AuthorizationCodeGrant;
 use margaret_accepted_clients::client_credentials_grant::ClientCredentialsGrant;
 use margaret_accepted_clients::code_grant_policy::CodeGrantPolicy;
 use margaret_accepted_clients::confidential_privileges::ConfidentialPrivileges;
 use margaret_accepted_clients::refresh_token_grant::RefreshTokenGrant;
+use margaret_accepted_clients::registered_authentication::RegisteredAuthentication;
 use margaret_accepted_clients::registered_client::RegisteredClient;
+use margaret_accepted_clients::registered_code_grant::RegisteredCodeGrant;
 use margaret_accepted_clients::token_exchange_grant::TokenExchangeGrant;
+use margaret_authorization_grants::authorization_grant::AuthorizationGrant;
+use margaret_authorization_grants::code_redemption::CodeRedemption;
+use margaret_authorization_grants::family_opening::FamilyOpening;
+use margaret_authorization_grants::issued_code::IssuedCode;
+use margaret_authorization_grants::refresh_family::RefreshFamily;
+use margaret_authorization_grants::refresh_rotation::RefreshRotation;
+use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
+use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_identity_session::id_token_claims::IdTokenClaims;
@@ -27,14 +35,7 @@ use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_oauth_vocabulary::openid_scope::OPENID_SCOPE;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
-use margaret_provider_state_storage::authorization_grant::AuthorizationGrant;
-use margaret_provider_state_storage::code_spending::CodeSpending;
-use margaret_provider_state_storage::presented_code::PresentedCode;
-use margaret_provider_state_storage::presented_refresh_token::PresentedRefreshToken;
-use margaret_provider_state_storage::refresh_family::RefreshFamily;
-use margaret_provider_state_storage::refresh_issuance::RefreshIssuance;
-use margaret_provider_state_storage::refresh_rotation::RefreshRotation;
-use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
+use margaret_oauth_vocabulary::subject_token_type_parsing::SubjectTokenTypeParsing;
 use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_subject_token_exchange::exchanged_subject::ExchangedSubject;
@@ -110,19 +111,38 @@ fn unauthorized_client() -> Response {
     )
 }
 
-fn code_settled(spending: CodeSpending, spent: impl FnOnce() -> Response) -> Response {
-    match spending {
-        CodeSpending::Expired => unknown_code(),
-        CodeSpending::Replayed => replayed_code(),
-        CodeSpending::Spent => spent(),
-    }
+async fn revoked_family(
+    grants: &dyn StoresAuthorizationGrants,
+    family: Uuid,
+) -> Result<Response, ProviderError> {
+    grants
+        .revoke_refresh_family(family)
+        .await
+        .map_err(ProviderError::RevokeRefreshFamily)
+        .map(|()| replayed_refresh_token())
 }
 
-fn refresh_rotated(rotation: RefreshRotation, prepared: PreparedTokens) -> Response {
-    match rotation {
-        RefreshRotation::Replayed => replayed_refresh_token(),
-        RefreshRotation::Revoked => unknown_refresh_token(),
-        RefreshRotation::Rotated => prepared.response(),
+async fn committed_tokens(
+    grants: &dyn StoresAuthorizationGrants,
+    family: Uuid,
+    grant: &AuthorizationGrant,
+    now: NumericDate,
+    prepared: PreparedTokens,
+) -> Result<Response, ProviderError> {
+    match &prepared.refresh {
+        RefreshTokenIssue::Issued(refresh_token) => grants
+            .open_refresh_family(
+                family,
+                RefreshFamily::opened_by(grant, now),
+                TokenDigest::of(refresh_token),
+            )
+            .await
+            .map_err(ProviderError::OpenRefreshFamily)
+            .map(|opening| match opening {
+                FamilyOpening::Opened => prepared.response(),
+                FamilyOpening::Revoked => replayed_code(),
+            }),
+        RefreshTokenIssue::Withheld => Ok(prepared.response()),
     }
 }
 
@@ -130,7 +150,7 @@ fn redeemed_issue(
     policy: &CodeGrantPolicy,
     AuthorizationGrant {
         scopes, subject, ..
-    }: AuthorizationGrant,
+    }: &AuthorizationGrant,
     resource: &'static str,
     id_token: Option<String>,
 ) -> TokenIssue {
@@ -165,14 +185,12 @@ pub struct TokenEndpoint {
     exchangers: Arc<SubjectTokenExchangers>,
     issuance: TokenIssuance,
     secret_store: Arc<JwksSecretStore>,
-    state: Arc<dyn StoresProviderState>,
 }
 
 impl TokenEndpoint {
     #[must_use]
     pub fn create(
         clients: Arc<AcceptedClients>,
-        state: Arc<dyn StoresProviderState>,
         exchangers: Arc<SubjectTokenExchangers>,
         secret_store: Arc<JwksSecretStore>,
         issuance: TokenIssuance,
@@ -182,13 +200,13 @@ impl TokenEndpoint {
             exchangers,
             issuance,
             secret_store,
-            state,
         }
     }
 
     /// # Errors
     ///
-    /// Returns `ProviderError::State` when the provider state cannot be reached,
+    /// Returns `ProviderError::ClientAuthentication` when the client assertion cannot be
+    /// remembered, a grant store variant when the application cannot reach its grants,
     /// `ProviderError::Signing` when an id token cannot be signed, and
     /// `ProviderError::SubjectTokenExchange` when a subject token exchanger fails.
     pub async fn respond(
@@ -212,7 +230,6 @@ impl TokenEndpoint {
             &self.clients,
             request,
             &client_authentication,
-            self.state.as_ref(),
             NumericDate::from(now),
         )
         .await?
@@ -220,7 +237,7 @@ impl TokenEndpoint {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(registered) => registered,
         };
-        let client = registered.client();
+        let client = &registered.client;
 
         match grant {
             TokenGrant::AuthorizationCode {
@@ -230,7 +247,7 @@ impl TokenEndpoint {
                 resource,
             } => {
                 self.authorization_code(
-                    client,
+                    registered,
                     &code,
                     code_verifier,
                     &redirect_uri,
@@ -248,7 +265,7 @@ impl TokenEndpoint {
                 scope,
             } => {
                 self.refresh_token(
-                    client,
+                    registered,
                     &refresh_token,
                     resource.as_deref(),
                     scope.as_deref(),
@@ -295,14 +312,19 @@ impl TokenEndpoint {
 
     async fn authorization_code(
         &self,
-        client: &AcceptedClient,
+        registered: &RegisteredClient,
         code: &str,
         code_verifier: String,
         redirect_uri: &str,
         resource: Option<&str>,
         now: DateTime<Utc>,
     ) -> Result<Response, ProviderError> {
-        let AuthorizationCodeGrant::Granted(policy) = &client.authorization_code else {
+        let RegisteredClient {
+            client,
+            code_grant: RegisteredCodeGrant::Granted { grants, policy, .. },
+            ..
+        } = registered
+        else {
             return Ok(unauthorized_client());
         };
         let Ok(redirect_uri) = Url::parse(redirect_uri) else {
@@ -312,48 +334,48 @@ impl TokenEndpoint {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(resource) => resource,
         };
-        let code = TokenDigest::of(code);
-        let grant = match self
-            .state
-            .present_code(code)
+        let family = Uuid::new_v4();
+        let instant = NumericDate::from(now);
+        let grant = match grants
+            .redeem_code(TokenDigest::of(code), family)
             .await
-            .map_err(ProviderError::State)?
+            .map_err(ProviderError::RedeemCode)?
         {
-            PresentedCode::Issued(grant) => *grant,
-            PresentedCode::Replayed => return Ok(replayed_code()),
-            PresentedCode::Unknown => return Ok(unknown_code()),
-        };
-        let code_challenge =
-            PkceCodeChallenge::from_code_verifier_sha256(&PkceCodeVerifier::new(code_verifier));
+            CodeRedemption::Redeemed(issued) if issued.expires_at > instant => {
+                let IssuedCode { grant, .. } = *issued;
 
-        if !(CodeAdmission {
+                grant
+            }
+            CodeRedemption::Redeemed(_) | CodeRedemption::Unknown => return Ok(unknown_code()),
+            CodeRedemption::AlreadyRedeemed { family } => {
+                return grants
+                    .revoke_refresh_family(family)
+                    .await
+                    .map_err(ProviderError::RevokeRefreshFamily)
+                    .map(|()| replayed_code());
+            }
+        };
+
+        if let ControlFlow::Break(refusal) = (CodeAdmission {
             client_id: client.client_id,
-            code_challenge: code_challenge.as_str(),
+            code_verifier: &code_verifier,
             redirect_uri: &redirect_uri,
         })
-        .admits(&grant)
+        .admission(&grant)
         {
-            return self
-                .state
-                .spend_code(code, RefreshIssuance::Withheld)
-                .await
-                .map_err(ProviderError::State)
-                .map(|spending| {
-                    code_settled(spending, || {
-                        invalid_grant(
-                            "the authorization code was granted to another client, callback or verifier",
-                        )
-                    })
-                });
+            return Ok(invalid_grant(refusal.description()));
         }
 
-        future::ready(self.id_token(client, policy, &grant, now))
+        ready(self.id_token(client, policy, &grant, now))
             .and_then(|id_token| {
-                self.spent_code(
-                    code,
+                committed_tokens(
+                    grants.as_ref(),
+                    family,
+                    &grant,
+                    instant,
                     self.prepared_tokens(
                         client,
-                        redeemed_issue(policy, grant, resource, id_token),
+                        redeemed_issue(policy, &grant, resource, id_token),
                         now,
                     ),
                 )
@@ -368,13 +390,17 @@ impl TokenEndpoint {
         scope: Option<&str>,
         now: DateTime<Utc>,
     ) -> Response {
-        let RegisteredClient::Confidential {
-            client,
-            privileges:
-                ConfidentialPrivileges {
-                    client_credentials: ClientCredentialsGrant::Granted { scopes: granted },
+        let RegisteredClient {
+            authentication:
+                RegisteredAuthentication::PrivateKeyJwt {
+                    privileges:
+                        ConfidentialPrivileges {
+                            client_credentials: ClientCredentialsGrant::Granted { scopes: granted },
+                            ..
+                        },
                     ..
                 },
+            client,
             ..
         } = registered
         else {
@@ -471,16 +497,26 @@ impl TokenEndpoint {
 
     async fn refresh_token(
         &self,
-        client: &AcceptedClient,
+        registered: &RegisteredClient,
         refresh_token: &str,
         resource: Option<&str>,
         scope: Option<&str>,
         now: DateTime<Utc>,
     ) -> Result<Response, ProviderError> {
-        let AuthorizationCodeGrant::Granted(CodeGrantPolicy {
-            refresh: RefreshTokenGrant::Granted,
+        let RegisteredClient {
+            client,
+            code_grant:
+                RegisteredCodeGrant::Granted {
+                    grants,
+                    policy:
+                        CodeGrantPolicy {
+                            refresh: RefreshTokenGrant::Granted,
+                            ..
+                        },
+                    ..
+                },
             ..
-        }) = &client.authorization_code
+        } = registered
         else {
             return Ok(unauthorized_client());
         };
@@ -494,25 +530,27 @@ impl TokenEndpoint {
         };
         let presented = TokenDigest::of(refresh_token);
         let RefreshFamily {
-            client_id,
             scopes: granted,
             subject,
             ..
-        } = match self
-            .state
-            .present_refresh_token(presented)
+        } = match grants
+            .find_refresh_token(presented)
             .await
-            .map_err(ProviderError::State)?
+            .map_err(ProviderError::FindRefreshToken)?
         {
-            PresentedRefreshToken::Current(family) => family,
-            PresentedRefreshToken::Replayed => return Ok(replayed_refresh_token()),
-            PresentedRefreshToken::Unknown => return Ok(unknown_refresh_token()),
+            RefreshTokenLookup::Current { record, .. }
+                if record.expires_at > NumericDate::from(now)
+                    && record.client_id == client.client_id =>
+            {
+                record
+            }
+            RefreshTokenLookup::Current { .. } | RefreshTokenLookup::Unknown => {
+                return Ok(unknown_refresh_token());
+            }
+            RefreshTokenLookup::Superseded { family } => {
+                return revoked_family(grants.as_ref(), family).await;
+            }
         };
-
-        if client_id != client.client_id {
-            return Ok(unknown_refresh_token());
-        }
-
         let scopes = match requested.within(&granted.iter().map(Scope::as_str).collect()) {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(scopes) => scopes,
@@ -532,23 +570,15 @@ impl TokenEndpoint {
             now,
         );
 
-        self.state
+        match grants
             .rotate_refresh_token(presented, next_digest)
             .await
-            .map_err(ProviderError::State)
-            .map(|rotation| refresh_rotated(rotation, prepared))
-    }
-
-    async fn spent_code(
-        &self,
-        code: TokenDigest,
-        prepared: PreparedTokens,
-    ) -> Result<Response, ProviderError> {
-        self.state
-            .spend_code(code, prepared.refresh.issuance())
-            .await
-            .map_err(ProviderError::State)
-            .map(|spending| code_settled(spending, || prepared.response()))
+            .map_err(ProviderError::RotateRefreshToken)?
+        {
+            RefreshRotation::Rotated => Ok(prepared.response()),
+            RefreshRotation::Superseded { family } => revoked_family(grants.as_ref(), family).await,
+            RefreshRotation::Unknown => Ok(unknown_refresh_token()),
+        }
     }
 
     async fn token_exchange(
@@ -565,11 +595,16 @@ impl TokenEndpoint {
         }: TokenExchangeParameters,
         now: DateTime<Utc>,
     ) -> Result<Response, ProviderError> {
-        if client.token_exchange == TokenExchangeGrant::Withheld {
+        let TokenExchangeGrant::Granted {
+            scopes: exchangeable,
+        } = client.token_exchange
+        else {
             return Ok(unauthorized_client());
-        }
+        };
 
-        let Ok(token_type) = subject_token_type.parse::<SubjectTokenType>() else {
+        let SubjectTokenTypeParsing::Accepted(token_type) =
+            SubjectTokenType::parse(&subject_token_type)
+        else {
             return Ok(oauth_error(
                 400,
                 BasicErrorResponseType::InvalidRequest,
@@ -579,9 +614,8 @@ impl TokenEndpoint {
 
         if actor_token.is_some()
             || requested_token_type.is_some_and(|requested| {
-                !requested
-                    .parse::<SubjectTokenType>()
-                    .is_ok_and(|requested| requested == SubjectTokenType::AccessToken)
+                SubjectTokenType::parse(&requested)
+                    != SubjectTokenTypeParsing::Accepted(SubjectTokenType::AccessToken)
             })
             || (audience.is_some() && resource.is_some())
         {
@@ -605,6 +639,16 @@ impl TokenEndpoint {
                 .map_err(ProviderError::SubjectTokenExchange)?
             {
                 ExchangedSubject::Granted { scopes, subject } => {
+                    if let Some(undeclared) = scopes
+                        .iter()
+                        .find(|granted| !exchangeable.contains(&granted.as_str()))
+                    {
+                        return Err(ProviderError::UndeclaredExchangeScope {
+                            client_id: client.client_id,
+                            scope: undeclared.as_str().to_string(),
+                        });
+                    }
+
                     match RequestedScope::resolved(
                         scope.as_deref(),
                         &scopes.iter().map(Scope::as_str).collect(),

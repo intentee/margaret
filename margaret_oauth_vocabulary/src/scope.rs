@@ -1,13 +1,12 @@
-use std::str::FromStr;
-
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 use serde::de::Error;
 
-use crate::oauth_vocabulary_error::OAuthVocabularyError;
 use crate::openid_scope::OPENID_SCOPE;
+use crate::scope_parsing::ScopeParsing;
+use crate::scope_rejection::ScopeRejection;
 
 const QUOTATION_MARK: u8 = 0x22;
 const REVERSE_SOLIDUS: u8 = 0x5c;
@@ -34,6 +33,19 @@ impl Scope {
     }
 
     #[must_use]
+    pub fn parse(value: &str) -> ScopeParsing {
+        if value.is_empty() {
+            ScopeParsing::Rejected(ScopeRejection::Empty)
+        } else if value.bytes().all(is_scope_octet) {
+            ScopeParsing::Accepted(Self {
+                value: value.to_string(),
+            })
+        } else {
+            ScopeParsing::Rejected(ScopeRejection::Character)
+        }
+    }
+
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.value
     }
@@ -50,29 +62,14 @@ impl From<&Scope> for oauth2::Scope {
     }
 }
 
-impl FromStr for Scope {
-    type Err = OAuthVocabularyError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        if value.is_empty() {
-            Err(OAuthVocabularyError::EmptyScope)
-        } else if value.bytes().all(is_scope_octet) {
-            Ok(Self {
-                value: value.to_string(),
-            })
-        } else {
-            Err(OAuthVocabularyError::ScopeCharacter)
-        }
-    }
-}
-
 impl<'de> Deserialize<'de> for Scope {
     fn deserialize<TDeserializer: Deserializer<'de>>(
         deserializer: TDeserializer,
     ) -> Result<Self, TDeserializer::Error> {
-        String::deserialize(deserializer)?
-            .parse()
-            .map_err(TDeserializer::Error::custom)
+        match Self::parse(&String::deserialize(deserializer)?) {
+            ScopeParsing::Accepted(scope) => Ok(scope),
+            ScopeParsing::Rejected(rejection) => Err(TDeserializer::Error::custom(rejection)),
+        }
     }
 }
 

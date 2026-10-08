@@ -10,9 +10,12 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
+margaret_accepted_clients_codegen = { workspace = true }
 margaret_attribute_arguments = { workspace = true }
 margaret_attributes = { workspace = true }
 margaret_oauth_client_codegen = { workspace = true }
+margaret_oauth_vocabulary = { workspace = true }
+margaret_token_issuance_codegen = { workspace = true }
 margaret_trusted_issuer_codegen = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }

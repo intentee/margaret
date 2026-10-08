@@ -57,7 +57,7 @@ impl MargaretClient {
         Self::discovering(
             request_client,
             trust,
-            fixture_roller(),
+            fixture_roller().await,
             |request_client, metadata, trusted_issuer| {
                 AuthorizationServerClient::with_client_secret_basic(
                     request_client,
@@ -71,9 +71,18 @@ impl MargaretClient {
         .await
     }
 
+    /// # Panics
+    ///
+    /// Panics when the callback is not a url.
     #[must_use]
-    pub fn sign_in_flow(&self) -> SignInFlow {
-        SignInFlow::create(Arc::clone(&self.server), Arc::clone(&self.roller))
+    pub fn sign_in_flow(&self, callback: &str, scopes: &[&str]) -> SignInFlow {
+        SignInFlow::create(
+            Arc::clone(&self.server),
+            Arc::clone(&self.roller),
+            callback.to_string(),
+            scopes,
+        )
+        .expect("the callback is a url")
     }
 
     pub async fn stop(self) {

@@ -8,7 +8,7 @@ use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 #[tokio::test]
 async fn admits_a_visitor_with_credentials_of_another_scheme_as_unaddressed() {
-    let trusted_issuer = TrustedIssuer::create(Arc::new(IssuerKeySet::awaiting()), fixture_trust());
+    let trusted_issuer = TrustedIssuer::polled(Arc::new(IssuerKeySet::awaiting()), fixture_trust());
 
     assert!(matches!(
         admit_access_token(&trusted_issuer, "Basic dXNlcjpwYXNz").await,

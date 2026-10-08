@@ -1,29 +1,27 @@
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller::initial_secret::initial_secret;
-use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
-use margaret_jwks_roller::loaded_secret::LoadedSecret;
-use margaret_jwks_roller_tests::stored_jwks_secret_storage::StoredJwksSecretStorage;
+use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
 
-#[test]
-fn initial_secret_persists_the_secret_it_seeds() {
-    let storage = StoredJwksSecretStorage::empty();
+#[tokio::test]
+async fn initial_secret_persists_the_secret_it_seeds() {
+    let storage = FixtureSigningKeys::empty();
 
     let seeded = initial_secret(
         &storage,
         SigningCurve::P256,
         &FixtureRsaSigningKeys::default(),
     )
+    .await
     .expect("a fresh secret is seeded");
-    let stored = storage
-        .load(&FixtureRsaSigningKeys::default())
-        .expect("the backend can be read");
+    let restored = initial_secret(
+        &storage,
+        SigningCurve::P256,
+        &FixtureRsaSigningKeys::default(),
+    )
+    .await
+    .expect("the seeded secret is restored");
 
-    match stored {
-        LoadedSecret::Absent => panic!("the seeded secret must be persisted"),
-        LoadedSecret::Present(secret) => {
-            assert_eq!(secret.current().kid(), seeded.current().kid());
-            assert_eq!(secret.next().kid(), seeded.next().kid());
-        }
-    }
+    assert_eq!(restored.current().kid(), seeded.current().kid());
+    assert_eq!(restored.next().kid(), seeded.next().kid());
 }

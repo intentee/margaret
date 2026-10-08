@@ -9,6 +9,9 @@ use margaret_oauth_vocabulary::scope::Scope;
 pub fn fixture_scopes(scopes: &[&str]) -> BTreeSet<Scope> {
     scopes
         .iter()
-        .map(|scope| scope.parse().expect("the fixture scope is a scope token"))
+        .map(|scope| {
+            serde_json::from_value::<Scope>(serde_json::Value::String((*scope).to_string()))
+                .expect("the fixture scope is a scope token")
+        })
         .collect()
 }

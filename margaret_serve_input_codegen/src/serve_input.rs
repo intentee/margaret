@@ -5,12 +5,14 @@ use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_environment_variable_codegen::environment_variable::EnvironmentVariable;
 use margaret_input_weaving::weaving_kind::WeavingKind;
 
+use crate::route_url_input::RouteUrlInput;
 use crate::serve_input_key::ServeInputKey;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ServeInput {
     ConsoleArgument(ConsoleArgument),
     EnvironmentVariable(EnvironmentVariable),
+    RouteUrl(RouteUrlInput),
     SpiffeHttpClient,
 }
 
@@ -20,6 +22,7 @@ impl ServeInput {
         match self {
             ServeInput::ConsoleArgument(argument) => argument.field_type(),
             ServeInput::EnvironmentVariable(variable) => variable.value.field_type(),
+            ServeInput::RouteUrl(_) => quote! { ::std::string::String },
             ServeInput::SpiffeHttpClient => quote! { reqwest::Client },
         }
     }
@@ -28,7 +31,9 @@ impl ServeInput {
     pub fn is_shareable(&self) -> bool {
         match self {
             ServeInput::ConsoleArgument(argument) => argument.is_shareable(),
-            ServeInput::EnvironmentVariable(_) | ServeInput::SpiffeHttpClient => true,
+            ServeInput::EnvironmentVariable(_)
+            | ServeInput::RouteUrl(_)
+            | ServeInput::SpiffeHttpClient => true,
         }
     }
 
@@ -37,15 +42,23 @@ impl ServeInput {
         match self {
             ServeInput::ConsoleArgument(argument) => argument.name(),
             ServeInput::EnvironmentVariable(variable) => variable.name.as_str(),
+            ServeInput::RouteUrl(route) => &route.path,
             ServeInput::SpiffeHttpClient => "spiffe_http_client",
         }
+    }
+
+    #[must_use]
+    pub fn reads_server_origins(&self) -> bool {
+        matches!(self, ServeInput::RouteUrl(_))
     }
 
     #[must_use]
     pub fn reads_clap_matches(&self) -> bool {
         match self {
             ServeInput::ConsoleArgument(_) => true,
-            ServeInput::EnvironmentVariable(_) | ServeInput::SpiffeHttpClient => false,
+            ServeInput::EnvironmentVariable(_)
+            | ServeInput::RouteUrl(_)
+            | ServeInput::SpiffeHttpClient => false,
         }
     }
 
@@ -58,6 +71,7 @@ impl ServeInput {
             ServeInput::EnvironmentVariable(variable) => ServeInputKey::EnvironmentVariable {
                 name: variable.name.as_str().to_string(),
             },
+            ServeInput::RouteUrl(route) => ServeInputKey::RouteUrl(route.clone()),
             ServeInput::SpiffeHttpClient => ServeInputKey::SpiffeHttpClient,
         }
     }
@@ -67,7 +81,7 @@ impl ServeInput {
         match self {
             ServeInput::ConsoleArgument(argument) => argument.weaving(),
             ServeInput::EnvironmentVariable(variable) => variable.value.weaving.clone(),
-            ServeInput::SpiffeHttpClient => WeavingKind::Cloned,
+            ServeInput::RouteUrl(_) | ServeInput::SpiffeHttpClient => WeavingKind::Cloned,
         }
     }
 }
@@ -83,6 +97,7 @@ mod tests {
     use margaret_input_weaving::input_value::InputValue;
     use margaret_input_weaving::weaving_kind::WeavingKind;
 
+    use crate::route_url_input::RouteUrlInput;
     use crate::serve_input_key::ServeInputKey;
 
     use super::ServeInput;
@@ -173,7 +188,28 @@ mod tests {
         assert_eq!(input.weaving(), WeavingKind::Cloned);
         assert!(input.is_shareable());
         assert!(!input.reads_clap_matches());
+        assert!(!input.reads_server_origins());
         assert_eq!(input.slot_key(), ServeInputKey::SpiffeHttpClient);
+    }
+
+    fn callback() -> RouteUrlInput {
+        RouteUrlInput {
+            path: "/sign-in/callback".to_string(),
+            server: "public".to_string(),
+        }
+    }
+
+    #[test]
+    fn a_route_url_is_a_cloned_string_composed_from_the_server_origins() {
+        let input = ServeInput::RouteUrl(callback());
+
+        assert_eq!(collapsed(&input.field_type()), "::std::string::String");
+        assert_eq!(input.name(), "/sign-in/callback");
+        assert_eq!(input.weaving(), WeavingKind::Cloned);
+        assert!(input.is_shareable());
+        assert!(!input.reads_clap_matches());
+        assert!(input.reads_server_origins());
+        assert_eq!(input.slot_key(), ServeInputKey::RouteUrl(callback()));
     }
 
     #[test]

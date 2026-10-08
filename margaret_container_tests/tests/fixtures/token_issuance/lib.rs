@@ -1,2 +1,2 @@
-#[issues_tokens(audience = "session", issuer = "https://issuer.fixture")]
+#[issues_tokens(provider, audience = "session", issuer = "https://issuer.fixture")]
 struct Issuer;

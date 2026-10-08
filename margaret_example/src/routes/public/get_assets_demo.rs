@@ -6,13 +6,14 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 use margaret::framework::views::renders_view::RendersView;
 
 use crate::views::asset_page::AssetPage;
 use crate::views::asset_page::AssetPageProps;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/assets-demo", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/assets-demo", server = "public")]
 pub struct GetAssetsDemo {
     asset_page: Arc<AssetPage>,
 }

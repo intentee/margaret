@@ -125,19 +125,26 @@ fn resolve_module_file(directory: &Path, identifier: &Ident) -> Result<PathBuf, 
     let file_module = directory.join(format!("{identifier}.rs"));
     let directory_module = directory.join(identifier.to_string()).join("mod.rs");
 
-    match (file_module.is_file(), directory_module.is_file()) {
-        (true, true) => Err(AttributeError::ModuleFileCollision {
+    let has_directory_module = directory_module.is_file();
+
+    if file_module.is_file() {
+        if has_directory_module {
+            Err(AttributeError::ModuleFileCollision {
+                module: identifier.to_string(),
+                file_module: file_module.display().to_string(),
+                directory_module: directory_module.display().to_string(),
+            })
+        } else {
+            Ok(file_module)
+        }
+    } else if has_directory_module {
+        Ok(directory_module)
+    } else {
+        Err(AttributeError::ModuleFileNotFound {
             module: identifier.to_string(),
             file_module: file_module.display().to_string(),
             directory_module: directory_module.display().to_string(),
-        }),
-        (true, false) => Ok(file_module),
-        (false, true) => Ok(directory_module),
-        (false, false) => Err(AttributeError::ModuleFileNotFound {
-            module: identifier.to_string(),
-            file_module: file_module.display().to_string(),
-            directory_module: directory_module.display().to_string(),
-        }),
+        })
     }
 }
 

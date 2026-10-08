@@ -4,6 +4,7 @@ use quote::quote;
 
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_model_codegen::model::Model;
+use margaret_model_codegen::on_delete_actions::ON_DELETE_ACTIONS;
 use margaret_model_codegen::resolved_column::ResolvedColumn;
 use margaret_model_codegen::resolved_foreign_key::ResolvedForeignKey;
 use margaret_model_codegen::resolved_index::ResolvedIndex;
@@ -11,8 +12,6 @@ use margaret_model_codegen::resolved_index::ResolvedIndex;
 use crate::column_check_tokens::column_check_tokens;
 use crate::column_default_tokens::column_default_tokens;
 use crate::column_type_tokens::column_type_tokens;
-use crate::framework_tables::FrameworkTables;
-use crate::on_delete_tokens::on_delete_tokens;
 
 fn string_vec(values: &[String]) -> TokenStream {
     let items = values.iter().map(|value| {
@@ -44,7 +43,7 @@ fn render_column(column: &ResolvedColumn) -> TokenStream {
 
 fn render_foreign_key(foreign_key: &ResolvedForeignKey) -> TokenStream {
     let columns = string_vec(&foreign_key.columns);
-    let on_delete = on_delete_tokens(foreign_key.on_delete);
+    let on_delete = ON_DELETE_ACTIONS.tokens(foreign_key.on_delete);
     let references_columns = string_vec(&foreign_key.references_columns);
     let references_table = Literal::string(&foreign_key.references_table);
 
@@ -103,23 +102,8 @@ fn render_table(model: &Model) -> TokenStream {
     }
 }
 
-fn tables(models: &[Model], framework_tables: FrameworkTables) -> TokenStream {
+pub(crate) fn render(models: &[Model]) -> TokenStream {
     let tables = models.iter().map(render_table);
-    let provider_state_tables = quote! {
-        margaret::framework::provider_state_postgres::provider_state_tables::provider_state_tables()
-    };
-
-    match framework_tables {
-        FrameworkTables::OidcProviderState if models.is_empty() => provider_state_tables,
-        FrameworkTables::OidcProviderState => quote! {
-            vec![#(#tables),*].into_iter().chain(#provider_state_tables).collect()
-        },
-        FrameworkTables::Unused => quote! { vec![#(#tables),*] },
-    }
-}
-
-pub(crate) fn render(models: &[Model], framework_tables: FrameworkTables) -> TokenStream {
-    let tables = tables(models, framework_tables);
     let too_many_lines = too_many_lines_allow();
 
     quote! {
@@ -127,7 +111,7 @@ pub(crate) fn render(models: &[Model], framework_tables: FrameworkTables) -> Tok
         #too_many_lines
         pub fn schema() -> margaret::framework::model::schema::Schema {
             margaret::framework::model::schema::Schema {
-                tables: #tables,
+                tables: vec![#(#tables),*],
             }
         }
     }

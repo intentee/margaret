@@ -1,24 +1,23 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::sync::Arc;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
 use margaret_serve_input_codegen::serve_input::ServeInput;
-use margaret_serve_input_codegen::serve_input_key::ServeInputKey;
 use margaret_serve_input_codegen::serve_input_registry::ServeInputRegistry;
-use margaret_serve_input_codegen::serve_input_slots::ServeInputSlots;
 
 use crate::container_error::ContainerError;
 use crate::dependency_kind::DependencyKind;
 use crate::planned_dependency::PlannedDependency;
 use crate::planned_field::PlannedField;
 use crate::planned_provider::PlannedProvider;
+use crate::planned_url::PlannedUrl;
 use crate::provider::Provider;
+use crate::slotted_serve_input::SlottedServeInput;
+use crate::url_source::UrlSource;
 
 struct DependencyCollector {
-    collected: Vec<ServeInput>,
-    collected_slots: Vec<usize>,
+    collected: Vec<SlottedServeInput>,
     is_async: bool,
     seen_slots: BTreeSet<usize>,
 }
@@ -26,8 +25,10 @@ struct DependencyCollector {
 impl DependencyCollector {
     fn collect(&mut self, input: &ServeInput, slot: usize) {
         if self.seen_slots.insert(slot) {
-            self.collected.push(input.clone());
-            self.collected_slots.push(slot);
+            self.collected.push(SlottedServeInput {
+                input: input.clone(),
+                slot,
+            });
         }
     }
 
@@ -44,19 +45,15 @@ impl DependencyCollector {
                 path: provider_key.to_string(),
             })?;
 
-        for (input, slot) in planned
-            .serve_inputs
-            .iter()
-            .zip(planned.serve_input_slots.iter().copied())
-        {
-            self.collect(input, slot);
+        for slotted in planned.serve_inputs.iter() {
+            self.collect(&slotted.input, slotted.slot);
         }
 
         self.is_async |= planned.is_async;
 
         Ok(PlannedField {
+            concrete_path: planned.provider.concrete_path.clone(),
             field_name: planned.provider.field_name.clone(),
-            provided: planned.provider.provided.clone(),
         })
     }
 
@@ -99,17 +96,34 @@ impl DependencyCollector {
             DependencyKind::Single { provider_key } => self
                 .field(positions, ordered, provider_key)
                 .map(PlannedDependency::Single),
+            DependencyKind::Urls { sources } => sources
+                .iter()
+                .map(|source| match source {
+                    UrlSource::Declared(url) => Ok(PlannedUrl::Declared(url.clone())),
+                    UrlSource::Route(route) => {
+                        let input = ServeInput::RouteUrl(route.clone());
+
+                        input_registry
+                            .register(key, input.clone())
+                            .map_err(ContainerError::from)
+                            .map(|slot| {
+                                self.collect(&input, slot);
+
+                                PlannedUrl::Route { input, slot }
+                            })
+                    }
+                })
+                .collect::<Result<Vec<PlannedUrl>, ContainerError>>()
+                .map(PlannedDependency::Urls),
         }
     }
 }
 
 pub(crate) struct ContainerPlan {
     entries: Vec<PlannedProvider>,
-    inputs: Arc<[ServeInput]>,
     positions: BTreeMap<CanonicalPath, usize>,
     injectable: BTreeSet<CanonicalPath>,
     serve_input_naming: ServeInputNaming,
-    slots: Arc<BTreeMap<ServeInputKey, usize>>,
 }
 
 impl ContainerPlan {
@@ -131,7 +145,6 @@ impl ContainerPlan {
                     })?;
             let mut collector = DependencyCollector {
                 collected: Vec::new(),
-                collected_slots: Vec::new(),
                 is_async: provider.construction.is_async(),
                 seen_slots: BTreeSet::new(),
             };
@@ -145,7 +158,6 @@ impl ContainerPlan {
 
             let DependencyCollector {
                 collected,
-                collected_slots,
                 is_async,
                 ..
             } = collector;
@@ -156,29 +168,20 @@ impl ContainerPlan {
                 is_async,
                 key,
                 provider,
-                serve_input_slots: collected_slots.into(),
                 serve_inputs: collected.into(),
             });
         }
 
-        let ServeInputSlots { inputs, slots } = input_registry.into_slots();
-
         Ok(Self {
             entries: ordered,
-            serve_input_naming: ServeInputNaming::for_slot_count(inputs.len()),
-            inputs: inputs.into(),
+            serve_input_naming: ServeInputNaming::for_slot_count(input_registry.slot_count()),
             positions,
             injectable,
-            slots: Arc::new(slots),
         })
     }
 
     pub(crate) fn injectable(&self, key: &CanonicalPath) -> bool {
         self.injectable.contains(key)
-    }
-
-    pub(crate) fn inputs(&self) -> Arc<[ServeInput]> {
-        Arc::clone(&self.inputs)
     }
 
     pub(crate) fn planned_entries(&self) -> impl DoubleEndedIterator<Item = &PlannedProvider> {
@@ -204,10 +207,6 @@ impl ContainerPlan {
     pub(crate) fn serve_input_naming(&self) -> ServeInputNaming {
         self.serve_input_naming
     }
-
-    pub(crate) fn slots(&self) -> Arc<BTreeMap<ServeInputKey, usize>> {
-        Arc::clone(&self.slots)
-    }
 }
 
 #[cfg(test)]
@@ -225,8 +224,8 @@ mod tests {
     use crate::dependency_kind::DependencyKind;
     use crate::direct_construction::DirectConstruction;
     use crate::framework_injection_role::FrameworkInjectionRole;
-    use crate::provided_type::ProvidedType;
     use crate::provider::Provider;
+    use crate::provider_requirement::ProviderRequirement;
 
     fn path(name: &str) -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
@@ -244,7 +243,7 @@ mod tests {
             },
             field_name: "root".to_string(),
             injection: FrameworkInjectionRole::Unmarked,
-            provided: ProvidedType::Concrete(concrete_path),
+            requirement: ProviderRequirement::Singleton,
             type_name: "Root".to_string(),
         }
     }
@@ -271,7 +270,7 @@ mod tests {
             },
             field_name: "root".to_string(),
             injection: FrameworkInjectionRole::Unmarked,
-            provided: ProvidedType::Concrete(concrete_path),
+            requirement: ProviderRequirement::Singleton,
             type_name: "Root".to_string(),
         }
     }
@@ -341,7 +340,7 @@ mod tests {
             .expect("the root belongs to the plan");
 
         assert_eq!(planned.serve_inputs.len(), 1);
-        assert_eq!(planned.serve_input_slots.len(), 1);
+        assert_eq!(planned.serve_inputs.len(), 1);
         assert_eq!(planned.dependencies.len(), 2);
     }
 }

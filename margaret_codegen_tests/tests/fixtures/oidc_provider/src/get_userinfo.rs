@@ -7,11 +7,12 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::oidc_provider::userinfo_authentication::UserinfoAuthentication;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::margaret::oidc_provider::UserinfoEndpoint;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/userinfo", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/userinfo", server = "public")]
 pub struct GetUserinfo {
     userinfo_endpoint: Arc<UserinfoEndpoint>,
 }

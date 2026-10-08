@@ -97,32 +97,6 @@ impl AttributeArgumentsReader {
 
     /// # Errors
     ///
-    /// Returns `AttributeArgumentsError::UnexpectedArgument` when the value is not a keyword,
-    /// and the errors of reading the keyword or of its leftover arguments.
-    pub fn take_keyword<Interpreted, InterpretError>(
-        &mut self,
-        key: &str,
-        read: impl FnOnce(&Ident, &mut Self) -> Result<Interpreted, InterpretError>,
-    ) -> Result<Option<Interpreted>, InterpretError>
-    where
-        InterpretError: From<AttributeArgumentsError>,
-    {
-        match self.take_named(key) {
-            None => Ok(None),
-            Some(Expr::Path(expression)) => match expression.path.get_ident() {
-                Some(keyword) => self.read_keyword(keyword, Vec::new(), read),
-                None => Err(self.unexpected_argument(key, "keyword").into()),
-            },
-            Some(Expr::Call(call)) => match call_name(&call).cloned() {
-                Some(keyword) => self.read_keyword(&keyword, call.args.into_iter().collect(), read),
-                None => Err(self.unexpected_argument(key, "keyword").into()),
-            },
-            Some(_) => Err(self.unexpected_argument(key, "keyword").into()),
-        }
-    }
-
-    /// # Errors
-    ///
     /// Returns `AttributeArgumentsError::UnexpectedArgument`.
     pub fn take_path(&mut self, key: &str) -> Result<Option<Path>, AttributeArgumentsError> {
         match self.take_named(key) {
@@ -255,6 +229,33 @@ impl AttributeArgumentsReader {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeArgumentsError::UnexpectedArgument` when the value is neither a path nor a
+    /// call of a path, and the errors of reading the variant or of its leftover arguments.
+    pub fn take_variant<Interpreted, InterpretError>(
+        &mut self,
+        key: &str,
+        read: impl FnOnce(&Path, &mut Self) -> Result<Interpreted, InterpretError>,
+    ) -> Result<Option<Interpreted>, InterpretError>
+    where
+        InterpretError: From<AttributeArgumentsError>,
+    {
+        match self.take_named(key) {
+            None => Ok(None),
+            Some(Expr::Path(expression)) => {
+                self.read_variant(key, &expression.path, Vec::new(), read)
+            }
+            Some(Expr::Call(call)) => match call.func.as_ref() {
+                Expr::Path(function) => {
+                    self.read_variant(key, &function.path, call.args.into_iter().collect(), read)
+                }
+                _ => Err(self.unexpected_argument(key, "enum variant").into()),
+            },
+            Some(_) => Err(self.unexpected_argument(key, "enum variant").into()),
+        }
+    }
+
     pub(crate) fn into_result(self) -> Result<(), AttributeArgumentsError> {
         if let Some(argument) = self.named.first() {
             return Err(AttributeArgumentsError::UnrecognizedArgument {
@@ -273,22 +274,23 @@ impl AttributeArgumentsReader {
         Ok(())
     }
 
-    fn read_keyword<Interpreted, InterpretError>(
+    fn nested_path(&self, name: &str) -> String {
+        format!("{}::{name}", self.attribute_path)
+    }
+
+    fn read_variant<Interpreted, InterpretError>(
         &self,
-        keyword: &Ident,
+        key: &str,
+        variant: &Path,
         arguments: Vec<Expr>,
-        read: impl FnOnce(&Ident, &mut Self) -> Result<Interpreted, InterpretError>,
+        read: impl FnOnce(&Path, &mut Self) -> Result<Interpreted, InterpretError>,
     ) -> Result<Option<Interpreted>, InterpretError>
     where
         InterpretError: From<AttributeArgumentsError>,
     {
-        AttributeArgs::from_expressions(self.nested_path(&keyword.to_string()), arguments)?
-            .interpret(|reader| read(keyword, reader))
+        AttributeArgs::from_expressions(self.nested_path(key), arguments)?
+            .interpret(|reader| read(variant, reader))
             .map(Some)
-    }
-
-    fn nested_path(&self, name: &str) -> String {
-        format!("{}::{name}", self.attribute_path)
     }
 
     fn take_named(&mut self, key: &str) -> Option<Expr> {

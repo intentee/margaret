@@ -94,16 +94,13 @@ impl VerificationMaterial {
         point.extend_from_slice(&x);
         point.extend_from_slice(&y);
 
-        flow(
-            Self::from_ec_point(curve, &point),
-            KeyMaterialRejection::InvalidPoint,
-        )
+        Self::from_ec_point(curve, &point).map_break(KeyMaterialRejection::InvalidPoint)
     }
 
-    /// # Errors
-    ///
-    /// Returns `KeyRejected` when the point is not an uncompressed point on the curve.
-    pub fn from_ec_point(curve: Curve, uncompressed_point: &[u8]) -> Result<Self, KeyRejected> {
+    pub fn from_ec_point(
+        curve: Curve,
+        uncompressed_point: &[u8],
+    ) -> ControlFlow<KeyRejected, Self> {
         Self::parse(
             SignatureScheme::Ecdsa(curve),
             uncompressed_point,
@@ -116,14 +113,12 @@ impl VerificationMaterial {
         x: &str,
     ) -> ControlFlow<KeyMaterialRejection, Self> {
         match curve {
-            OctetKeyPairCurve::Ed25519 => flow(
-                Self::parse(
-                    SignatureScheme::Ed25519,
-                    &coordinate(x, ED25519_PUBLIC_KEY_LEN)?,
-                    ED25519_SIGNATURE_OCTETS,
-                ),
-                KeyMaterialRejection::InvalidOctetKeyPair,
-            ),
+            OctetKeyPairCurve::Ed25519 => Self::parse(
+                SignatureScheme::Ed25519,
+                &coordinate(x, ED25519_PUBLIC_KEY_LEN)?,
+                ED25519_SIGNATURE_OCTETS,
+            )
+            .map_break(KeyMaterialRejection::InvalidOctetKeyPair),
         }
     }
 
@@ -152,26 +147,27 @@ impl VerificationMaterial {
             KeyMaterialRejection::RsaComponentsNotMinimal,
         )?;
 
-        flow(
-            Self::parse(
-                SignatureScheme::Rsa(scheme),
-                public_key.as_ref(),
-                modulus.len(),
-            ),
-            KeyMaterialRejection::InvalidRsaKey,
+        Self::parse(
+            SignatureScheme::Rsa(scheme),
+            public_key.as_ref(),
+            modulus.len(),
         )
+        .map_break(KeyMaterialRejection::InvalidRsaKey)
     }
 
     fn parse(
         scheme: SignatureScheme,
         public_key: &[u8],
         signature_octets: usize,
-    ) -> Result<Self, KeyRejected> {
-        ParsedPublicKey::new(scheme.verification_algorithm(), public_key).map(|key| Self {
-            key,
-            scheme,
-            signature_octets,
-        })
+    ) -> ControlFlow<KeyRejected, Self> {
+        match ParsedPublicKey::new(scheme.verification_algorithm(), public_key) {
+            Ok(key) => ControlFlow::Continue(Self {
+                key,
+                scheme,
+                signature_octets,
+            }),
+            Err(rejection) => ControlFlow::Break(rejection),
+        }
     }
 
     pub(crate) fn admits(&self, algorithm: JwsAlgorithm) -> bool {
@@ -190,7 +186,6 @@ impl VerificationMaterial {
             ParsedPublicKey::new(self.key.algorithm(), subject_public_key_info),
             CertificateRejection::CertificateKeyUnreadable,
         )?;
-
         flow(
             self.key
                 .as_der()

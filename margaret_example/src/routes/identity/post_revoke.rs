@@ -8,6 +8,7 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::oidc_provider::token_submission::TokenSubmission;
+use margaret::framework::route_method::route_method::RouteMethod;
 use margaret::framework::validation::validation_result::ValidationResult;
 
 use crate::margaret::oidc_provider::RevocationEndpoint;
@@ -15,7 +16,7 @@ use crate::margaret::oidc_provider::RevocationEndpoint;
 #[singleton]
 #[responds_to_http(
     max_body_bytes = 8_388_608,
-    method = "post",
+    method = RouteMethod::Post,
     path = "/revoke",
     server = "identity"
 )]

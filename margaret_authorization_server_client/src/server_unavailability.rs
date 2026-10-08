@@ -27,6 +27,9 @@ pub enum ServerUnavailability {
         source: serde_path_to_error::Error<serde_json::Error>,
     },
     MetadataAwaited,
+    OversizedAnswer {
+        max_bytes: usize,
+    },
     UnexpectedContentType {
         content_type: HeaderValue,
     },
@@ -63,6 +66,10 @@ impl Display for ServerUnavailability {
             ),
             Self::MetadataAwaited => formatter
                 .write_str("the metadata of the authorization server has not been discovered yet"),
+            Self::OversizedAnswer { max_bytes } => write!(
+                formatter,
+                "the authorization server answered with more than {max_bytes} bytes"
+            ),
             Self::UnexpectedContentType { content_type } => write!(
                 formatter,
                 "the authorization server answered with the content type {content_type:?} instead of application/json"

@@ -28,27 +28,27 @@ pub fn render_token_issuance(
 
 #[cfg(test)]
 mod tests {
-    use margaret_attributes::canonical_path::CanonicalPath;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
 
     use super::render_token_issuance;
-    use crate::token_issuance_declaration::TokenIssuanceDeclaration;
+    use crate::declared_token_issuance::DeclaredTokenIssuance;
 
     #[test]
     fn renders_the_token_issuance_as_a_constant() {
-        let module = render_token_issuance(&TokenIssuanceDeclaration {
-            anchor: CanonicalPath::new(vec!["crate".to_string(), "Issuer".to_string()]),
-            audience: "session".parse().expect("the audience is not empty"),
-            issuer: "https://issuer.example"
-                .parse()
-                .expect("the issuer is an https url"),
-        })
-        .format()
-        .expect("the module formats");
-
-        assert_eq!(module.name(), "token_issuance");
-        assert_eq!(
-            module.source(),
-            "pub const TOKEN_ISSUANCE: margaret::framework::token_issuance::token_issuance::TokenIssuance = margaret::framework::token_issuance::token_issuance::TokenIssuance {\n    audience: \"session\",\n    issuer: \"https://issuer.example\",\n};\n"
+        let indexed = IndexedSource::new(
+            "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n",
         );
+        let declared =
+            DeclaredTokenIssuance::read(&indexed.index).expect("the token issuance is read");
+
+        assert!(matches!(
+            &declared,
+            DeclaredTokenIssuance::Declared(issuance)
+                if render_token_issuance(issuance).format().is_ok_and(|module| {
+                    module.name() == "token_issuance"
+                        && module.source()
+                            == "pub const TOKEN_ISSUANCE: margaret::framework::token_issuance::token_issuance::TokenIssuance = margaret::framework::token_issuance::token_issuance::TokenIssuance {\n    audience: \"session\",\n    issuer: \"https://issuer.example\",\n};\n"
+                })
+        ));
     }
 }

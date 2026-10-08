@@ -7,6 +7,7 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::oidc_provider::consent_outcome::ConsentOutcome;
+use margaret::framework::route_method::route_method::RouteMethod;
 use margaret::framework::validation::validation_result::ValidationResult;
 
 use crate::forms::consent_form::ConsentForm;
@@ -16,7 +17,7 @@ use crate::models::user::User;
 #[singleton]
 #[responds_to_http(
     max_body_bytes = 8_388_608,
-    method = "post",
+    method = RouteMethod::Post,
     name = "post_authorization_consent",
     path = "/authorize/consent",
     server = "identity"

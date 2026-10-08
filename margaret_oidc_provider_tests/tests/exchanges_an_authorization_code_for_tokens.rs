@@ -5,6 +5,7 @@ use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::header_type::HeaderType;
 use margaret_jws_verification::parameter_value::ParameterValue;
 use margaret_oauth_vocabulary::scope_list::ScopeList;
+use margaret_oauth_vocabulary::scope_list_parsing::ScopeListParsing;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider_tests::end_user_subject::END_USER_SUBJECT;
 use margaret_oidc_provider_tests::fixture_scopes::fixture_scopes;
@@ -61,12 +62,10 @@ async fn exchanges_an_authorization_code_for_tokens() {
     assert_eq!(id_claims["sub"], END_USER_SUBJECT.to_string());
     assert!(id_claims["auth_time"].is_i64());
     assert_eq!(
-        answer
-            .member("scope")
-            .parse::<ScopeList>()
-            .expect("the scope is a scope list")
-            .scopes,
-        fixture_scopes(&["openid", "profile"])
+        ScopeList::parse(answer.member("scope")),
+        ScopeListParsing::Accepted(ScopeList {
+            scopes: fixture_scopes(&["openid", "profile"])
+        })
     );
 
     fixture.stop().await;

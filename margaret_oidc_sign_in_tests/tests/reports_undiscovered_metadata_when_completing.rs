@@ -11,27 +11,26 @@ use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
-use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
-use margaret_oidc_sign_in_tests::begin_sign_in::begin_sign_in;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::callback_request::callback_request;
 use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
+use margaret_oidc_sign_in_tests::fixture_sign_in_flow::fixture_sign_in_flow;
 use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 #[tokio::test]
 async fn reports_undiscovered_metadata_when_completing() {
     let fixture = SignInFixture::start(secret_basic_authentication()).await;
-    let SignInBeginning::Redirected(response) = begin_sign_in(&fixture.flow).await else {
+    let SignInBeginning::Redirected(response) = fixture.flow.begin().await else {
         panic!("the sign-in redirects to the authorization endpoint");
     };
     let begun = BegunSignIn::of(&response);
     let metadata = Arc::new(IssuerMetadata::awaiting());
-    let undiscovered = SignInFlow::create(
+    let undiscovered = fixture_sign_in_flow(
         Arc::new(AuthorizationServerClient::with_client_secret_basic(
             fixture.server.request_client(),
             Arc::clone(&metadata),
-            Arc::new(TrustedIssuer::create(
+            Arc::new(TrustedIssuer::polled(
                 Arc::new(IssuerKeySet::awaiting()),
                 localhost_trust(),
             )),

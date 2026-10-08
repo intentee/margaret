@@ -12,6 +12,7 @@ use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
 use margaret_route_method::route_method::RouteMethod;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 
+use crate::fixture_sign_in_flow::fixture_sign_in_flow;
 use crate::token_endpoint::TokenEndpoint;
 
 pub struct SignInFixture {
@@ -38,10 +39,10 @@ impl SignInFixture {
         key_set.hold(Arc::new(issuer_secret.key_set().clone()));
 
         let client = server.client_verifying_with(authentication, key_set);
-        let roller = fixture_roller();
+        let roller = fixture_roller().await;
 
         Self {
-            flow: SignInFlow::create(Arc::new(client), Arc::clone(&roller)),
+            flow: fixture_sign_in_flow(Arc::new(client), Arc::clone(&roller)),
             issuer_secret,
             roller,
             server,

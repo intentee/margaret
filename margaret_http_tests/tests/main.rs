@@ -66,6 +66,7 @@ mod rejects_a_repeated_query_parameter;
 mod rejects_a_repeated_upload_field;
 mod rejects_a_repeated_upload_field_of_a_multipart_body;
 mod rejects_a_repeated_urlencoded_form_field;
+mod rejects_a_route_path_that_answers_one_method_twice;
 mod rejects_a_truncated_body_read_by_a_route;
 mod rejects_a_truncated_uploaded_file;
 mod rejects_an_ambiguous_request_path;

@@ -4,6 +4,7 @@ use margaret::framework::http::response::Response;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::models::article::Article;
 use crate::models::attachment_uploader::AttachmentUploader;
@@ -11,7 +12,7 @@ use crate::models::attachment_uploader::AttachmentUploader;
 #[singleton]
 #[responds_to_http(
     max_body_bytes = 8_388_608,
-    method = "put",
+    method = RouteMethod::Put,
     path = "/articles/{article}/attachment",
     server = "public"
 )]

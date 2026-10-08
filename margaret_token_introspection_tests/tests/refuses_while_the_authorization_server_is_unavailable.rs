@@ -20,7 +20,7 @@ async fn refuses_while_the_authorization_server_is_unavailable() {
     let server = AuthorizationServerClient::with_client_secret_basic(
         Arc::new(IssuerRequestClient::create().expect("the issuer request client builds")),
         Arc::clone(&metadata),
-        Arc::new(TrustedIssuer::create(
+        Arc::new(TrustedIssuer::polled(
             Arc::new(IssuerKeySet::awaiting()),
             localhost_trust(),
         )),

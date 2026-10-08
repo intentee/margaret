@@ -18,7 +18,7 @@ async fn refuses_a_key_that_the_refetched_set_still_lacks() {
     let unpublished = JwksSecret::fresh(SigningCurve::P256, &FixtureRsaSigningKeys::default())
         .expect("an unpublished secret");
     let key_set = held_key_set(published.key_set().clone());
-    let trusted_issuer = TrustedIssuer::create(Arc::clone(&key_set), fixture_trust());
+    let trusted_issuer = TrustedIssuer::polled(Arc::clone(&key_set), fixture_trust());
     let token = TestClaims {
         sub: "subject".to_string(),
     }

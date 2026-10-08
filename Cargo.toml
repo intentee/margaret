@@ -11,6 +11,7 @@ members = [
     "margaret_attribute_arguments",
     "margaret_attributes",
     "margaret_attributes_tests",
+    "margaret_authorization_grants",
     "margaret_authorization_server_client",
     "margaret_authorization_server_client_tests",
     "margaret_bearer_token_verification",
@@ -61,20 +62,17 @@ members = [
     "margaret_issuer_directory",
     "margaret_issuer_directory_tests",
     "margaret_issuer_key_set",
+    "margaret_issuer_key_set_tests",
     "margaret_issuer_metadata",
     "margaret_issuer_request",
     "margaret_item_naming_argument",
     "margaret_jose_parameters",
     "margaret_jwks_codegen",
-    "margaret_jwks_file_secret_storage",
-    "margaret_jwks_file_secret_storage_tests",
     "margaret_jwks_keygen",
     "margaret_jwks_keygen_tests",
     "margaret_jwks_roller",
     "margaret_jwks_roller_server",
     "margaret_jwks_roller_tests",
-    "margaret_jwks_secret_storage_selection",
-    "margaret_jwks_secret_storage_selection_tests",
     "margaret_jwks_secret_store",
     "margaret_jwks_secret_store_tests",
     "margaret_jws_verification",
@@ -88,6 +86,7 @@ members = [
     "margaret_oauth_client",
     "margaret_oauth_client_codegen",
     "margaret_oauth_vocabulary",
+    "margaret_oauth_vocabulary_codegen",
     "margaret_oidc_discovery",
     "margaret_oidc_provider",
     "margaret_oidc_provider_codegen",
@@ -97,11 +96,6 @@ members = [
     "margaret_openid_conformance_tests",
     "margaret_peer_identity",
     "margaret_peer_identity_tests",
-    "margaret_provider_state_postgres",
-    "margaret_provider_state_storage",
-    "margaret_provider_state_storage_selection",
-    "margaret_provider_state_storage_selection_tests",
-    "margaret_provider_state_storage_tests",
     "margaret_registered_claims",
     "margaret_request_binding_codegen",
     "margaret_route_method",
@@ -123,12 +117,12 @@ members = [
     "margaret_spiffe_svid_server",
     "margaret_spiffe_svid_server_tests",
     "margaret_spiffe_svid_tests",
-    "margaret_storage_uri",
     "margaret_subject_token_exchange",
     "margaret_subject_token_exchange_tests",
     "margaret_syn_type_peeling",
     "margaret_sync_holder",
     "margaret_tag_codegen",
+    "margaret_tag_codegen_tests",
     "margaret_token_digest",
     "margaret_token_exchange_client",
     "margaret_token_exchange_client_tests",
@@ -215,7 +209,6 @@ tokio = "1.52"
 tokio-rustls = "0.26"
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 tokio-util = "0.7"
-toml = "0.8"
 tower = "0.5"
 trzcina = "0.4"
 url = "2.5"
@@ -232,6 +225,7 @@ margaret_asset_bag = { path = "margaret_asset_bag", version = "0.1.0" }
 margaret_asset_bag_codegen = { path = "margaret_asset_bag_codegen", version = "0.4.0" }
 margaret_attribute_arguments = { path = "margaret_attribute_arguments", version = "0.4.0" }
 margaret_attributes = { path = "margaret_attributes", version = "0.4.0" }
+margaret_authorization_grants = { path = "margaret_authorization_grants", version = "0.1.0" }
 margaret_authorization_server_client = { path = "margaret_authorization_server_client", version = "0.1.0" }
 margaret_bearer_token_verification = { path = "margaret_bearer_token_verification", version = "0.1.0" }
 margaret_client_credentials = { path = "margaret_client_credentials", version = "0.1.0" }
@@ -262,11 +256,9 @@ margaret_issuer_request = { path = "margaret_issuer_request", version = "0.1.0" 
 margaret_item_naming_argument = { path = "margaret_item_naming_argument", version = "0.4.0" }
 margaret_jose_parameters = { path = "margaret_jose_parameters", version = "0.1.0" }
 margaret_jwks_codegen = { path = "margaret_jwks_codegen", version = "0.4.0" }
-margaret_jwks_file_secret_storage = { path = "margaret_jwks_file_secret_storage", version = "0.1.0" }
 margaret_jwks_keygen = { path = "margaret_jwks_keygen", version = "0.1.0" }
 margaret_jwks_roller = { path = "margaret_jwks_roller", version = "0.1.0" }
 margaret_jwks_roller_server = { path = "margaret_jwks_roller_server", version = "0.1.0" }
-margaret_jwks_secret_storage_selection = { path = "margaret_jwks_secret_storage_selection", version = "0.1.0" }
 margaret_jwks_secret_store = { path = "margaret_jwks_secret_store", version = "0.1.0" }
 margaret_jws_verification = { path = "margaret_jws_verification", version = "0.1.0" }
 margaret_jwt_verification = { path = "margaret_jwt_verification", version = "0.1.0" }
@@ -277,14 +269,12 @@ margaret_model_codegen = { path = "margaret_model_codegen", version = "0.4.0" }
 margaret_oauth_client = { path = "margaret_oauth_client", version = "0.1.0" }
 margaret_oauth_client_codegen = { path = "margaret_oauth_client_codegen", version = "0.1.0" }
 margaret_oauth_vocabulary = { path = "margaret_oauth_vocabulary", version = "0.1.0" }
+margaret_oauth_vocabulary_codegen = { path = "margaret_oauth_vocabulary_codegen", version = "0.1.0" }
 margaret_oidc_discovery = { path = "margaret_oidc_discovery", version = "0.1.0" }
 margaret_oidc_provider = { path = "margaret_oidc_provider", version = "0.1.0" }
 margaret_oidc_provider_codegen = { path = "margaret_oidc_provider_codegen", version = "0.1.0" }
 margaret_oidc_sign_in = { path = "margaret_oidc_sign_in", version = "0.1.0" }
 margaret_peer_identity = { path = "margaret_peer_identity", version = "0.1.0" }
-margaret_provider_state_postgres = { path = "margaret_provider_state_postgres", version = "0.1.0" }
-margaret_provider_state_storage = { path = "margaret_provider_state_storage", version = "0.1.0" }
-margaret_provider_state_storage_selection = { path = "margaret_provider_state_storage_selection", version = "0.1.0" }
 margaret_registered_claims = { path = "margaret_registered_claims", version = "0.1.0" }
 margaret_request_binding_codegen = { path = "margaret_request_binding_codegen", version = "0.4.0" }
 margaret_route_method = { path = "margaret_route_method", version = "0.1.0" }
@@ -299,7 +289,6 @@ margaret_spiffe_svid = { path = "margaret_spiffe_svid", version = "0.1.0" }
 margaret_spiffe_svid_bundle = { path = "margaret_spiffe_svid_bundle", version = "0.1.0" }
 margaret_spiffe_svid_client = { path = "margaret_spiffe_svid_client", version = "0.1.0" }
 margaret_spiffe_svid_server = { path = "margaret_spiffe_svid_server", version = "0.1.0" }
-margaret_storage_uri = { path = "margaret_storage_uri", version = "0.1.0" }
 margaret_subject_token_exchange = { path = "margaret_subject_token_exchange", version = "0.1.0" }
 margaret_syn_type_peeling = { path = "margaret_syn_type_peeling", version = "0.1.0" }
 margaret_sync_holder = { path = "margaret_sync_holder", version = "0.1.0" }

@@ -36,47 +36,47 @@ pub(crate) fn infer_column(
         nullable,
     } = declared_column_type;
 
-    match (
-        ColumnTypeSource::of(attribute_index, item, base),
-        numeric_digits,
-    ) {
-        (ColumnTypeSource::Decimal, NumericDigits::Declared { precision, scale }) => {
-            Ok(numeric_column(*precision, *scale, *nullable))
-        }
-        (ColumnTypeSource::Decimal, NumericDigits::NotDeclared) => {
-            Err(ModelCodegenError::NumericColumnRequiresDigits {
+    let source = ColumnTypeSource::of(attribute_index, item, base);
+
+    match numeric_digits {
+        NumericDigits::Declared { precision, scale } => match source {
+            ColumnTypeSource::Decimal => Ok(numeric_column(*precision, *scale, *nullable)),
+            ColumnTypeSource::Known(_)
+            | ColumnTypeSource::LocalEnum(_)
+            | ColumnTypeSource::LocalItem(_)
+            | ColumnTypeSource::Uninferrable => {
+                Err(ModelCodegenError::NumericDigitsOnNonNumericColumn {
+                    column: column.to_string(),
+                    model: model.to_string(),
+                    rust_type: declared.to_token_stream().to_string(),
+                })
+            }
+        },
+        NumericDigits::NotDeclared => match source {
+            ColumnTypeSource::Decimal => Err(ModelCodegenError::NumericColumnRequiresDigits {
                 column: column.to_string(),
                 model: model.to_string(),
-            })
-        }
-        (_, NumericDigits::Declared { .. }) => {
-            Err(ModelCodegenError::NumericDigitsOnNonNumericColumn {
+            }),
+            ColumnTypeSource::LocalEnum(enum_item) => {
+                enum_column(validated_enums, enum_item, *nullable, model, column)
+            }
+            ColumnTypeSource::LocalItem(local_item) => {
+                Err(ModelCodegenError::LocalColumnTypeIsNotAnEnum {
+                    column: column.to_string(),
+                    model: model.to_string(),
+                    resolved_type: local_item.canonical_path().to_string(),
+                    rust_type: declared.to_token_stream().to_string(),
+                })
+            }
+            ColumnTypeSource::Known(known) => Ok(InferredColumn {
+                nullable: *nullable,
+                ..known
+            }),
+            ColumnTypeSource::Uninferrable => Err(ModelCodegenError::UninferrableColumnType {
                 column: column.to_string(),
                 model: model.to_string(),
                 rust_type: declared.to_token_stream().to_string(),
-            })
-        }
-        (ColumnTypeSource::LocalEnum(enum_item), NumericDigits::NotDeclared) => {
-            enum_column(validated_enums, enum_item, *nullable, model, column)
-        }
-        (ColumnTypeSource::LocalItem(local_item), NumericDigits::NotDeclared) => {
-            Err(ModelCodegenError::LocalColumnTypeIsNotAnEnum {
-                column: column.to_string(),
-                model: model.to_string(),
-                resolved_type: local_item.canonical_path().to_string(),
-                rust_type: declared.to_token_stream().to_string(),
-            })
-        }
-        (ColumnTypeSource::Known(known), NumericDigits::NotDeclared) => Ok(InferredColumn {
-            nullable: *nullable,
-            ..known
-        }),
-        (ColumnTypeSource::Uninferrable, NumericDigits::NotDeclared) => {
-            Err(ModelCodegenError::UninferrableColumnType {
-                column: column.to_string(),
-                model: model.to_string(),
-                rust_type: declared.to_token_stream().to_string(),
-            })
-        }
+            }),
+        },
     }
 }

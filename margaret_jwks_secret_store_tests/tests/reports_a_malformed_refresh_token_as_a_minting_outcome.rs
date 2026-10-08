@@ -5,10 +5,12 @@ use margaret_token_signer::access_token_minting::AccessTokenMinting;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_signer_tests::unix_time::unix_time;
 
-#[test]
-fn reports_a_malformed_refresh_token_as_a_minting_outcome() {
+#[tokio::test]
+async fn reports_a_malformed_refresh_token_as_a_minting_outcome() {
     assert!(matches!(
-        rolled_store(fresh_p256_secret()).mint_access_token("not-a-valid-jwt", unix_time(500)),
+        rolled_store(fresh_p256_secret())
+            .await
+            .mint_access_token("not-a-valid-jwt", unix_time(500)),
         AccessTokenMinting::RejectedRefreshToken(JwtRejection::Jws(JwsRejection::NotCompactJws))
     ));
 }

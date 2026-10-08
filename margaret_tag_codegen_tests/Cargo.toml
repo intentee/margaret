@@ -1,0 +1,21 @@
+[package]
+name = "margaret_tag_codegen_tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Collects the tags of an indexed fixture crate for the tests of the Margaret code generators."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
+
+[dependencies]
+margaret_accepted_clients_codegen = { workspace = true }
+margaret_attributes = { workspace = true }
+margaret_oauth_client_codegen = { workspace = true }
+margaret_tag_codegen = { workspace = true }
+margaret_token_issuance_codegen = { workspace = true }
+margaret_trusted_issuer_codegen = { workspace = true }
+
+[lints]
+workspace = true

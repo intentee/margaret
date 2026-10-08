@@ -8,7 +8,7 @@ use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 #[tokio::test]
 async fn refuses_malformed_credentials_as_an_invalid_request() {
-    let trusted_issuer = TrustedIssuer::create(Arc::new(IssuerKeySet::awaiting()), fixture_trust());
+    let trusted_issuer = TrustedIssuer::polled(Arc::new(IssuerKeySet::awaiting()), fixture_trust());
 
     assert!(refused_with_challenge(
         &admit_access_token(&trusted_issuer, "Bearer").await,

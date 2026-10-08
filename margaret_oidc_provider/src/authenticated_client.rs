@@ -10,7 +10,6 @@ use margaret_accepted_clients::registered_client::RegisteredClient;
 use margaret_http::basic_challenged::basic_challenged;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
-use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 use crate::oauth_error::oauth_error;
@@ -29,8 +28,8 @@ fn refused_client(refusal: &ClientRefusal) -> Response {
         ClientRefusal::AssertionIdentifierMissing
         | ClientRefusal::AssertionMissing
         | ClientRefusal::AssertionOutlivesLimit { .. }
-        | ClientRefusal::AssertionRefused(_)
         | ClientRefusal::AssertionRejected(_)
+        | ClientRefusal::AssertionReplayed
         | ClientRefusal::AssertionRequired
         | ClientRefusal::AssertionTypeMissing
         | ClientRefusal::ConflictingClientIds
@@ -46,18 +45,12 @@ pub(crate) async fn authenticated_client<'clients>(
     clients: &'clients AcceptedClients,
     request: &Request,
     parameters: &ClientAuthenticationParameters,
-    state: &dyn StoresProviderState,
     now: NumericDate,
 ) -> Result<ControlFlow<Response, &'clients RegisteredClient>, ProviderError> {
     clients
-        .authenticate(
-            request.inputs.server.authorization(),
-            parameters,
-            state,
-            now,
-        )
+        .authenticate(request.inputs.server.authorization(), parameters, now)
         .await
-        .map_err(ProviderError::State)
+        .map_err(ProviderError::ClientAuthentication)
         .map(|outcome| match outcome {
             ClientAuthenticationOutcome::Authenticated(client) => ControlFlow::Continue(client),
             ClientAuthenticationOutcome::KeysAwaited => ControlFlow::Break(

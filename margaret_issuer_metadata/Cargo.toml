@@ -12,6 +12,7 @@ autotests = false
 
 [dependencies]
 margaret_oidc_discovery = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 
 [[test]]

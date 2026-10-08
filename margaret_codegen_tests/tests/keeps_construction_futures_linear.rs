@@ -48,4 +48,9 @@ async fn keeps_deep_construction_futures_below_the_linear_size_ceiling() {
     margaret_codegen_linear_construction_future_fixture::serve_construction()
         .await
         .expect("the complete generated container is constructed");
+
+    assert!(matches!(
+        run::run(["future-size-fixture", "serve"]).await,
+        CommandOutcome::Succeeded
+    ));
 }

@@ -64,7 +64,7 @@ impl FixtureAuthorizationServer {
             ),
         ));
 
-        let trusted_issuer = Arc::new(TrustedIssuer::create(key_set, localhost_trust()));
+        let trusted_issuer = Arc::new(TrustedIssuer::polled(key_set, localhost_trust()));
 
         match authentication {
             ClientAuthentication::ClientSecretBasic(secret) => {

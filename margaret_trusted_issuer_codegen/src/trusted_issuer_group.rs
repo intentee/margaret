@@ -88,17 +88,18 @@ impl<'index> TrustedIssuerGroup<'index> {
             });
         }
 
-        match (self, source) {
-            (Self::Discovered { others, .. }, TrustSource::Discovery) => {
-                others.push(trust);
+        if let Self::Discovered { others, .. } = self
+            && matches!(source, TrustSource::Discovery)
+        {
+            others.push(trust);
 
-                Ok(())
-            }
-            (group, _) => Err(TrustedIssuerCodegenError::JwksEndpointIssuerTrustedTwice {
-                first: group.lead().anchor.canonical_path().to_string(),
-                issuer: group.issuer().as_str().to_string(),
-                second: trust.anchor.canonical_path().to_string(),
-            }),
+            return Ok(());
         }
+
+        Err(TrustedIssuerCodegenError::JwksEndpointIssuerTrustedTwice {
+            first: self.lead().anchor.canonical_path().to_string(),
+            issuer: self.issuer().as_str().to_string(),
+            second: trust.anchor.canonical_path().to_string(),
+        })
     }
 }

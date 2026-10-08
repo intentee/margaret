@@ -13,6 +13,7 @@ cookie = { workspace = true }
 dashmap = { workspace = true }
 margaret = { workspace = true, features = ["runtime"] }
 maud = { workspace = true }
+moka = { workspace = true }
 rust_decimal = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

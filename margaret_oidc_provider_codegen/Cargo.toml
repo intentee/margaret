@@ -33,6 +33,7 @@ margaret_oauth_client_codegen = { workspace = true }
 margaret_request_binding_codegen = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
 margaret_tag_codegen = { workspace = true }
+margaret_tag_codegen_tests = { path = "../margaret_tag_codegen_tests" }
 margaret_trusted_issuer_codegen = { workspace = true }
 
 [lints]

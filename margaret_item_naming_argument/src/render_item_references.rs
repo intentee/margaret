@@ -13,9 +13,10 @@ pub fn render_item_references(
 ) -> TokenStream {
     let references: Vec<TokenStream> = item_naming_arguments
         .iter()
-        .filter_map(|item_naming_argument| {
+        .flat_map(|item_naming_argument| {
             arguments
-                .named_path(item_naming_argument.key())
+                .named_paths(item_naming_argument.key())
+                .into_iter()
                 .map(|path| match item_naming_argument.named_item() {
                     NamedItem::Type => quote! {
                         let _: ::core::marker::PhantomData<#path> = ::core::marker::PhantomData;

@@ -9,15 +9,11 @@ use oauth2::basic::BasicErrorResponse;
 use oauth2::basic::BasicTokenType;
 use serde::de::DeserializeOwned;
 
+use margaret_issuer_request::issuer_answer::IssuerAnswer;
 use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
 
+use crate::answer_parsing::AnswerParsing;
 use crate::server_unavailability::ServerUnavailability;
-
-fn parsed<TParsed: DeserializeOwned>(
-    body: &[u8],
-) -> Result<TParsed, serde_path_to_error::Error<serde_json::Error>> {
-    serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_slice(body))
-}
 
 fn is_json(content_type: &HeaderValue) -> bool {
     content_type
@@ -34,10 +30,15 @@ pub enum EndpointOutcome<TAnswer> {
 }
 
 impl<TAnswer: DeserializeOwned> EndpointOutcome<TAnswer> {
-    pub(crate) fn of(exchanged: Result<Response<Vec<u8>>, IssuerExchangeError>) -> Self {
+    pub(crate) fn of(exchanged: Result<IssuerAnswer, IssuerExchangeError>) -> Self {
         match exchanged {
-            Ok(answer) if answer.status() == StatusCode::OK => Self::answered(&answer),
-            Ok(answer) => Self::refused(&answer),
+            Ok(IssuerAnswer::Received(answer)) if answer.status() == StatusCode::OK => {
+                Self::answered(&answer)
+            }
+            Ok(IssuerAnswer::Received(answer)) => Self::refused(&answer),
+            Ok(IssuerAnswer::Oversized { max_bytes }) => {
+                Self::Unavailable(ServerUnavailability::OversizedAnswer { max_bytes })
+            }
             Err(failure) => Self::Unavailable(ServerUnavailability::Exchange(failure)),
         }
     }
@@ -55,10 +56,12 @@ impl<TAnswer: DeserializeOwned> EndpointOutcome<TAnswer> {
     }
 
     fn parsed_into<TParsed: DeserializeOwned>(body: &[u8], outcome: fn(TParsed) -> Self) -> Self {
-        parsed(body).map_or_else(
-            |source| Self::Unavailable(ServerUnavailability::MalformedAnswer { source }),
-            outcome,
-        )
+        match AnswerParsing::of(body) {
+            AnswerParsing::Parsed(parsed) => outcome(parsed),
+            AnswerParsing::Malformed(source) => {
+                Self::Unavailable(ServerUnavailability::MalformedAnswer { source })
+            }
+        }
     }
 
     fn refused(answer: &Response<Vec<u8>>) -> Self {

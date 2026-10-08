@@ -16,7 +16,7 @@ pub fn constructed_from(dependencies: Vec<FrameworkDependency>, name: &str) -> F
             method: "create".to_string(),
             outcome: ConstructorOutcome::Infallible,
         },
-        enablement: FrameworkEnablement::Always,
+        enablement: FrameworkEnablement::Declared,
         injection: FrameworkInjectionRole::Unmarked,
         provided: crate_path(name),
     }

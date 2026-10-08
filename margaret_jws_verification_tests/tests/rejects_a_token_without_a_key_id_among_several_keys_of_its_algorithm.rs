@@ -26,6 +26,6 @@ fn rejects_a_token_without_a_key_id_among_several_keys_of_its_algorithm() {
 
     assert!(matches!(
         key_set.verify(&jws),
-        JwsVerification::Rejected(JwsRejection::MissingKeyId { candidates: 2 })
+        JwsVerification::Rejected(JwsRejection::KeyIdRequired { candidates: 2 })
     ));
 }

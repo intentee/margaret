@@ -29,7 +29,7 @@ async fn reports_an_endpoint_the_metadata_does_not_advertise() {
     let client = AuthorizationServerClient::with_client_secret_basic(
         Arc::new(IssuerRequestClient::create().expect("the issuer request client builds")),
         Arc::clone(&metadata),
-        Arc::new(TrustedIssuer::create(
+        Arc::new(TrustedIssuer::polled(
             Arc::new(IssuerKeySet::awaiting()),
             localhost_trust(),
         )),

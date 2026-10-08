@@ -1,4 +1,5 @@
 use cookie::Cookie;
+use cookie::CookieBuilder;
 use cookie::SameSite;
 use cookie::time::OffsetDateTime;
 
@@ -17,80 +18,61 @@ pub struct SessionCookieManager {
 impl SessionCookieManager {
     /// # Errors
     ///
-    /// Returns an error propagated from the work it performs.
+    /// Returns `IdentitySessionError::CookieExpiration` when the expiration is out of range.
     pub fn access_token_cookie(
         &self,
         AccessTokenClaimsSigned { exp, signed_claims }: AccessTokenClaimsSigned,
     ) -> Result<Cookie<'static>, IdentitySessionError> {
-        Ok(Cookie::build((COOKIE_NAME_ACCESS_TOKEN, signed_claims))
-            .domain(self.cookie_domain.clone())
-            .expires(
-                OffsetDateTime::from_unix_timestamp(exp)
-                    .map_err(|source| IdentitySessionError::CookieExpiration { exp, source })?,
-            )
-            .http_only(true)
-            .path("/")
-            .same_site(SameSite::Strict)
-            .secure(self.cookie_secure)
-            .build()
-            .into_owned())
+        self.expiring_cookie(COOKIE_NAME_ACCESS_TOKEN, signed_claims, exp)
+    }
+
+    #[must_use]
+    pub fn access_token_removal_cookie(&self) -> Cookie<'static> {
+        self.removal_cookie(COOKIE_NAME_ACCESS_TOKEN)
     }
 
     /// # Errors
     ///
-    /// Returns `IdentitySessionError` propagated from the work it performs.
-    pub fn access_token_removal_cookie(&self) -> Result<Cookie<'static>, IdentitySessionError> {
-        let mut cookie = Cookie::build((COOKIE_NAME_ACCESS_TOKEN, ""))
-            .domain(self.cookie_domain.clone())
-            .http_only(true)
-            .path("/")
-            .same_site(SameSite::Strict)
-            .secure(self.cookie_secure)
-            .build()
-            .into_owned();
-
-        cookie.make_removal();
-
-        Ok(cookie)
-    }
-
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    /// Returns `IdentitySessionError::CookieExpiration` when the expiration is out of range.
     pub fn refresh_token_cookie(
         &self,
         RefreshTokenClaimsSigned { exp, signed_claims }: RefreshTokenClaimsSigned,
     ) -> Result<Cookie<'static>, IdentitySessionError> {
-        Ok(Cookie::build((COOKIE_NAME_REFRESH_TOKEN, signed_claims))
-            .domain(self.cookie_domain.clone())
-            .expires(
-                OffsetDateTime::from_unix_timestamp(exp)
-                    .map_err(|source| IdentitySessionError::CookieExpiration { exp, source })?,
-            )
-            .http_only(true)
-            .path("/")
-            .same_site(SameSite::Strict)
-            .secure(self.cookie_secure)
-            .build()
-            .into_owned())
+        self.expiring_cookie(COOKIE_NAME_REFRESH_TOKEN, signed_claims, exp)
     }
 
-    /// # Errors
-    ///
-    /// Returns `IdentitySessionError` propagated from the work it performs.
-    pub fn refresh_token_removal_cookie(&self) -> Result<Cookie<'static>, IdentitySessionError> {
-        let mut cookie = Cookie::build((COOKIE_NAME_REFRESH_TOKEN, ""))
-            .domain(self.cookie_domain.clone())
-            .http_only(true)
-            .path("/")
-            .same_site(SameSite::Strict)
-            .secure(self.cookie_secure)
-            .build()
-            .into_owned();
+    #[must_use]
+    pub fn refresh_token_removal_cookie(&self) -> Cookie<'static> {
+        self.removal_cookie(COOKIE_NAME_REFRESH_TOKEN)
+    }
+
+    fn expiring_cookie(
+        &self,
+        name: &'static str,
+        value: String,
+        exp: i64,
+    ) -> Result<Cookie<'static>, IdentitySessionError> {
+        let expires = OffsetDateTime::from_unix_timestamp(exp)
+            .map_err(|source| IdentitySessionError::CookieExpiration { exp, source })?;
+
+        Ok(self.session_cookie(name, value).expires(expires).build())
+    }
+
+    fn removal_cookie(&self, name: &'static str) -> Cookie<'static> {
+        let mut cookie = self.session_cookie(name, String::new()).build();
 
         cookie.make_removal();
 
-        Ok(cookie)
+        cookie
+    }
+
+    fn session_cookie(&self, name: &'static str, value: String) -> CookieBuilder<'static> {
+        Cookie::build((name, value))
+            .domain(self.cookie_domain.clone())
+            .http_only(true)
+            .path("/")
+            .same_site(SameSite::Strict)
+            .secure(self.cookie_secure)
     }
 }
 
@@ -154,9 +136,7 @@ mod tests {
 
     #[test]
     fn builds_an_access_token_removal_cookie() {
-        let cookie = manager()
-            .access_token_removal_cookie()
-            .expect("a well-formed access token removal cookie is built");
+        let cookie = manager().access_token_removal_cookie();
 
         assert_eq!(cookie.name(), COOKIE_NAME_ACCESS_TOKEN);
         assert_eq!(cookie.value(), "");
@@ -166,9 +146,7 @@ mod tests {
 
     #[test]
     fn builds_a_refresh_token_removal_cookie() {
-        let cookie = manager()
-            .refresh_token_removal_cookie()
-            .expect("a well-formed refresh token removal cookie is built");
+        let cookie = manager().refresh_token_removal_cookie();
 
         assert_eq!(cookie.name(), COOKIE_NAME_REFRESH_TOKEN);
         assert_eq!(cookie.value(), "");

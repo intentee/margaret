@@ -2,15 +2,16 @@ use margaret_jwks_keygen::previous_key::PreviousKey;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller::initial_secret::initial_secret;
-use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
+use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
 
-#[test]
-fn initial_secret_seeds_a_fresh_secret_when_storage_is_absent() {
+#[tokio::test]
+async fn initial_secret_seeds_a_fresh_secret_when_storage_is_absent() {
     let seeded = initial_secret(
-        &MemoryJwksSecretStorage,
+        &FixtureSigningKeys::empty(),
         SigningCurve::P256,
         &FixtureRsaSigningKeys::default(),
     )
+    .await
     .expect("a fresh secret is seeded");
 
     assert!(matches!(seeded.previous(), PreviousKey::Absent));

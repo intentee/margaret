@@ -15,10 +15,10 @@ use margaret_issuer_directory_tests::polled_fixture::PolledFixture;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
-use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
 use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
 use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
+use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_route_method::route_method::RouteMethod;
@@ -28,8 +28,9 @@ async fn admits_a_token_of_a_rolling_margaret_issuer() {
     let fixture = TlsFixture::generate();
     let server_bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
         rsa_keys: Arc::new(FixtureRsaSigningKeys::default()),
-        storage: Arc::new(MemoryJwksSecretStorage),
+        storage: Arc::new(FixtureSigningKeys::empty()),
     })
+    .await
     .expect("the first secret is rolled and published");
     let jwks_server = RunningFixtureServer::start(
         fixture.server_config.clone(),

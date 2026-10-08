@@ -10,9 +10,9 @@ use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_signer_tests::unix_time::unix_time;
 
-#[test]
-fn rejects_a_refresh_token_presented_as_a_resource_access_token() {
-    let store = rolled_store(fresh_p256_secret());
+#[tokio::test]
+async fn rejects_a_refresh_token_presented_as_a_resource_access_token() {
+    let store = rolled_store(fresh_p256_secret()).await;
     let refresh_token = store.issue_refresh_token(Uuid::from_u128(7), unix_time(1_000));
 
     assert!(matches!(

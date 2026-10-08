@@ -20,28 +20,27 @@ use margaret_oidc_provider::authorization_endpoint::AuthorizationEndpoint;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::consent_endpoint::ConsentEndpoint;
 use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
-use margaret_oidc_provider::provider_endpoints::ProviderEndpoints;
-use margaret_provider_state_storage::memory_provider_state::MemoryProviderState;
-use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::answer::Answer;
 use crate::client_credentials::ClientCredentials;
+use crate::fixture_authorization_grants::FixtureAuthorizationGrants;
 use crate::fixture_clients::FixtureClients;
 use crate::fixture_endpoints::fixture_endpoints;
-use crate::provider_endpoints_of_the_fixture::provider_endpoints_of_the_fixture;
+use crate::grant_interference::GrantInterference;
 use crate::provider_issuance::provider_issuance;
 use crate::provider_parts::ProviderParts;
 use crate::provider_url::provider_url;
+use crate::published_endpoints::PublishedEndpoints;
 use crate::signed_in_end_user::signed_in_end_user;
 use crate::validated_form::validated_form;
 
 const FORM_CONTENT_TYPE: &str = "application/x-www-form-urlencoded";
 
 struct ProviderPublication {
-    endpoints: ProviderEndpoints,
+    endpoints: PublishedEndpoints,
     ip: IpAddr,
     issuance: TokenIssuance,
     tls: TlsFixture,
@@ -50,7 +49,12 @@ struct ProviderPublication {
 impl ProviderPublication {
     fn on_localhost() -> Self {
         Self {
-            endpoints: provider_endpoints_of_the_fixture(),
+            endpoints: fixture_endpoints(
+                &provider_issuance()
+                    .issuer
+                    .parse()
+                    .expect("the fixture issuer is an https url"),
+            ),
             ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
             issuance: provider_issuance(),
             tls: TlsFixture::generate(),
@@ -72,23 +76,26 @@ impl ProviderFixture {
     async fn assembled(
         clients: FixtureClients,
         exchangers: Vec<Arc<SubjectTokenExchanger>>,
-        state: Arc<dyn StoresProviderState>,
         ProviderPublication {
-            endpoints,
+            endpoints:
+                PublishedEndpoints {
+                    authorization,
+                    provider: endpoints,
+                },
             ip,
             issuance,
             tls,
         }: ProviderPublication,
     ) -> Self {
-        let roller = fixture_roller();
+        let roller = fixture_roller().await;
         let secret_store = Arc::new(JwksSecretStore::create(Arc::clone(&roller), issuance));
         let parts = ProviderParts {
             clients: Arc::new(AcceptedClients::create(clients.registered(), issuance)),
             endpoints,
+            grants: Arc::clone(&clients.grants),
             issuance,
             roller,
             secret_store,
-            state,
         };
         let server =
             RunningFixtureServer::start_at(ip, tls.server_config.clone(), parts.routes(exchangers))
@@ -101,30 +108,16 @@ impl ProviderFixture {
         Self {
             authorization: AuthorizationEndpoint::create(
                 parts.clients,
-                Arc::clone(&parts.state),
-                parts.endpoints,
+                authorization,
                 parts.issuance,
             ),
             client,
+            consent: ConsentEndpoint::create(Arc::clone(&clients.grants), parts.issuance),
             clients,
-            consent: ConsentEndpoint::create(parts.state, parts.issuance),
             issuer: parts.issuance.issuer,
             server,
             tls,
         }
-    }
-
-    /// # Panics
-    ///
-    /// Panics when the fixture clients, endpoints or tls client cannot be prepared.
-    pub async fn over_state(clients: FixtureClients, state: Arc<dyn StoresProviderState>) -> Self {
-        Self::assembled(
-            clients,
-            Vec::new(),
-            state,
-            ProviderPublication::on_localhost(),
-        )
-        .await
     }
 
     /// # Panics
@@ -135,9 +128,8 @@ impl ProviderFixture {
         let tls = TlsFixture::serving(issuer.url().host_str().expect("the issuer names a host"));
 
         Self::assembled(
-            FixtureClients::standard(),
+            FixtureClients::standard().await,
             Vec::new(),
-            Arc::new(MemoryProviderState::create()),
             ProviderPublication {
                 endpoints: fixture_endpoints(&issuer),
                 ip,
@@ -154,15 +146,13 @@ impl ProviderFixture {
     /// # Panics
     ///
     /// Panics when the fixture clients, endpoints or tls client cannot be prepared.
-    pub async fn serving(
-        clients: FixtureClients,
-        exchangers: Vec<Arc<SubjectTokenExchanger>>,
-    ) -> Self {
-        Self::assembled(
-            clients,
-            exchangers,
-            Arc::new(MemoryProviderState::create()),
-            ProviderPublication::on_localhost(),
+    pub async fn interfered(interference: GrantInterference) -> Self {
+        Self::serving(
+            FixtureClients::over_grants(Arc::new(FixtureAuthorizationGrants::interfered(
+                interference,
+            )))
+            .await,
+            Vec::new(),
         )
         .await
     }
@@ -170,8 +160,18 @@ impl ProviderFixture {
     /// # Panics
     ///
     /// Panics when the fixture clients, endpoints or tls client cannot be prepared.
+    pub async fn serving(
+        clients: FixtureClients,
+        exchangers: Vec<Arc<SubjectTokenExchanger>>,
+    ) -> Self {
+        Self::assembled(clients, exchangers, ProviderPublication::on_localhost()).await
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the fixture clients, endpoints or tls client cannot be prepared.
     pub async fn start(exchangers: Vec<Arc<SubjectTokenExchanger>>) -> Self {
-        Self::serving(FixtureClients::standard(), exchangers).await
+        Self::serving(FixtureClients::standard().await, exchangers).await
     }
 
     /// # Panics

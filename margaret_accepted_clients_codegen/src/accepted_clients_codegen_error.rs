@@ -3,14 +3,15 @@ use thiserror::Error;
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_declaration_anchor::declaration_anchor_error::DeclarationAnchorError;
-use margaret_https_url::https_url_error::HttpsUrlError;
-use margaret_oauth_vocabulary::oauth_vocabulary_error::OAuthVocabularyError;
-use margaret_registered_claims::registered_claims_error::RegisteredClaimsError;
+use margaret_https_url::https_url_rejection::HttpsUrlRejection;
+use margaret_oauth_vocabulary::client_id_rejection::ClientIdRejection;
+use margaret_oauth_vocabulary::resource_scope_rejection::ResourceScopeRejection;
+use margaret_oauth_vocabulary::scope_rejection::ScopeRejection;
 
 #[derive(Debug, Error)]
 pub enum AcceptedClientsCodegenError {
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' accepts a client, but no struct declares #[issues_tokens] for the provider"
+        "#[admits_oauth_client] on '{anchor}' accepts a client, but no struct declares #[issues_tokens] for the provider"
     )]
     AcceptedWithoutTokenIssuance { anchor: String },
 
@@ -27,17 +28,26 @@ pub enum AcceptedClientsCodegenError {
         second: String,
     },
 
-    #[error("#[accepts_oauth_client] on '{anchor}' declares an empty list of redirect_uris")]
+    #[error("#[admits_oauth_client] on '{anchor}' names the resource '{tag}' more than once")]
+    DuplicateResource { anchor: String, tag: String },
+
+    #[error("#[admits_oauth_client] on '{anchor}' redirects to the route '{route}' more than once")]
+    DuplicateRedirectRoute { anchor: String, route: String },
+
+    #[error("#[admits_oauth_client] on '{anchor}' declares an empty list of redirect_routes")]
+    EmptyRedirectRoutes { anchor: String },
+
+    #[error("#[admits_oauth_client] on '{anchor}' declares an empty list of redirect_uris")]
     EmptyRedirectUris { anchor: String },
 
-    #[error("#[accepts_oauth_client] on '{anchor}' declares an empty list of resources")]
+    #[error("#[admits_oauth_client] on '{anchor}' declares an empty list of resources")]
     EmptyResources { anchor: String },
 
     #[error(transparent)]
     Index(#[from] AttributeError),
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' redirects to '{redirect_uri}', which is neither https nor http to a loopback ip address"
+        "#[admits_oauth_client] on '{anchor}' redirects to '{redirect_uri}', which is neither https nor http to a loopback ip address"
     )]
     InsecureRedirectUri {
         anchor: String,
@@ -45,63 +55,42 @@ pub enum AcceptedClientsCodegenError {
     },
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' names the client '{client_id}', which is the issuer of the provider itself"
+        "#[admits_oauth_client] on '{anchor}' names the client '{client_id}', which is the issuer of the provider itself"
     )]
     IssuerClientId { anchor: String, client_id: String },
 
     #[error(
-        "the authentication #[accepts_oauth_client] declares on '{anchor}' is malformed: {source}"
-    )]
-    MalformedAuthentication {
-        anchor: String,
-        #[source]
-        source: OAuthVocabularyError,
-    },
-
-    #[error(
-        "a client_credentials scope #[accepts_oauth_client] declares on '{anchor}' is malformed: {source}"
+        "a client_credentials scope #[admits_oauth_client] declares on '{anchor}' is malformed: {rejection}"
     )]
     MalformedClientCredentialsScope {
         anchor: String,
-        #[source]
-        source: OAuthVocabularyError,
-    },
-
-    #[error("the client_id #[accepts_oauth_client] declares on '{anchor}' is malformed: {source}")]
-    MalformedClientId {
-        anchor: String,
-        #[source]
-        source: OAuthVocabularyError,
+        rejection: ResourceScopeRejection,
     },
 
     #[error(
-        "an authorization_code scope #[accepts_oauth_client] declares on '{anchor}' is malformed: {source}"
+        "the client_id #[admits_oauth_client] declares on '{anchor}' is malformed: {rejection}"
+    )]
+    MalformedClientId {
+        anchor: String,
+        rejection: ClientIdRejection,
+    },
+
+    #[error(
+        "an authorization_code scope #[admits_oauth_client] declares on '{anchor}' is malformed: {rejection}"
     )]
     MalformedCodeScope {
         anchor: String,
-        #[source]
-        source: OAuthVocabularyError,
+        rejection: ScopeRejection,
     },
 
-    #[error(
-        "#[accepts_oauth_client] on '{anchor}' declares the consent '{keyword}', but the consent is prompted or implicit"
-    )]
-    MalformedConsent { anchor: String, keyword: String },
-
-    #[error(
-        "#[accepts_oauth_client] on '{anchor}' declares the id_token_signing '{keyword}', but id tokens are signed with rsa or elliptic_curve"
-    )]
-    MalformedIdTokenSigning { anchor: String, keyword: String },
-
-    #[error("the jwks_uri #[accepts_oauth_client] declares on '{anchor}' is malformed: {source}")]
+    #[error("the jwks_uri #[admits_oauth_client] declares on '{anchor}' is malformed: {rejection}")]
     MalformedJwksUri {
         anchor: String,
-        #[source]
-        source: HttpsUrlError,
+        rejection: HttpsUrlRejection,
     },
 
     #[error(
-        "the redirect uri '{redirect_uri}' #[accepts_oauth_client] declares on '{anchor}' is malformed: {source}"
+        "the redirect uri '{redirect_uri}' #[admits_oauth_client] declares on '{anchor}' is malformed: {source}"
     )]
     MalformedRedirectUri {
         anchor: String,
@@ -110,54 +99,55 @@ pub enum AcceptedClientsCodegenError {
         source: url::ParseError,
     },
 
-    #[error("a resource #[accepts_oauth_client] declares on '{anchor}' is malformed: {source}")]
-    MalformedResource {
-        anchor: String,
-        #[source]
-        source: RegisteredClaimsError,
-    },
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' names a resource that is not a single plain tag name"
+    )]
+    MalformedResourceTag { anchor: String },
 
-    #[error("#[accepts_oauth_client] on '{anchor}' does not declare how the client authenticates")]
+    #[error("#[admits_oauth_client] on '{anchor}' does not declare how the client authenticates")]
     MissingAuthentication { anchor: String },
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' grants client_credentials without declaring their scopes"
+        "#[admits_oauth_client] on '{anchor}' grants client_credentials without declaring their scopes"
     )]
     MissingClientCredentialsScopes { anchor: String },
 
-    #[error("#[accepts_oauth_client] on '{anchor}' does not declare its client_id")]
+    #[error("#[admits_oauth_client] on '{anchor}' does not declare its client_id")]
     MissingClientId { anchor: String },
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' grants authorization_code without declaring its scopes"
+        "#[admits_oauth_client] on '{anchor}' grants authorization_code without declaring its scopes"
     )]
     MissingCodeScopes { anchor: String },
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' grants authorization_code without declaring its consent"
+        "#[admits_oauth_client] on '{anchor}' grants authorization_code without declaring its consent"
     )]
     MissingConsent { anchor: String },
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' grants authorization_code without declaring its id_token_signing"
+        "#[admits_oauth_client] on '{anchor}' grants authorization_code without declaring its id_token_signing"
     )]
     MissingIdTokenSigning { anchor: String },
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' authenticates with private_key_jwt without declaring its jwks_uri"
+        "#[admits_oauth_client] on '{anchor}' trusts keys the client publishes without declaring their jwks_uri"
     )]
     MissingJwksUri { anchor: String },
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' grants authorization_code without declaring its redirect_uris"
+        "#[admits_oauth_client] on '{anchor}' grants authorization_code without declaring its redirect_uris or redirect_routes"
     )]
     MissingRedirectUris { anchor: String },
 
-    #[error("#[accepts_oauth_client] on '{anchor}' does not declare its resources")]
+    #[error("#[admits_oauth_client] on '{anchor}' does not declare its resources")]
     MissingResources { anchor: String },
 
+    #[error("#[admits_oauth_client] on '{anchor}' redirects to '{written}', which names no item")]
+    UnknownRedirectRoute { anchor: String, written: String },
+
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' declares the redirect uri '{redirect_uri}' with a fragment"
+        "#[admits_oauth_client] on '{anchor}' declares the redirect uri '{redirect_uri}' with a fragment"
     )]
     RedirectUriHasFragment {
         anchor: String,
@@ -165,18 +155,13 @@ pub enum AcceptedClientsCodegenError {
     },
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' declares the redirect uri '{redirect_uri}', which must be written as '{canonical}'"
+        "#[admits_oauth_client] on '{anchor}' declares the redirect uri '{redirect_uri}', which must be written as '{canonical}'"
     )]
     RedirectUriNotCanonical {
         anchor: String,
         canonical: String,
         redirect_uri: String,
     },
-
-    #[error(
-        "#[accepts_oauth_client] on '{anchor}' names the session audience '{audience}' as one of its resources"
-    )]
-    SessionAudienceResource { anchor: String, audience: String },
 
     #[error(
         "the clients accepted by '{first}' and '{second}' share the jwks_uri '{jwks_uri}', so each could impersonate the other"
@@ -188,7 +173,7 @@ pub enum AcceptedClientsCodegenError {
     },
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' authenticates with '{method}', but an accepted client authenticates with private_key_jwt or none"
+        "#[admits_oauth_client] on '{anchor}' authenticates with '{method}', but an admitted client authenticates with ClientAuthenticationMethod::PrivateKeyJwt or ClientAuthenticationMethod::None"
     )]
     UnsupportedAuthentication {
         anchor: String,
@@ -196,7 +181,71 @@ pub enum AcceptedClientsCodegenError {
     },
 
     #[error(
-        "#[accepts_oauth_client] on '{anchor}' names the client '{client_id}', which is a uuid that could be mistaken for the subject of a user"
+        "#[admits_oauth_client] on '{anchor}' names the client '{client_id}', which is a uuid that could be mistaken for the subject of a user"
     )]
     UuidClientId { anchor: String, client_id: String },
+
+    #[error(
+        "a token_exchange scope #[admits_oauth_client] declares on '{anchor}' is malformed: {rejection}"
+    )]
+    MalformedTokenExchangeScope {
+        anchor: String,
+        rejection: ScopeRejection,
+    },
+
+    #[error("#[admits_oauth_client] on '{anchor}' names a tag that is not a single plain name")]
+    MalformedTag { anchor: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' authenticates with ClientAuthenticationMethod::PrivateKeyJwt without declaring the keys that verify its assertions as a variant of margaret::framework::accepted_clients::client_keys::ClientKeys"
+    )]
+    MissingClientKeys { anchor: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' trusts keys the client publishes without pinning the algorithm of its assertions as a variant of margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm"
+    )]
+    MissingSigningAlgorithm { anchor: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' pins its assertions to JwsAlgorithm::EdDsa, which does not name its curve (RFC 9864), so pin JwsAlgorithm::Ed25519 instead"
+    )]
+    PolymorphicSigningAlgorithm { anchor: String },
+
+    #[error("#[admits_oauth_client] on '{anchor}' does not name a tag")]
+    MissingTag { anchor: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' grants token_exchange without declaring the scopes an exchange can grant"
+    )]
+    MissingTokenExchangeScopes { anchor: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' authenticates with '{written}', which is not a variant of margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod"
+    )]
+    UnknownAuthentication { anchor: String, written: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' verifies its assertions with the keys '{written}', which is not a variant of margaret::framework::accepted_clients::client_keys::ClientKeys"
+    )]
+    UnknownClientKeys { anchor: String, written: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' declares the consent '{written}', which is not a variant of margaret::framework::accepted_clients::consent_policy::ConsentPolicy"
+    )]
+    UnknownConsent { anchor: String, written: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' signs id tokens with '{written}', which is not a variant of margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning"
+    )]
+    UnknownIdTokenSigning { anchor: String, written: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' names the resource '{tag}', which no #[issues_resource_tokens] declares"
+    )]
+    UnknownResource { anchor: String, tag: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' pins its assertions to '{written}', which is not a variant of margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm"
+    )]
+    UnknownSigningAlgorithm { anchor: String, written: String },
 }

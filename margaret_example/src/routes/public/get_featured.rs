@@ -2,12 +2,13 @@ use margaret::framework::http::forward::Forward;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::margaret::forwarders::public::Forwarder;
 use crate::stores::article_store::FEATURED_ARTICLE_ID;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/featured", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/featured", server = "public")]
 pub struct GetFeatured;
 
 impl GetFeatured {

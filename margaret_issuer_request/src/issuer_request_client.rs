@@ -7,6 +7,7 @@ use reqwest::RequestBuilder;
 use reqwest::redirect::Policy;
 use tokio_util::sync::CancellationToken;
 
+use crate::issuer_answer::IssuerAnswer;
 use crate::issuer_document::IssuerDocument;
 use crate::issuer_exchange_error::IssuerExchangeError;
 use crate::issuer_request_error::IssuerRequestError;
@@ -29,9 +30,7 @@ async fn received_document(request: RequestBuilder) -> IssuerDocument {
         ResponseBody::Failed(source) => {
             IssuerDocument::Failed(IssuerExchangeError::Transport(source))
         }
-        ResponseBody::Oversized { max_bytes } => {
-            IssuerDocument::Failed(IssuerExchangeError::Oversized { max_bytes })
-        }
+        ResponseBody::Oversized { max_bytes } => IssuerDocument::Oversized { max_bytes },
         ResponseBody::Read(document) => IssuerDocument::Fetched(document),
     }
 }
@@ -66,11 +65,11 @@ impl IssuerRequestClient {
     /// # Errors
     ///
     /// Returns `IssuerExchangeError::Transport` when the request cannot be sent or its answer
-    /// cannot be read, and `IssuerExchangeError::Oversized` when the answer exceeds the size cap.
+    /// cannot be read.
     pub async fn exchange(
         &self,
         mut request: Request,
-    ) -> Result<Response<Vec<u8>>, IssuerExchangeError> {
+    ) -> Result<IssuerAnswer, IssuerExchangeError> {
         *request.timeout_mut() = Some(ISSUER_REQUEST_TIMEOUT);
 
         let response = match self.http_client.execute(request).await {
@@ -82,16 +81,14 @@ impl IssuerRequestClient {
 
         match read_response_body(response).await {
             ResponseBody::Failed(source) => Err(IssuerExchangeError::Transport(source)),
-            ResponseBody::Oversized { max_bytes } => {
-                Err(IssuerExchangeError::Oversized { max_bytes })
-            }
+            ResponseBody::Oversized { max_bytes } => Ok(IssuerAnswer::Oversized { max_bytes }),
             ResponseBody::Read(body) => {
                 let mut answer = Response::new(body.to_vec());
 
                 *answer.status_mut() = status;
                 *answer.headers_mut() = headers;
 
-                Ok(answer)
+                Ok(IssuerAnswer::Received(answer))
             }
         }
     }

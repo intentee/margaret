@@ -15,37 +15,40 @@ impl NumericDigits {
         model: &str,
         field: &str,
     ) -> Result<Self, ModelCodegenError> {
-        match (precision, scale) {
-            (None, None) => Ok(NumericDigits::NotDeclared),
-            (None, Some(_)) => Err(ModelCodegenError::NumericPrecisionMissing {
+        let Some(precision) = precision else {
+            return match scale {
+                None => Ok(NumericDigits::NotDeclared),
+                Some(_) => Err(ModelCodegenError::NumericPrecisionMissing {
+                    field: field.to_string(),
+                    model: model.to_string(),
+                }),
+            };
+        };
+        let Some(scale) = scale else {
+            return Err(ModelCodegenError::NumericScaleMissing {
                 field: field.to_string(),
                 model: model.to_string(),
-            }),
-            (Some(_), None) => Err(ModelCodegenError::NumericScaleMissing {
+            });
+        };
+
+        if precision == 0 || precision > MAX_NUMERIC_PRECISION {
+            return Err(ModelCodegenError::NumericPrecisionOutOfRange {
                 field: field.to_string(),
                 model: model.to_string(),
-            }),
-            (Some(precision), Some(scale)) => {
-                if precision == 0 || precision > MAX_NUMERIC_PRECISION {
-                    return Err(ModelCodegenError::NumericPrecisionOutOfRange {
-                        field: field.to_string(),
-                        model: model.to_string(),
-                        precision,
-                    });
-                }
-
-                if scale > precision {
-                    return Err(ModelCodegenError::NumericScaleExceedsPrecision {
-                        field: field.to_string(),
-                        model: model.to_string(),
-                        precision,
-                        scale,
-                    });
-                }
-
-                Ok(NumericDigits::Declared { precision, scale })
-            }
+                precision,
+            });
         }
+
+        if scale > precision {
+            return Err(ModelCodegenError::NumericScaleExceedsPrecision {
+                field: field.to_string(),
+                model: model.to_string(),
+                precision,
+                scale,
+            });
+        }
+
+        Ok(NumericDigits::Declared { precision, scale })
     }
 }
 

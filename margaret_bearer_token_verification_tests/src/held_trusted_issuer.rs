@@ -6,5 +6,5 @@ use crate::held_key_set::held_key_set;
 
 #[must_use]
 pub fn held_trusted_issuer(trust: TokenTrust, key_set: VerificationKeySet) -> TrustedIssuer {
-    TrustedIssuer::create(held_key_set(key_set), trust)
+    TrustedIssuer::polled(held_key_set(key_set), trust)
 }

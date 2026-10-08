@@ -1,13 +1,12 @@
 use serde::Deserialize;
 use url::form_urlencoded::Serializer;
 use validator::Validate;
-use validator::ValidationErrors;
 
 use margaret_oauth_vocabulary::optional_parameter::optional_parameter;
 
 use crate::named_parameter::NamedParameter;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct AuthorizationRequest {
     #[serde(default, deserialize_with = "optional_parameter")]
     pub client_id: Option<String>,
@@ -23,6 +22,10 @@ pub struct AuthorizationRequest {
     pub prompt: Option<String>,
     #[serde(default, deserialize_with = "optional_parameter")]
     pub redirect_uri: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
+    pub request: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
+    pub request_uri: Option<String>,
     #[serde(default, deserialize_with = "optional_parameter")]
     pub response_type: Option<String>,
     #[serde(default, deserialize_with = "optional_parameter")]
@@ -87,11 +90,5 @@ impl AuthorizationRequest {
         }
 
         format!("{endpoint}?{}", pairs.finish())
-    }
-}
-
-impl Validate for AuthorizationRequest {
-    fn validate(&self) -> Result<(), ValidationErrors> {
-        Ok(())
     }
 }

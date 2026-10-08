@@ -1,4 +1,4 @@
-use margaret_https_url::https_url_error::HttpsUrlError;
+use margaret_https_url::https_url_rejection::HttpsUrlRejection;
 use margaret_oidc_discovery::metadata_endpoint::MetadataEndpoint;
 use margaret_oidc_discovery::provider_metadata::ProviderMetadata;
 use margaret_oidc_discovery::provider_metadata_parsing::ProviderMetadataParsing;
@@ -15,7 +15,7 @@ fn rejects_a_jwks_uri_that_is_not_a_url() {
         ),
         ProviderMetadataParsing::Rejected(ProviderMetadataRejection::Endpoint {
             endpoint: MetadataEndpoint::JwksUri,
-            source: HttpsUrlError::Malformed { .. },
+            rejection: HttpsUrlRejection::Malformed(url::ParseError::RelativeUrlWithoutBase),
         })
     ));
 }

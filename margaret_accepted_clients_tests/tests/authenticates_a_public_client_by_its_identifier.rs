@@ -8,7 +8,6 @@ use margaret_accepted_clients::registered_client::RegisteredClient;
 use margaret_accepted_clients_tests::accepted_clients_of::accepted_clients_of;
 use margaret_accepted_clients_tests::fixture_client::fixture_client;
 use margaret_http::request_authorization::RequestAuthorization;
-use margaret_provider_state_storage::memory_provider_state::MemoryProviderState;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[tokio::test]
@@ -25,11 +24,10 @@ async fn authenticates_a_public_client_by_its_identifier() {
                     client_id: Some("blog".to_string()),
                     ..ClientAuthenticationParameters::default()
                 },
-                &MemoryProviderState::create(),
                 NumericDate::from(Utc::now()),
             )
             .await,
         Ok(ClientAuthenticationOutcome::Authenticated(registered))
-            if registered.client().client_id == "blog"
+            if registered.client.client_id == "blog"
     ));
 }

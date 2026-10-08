@@ -33,6 +33,52 @@ fn awaiting(provided: TrustedIssuerItem, group: &TrustedIssuerGroup) -> Framewor
     }
 }
 
+fn polled_key_set_construction(group: &TrustedIssuerGroup) -> FrameworkConstruction {
+    let lead = &group.lead().tag;
+    let key_set = FrameworkDependency::Provider(trusted_issuer_item_path(
+        lead,
+        TrustedIssuerItem::IssuerKeySet,
+    ));
+
+    match group {
+        TrustedIssuerGroup::Discovered { .. } => constructed(
+            vec![
+                FrameworkDependency::Constant(trusted_issuer_constant_path(
+                    lead,
+                    TrustedIssuerConstant::DiscoveredIssuer,
+                )),
+                FrameworkDependency::Provider(trusted_issuer_item_path(
+                    lead,
+                    TrustedIssuerItem::IssuerMetadata,
+                )),
+                key_set,
+            ],
+            "discovered",
+            ConstructorOutcome::Infallible,
+        ),
+        TrustedIssuerGroup::JwksEndpoint { .. } => constructed(
+            vec![
+                FrameworkDependency::Constant(trusted_issuer_constant_path(
+                    lead,
+                    TrustedIssuerConstant::JwksEndpointIssuer,
+                )),
+                key_set,
+            ],
+            "published",
+            ConstructorOutcome::Infallible,
+        ),
+    }
+}
+
+fn metadata_providers(group: &TrustedIssuerGroup) -> Vec<FrameworkProvider> {
+    match group {
+        TrustedIssuerGroup::Discovered { .. } => {
+            vec![awaiting(TrustedIssuerItem::IssuerMetadata, group)]
+        }
+        TrustedIssuerGroup::JwksEndpoint { .. } => Vec::new(),
+    }
+}
+
 fn group_providers(group: &TrustedIssuerGroup) -> Vec<FrameworkProvider> {
     let lead = &group.lead().tag;
     let key_set = || {
@@ -41,44 +87,11 @@ fn group_providers(group: &TrustedIssuerGroup) -> Vec<FrameworkProvider> {
             TrustedIssuerItem::IssuerKeySet,
         ))
     };
-    let (mut providers, polled_key_set) = match group {
-        TrustedIssuerGroup::Discovered { .. } => (
-            vec![awaiting(TrustedIssuerItem::IssuerMetadata, group)],
-            constructed(
-                vec![
-                    FrameworkDependency::Constant(trusted_issuer_constant_path(
-                        lead,
-                        TrustedIssuerConstant::DiscoveredIssuer,
-                    )),
-                    FrameworkDependency::Provider(trusted_issuer_item_path(
-                        lead,
-                        TrustedIssuerItem::IssuerMetadata,
-                    )),
-                    key_set(),
-                ],
-                "discovered",
-                ConstructorOutcome::Infallible,
-            ),
-        ),
-        TrustedIssuerGroup::JwksEndpoint { .. } => (
-            Vec::new(),
-            constructed(
-                vec![
-                    FrameworkDependency::Constant(trusted_issuer_constant_path(
-                        lead,
-                        TrustedIssuerConstant::JwksEndpointIssuer,
-                    )),
-                    key_set(),
-                ],
-                "published",
-                ConstructorOutcome::Infallible,
-            ),
-        ),
-    };
+    let mut providers = metadata_providers(group);
 
     providers.push(awaiting(TrustedIssuerItem::IssuerKeySet, group));
     providers.push(FrameworkProvider {
-        construction: polled_key_set,
+        construction: polled_key_set_construction(group),
         enablement: FrameworkEnablement::Dependency,
         injection: FrameworkInjectionRole::Unmarked,
         provided: trusted_issuer_item_path(lead, TrustedIssuerItem::PolledKeySet),
@@ -92,10 +105,10 @@ fn group_providers(group: &TrustedIssuerGroup) -> Vec<FrameworkProvider> {
                     TrustedIssuerConstant::TokenTrust,
                 )),
             ],
-            "create",
+            "polled",
             ConstructorOutcome::Infallible,
         ),
-        enablement: FrameworkEnablement::Always,
+        enablement: FrameworkEnablement::Declared,
         injection: FrameworkInjectionRole::TrustedIssuer(trust.tag.clone()),
         provided: trusted_issuer_item_path(&trust.tag, TrustedIssuerItem::TrustedIssuer),
     }));

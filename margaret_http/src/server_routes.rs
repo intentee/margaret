@@ -1,9 +1,8 @@
-use matchit::InsertError;
-
 use crate::method_handler::MethodHandler;
 use crate::named_handler::NamedHandler;
 use crate::route_entry::RouteEntry;
 use crate::router::Router;
+use crate::router_error::RouterError;
 
 fn named_handlers(entries: &[RouteEntry]) -> Vec<NamedHandler> {
     entries
@@ -25,8 +24,8 @@ pub struct ServerRoutes {
 impl ServerRoutes {
     /// # Errors
     ///
-    /// Returns `InsertError` when two entries claim the same path.
-    pub fn build(entries: Vec<RouteEntry>) -> Result<Self, InsertError> {
+    /// Returns `RouterError` when the entries do not build a router.
+    pub fn build(entries: Vec<RouteEntry>) -> Result<Self, RouterError> {
         let named_handlers = named_handlers(&entries);
 
         Ok(Self {

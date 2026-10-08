@@ -2,8 +2,6 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
-use crate::framework_environment_variable::FrameworkEnvironmentVariable;
-
 fn starts_a_name(character: char) -> bool {
     character.is_ascii_alphabetic() || character == '_'
 }
@@ -41,14 +39,6 @@ impl EnvironmentVariableName {
     }
 }
 
-impl From<FrameworkEnvironmentVariable> for EnvironmentVariableName {
-    fn from(variable: FrameworkEnvironmentVariable) -> Self {
-        Self {
-            name: variable.name().to_string(),
-        }
-    }
-}
-
 impl Display for EnvironmentVariableName {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         formatter.write_str(&self.name)
@@ -58,7 +48,6 @@ impl Display for EnvironmentVariableName {
 #[cfg(test)]
 mod tests {
     use super::EnvironmentVariableName;
-    use crate::framework_environment_variable::FrameworkEnvironmentVariable;
 
     fn accepts(name: &str) -> bool {
         EnvironmentVariableName::new(name).is_some()
@@ -70,16 +59,6 @@ mod tests {
 
         assert_eq!(name.as_str(), "DATABASE_URL");
         assert_eq!(name.to_string(), "DATABASE_URL");
-    }
-
-    #[test]
-    fn names_every_framework_variable_within_the_grammar() {
-        for variable in FrameworkEnvironmentVariable::ALL {
-            assert_eq!(
-                EnvironmentVariableName::new(variable.name()),
-                Some(EnvironmentVariableName::from(variable))
-            );
-        }
     }
 
     #[test]

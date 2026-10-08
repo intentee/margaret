@@ -19,5 +19,5 @@ pub fn render_container(
     let planned = plan_container(index, serve_inputs, framework_providers, token_issuance)?;
     let roots = planned.roots();
 
-    planned.render(&roots, &roots, &roots)
+    planned.render(&roots, &roots)
 }

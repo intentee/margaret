@@ -30,7 +30,12 @@ fn describes_every_server_unavailability() {
         ServerUnavailability::EndpointUnadvertised {
             endpoint: ServerEndpoint::Userinfo,
         },
-        ServerUnavailability::Exchange(IssuerExchangeError::Oversized { max_bytes: 16 }),
+        ServerUnavailability::Exchange(IssuerExchangeError::Transport(
+            reqwest::Client::new()
+                .get("not a url")
+                .build()
+                .expect_err("a relative url is not requestable"),
+        )),
         ServerUnavailability::MalformedAnswer {
             source: serde_path_to_error::deserialize::<_, u8>(
                 &mut serde_json::Deserializer::from_str("x"),
@@ -38,6 +43,7 @@ fn describes_every_server_unavailability() {
             .expect_err("not json"),
         },
         ServerUnavailability::MetadataAwaited,
+        ServerUnavailability::OversizedAnswer { max_bytes: 16 },
         ServerUnavailability::UnexpectedContentType {
             content_type: HeaderValue::from_static("text/html"),
         },
@@ -74,10 +80,9 @@ fn describes_every_server_unavailability() {
         described[6],
         "the authorization server does not advertise its userinfo_endpoint"
     );
-    assert_eq!(
-        described[7],
-        "the exchange with the authorization server failed: the issuer answered with more than 16 bytes"
-    );
+    assert!(described[7].starts_with(
+        "the exchange with the authorization server failed: the issuer could not be reached: "
+    ));
     assert!(
         described[8].starts_with("the authorization server answered with a malformed response: ")
     );
@@ -87,10 +92,14 @@ fn describes_every_server_unavailability() {
     );
     assert_eq!(
         described[10],
-        "the authorization server answered with the content type \"text/html\" instead of application/json"
+        "the authorization server answered with more than 16 bytes"
     );
     assert_eq!(
         described[11],
+        "the authorization server answered with the content type \"text/html\" instead of application/json"
+    );
+    assert_eq!(
+        described[12],
         "the authorization server issued a token of the unsupported type 'dpop'"
     );
 }

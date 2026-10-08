@@ -13,12 +13,15 @@ fn has_malformed_percent_escape(segment: &str) -> bool {
 
     while index < bytes.len() {
         if bytes[index] == b'%' {
-            match (bytes.get(index + 1), bytes.get(index + 2)) {
-                (Some(high), Some(low)) if high.is_ascii_hexdigit() && low.is_ascii_hexdigit() => {
-                    index += 3;
-                }
-                _ => return true,
+            let escaped = bytes
+                .get(index + 1..index + 3)
+                .is_some_and(|digits| digits.iter().all(u8::is_ascii_hexdigit));
+
+            if !escaped {
+                return true;
             }
+
+            index += 3;
         } else {
             index += 1;
         }

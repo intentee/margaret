@@ -1,4 +1,5 @@
 mod accepts_the_discovery_specification_example_metadata;
+mod describes_the_own_provider_by_its_endpoints;
 mod locates_the_discovery_document_at_the_issuer_root;
 mod locates_the_discovery_document_below_the_issuer_path;
 mod recognizes_an_advertised_authorization_response_issuer;

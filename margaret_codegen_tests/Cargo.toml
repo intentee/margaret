@@ -15,11 +15,11 @@ margaret_codegen = { workspace = true }
 margaret_generated_module = { workspace = true }
 
 [dev-dependencies]
+margaret_codegen_fallible_roles_fixture = { path = "tests/fixtures/fallible_roles" }
+margaret_codegen_linear_construction_future_fixture = { path = "tests/fixtures/linear_construction_future" }
 margaret_console_argument_codegen = { workspace = true }
 margaret_input_weaving = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
-margaret_codegen_fallible_roles_fixture = { path = "tests/fixtures/fallible_roles" }
-margaret_codegen_linear_construction_future_fixture = { path = "tests/fixtures/linear_construction_future" }
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [[test]]

@@ -5,7 +5,7 @@ use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
 use margaret_oidc_provider_tests::authentication_claims::AuthenticationClaims;
 use margaret_oidc_provider_tests::end_user_subject::END_USER_SUBJECT;
 use margaret_oidc_provider_tests::margaret_client::MargaretClient;
-use margaret_oidc_provider_tests::portal_sign_in_request::portal_sign_in_request;
+use margaret_oidc_provider_tests::portal_callback::PORTAL_CALLBACK;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::sign_in_callback::sign_in_callback;
 use margaret_oidc_provider_tests::signed_in_end_user::signed_in_end_user;
@@ -24,8 +24,8 @@ struct NameClaims {
 async fn signs_in_a_margaret_client_through_the_provider() {
     let fixture = ProviderFixture::start(Vec::new()).await;
     let client = MargaretClient::of_portal(&fixture).await;
-    let flow = client.sign_in_flow();
-    let SignInBeginning::Redirected(beginning) = flow.begin(portal_sign_in_request()).await else {
+    let flow = client.sign_in_flow(PORTAL_CALLBACK, &["openid", "profile"]);
+    let SignInBeginning::Redirected(beginning) = flow.begin().await else {
         panic!("the sign-in redirects to the provider");
     };
     let begun = BegunSignIn::of(&beginning);

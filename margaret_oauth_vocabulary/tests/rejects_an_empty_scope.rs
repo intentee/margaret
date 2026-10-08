@@ -1,10 +1,11 @@
-use margaret_oauth_vocabulary::oauth_vocabulary_error::OAuthVocabularyError;
 use margaret_oauth_vocabulary::scope::Scope;
+use margaret_oauth_vocabulary::scope_parsing::ScopeParsing;
+use margaret_oauth_vocabulary::scope_rejection::ScopeRejection;
 
 #[test]
 fn rejects_an_empty_scope() {
-    assert!(matches!(
-        "".parse::<Scope>(),
-        Err(OAuthVocabularyError::EmptyScope)
-    ));
+    assert_eq!(
+        Scope::parse(""),
+        ScopeParsing::Rejected(ScopeRejection::Empty)
+    );
 }

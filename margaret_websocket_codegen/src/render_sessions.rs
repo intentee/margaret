@@ -39,12 +39,7 @@ fn captured_providers(session: &WebSocketSession) -> CapturedProviders {
     let mut allocator = NameAllocator::new();
 
     for parameter in &session.parameters {
-        if matches!(
-            parameter.binding,
-            RequestBinding::Injectable { .. } | RequestBinding::Routes
-        ) {
-            allocator.reserve(&parameter.holder.to_string());
-        }
+        allocator.reserve(&parameter.holder.to_string());
     }
 
     CapturedProviders::capture(&session.parameters, &mut allocator)

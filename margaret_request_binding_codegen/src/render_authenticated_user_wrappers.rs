@@ -12,7 +12,6 @@ use crate::authenticated_user_application::AuthenticatedUserApplication;
 use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::binding_reads_request::binding_reads_request;
-use crate::binding_shadows_request::binding_shadows_request;
 use crate::bound_parameter::BoundParameter;
 use crate::extraction_context::ExtractionContext;
 use crate::render_request_extraction::render_request_extraction;
@@ -185,9 +184,7 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     let mut allocator = NameAllocator::new();
 
     for parameter in parameters {
-        if binding_shadows_request(&parameter.binding) {
-            allocator.reserve(&parameter.holder.to_string());
-        }
+        allocator.reserve(&parameter.holder.to_string());
     }
 
     let request_binding = if parameters

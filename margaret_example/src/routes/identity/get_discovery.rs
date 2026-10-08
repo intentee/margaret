@@ -5,12 +5,13 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::margaret::oidc_provider::ProviderMetadataHandler;
 
 #[singleton]
 #[responds_to_http(
-    method = "get",
+    method = RouteMethod::Get,
     path = "/.well-known/openid-configuration",
     server = "identity"
 )]

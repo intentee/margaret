@@ -33,7 +33,10 @@ fn argument_error(error: &AttributeArgumentsError) -> Error {
 
 fn marker_item_naming_arguments(attribute: &Attribute) -> &'static [ItemNamingArgument] {
     if attribute.path().is_ident("foreign_key") {
-        &[ItemNamingArgument::ForeignKeyReferences]
+        &[
+            ItemNamingArgument::ForeignKeyReferences,
+            ItemNamingArgument::OnDelete,
+        ]
     } else if attribute.path().is_ident("form_request") {
         &[ItemNamingArgument::FormRequestSource]
     } else {
@@ -46,12 +49,14 @@ fn render_marker_references(
 ) -> Result<Vec<proc_macro2::TokenStream>, Error> {
     attributes
         .iter()
-        .map(|attribute| (attribute, marker_item_naming_arguments(attribute)))
-        .filter(|(_, item_naming_arguments)| !item_naming_arguments.is_empty())
-        .map(|(attribute, item_naming_arguments)| {
-            AttributeArgs::from_attribute(attribute)
-                .map(|arguments| render_item_references(&arguments, item_naming_arguments))
-                .map_err(|error| argument_error(&error))
+        .filter_map(|attribute| {
+            let item_naming_arguments = marker_item_naming_arguments(attribute);
+
+            (!item_naming_arguments.is_empty()).then(|| {
+                AttributeArgs::from_attribute(attribute)
+                    .map(|arguments| render_item_references(&arguments, item_naming_arguments))
+                    .map_err(|error| argument_error(&error))
+            })
         })
         .collect()
 }
@@ -153,11 +158,12 @@ fn strip_struct(
     markers: &[&str],
 ) -> Result<proc_macro2::TokenStream, Error> {
     let mut item_struct: ItemStruct = syn::parse2(item)?;
-    let references = render_marker_references(&item_struct.attrs)?;
+    let mut references = render_marker_references(&item_struct.attrs)?;
 
     retain_non_marker_attributes(&mut item_struct.attrs, markers);
 
     for field in &mut item_struct.fields {
+        references.extend(render_marker_references(&field.attrs)?);
         retain_non_marker_attributes(&mut field.attrs, markers);
     }
 
@@ -205,8 +211,13 @@ pub fn process(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn responds_to_http(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
+pub fn responds_to_http(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "responds_to_http",
+        attributes,
+        item,
+        &[ItemNamingArgument::RouteMethod],
+    )
 }
 
 #[proc_macro_attribute]
@@ -223,12 +234,42 @@ pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn accepts_oauth_client(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn acts_as_oauth_client(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "acts_as_oauth_client",
+        attributes,
+        item,
+        &[
+            ItemNamingArgument::ClientAuthentication,
+            ItemNamingArgument::RedirectRoute,
+        ],
+    )
+}
+
+#[proc_macro_attribute]
+pub fn admits_oauth_client(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "admits_oauth_client",
+        attributes,
+        item,
+        &[
+            ItemNamingArgument::ClientAuthentication,
+            ItemNamingArgument::Keys,
+            ItemNamingArgument::Signing,
+            ItemNamingArgument::Consent,
+            ItemNamingArgument::IdTokenSigning,
+            ItemNamingArgument::RedirectRoutes,
+        ],
+    )
+}
+
+#[proc_macro_attribute]
+pub fn exchanges_tokens_from(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
 #[proc_macro_attribute]
-pub fn exchanges_subject_tokens(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn issues_resource_tokens(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
@@ -238,23 +279,33 @@ pub fn issues_tokens(_attributes: TokenStream, item: TokenStream) -> TokenStream
 }
 
 #[proc_macro_attribute]
-pub fn oauth_client(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
-pub fn provides_jwks_endpoint(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
 pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
 #[proc_macro_attribute]
-pub fn trusts_oidc_issuer(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn remembers_client_assertions(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
+}
+
+#[proc_macro_attribute]
+pub fn stores_authorization_grants(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn stores_signing_keys(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn verifies_tokens_from_issuer(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "verifies_tokens_from_issuer",
+        attributes,
+        item,
+        &[ItemNamingArgument::Keys],
+    )
 }
 
 #[proc_macro_attribute]
@@ -298,8 +349,13 @@ pub fn websocket_session(_attributes: TokenStream, item: TokenStream) -> TokenSt
 }
 
 #[proc_macro_attribute]
-pub fn websocket_message(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
+pub fn websocket_message(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "websocket_message",
+        attributes,
+        item,
+        &[ItemNamingArgument::WebSocketResponse],
+    )
 }
 
 #[proc_macro_attribute]
@@ -541,6 +597,25 @@ mod tests {
     }
 
     #[test]
+    fn references_the_on_delete_action_of_a_field_foreign_key() {
+        let stripped: String = strip_struct_or_compile_error(
+            quote! {
+                struct Article {
+                    #[column]
+                    #[foreign_key(on_delete = OnDelete::Cascade)]
+                    author: Author,
+                }
+            },
+            &["column", "foreign_key"],
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
+
+        assert!(stripped.contains("const_:()={let_=&OnDelete::Cascade;};"));
+    }
+
+    #[test]
     fn references_the_model_named_by_a_struct_foreign_key() {
         let stripped: String = strip_struct_or_compile_error(
             quote! {
@@ -565,6 +640,22 @@ mod tests {
             quote! {
                 #[foreign_key(= 5)]
                 pub struct FragmentAssociation;
+            },
+            &["foreign_key"],
+        )
+        .to_string();
+
+        assert!(output.contains("compile_error"));
+    }
+
+    #[test]
+    fn turns_malformed_field_foreign_key_arguments_into_a_compile_error() {
+        let output = strip_struct_or_compile_error(
+            quote! {
+                pub struct Article {
+                    #[foreign_key(= 5)]
+                    author: Author,
+                }
             },
             &["foreign_key"],
         )

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use quote::ToTokens;
+use quote::format_ident;
 use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
@@ -19,6 +20,7 @@ use margaret_injection_codegen::parameters::parameters;
 use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
+use crate::bearer_token_marker::BearerTokenMarker;
 use crate::bearer_token_parameter::BearerTokenParameter;
 use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
@@ -404,18 +406,17 @@ fn verify_single_request_parameters(
 fn classify_bearer_token(
     index: &AttributeIndex,
     item: &IndexedItem,
-    attribute: &IndexedAttribute,
+    marker: BearerTokenMarker,
     declared: &Type,
     context: &BindingContext,
     position: usize,
     bound_bearer_tokens: &mut BoundBearerTokens,
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
-    let BindingContext::AuthenticatedUserProvider {
+    let BearerTokenMarker::Scanned {
+        addressee,
         container_bindings,
-        tags,
-        ..
-    } = context
+    } = marker
     else {
         return Err(RequestBindingError::BearerTokenUnavailable {
             subject: subject.to_string(),
@@ -424,19 +425,45 @@ fn classify_bearer_token(
     };
 
     BearerTokenParameter {
-        attribute,
+        addressee,
         container_bindings,
         index,
         item,
         position,
         subject,
-        tags,
     }
     .classify(declared, bound_bearer_tokens)
 }
 
+fn bearer_token_marker<'marker>(
+    attributes: &'marker [IndexedAttribute],
+    context: &'marker BindingContext,
+) -> Option<BearerTokenMarker<'marker>> {
+    match context {
+        BindingContext::AuthenticatedUserProvider {
+            container_bindings,
+            tags,
+            ..
+        } => tags
+            .bearer_token(attributes)
+            .map(|addressee| BearerTokenMarker::Scanned {
+                addressee,
+                container_bindings,
+            }),
+        BindingContext::Handshake { .. }
+        | BindingContext::Middleware { .. }
+        | BindingContext::Responder { .. } => attributes
+            .iter()
+            .any(|attribute| {
+                attribute.framework_attribute() == Some(FrameworkAttribute::BearerToken)
+            })
+            .then_some(BearerTokenMarker::Unavailable),
+    }
+}
+
 fn parameter_marker<'marker>(
     attributes: &'marker [IndexedAttribute],
+    bearer_token: Option<BearerTokenMarker<'marker>>,
     subject: &str,
     position: usize,
     is_peer_spiffe_id: bool,
@@ -448,7 +475,6 @@ fn parameter_marker<'marker>(
     };
     let authenticated_user = marker(FrameworkAttribute::AuthenticatedUser);
     let form_request = marker(FrameworkAttribute::FormRequest);
-    let bearer_token = marker(FrameworkAttribute::BearerToken);
     let route_parameter = marker(FrameworkAttribute::RouteParameter);
 
     if route_parameter.is_some() && form_request.is_some() {
@@ -486,25 +512,22 @@ fn parameter_marker<'marker>(
         });
     }
 
-    Ok(
-        match (
-            authenticated_user,
-            form_request,
-            bearer_token,
-            route_parameter,
-        ) {
-            (Some(_), _, _, _) => ParameterMarker::AuthenticatedUser,
-            (None, Some(attribute), _, _) => ParameterMarker::FormRequest(attribute),
-            (None, None, Some(attribute), _) => ParameterMarker::BearerToken(attribute),
-            (None, None, None, Some(attribute)) => ParameterMarker::RouteParameter(attribute),
-            (None, None, None, None) => ParameterMarker::Unmarked,
-        },
-    )
+    Ok(if authenticated_user.is_some() {
+        ParameterMarker::AuthenticatedUser
+    } else if let Some(attribute) = form_request {
+        ParameterMarker::FormRequest(attribute)
+    } else if let Some(bearer_token) = bearer_token {
+        ParameterMarker::BearerToken(bearer_token)
+    } else if let Some(attribute) = route_parameter {
+        ParameterMarker::RouteParameter(attribute)
+    } else {
+        ParameterMarker::Unmarked
+    })
 }
 
 enum ParameterMarker<'marker> {
     AuthenticatedUser,
-    BearerToken(&'marker IndexedAttribute),
+    BearerToken(BearerTokenMarker<'marker>),
     FormRequest(&'marker IndexedAttribute),
     RouteParameter(&'marker IndexedAttribute),
     Unmarked,
@@ -528,15 +551,21 @@ pub fn classify_parameters(
     for ParameterView {
         attributes,
         declared,
-        holder,
         position,
+        ..
     } in parameters(method)
     {
         let resolved = index.resolve_item_type(item, declared);
         let is_reference = matches!(declared, Type::Reference(_));
         let injectable = RequestInjectable::resolve(resolved.as_ref(), is_reference);
         let is_peer_spiffe_id = matches!(injectable, Some(RequestInjectable::PeerSpiffeId));
-        let binding = match parameter_marker(attributes, subject, position, is_peer_spiffe_id)? {
+        let binding = match parameter_marker(
+            attributes,
+            bearer_token_marker(attributes, context),
+            subject,
+            position,
+            is_peer_spiffe_id,
+        )? {
             ParameterMarker::AuthenticatedUser => classify_authenticated_user(
                 index,
                 item,
@@ -545,10 +574,10 @@ pub fn classify_parameters(
                 position,
                 &registries.authenticated_users,
             )?,
-            ParameterMarker::BearerToken(attribute) => classify_bearer_token(
+            ParameterMarker::BearerToken(marker) => classify_bearer_token(
                 index,
                 item,
-                attribute,
+                marker,
                 declared,
                 context,
                 position,
@@ -611,7 +640,10 @@ pub fn classify_parameters(
             }
         };
 
-        bound.push(BoundParameter { binding, holder });
+        bound.push(BoundParameter {
+            binding,
+            holder: format_ident!("argument_{position}"),
+        });
     }
 
     verify_single_request_parameters(&bound, subject)?;

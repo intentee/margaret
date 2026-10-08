@@ -2,13 +2,14 @@ use margaret::framework::http::response::Response;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::models::article::Article;
 use crate::models::author::Author;
 
 #[singleton]
 #[responds_to_http(
-    method = "get",
+    method = RouteMethod::Get,
     name = "get_article",
     path = "/articles/{article}",
     server = "public"

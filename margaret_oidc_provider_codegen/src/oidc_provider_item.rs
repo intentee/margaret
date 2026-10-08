@@ -7,6 +7,7 @@ pub enum OidcProviderItem {
     AuthorizationEndpoint,
     ConsentEndpoint,
     IntrospectionEndpoint,
+    IssuerMetadata,
     ProviderMetadataHandler,
     RevocationEndpoint,
     SubjectTokenExchangers,
@@ -15,11 +16,12 @@ pub enum OidcProviderItem {
 }
 
 impl OidcProviderItem {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::AcceptedClients,
         Self::AuthorizationEndpoint,
         Self::ConsentEndpoint,
         Self::IntrospectionEndpoint,
+        Self::IssuerMetadata,
         Self::ProviderMetadataHandler,
         Self::RevocationEndpoint,
         Self::SubjectTokenExchangers,
@@ -42,6 +44,9 @@ impl OidcProviderItem {
             Self::IntrospectionEndpoint => quote! {
                 margaret::framework::oidc_provider::introspection_endpoint::IntrospectionEndpoint
             },
+            Self::IssuerMetadata => quote! {
+                margaret::framework::issuer_metadata::issuer_metadata::IssuerMetadata
+            },
             Self::ProviderMetadataHandler => quote! {
                 margaret::framework::oidc_provider::provider_metadata_handler::ProviderMetadataHandler
             },
@@ -63,7 +68,9 @@ impl OidcProviderItem {
     #[must_use]
     pub fn uses_provider_endpoints(self) -> bool {
         match self {
-            Self::AuthorizationEndpoint | Self::ProviderMetadataHandler => true,
+            Self::AuthorizationEndpoint | Self::IssuerMetadata | Self::ProviderMetadataHandler => {
+                true
+            }
             Self::AcceptedClients
             | Self::ConsentEndpoint
             | Self::IntrospectionEndpoint
@@ -81,6 +88,7 @@ impl OidcProviderItem {
             Self::AuthorizationEndpoint => "AuthorizationEndpoint",
             Self::ConsentEndpoint => "ConsentEndpoint",
             Self::IntrospectionEndpoint => "IntrospectionEndpoint",
+            Self::IssuerMetadata => "IssuerMetadata",
             Self::ProviderMetadataHandler => "ProviderMetadataHandler",
             Self::RevocationEndpoint => "RevocationEndpoint",
             Self::SubjectTokenExchangers => "SubjectTokenExchangers",

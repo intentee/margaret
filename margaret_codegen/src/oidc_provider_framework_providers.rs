@@ -7,8 +7,8 @@ use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
-use margaret_environment_variable_codegen::environment_variable_name::EnvironmentVariableName;
-use margaret_environment_variable_codegen::framework_environment_variable::FrameworkEnvironmentVariable;
+use margaret_container::singleton_declaration::SingletonDeclaration;
+use margaret_oidc_provider_codegen::authorization_endpoint_url_path::authorization_endpoint_url_path;
 use margaret_oidc_provider_codegen::oidc_provider_item::OidcProviderItem;
 use margaret_oidc_provider_codegen::oidc_provider_item_path::oidc_provider_item_path;
 use margaret_oidc_provider_codegen::provider_endpoints_path::provider_endpoints_path;
@@ -17,18 +17,7 @@ use margaret_tag_codegen::subject_token_exchanger_binding::SubjectTokenExchanger
 use margaret_trusted_issuer_codegen::trusted_issuer_item::TrustedIssuerItem;
 use margaret_trusted_issuer_codegen::trusted_issuer_item_path::trusted_issuer_item_path;
 
-use crate::provider_state_canonical_path::provider_state_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
-
-fn framework_path(segments: &[&str]) -> CanonicalPath {
-    CanonicalPath::new(
-        ["margaret", "framework"]
-            .iter()
-            .chain(segments)
-            .map(|segment| (*segment).to_string())
-            .collect(),
-    )
-}
 
 fn constructed(
     dependencies: Vec<FrameworkDependency>,
@@ -65,31 +54,6 @@ fn endpoint(
     )
 }
 
-fn provider_state_storage() -> FrameworkProvider {
-    FrameworkProvider {
-        construction: FrameworkConstruction::Resolved {
-            dependencies: vec![FrameworkDependency::EnvironmentVariable {
-                name: EnvironmentVariableName::from(
-                    FrameworkEnvironmentVariable::OidcProviderStateStorage,
-                ),
-                value_type: framework_path(&[
-                    "provider_state_storage_selection",
-                    "provider_state_storage_uri",
-                    "ProviderStateStorageUri",
-                ]),
-            }],
-            resolver: framework_path(&[
-                "provider_state_storage_selection",
-                "resolve_provider_state_storage",
-                "resolve_provider_state_storage",
-            ]),
-        },
-        enablement: FrameworkEnablement::Dependency,
-        injection: FrameworkInjectionRole::Unmarked,
-        provided: provider_state_canonical_path(),
-    }
-}
-
 fn subject_token_exchanger(
     SubjectTokenExchangerBinding { declaring, issuer }: &SubjectTokenExchangerBinding,
 ) -> FrameworkProvider {
@@ -115,10 +79,8 @@ pub(crate) fn oidc_provider_framework_providers(
     registered_clients: Vec<CanonicalPath>,
     exchangers: &[SubjectTokenExchangerBinding],
 ) -> Vec<FrameworkProvider> {
-    let state = || FrameworkDependency::Provider(provider_state_canonical_path());
     let secret_store = || FrameworkDependency::Provider(server_secret_store_canonical_path());
     let mut providers = vec![
-        provider_state_storage(),
         constructed(
             vec![
                 FrameworkDependency::Providers(registered_clients),
@@ -142,24 +104,35 @@ pub(crate) fn oidc_provider_framework_providers(
         endpoint(
             vec![
                 item(OidcProviderItem::AcceptedClients),
-                state(),
-                FrameworkDependency::Constant(provider_endpoints_path()),
+                FrameworkDependency::Constant(authorization_endpoint_url_path()),
                 FrameworkDependency::TokenIssuance,
             ],
             OidcProviderItem::AuthorizationEndpoint,
         ),
         endpoint(
-            vec![state(), FrameworkDependency::TokenIssuance],
+            vec![
+                FrameworkDependency::DeclaredSingleton(
+                    SingletonDeclaration::StoresAuthorizationGrants,
+                ),
+                FrameworkDependency::TokenIssuance,
+            ],
             OidcProviderItem::ConsentEndpoint,
         ),
         endpoint(
-            vec![
-                item(OidcProviderItem::AcceptedClients),
-                secret_store(),
-                state(),
-            ],
+            vec![item(OidcProviderItem::AcceptedClients), secret_store()],
             OidcProviderItem::IntrospectionEndpoint,
         ),
+        FrameworkProvider {
+            construction: FrameworkConstruction::Constructor {
+                dependencies: vec![FrameworkDependency::Constant(provider_endpoints_path())],
+                is_async: false,
+                method: "of_provider".to_string(),
+                outcome: ConstructorOutcome::Fallible,
+            },
+            enablement: FrameworkEnablement::Dependency,
+            injection: FrameworkInjectionRole::Unmarked,
+            provided: oidc_provider_item_path(OidcProviderItem::IssuerMetadata),
+        },
         constructed(
             vec![
                 aggregate(ProviderAggregate::ProviderSupport),
@@ -174,7 +147,9 @@ pub(crate) fn oidc_provider_framework_providers(
             vec![
                 item(OidcProviderItem::AcceptedClients),
                 secret_store(),
-                state(),
+                FrameworkDependency::DeclaredSingleton(
+                    SingletonDeclaration::StoresAuthorizationGrants,
+                ),
                 aggregate(ProviderAggregate::AcceptedResources),
             ],
             OidcProviderItem::RevocationEndpoint,
@@ -182,7 +157,6 @@ pub(crate) fn oidc_provider_framework_providers(
         endpoint(
             vec![
                 item(OidcProviderItem::AcceptedClients),
-                state(),
                 item(OidcProviderItem::SubjectTokenExchangers),
                 secret_store(),
                 FrameworkDependency::TokenIssuance,

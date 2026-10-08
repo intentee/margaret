@@ -1,10 +1,16 @@
 mod client_id_module_name;
 pub mod declared_client_authentication;
+pub mod declared_client_registration;
 pub mod declared_oauth_clients;
+pub mod declared_sign_in;
+pub mod module_sign_in;
 pub mod oauth_client_codegen_error;
 pub mod oauth_client_declaration;
 pub mod oauth_client_id_path;
 pub mod oauth_client_item;
 pub mod oauth_client_item_path;
+pub mod oauth_client_module;
+pub mod oauth_client_sign_in_scopes_path;
 pub mod oauth_clients_module_name;
 pub mod render_oauth_clients;
+mod sign_in_scopes_module_name;

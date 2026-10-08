@@ -1,2 +1,2 @@
-#[exchanges_subject_tokens(issuer = ci)]
+#[exchanges_tokens_from(issuer = ci)]
 enum Bad {}

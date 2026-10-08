@@ -12,8 +12,7 @@ use crate::scanned_attribute::ScannedAttribute;
 pub(crate) struct ScannedParameter {
     attributes: Vec<ScannedAttribute>,
     declared: Type,
-    diagnostic_name: String,
-    holder: Ident,
+    name: Ident,
     position: usize,
 }
 
@@ -24,18 +23,15 @@ impl ScannedParameter {
         pattern: &Pat,
         position: usize,
     ) -> Self {
-        let (diagnostic_name, holder) = match pattern {
-            Pat::Ident(pattern_ident) => {
-                (pattern_ident.ident.to_string(), pattern_ident.ident.clone())
-            }
-            _ => (position.to_string(), format_ident!("argument_{position}")),
+        let name = match pattern {
+            Pat::Ident(pattern_ident) => pattern_ident.ident.clone(),
+            _ => format_ident!("argument_{position}"),
         };
 
         Self {
             attributes: ScannedAttribute::scan_all(attributes),
             declared,
-            diagnostic_name,
-            holder,
+            name,
             position,
         }
     }
@@ -47,8 +43,7 @@ impl ScannedParameter {
         IndexedParameter::from_parts(
             ScannedAttribute::resolve_all(self.attributes, resolve),
             self.declared,
-            self.diagnostic_name,
-            self.holder,
+            self.name,
             self.position,
         )
     }

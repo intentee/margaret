@@ -5,13 +5,14 @@ use margaret::framework::http::response::Response;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use super::project::Project;
 use crate::margaret::asset_bag::asset;
 
 #[singleton]
 #[responds_to_http(
-    method = "get",
+    method = RouteMethod::Get,
     name = "get_project_asset",
     path = "/projects/{project}/assets/{*asset_path}",
     server = "public"

@@ -13,33 +13,27 @@ pub enum TypeHeaderExpectation {
 
 impl TypeHeaderExpectation {
     pub(crate) fn check(self, typ: Option<&HeaderType>) -> ControlFlow<TypeRejection> {
-        match (self, typ) {
-            (Self::Required(expected), None) => {
-                ControlFlow::Break(TypeRejection::Missing { expected })
-            }
-            (Self::Required(expected), Some(HeaderType::Supported(found)))
-                if *found == expected =>
-            {
-                ControlFlow::Continue(())
-            }
-            (Self::Required(expected), Some(found)) => {
-                ControlFlow::Break(TypeRejection::Mismatch {
+        match self {
+            Self::Required(expected) => match typ {
+                None => ControlFlow::Break(TypeRejection::Missing { expected }),
+                Some(HeaderType::Supported(found)) if *found == expected => {
+                    ControlFlow::Continue(())
+                }
+                Some(found) => ControlFlow::Break(TypeRejection::Mismatch {
                     expected,
                     found: found.clone(),
-                })
-            }
-            (Self::UntypedOr(_), None) => ControlFlow::Continue(()),
-            (Self::UntypedOr(accepted), Some(HeaderType::Supported(found)))
-                if accepted.contains(found) =>
-            {
-                ControlFlow::Continue(())
-            }
-            (Self::UntypedOr(accepted), Some(found)) => {
-                ControlFlow::Break(TypeRejection::Unaccepted {
+                }),
+            },
+            Self::UntypedOr(accepted) => match typ {
+                None => ControlFlow::Continue(()),
+                Some(HeaderType::Supported(found)) if accepted.contains(found) => {
+                    ControlFlow::Continue(())
+                }
+                Some(found) => ControlFlow::Break(TypeRejection::Unaccepted {
                     accepted,
                     found: found.clone(),
-                })
-            }
+                }),
+            },
         }
     }
 }

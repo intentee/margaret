@@ -14,7 +14,6 @@ use oauth2::AccessToken;
 use oauth2::AuthUrl;
 use oauth2::AuthorizationCode;
 use oauth2::ExtraTokenFields;
-use oauth2::PkceCodeVerifier;
 use oauth2::RedirectUrl;
 use oauth2::StandardTokenIntrospectionResponse;
 use oauth2::StandardTokenResponse;
@@ -28,12 +27,15 @@ use url::Url;
 
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_metadata::metadata_holding::MetadataHolding;
+use margaret_issuer_request::issuer_answer::IssuerAnswer;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_issuer_request::issuer_request_timeout::ISSUER_REQUEST_TIMEOUT;
 use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_oauth_client::client_authentication::ClientAuthentication;
 use margaret_oauth_client::presented_client_authentication::PresentedClientAuthentication;
 use margaret_oauth_vocabulary::client_secret::ClientSecret;
+use margaret_oauth_vocabulary::code_challenge_method::CodeChallengeMethod;
+use margaret_oauth_vocabulary::code_verifier::CodeVerifier;
 use margaret_oauth_vocabulary::grant_type::GrantType;
 use margaret_oauth_vocabulary::jwt_bearer_client_assertion_type::JWT_BEARER_CLIENT_ASSERTION_TYPE;
 use margaret_oauth_vocabulary::token_type_hint::TokenTypeHint;
@@ -41,6 +43,7 @@ use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
+use crate::answer_parsing::AnswerParsing;
 use crate::authorization_request::AuthorizationRequest;
 use crate::authorization_url::AuthorizationUrl;
 use crate::endpoint_outcome::EndpointOutcome;
@@ -73,10 +76,9 @@ fn userinfo_answer<TUserinfo: DeserializeOwned>(
         };
     }
 
-    match serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_slice(answer.body()))
-    {
-        Ok(userinfo) => UserinfoOutcome::Answered(userinfo),
-        Err(source) => {
+    match AnswerParsing::of(answer.body()) {
+        AnswerParsing::Parsed(userinfo) => UserinfoOutcome::Answered(userinfo),
+        AnswerParsing::Malformed(source) => {
             UserinfoOutcome::Unavailable(ServerUnavailability::MalformedAnswer { source })
         }
     }
@@ -128,8 +130,8 @@ impl AuthorizationServerClient {
     pub async fn authorization_url(
         &self,
         AuthorizationRequest {
+            code_challenge,
             nonce,
-            pkce_challenge,
             redirect_uri,
             scopes,
             state,
@@ -140,8 +142,12 @@ impl AuthorizationServerClient {
                 .set_auth_uri(AuthUrl::from_url(authorization_url))
                 .authorize_url(|| state)
                 .add_scopes(scopes)
-                .set_pkce_challenge(pkce_challenge)
                 .set_redirect_uri(Cow::Owned(redirect_uri))
+                .add_extra_param("code_challenge", code_challenge.wire())
+                .add_extra_param(
+                    "code_challenge_method",
+                    CodeChallengeMethod::S256.wire_name(),
+                )
                 .add_extra_param("nonce", nonce)
                 .url();
 
@@ -161,7 +167,7 @@ impl AuthorizationServerClient {
     pub async fn exchange_authorization_code<TExtraFields: ExtraTokenFields>(
         &self,
         code: AuthorizationCode,
-        pkce_verifier: PkceCodeVerifier,
+        code_verifier: &CodeVerifier,
         redirect_uri: RedirectUrl,
     ) -> EndpointOutcome<StandardTokenResponse<TExtraFields, BasicTokenType>> {
         self.request_grant(
@@ -173,7 +179,7 @@ impl AuthorizationServerClient {
                 },
                 FormParameter {
                     name: "code_verifier",
-                    value: pkce_verifier.into_secret(),
+                    value: code_verifier.secret().to_string(),
                 },
                 FormParameter {
                     name: "redirect_uri",
@@ -243,7 +249,12 @@ impl AuthorizationServerClient {
             request.headers_mut().typed_insert(authorization);
 
             match self.request_client.exchange(request).await {
-                Ok(answer) => userinfo_answer(&answer),
+                Ok(IssuerAnswer::Received(answer)) => userinfo_answer(&answer),
+                Ok(IssuerAnswer::Oversized { max_bytes }) => {
+                    UserinfoOutcome::Unavailable(ServerUnavailability::OversizedAnswer {
+                        max_bytes,
+                    })
+                }
                 Err(failure) => {
                     UserinfoOutcome::Unavailable(ServerUnavailability::Exchange(failure))
                 }

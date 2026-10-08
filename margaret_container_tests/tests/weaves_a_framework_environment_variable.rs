@@ -56,11 +56,20 @@ fn render(fixture: &str) -> Result<RenderedContainer, ContainerError> {
 #[test]
 fn reads_one_variable_shared_by_the_framework_and_the_application() {
     let rendered = render("framework_environment_variable").expect("the fixture renders");
+    let serve_inputs = rendered
+        .bindings
+        .serve_inputs(&[
+            CanonicalPath::new(vec!["crate".to_string(), "Consumer".to_string()]),
+            CanonicalPath::new(vec!["crate".to_string(), "Vault".to_string()]),
+        ])
+        .expect("the consumer and the vault have planned serve inputs");
 
-    assert_eq!(rendered.bindings.all_serve_inputs().len(), 1);
     assert_eq!(
-        rendered.bindings.all_serve_inputs()[0].name(),
-        "VAULT_TOKEN"
+        serve_inputs
+            .iter()
+            .map(|slotted| slotted.input.name())
+            .collect::<Vec<&str>>(),
+        ["VAULT_TOKEN"]
     );
 }
 

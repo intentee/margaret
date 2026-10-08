@@ -8,5 +8,6 @@ pub enum IssuerDocument {
     Cancelled,
     Failed(IssuerExchangeError),
     Fetched(Bytes),
+    Oversized { max_bytes: usize },
     UnexpectedStatus(StatusCode),
 }

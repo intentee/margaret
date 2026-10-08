@@ -29,7 +29,7 @@ impl Ticker for JwksRollerService {
         _cancellation_token: CancellationToken,
         _tick_context: TickContext,
     ) -> Result<()> {
-        self.bundle.roll_and_publish()?;
+        self.bundle.roll_and_publish().await?;
 
         Ok(())
     }

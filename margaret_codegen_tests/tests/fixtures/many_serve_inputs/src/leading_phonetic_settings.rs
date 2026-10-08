@@ -3,9 +3,10 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/leading-phonetic-settings", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/leading-phonetic-settings", server = "public")]
 pub struct LeadingPhoneticSettings {
     settings: Vec<String>,
 }

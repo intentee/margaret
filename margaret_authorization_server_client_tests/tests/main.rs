@@ -26,4 +26,5 @@ mod reports_an_unreachable_server;
 mod reports_an_unreachable_userinfo_endpoint;
 mod reports_malformed_userinfo;
 mod reports_metadata_that_has_not_been_discovered;
+mod reports_oversized_userinfo;
 mod reports_undiscovered_metadata_for_userinfo;

@@ -51,7 +51,7 @@ fn scan_item(
     for view in parameters(constructor) {
         let site = ConstructorParameter {
             owner: owner.clone(),
-            parameter: view.holder.to_string(),
+            parameter: view.name.to_string(),
         };
         let Some(DeclaredServeInputSource {
             attribute,
@@ -145,7 +145,7 @@ mod tests {
                 requiredness(variable.value.required),
                 variable.value.value_type
             ),
-            ServeInput::SpiffeHttpClient => "spiffe_http_client".to_string(),
+            ServeInput::RouteUrl(_) | ServeInput::SpiffeHttpClient => input.name().to_string(),
         }
     }
 

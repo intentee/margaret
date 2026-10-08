@@ -9,18 +9,16 @@ mod built_websocket_plan;
 mod discovered_handler;
 mod handler_binding;
 mod handler_kind;
-mod handler_serve_inputs;
 mod message_cardinality;
 mod message_kind;
 mod render_messages;
 mod render_server_routes;
 mod render_sessions;
-mod server_serve_inputs;
 mod session_arguments;
 mod session_handler_plan;
 mod session_plan;
-mod session_serve_inputs;
 mod web_socket_message;
+mod web_socket_responses;
 mod web_socket_session;
 mod websocket_handlers;
 mod websocket_messages;
@@ -29,8 +27,6 @@ mod websocket_sessions;
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-
-    use quote::format_ident;
 
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::canonical_path::CanonicalPath;
@@ -43,28 +39,18 @@ mod tests {
     use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
-    use margaret_middleware_codegen::layer_application::LayerApplication;
     use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
-    use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
-    use margaret_request_binding_codegen::bound_parameter::BoundParameter;
-    use margaret_request_binding_codegen::request_binding::RequestBinding;
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_tag_codegen::tag_pool::TagPool;
+    use margaret_tag_codegen_tests::collected_tags::collected_tags;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
-    use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
 
-    use crate::handler_binding::HandlerBinding;
     use crate::render_websocket;
-    use crate::server_serve_inputs::server_serve_inputs;
-    use crate::session_plan::SessionPlan;
-    use crate::session_serve_inputs::session_serve_inputs;
     use crate::web_socket_artifacts::WebSocketArtifacts;
     use crate::web_socket_codegen_error::WebSocketCodegenError;
     use crate::web_socket_plan::WebSocketPlan;
-    use crate::web_socket_session::WebSocketSession;
     use crate::websocket_handlers::websocket_handlers;
 
     fn render_websocket(
@@ -122,10 +108,10 @@ impl ChatSession {
     ) -> anyhow::Result<Self> {}
 }
 
-#[websocket_message(request, method = "say", response = stream)]
+#[websocket_message(request, method = "say", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Stream)]
 struct Say;
 
-#[websocket_message(request, method = "ping", response = single)]
+#[websocket_message(request, method = "ping", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct Ping;
 
 #[websocket_message(notification, method = "typing")]
@@ -173,12 +159,7 @@ impl RespondsToWebSocketNotification for Typist {
         BindingRegistries::collect(
             index,
             ViewsAvailability::Available,
-            &TagPool::collect(
-                index,
-                &DeclaredTrusts::read(index).expect("the trusts are read"),
-                &DeclaredOAuthClients::read(index).expect("the oauth clients are read"),
-            )
-            .expect("the tags are collected"),
+            &collected_tags(index),
             &bindings(&IndexedSource::new("").index),
         )
     }
@@ -187,44 +168,10 @@ impl RespondsToWebSocketNotification for Typist {
         collect_registries(index).expect("the binding registries are collected")
     }
 
-    fn missing_path() -> CanonicalPath {
-        CanonicalPath::new(vec!["crate".to_string(), "Missing".to_string()])
-    }
-
-    fn empty_session_plan() -> SessionPlan {
-        SessionPlan {
-            notification_handlers: Vec::new(),
-            request_handlers: Vec::new(),
-            session: WebSocketSession {
-                layers: Vec::new(),
-                method_name: format_ident!("build"),
-                module_name: "room".to_string(),
-                parameters: Vec::new(),
-                path: "/room".to_string(),
-                server: "public".to_string(),
-                session_path: CanonicalPath::new(vec!["crate".to_string(), "Room".to_string()]),
-            },
-        }
-    }
-
-    fn missing_handler() -> HandlerBinding {
-        HandlerBinding {
-            dispatch_ident: "MissingDispatch".to_string(),
-            handler_field: "missing".to_string(),
-            handler_path: missing_path(),
-            method: "missing".to_string(),
-        }
-    }
-
     fn generated(source: &str) -> String {
         let index = IndexedSource::new(source).index;
         let registries = registries_for(&index);
-        let tags = TagPool::collect(
-            &index,
-            &DeclaredTrusts::read(&index).expect("the trusts are read"),
-            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-        )
-        .expect("the tags are collected");
+        let tags = collected_tags(&index);
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
 
@@ -249,12 +196,7 @@ impl RespondsToWebSocketNotification for Typist {
             Ok(registries) => registries,
             Err(rejection) => return WebSocketCodegenError::from(rejection),
         };
-        let tags = TagPool::collect(
-            &index,
-            &DeclaredTrusts::read(&index).expect("the trusts are read"),
-            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-        )
-        .expect("the tags are collected");
+        let tags = collected_tags(&index);
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
 
@@ -273,7 +215,7 @@ impl Room {
     fn build() -> anyhow::Result<Self> {}
 }
 
-#[websocket_message(request, method = "chat", response = single)]
+#[websocket_message(request, method = "chat", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct Chat;
 
 #[singleton]
@@ -338,123 +280,10 @@ impl RespondsToWebSocketNotification for Typist {
         assert!(!source.contains("serve_input_"));
     }
 
-    #[test]
-    fn reports_a_notification_handler_absent_from_the_container_plan() {
-        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
-        let mut plan = empty_session_plan();
-        plan.notification_handlers.push(missing_handler());
-
-        let error = session_serve_inputs(&plan, &bindings(&index))
-            .expect_err("an unplanned handler has no console argument closure");
-
-        assert!(error.to_string().contains("crate::Missing"));
-    }
-
-    #[test]
-    fn reports_a_request_handler_absent_from_the_container_plan() {
-        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
-        let mut plan = empty_session_plan();
-        plan.request_handlers.push(missing_handler());
-
-        let error = session_serve_inputs(&plan, &bindings(&index))
-            .expect_err("an unplanned handler has no console arguments");
-
-        assert!(error.to_string().contains("crate::Missing"));
-
-        let error = server_serve_inputs(&[&plan], &bindings(&index))
-            .expect_err("a server cannot include an unplanned handler");
-
-        assert!(error.to_string().contains("crate::Missing"));
-    }
-
-    #[test]
-    fn reports_a_session_binding_absent_from_the_container_plan() {
-        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
-        let mut plan = empty_session_plan();
-        plan.session.parameters.push(BoundParameter {
-            binding: RequestBinding::BoundRouteParameter {
-                binder_field: "missing".to_string(),
-                binder_provider: missing_path(),
-                path_key: "room".to_string(),
-            },
-            holder: format_ident!("room"),
-        });
-
-        let error = session_serve_inputs(&plan, &bindings(&index))
-            .expect_err("an unplanned binding has no console arguments");
-
-        assert!(error.to_string().contains("crate::Missing"));
-    }
-
-    #[test]
-    fn reports_a_session_layer_absent_from_the_container_plan() {
-        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
-        let mut plan = empty_session_plan();
-        plan.session.layers.push(LayerApplication {
-            concrete: missing_path(),
-            field: format_ident!("missing"),
-            injects_peer_spiffe_id: false,
-            injects_routes: false,
-            injects_views: false,
-            wrapper: format_ident!("Missing"),
-        });
-
-        let error = server_serve_inputs(&[&plan], &bindings(&index))
-            .expect_err("an unplanned middleware layer has no console arguments");
-
-        assert!(error.to_string().contains("crate::Missing"));
-    }
-
-    #[test]
-    fn propagates_a_container_mismatch_from_websocket_rendering() {
-        let index = IndexedSource::new(
-            r#"
-use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
-
-#[websocket_session(path = "/room", server = "public")]
-struct Room;
-
-impl Room {
-    #[build_for_session]
-    fn build() -> anyhow::Result<Self> {}
-}
-
-#[websocket_message(request, method = "ping", response = single)]
-struct Ping;
-
-#[singleton]
-struct Ponger;
-
-impl RespondsToWebSocketMessage for Ponger {
-    type Session = Room;
-    type Message = Ping;
-}
-"#,
-        )
-        .index;
-        let registries = registries_for(&index);
-        let tags = TagPool::collect(
-            &index,
-            &DeclaredTrusts::read(&index).expect("the trusts are read"),
-            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-        )
-        .expect("the tags are collected");
-        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
-            .expect("the middleware plans are collected");
-        let empty_index = IndexedSource::new("").index;
-        let error = render_websocket(&index, &bindings(&empty_index), &plans, &registries)
-            .map(drop)
-            .expect_err("websocket rendering requires the same container plan");
-
-        let message = error.to_string();
-
-        assert!(message.contains("crate::"));
-    }
-
     const NON_STRUCT_HANDLER: &str = r#"
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
-#[websocket_message(request, method = "chat", response = single)]
+#[websocket_message(request, method = "chat", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct Chat;
 
 #[singleton]
@@ -482,7 +311,7 @@ impl RespondsToWebSocketMessage for Chatter {
     const COLLIDING_HANDLER_FIELD: &str = r#"
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
-#[websocket_message(request, method = "chat", response = single)]
+#[websocket_message(request, method = "chat", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct Chat;
 
 mod a {
@@ -530,10 +359,10 @@ impl Room {
     fn build() -> anyhow::Result<Self> {}
 }
 
-#[websocket_message(request, method = "say_hi", response = single)]
+#[websocket_message(request, method = "say_hi", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct SayHi;
 
-#[websocket_message(request, method = "say__hi", response = single)]
+#[websocket_message(request, method = "say__hi", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct SayHiToo;
 
 #[singleton]
@@ -756,9 +585,9 @@ impl Guard {
     fn generates_a_factory_with_concrete_dependencies() {
         let source = generated(FULL_SESSION);
 
-        assert!(source.contains("clock:::std::sync::Arc<crate::SystemClock>"));
-        assert!(source.contains("config:::std::sync::Arc<crate::Config>"));
-        assert!(source.contains("plugin:::std::sync::Arc<crate::LogPlugin>"));
+        assert!(source.contains("argument_0:::std::sync::Arc<crate::SystemClock>"));
+        assert!(source.contains("argument_1:::std::sync::Arc<crate::Config>"));
+        assert!(source.contains("argument_2:::std::sync::Arc<crate::LogPlugin>"));
         assert!(source.contains("container.system_clock()"));
         assert!(source.contains("container.config()"));
         assert!(source.contains("container.log_plugin()"));
@@ -771,7 +600,7 @@ impl Guard {
         assert!(source.contains("require_route_parameter::require_route_parameter"));
         assert!(source.contains("\"room\""));
         assert!(source.contains("crate::ChatSession::build_for_session"));
-        assert!(source.contains("self.clock.clone()"));
+        assert!(source.contains("self.argument_0.clone()"));
     }
 
     #[test]
@@ -825,13 +654,13 @@ impl Guard {
 
     #[test]
     fn rejects_a_message_with_multiple_kinds() {
-        assert!(error(r#"#[websocket_message(request, response, method = "x", response = single)] struct Bad;"#).to_string().contains("more than one message kind"));
+        assert!(error(r#"#[websocket_message(request, response, method = "x", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#).to_string().contains("more than one message kind"));
     }
 
     #[test]
     fn rejects_a_request_without_a_method() {
         assert!(
-            error(r"#[websocket_message(request, response = single)] struct Bad;")
+            error(r"#[websocket_message(request, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
                 .to_string()
                 .contains("missing the required 'method'")
         );
@@ -842,22 +671,48 @@ impl Guard {
         assert!(
             error(r#"#[websocket_message(request, method = "x")] struct Bad;"#)
                 .to_string()
-                .contains("must declare 'response = single'")
+                .contains("must declare its response as a variant of margaret::framework::websocket::web_socket_response::WebSocketResponse")
         );
     }
 
     #[test]
-    fn rejects_a_request_with_an_invalid_cardinality() {
+    fn rejects_a_request_with_an_unknown_cardinality() {
         assert!(
-            error(r#"#[websocket_message(request, method = "x", response = burst)] struct Bad;"#)
+            error(r#"#[websocket_message(request, method = "x", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Burst)] struct Bad;"#)
                 .to_string()
-                .contains("invalid cardinality")
+                .contains("declares the response 'margaret :: framework :: websocket :: web_socket_response :: WebSocketResponse :: Burst', which is not a variant")
         );
+    }
+
+    #[test]
+    fn rejects_a_cardinality_of_a_foreign_enum() {
+        assert!(
+            error("mod local {\n    pub enum WebSocketResponse {\n        Single,\n    }\n}\n\nuse crate::local::WebSocketResponse;\n\n#[websocket_message(request, method = \"x\", response = WebSocketResponse::Single)] struct Bad;\n")
+                .to_string()
+                .contains("declares the response 'WebSocketResponse :: Single', which is not a variant")
+        );
+    }
+
+    #[test]
+    fn reads_a_cardinality_named_through_an_imported_variant() {
+        let source = generated(
+            &FULL_SESSION
+                .replace(
+                    "response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Stream",
+                    "response = Stream",
+                )
+                .replace(
+                    "use std::sync::Arc;",
+                    "use std::sync::Arc;\nuse margaret::framework::websocket::web_socket_response::WebSocketResponse::Stream;",
+                ),
+        );
+
+        assert!(source.contains("streaming_request_envelope::StreamingRequestEnvelope::new"));
     }
 
     #[test]
     fn rejects_a_non_snake_case_method() {
-        assert!(error(r#"#[websocket_message(request, method = "NotSnake", response = single)] struct Bad;"#).to_string().contains("has method"));
+        assert!(error(r#"#[websocket_message(request, method = "NotSnake", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#).to_string().contains("has method"));
     }
 
     #[test]
@@ -893,7 +748,7 @@ impl Guard {
     fn rejects_a_notification_that_declares_a_cardinality() {
         assert!(
             error(
-                r#"#[websocket_message(notification, method = "x", response = single)] struct Bad;"#
+                r#"#[websocket_message(notification, method = "x", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#
             )
             .to_string()
             .contains("declares a response cardinality but is not a request")
@@ -1054,12 +909,7 @@ impl Bad {
         )
         .index;
         let registries = registries_for(&index);
-        let tags = TagPool::collect(
-            &index,
-            &DeclaredTrusts::read(&index).expect("the trusts are read"),
-            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-        )
-        .expect("the tags are collected");
+        let tags = collected_tags(&index);
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
         let registry = scan(&index).expect("the console arguments are scanned");
@@ -1068,7 +918,7 @@ impl Bad {
             &registry,
             &[FrameworkProvider {
                 construction: FrameworkConstruction::Unit,
-                enablement: FrameworkEnablement::Always,
+                enablement: FrameworkEnablement::Declared,
                 injection: FrameworkInjectionRole::TrustedIssuer(
                     Tag::from_path(&syn::parse_str("auth").expect("the tag path parses"))
                         .expect("the tag is a plain name"),
@@ -1140,7 +990,7 @@ impl Room {
     fn assemble(#[authenticated_user] viewer: Option<User>) -> anyhow::Result<Self> {}
 }
 
-#[websocket_message(request, method = "chat", response = single)]
+#[websocket_message(request, method = "chat", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct Chat;
 
 #[singleton]
@@ -1181,7 +1031,7 @@ impl RespondsToWebSocketMessage for Chatter {
 
     #[test]
     fn builds_the_session_through_the_method_the_session_declares() {
-        assert!(generated(AUTHENTICATED_HANDSHAKE).contains("crate::Room::assemble(viewer)"));
+        assert!(generated(AUTHENTICATED_HANDSHAKE).contains("crate::Room::assemble(argument_0)"));
     }
 
     #[test]
@@ -1223,7 +1073,7 @@ impl Room {
     fn build(#[authenticated_user] viewer: User) -> anyhow::Result<Self> {}
 }
 
-#[websocket_message(request, method = "chat", response = single)]
+#[websocket_message(request, method = "chat", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct Chat;
 
 #[singleton]
@@ -1273,7 +1123,7 @@ impl Room {
     fn build(session: std::sync::Arc<SystemClock>, #[authenticated_user] viewer: User) -> anyhow::Result<Self> {}
 }
 
-#[websocket_message(request, method = "chat", response = single)]
+#[websocket_message(request, method = "chat", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct Chat;
 
 #[singleton]
@@ -1286,11 +1136,11 @@ impl RespondsToWebSocketMessage for Chatter {
 "#,
         );
 
-        assert!(source.contains("session:::std::sync::Arc<crate::SystemClock>,"));
+        assert!(source.contains("argument_0:::std::sync::Arc<crate::SystemClock>,"));
         assert!(source.contains(
-            "session_2:::std::sync::Arc<super::super::super::authenticated_users::Session>,"
+            "session:::std::sync::Arc<super::super::super::authenticated_users::Session>,"
         ));
-        assert!(source.contains("self.session_2.as_ref()"));
+        assert!(source.contains("self.session.as_ref()"));
     }
 
     const CONSOLE_ARGUMENT_PROVIDER: &str = r#"
@@ -1319,7 +1169,7 @@ impl Room {
     fn build(#[authenticated_user] viewer: User) -> anyhow::Result<Self> {}
 }
 
-#[websocket_message(request, method = "chat", response = single)]
+#[websocket_message(request, method = "chat", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct Chat;
 
 #[singleton]
@@ -1518,7 +1368,7 @@ impl BoardSession {
     ) -> anyhow::Result<Self> {}
 }
 
-#[websocket_message(request, method = "post", response = single)]
+#[websocket_message(request, method = "post", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct Post;
 
 #[singleton]
@@ -1544,7 +1394,7 @@ impl RespondsToWebSocketMessage for Poster {
         assert!(source.contains(".inputs.cookies"));
         assert!(source.contains("require_peer_spiffe_id::require_peer_spiffe_id"));
         assert!(source.contains("::margaret::framework::asset_bag::asset_bag::AssetBag::new()"));
-        assert!(source.contains("self.routes.as_ref()"));
+        assert!(source.contains("self.argument_7.as_ref()"));
         assert!(source.contains("routes:&::std::sync::Arc<super::super::routes::Routes>"));
         assert!(source.contains("upgrade_entry(container,routes)"));
         assert!(source.contains("routes:&::std::sync::Arc<super::super::super::routes::Routes>"));
@@ -1648,7 +1498,7 @@ impl Room {
 
         assert!(source.contains("require_route_parameter::require_route_parameter"));
         assert!(source.contains("\"room_slug\""));
-        assert!(source.contains("crate::Room::build(room_slug)"));
+        assert!(source.contains("crate::Room::build(argument_0)"));
     }
 
     #[test]
@@ -1697,7 +1547,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_that_is_not_a_singleton() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = single)]\nstruct M;\n\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = Missing;\n    type Message = M;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = Missing;\n    type Message = M;\n}}\n"
         );
 
         assert!(error(&source).to_string().contains("is not a #[singleton]"));
@@ -1706,7 +1556,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_missing_an_associated_type() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = single)]\nstruct M;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Message = M;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Message = M;\n}}\n"
         );
 
         assert!(error(&source).to_string().contains("associated type"));
@@ -1715,7 +1565,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_whose_session_is_not_a_session() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = single)]\nstruct M;\n\nstruct NotASession;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = NotASession;\n    type Message = M;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\nstruct NotASession;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = NotASession;\n    type Message = M;\n}}\n"
         );
 
         assert!(
@@ -1767,7 +1617,7 @@ impl Room {
     #[test]
     fn rejects_a_notification_handler_bound_to_a_request() {
         let source = format!(
-            "{NOTIFICATION_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"r\", response = single)]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketNotification for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
+            "{NOTIFICATION_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"r\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketNotification for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
         );
 
         assert!(
@@ -1794,7 +1644,7 @@ impl SecondSession {
     fn build() -> anyhow::Result<Self> {}
 }
 
-#[websocket_message(request, method = "shared_request", response = single)]
+#[websocket_message(request, method = "shared_request", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
 struct SharedRequest;
 
 #[websocket_message(notification, method = "shared_notification")]
@@ -1867,7 +1717,7 @@ mod second_notification {
     #[test]
     fn rejects_two_handlers_for_the_same_message() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = single)]\nstruct M;\n\n#[singleton]\nstruct First;\n\nimpl RespondsToWebSocketMessage for First {{\n    type Session = S;\n    type Message = M;\n}}\n\n#[singleton]\nstruct Second;\n\nimpl RespondsToWebSocketMessage for Second {{\n    type Session = S;\n    type Message = M;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\n#[singleton]\nstruct First;\n\nimpl RespondsToWebSocketMessage for First {{\n    type Session = S;\n    type Message = M;\n}}\n\n#[singleton]\nstruct Second;\n\nimpl RespondsToWebSocketMessage for Second {{\n    type Session = S;\n    type Message = M;\n}}\n"
         );
 
         assert!(
@@ -1879,8 +1729,7 @@ mod second_notification {
 
     #[test]
     fn rejects_a_message_without_a_handler() {
-        let source =
-            "#[websocket_message(request, method = \"m\", response = single)]\nstruct M;\n";
+        let source = "#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n";
 
         assert!(error(source).to_string().contains("has no handler"));
     }
@@ -1923,7 +1772,7 @@ impl BetaSession {
     #[test]
     fn propagates_a_non_string_request_method() {
         assert!(
-            error(r"#[websocket_message(request, method = 5, response = single)] struct Bad;")
+            error(r"#[websocket_message(request, method = 5, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
                 .to_string()
                 .contains("failed to read")
         );
@@ -1941,7 +1790,7 @@ impl BetaSession {
     #[test]
     fn rejects_a_response_that_declares_a_cardinality() {
         assert!(
-            error(r"#[websocket_message(response, response = single)] struct Bad;")
+            error(r"#[websocket_message(response, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
                 .to_string()
                 .contains("declares a response cardinality but is not a request")
         );
@@ -2047,7 +1896,7 @@ impl Bad {
     #[test]
     fn rejects_two_methods_that_collide_in_a_session() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = single)]\nstruct First;\n\n#[websocket_message(request, method = \"m\", response = single)]\nstruct Second;\n\n#[singleton]\nstruct HandlerOne;\n\nimpl RespondsToWebSocketMessage for HandlerOne {{\n    type Session = S;\n    type Message = First;\n}}\n\n#[singleton]\nstruct HandlerTwo;\n\nimpl RespondsToWebSocketMessage for HandlerTwo {{\n    type Session = S;\n    type Message = Second;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct First;\n\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct Second;\n\n#[singleton]\nstruct HandlerOne;\n\nimpl RespondsToWebSocketMessage for HandlerOne {{\n    type Session = S;\n    type Message = First;\n}}\n\n#[singleton]\nstruct HandlerTwo;\n\nimpl RespondsToWebSocketMessage for HandlerTwo {{\n    type Session = S;\n    type Message = Second;\n}}\n"
         );
 
         assert!(error(&source).to_string().contains("more than once"));
@@ -2056,12 +1905,7 @@ impl Bad {
     fn transport_policies(source: &str) -> BTreeMap<String, ServerTransportPolicy> {
         let index = IndexedSource::new(source).index;
         let registries = registries_for(&index);
-        let tags = TagPool::collect(
-            &index,
-            &DeclaredTrusts::read(&index).expect("the trusts are read"),
-            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-        )
-        .expect("the tags are collected");
+        let tags = collected_tags(&index);
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
 

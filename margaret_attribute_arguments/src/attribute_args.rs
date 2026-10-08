@@ -11,6 +11,42 @@ use crate::attribute_arguments_error::AttributeArgumentsError;
 use crate::attribute_arguments_reader::AttributeArgumentsReader;
 use crate::format_path::format_path;
 use crate::named_argument::NamedArgument;
+use crate::named_assignment::NamedAssignment;
+
+fn written_paths(value: &Expr) -> Vec<&Path> {
+    match value {
+        Expr::Path(expression) => vec![&expression.path],
+        Expr::Call(call) => match call.func.as_ref() {
+            Expr::Path(function) => vec![&function.path],
+            _ => Vec::new(),
+        },
+        Expr::Array(array) => array.elems.iter().flat_map(written_paths).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn collect_nested_paths<'arguments>(
+    expression: &'arguments Expr,
+    key: &str,
+    paths: &mut Vec<&'arguments Path>,
+) {
+    let Expr::Call(call) = expression else {
+        return;
+    };
+
+    for argument in &call.args {
+        match NamedAssignment::of(argument) {
+            Some(NamedAssignment { name, value }) => {
+                if name == key {
+                    paths.extend(written_paths(value));
+                }
+
+                collect_nested_paths(value, key, paths);
+            }
+            None => collect_nested_paths(argument, key, paths),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct AttributeArgs {
@@ -120,14 +156,22 @@ impl AttributeArgs {
     }
 
     #[must_use]
-    pub fn named_path(&self, key: &str) -> Option<&Path> {
-        self.named
-            .iter()
-            .find(|argument| argument.name == key)
-            .and_then(|argument| match &argument.value {
-                Expr::Path(expression) => Some(&expression.path),
-                _ => None,
-            })
+    pub fn named_paths(&self, key: &str) -> Vec<&Path> {
+        let mut paths = Vec::new();
+
+        for argument in &self.named {
+            if argument.name == key {
+                paths.extend(written_paths(&argument.value));
+            }
+
+            collect_nested_paths(&argument.value, key, &mut paths);
+        }
+
+        for expression in &self.positional {
+            collect_nested_paths(expression, key, &mut paths);
+        }
+
+        paths
     }
 }
 
@@ -428,8 +472,12 @@ mod tests {
         .expect("the macro arguments parse");
 
         assert_eq!(
-            arguments.named_path("behavior").map(format_path).as_deref(),
-            Some("MissedTickBehavior::Delay")
+            arguments
+                .named_paths("behavior")
+                .into_iter()
+                .map(format_path)
+                .collect::<Vec<String>>(),
+            vec!["MissedTickBehavior::Delay".to_string()]
         );
     }
 
@@ -447,20 +495,67 @@ mod tests {
     }
 
     #[test]
-    fn named_path_ignores_an_argument_written_as_another_expression() {
-        assert!(
-            parsed(&parse_quote!(#[infers_authenticated_user(user_model = "User")]))
-                .named_path("user_model")
-                .is_none()
+    fn named_paths_reach_every_path_of_a_list_nested_in_a_group() {
+        assert_eq!(
+            parsed(&parse_quote!(
+                #[client(code(routes = [Callback, routes::Landing], uris = ["https://x"]))]
+            ))
+            .named_paths("routes")
+            .into_iter()
+            .map(format_path)
+            .collect::<Vec<String>>(),
+            vec!["Callback".to_string(), "routes::Landing".to_string()]
         );
     }
 
     #[test]
-    fn named_path_reports_no_path_for_an_absent_argument() {
+    fn named_paths_ignore_an_argument_written_as_another_expression() {
+        assert!(
+            parsed(&parse_quote!(#[infers_authenticated_user(user_model = "User")]))
+                .named_paths("user_model")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn named_paths_ignore_a_call_of_a_computed_function() {
+        assert!(
+            parsed(&parse_quote!(#[admits_oauth_client(authentication = (method)(keys))]))
+                .named_paths("authentication")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn named_paths_report_no_path_for_an_absent_argument() {
         assert!(
             parsed(&parse_quote!(#[infers_authenticated_user]))
-                .named_path("user_model")
-                .is_none()
+                .named_paths("user_model")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn named_paths_reach_the_variants_nested_in_groups_and_variant_calls() {
+        assert_eq!(
+            parsed(&parse_quote!(
+                #[client(
+                    authentication = Auth::Jwt(keys = Keys::Published(signing = Algorithm::Es256)),
+                    code(signing = Algorithm::Rs256, label = "signing"),
+                    signing = Algorithm::Es384(),
+                    other = (signing)(Algorithm::Ps256),
+                    flag
+                )]
+            ))
+            .named_paths("signing")
+            .into_iter()
+            .map(format_path)
+            .collect::<Vec<String>>(),
+            vec![
+                "Algorithm::Es256".to_string(),
+                "Algorithm::Es384".to_string(),
+                "Algorithm::Rs256".to_string(),
+            ]
         );
     }
 
@@ -471,9 +566,9 @@ mod tests {
     }
 
     #[derive(Debug, PartialEq, Eq)]
-    struct ReadKeyword {
+    struct ReadVariant {
         introspection: bool,
-        keyword: String,
+        variant: String,
     }
 
     fn read_group(arguments: &AttributeArgs) -> Result<Option<ReadGroup>, AttributeArgumentsError> {
@@ -487,14 +582,14 @@ mod tests {
         })
     }
 
-    fn read_keyword(
+    fn read_variant(
         arguments: &AttributeArgs,
-    ) -> Result<Option<ReadKeyword>, AttributeArgumentsError> {
+    ) -> Result<Option<ReadVariant>, AttributeArgumentsError> {
         arguments.interpret(|reader| {
-            reader.take_keyword("authentication", |keyword, arguments| {
-                Ok(ReadKeyword {
+            reader.take_variant("authentication", |variant, arguments| {
+                Ok(ReadVariant {
                     introspection: arguments.take_flag("introspection"),
-                    keyword: keyword.to_string(),
+                    variant: format_path(variant),
                 })
             })
         })
@@ -587,6 +682,15 @@ mod tests {
     }
 
     #[test]
+    fn leaves_a_call_of_a_computed_function_out_of_a_group() {
+        assert!(matches!(
+            read_group(&parsed(&parse_quote!(#[client((authorization_code)())]))),
+            Err(AttributeArgumentsError::UnrecognizedArgument { argument, attribute_path })
+                if argument == "(authorization_code) ()" && attribute_path == "client"
+        ));
+    }
+
+    #[test]
     fn an_absent_group_reads_as_none() {
         assert_eq!(
             read_group(&parsed(&parse_quote!(#[client]))).expect("the absent group reads"),
@@ -651,115 +755,91 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_named_argument_repeated_inside_a_keyword() {
-        let error = read_keyword(&parsed(
-            &parse_quote!(#[client(authentication = private_key_jwt(jwks_uri = "a", jwks_uri = "b"))]),
-        ))
+    fn rejects_a_named_argument_repeated_inside_a_variant() {
+        let error = read_variant(&parsed(&parse_quote!(
+            #[client(authentication = Auth::PrivateKeyJwt(jwks_uri = "a", jwks_uri = "b"))]
+        )))
         .expect_err("a repeated argument is ambiguous");
 
         assert!(matches!(
             error,
             AttributeArgumentsError::DuplicateNamedArgument { attribute_path, key }
-                if attribute_path == "client::private_key_jwt" && key == "jwks_uri"
+                if attribute_path == "client::authentication" && key == "jwks_uri"
         ));
     }
 
     #[test]
-    fn reads_a_bare_keyword() {
+    fn reads_a_unit_variant() {
         assert_eq!(
-            read_keyword(&parsed(&parse_quote!(#[client(authentication = none)])))
-                .expect("the keyword reads"),
-            Some(ReadKeyword {
-                introspection: false,
-                keyword: "none".to_string(),
-            })
-        );
-    }
-
-    #[test]
-    fn reads_a_keyword_with_arguments() {
-        assert_eq!(
-            read_keyword(&parsed(
-                &parse_quote!(#[client(authentication = private_key_jwt(introspection))])
+            read_variant(&parsed(
+                &parse_quote!(#[client(authentication = Auth::None)])
             ))
-            .expect("the keyword reads"),
-            Some(ReadKeyword {
-                introspection: true,
-                keyword: "private_key_jwt".to_string(),
+            .expect("the variant reads"),
+            Some(ReadVariant {
+                introspection: false,
+                variant: "Auth::None".to_string(),
             })
         );
     }
 
     #[test]
-    fn an_absent_keyword_reads_as_none() {
+    fn reads_a_variant_with_arguments() {
         assert_eq!(
-            read_keyword(&parsed(&parse_quote!(#[client]))).expect("the absent keyword reads"),
+            read_variant(&parsed(
+                &parse_quote!(#[client(authentication = Auth::PrivateKeyJwt(introspection))])
+            ))
+            .expect("the variant reads"),
+            Some(ReadVariant {
+                introspection: true,
+                variant: "Auth::PrivateKeyJwt".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn an_absent_variant_reads_as_none() {
+        assert_eq!(
+            read_variant(&parsed(&parse_quote!(#[client]))).expect("the absent variant reads"),
             None
         );
     }
 
     #[test]
-    fn rejects_a_keyword_written_as_a_qualified_path() {
-        let error = read_keyword(&parsed(
-            &parse_quote!(#[client(authentication = auth::none)]),
+    fn rejects_a_variant_call_of_an_expression() {
+        let error = read_variant(&parsed(
+            &parse_quote!(#[client(authentication = (Auth::PrivateKeyJwt)(introspection))]),
         ))
-        .expect_err("a qualified path is not a keyword");
+        .expect_err("a call of a parenthesized expression is not a variant");
 
         assert!(matches!(
             error,
             AttributeArgumentsError::UnexpectedArgument { expected, key, .. }
-                if expected == "keyword" && key == "authentication"
+                if expected == "enum variant" && key == "authentication"
         ));
     }
 
     #[test]
-    fn rejects_a_keyword_call_of_a_qualified_path() {
-        let error = read_keyword(&parsed(
-            &parse_quote!(#[client(authentication = auth::private_key_jwt(introspection))]),
-        ))
-        .expect_err("a qualified call is not a keyword");
+    fn rejects_a_variant_written_as_a_literal() {
+        let error = read_variant(&parsed(&parse_quote!(#[client(authentication = "none")])))
+            .expect_err("a string literal is not a variant");
 
         assert!(matches!(
             error,
-            AttributeArgumentsError::UnexpectedArgument { expected, .. } if expected == "keyword"
+            AttributeArgumentsError::UnexpectedArgument { expected, .. } if expected == "enum variant"
         ));
     }
 
     #[test]
-    fn rejects_a_keyword_call_of_an_expression() {
-        let error = read_keyword(&parsed(
-            &parse_quote!(#[client(authentication = (private_key_jwt)(introspection))]),
+    fn reports_a_leftover_argument_of_a_variant_under_its_key() {
+        let error = read_variant(&parsed(
+            &parse_quote!(#[client(authentication = Auth::None(scopes = ["openid"]))]),
         ))
-        .expect_err("a call of a parenthesized expression is not a keyword");
-
-        assert!(matches!(
-            error,
-            AttributeArgumentsError::UnexpectedArgument { expected, .. } if expected == "keyword"
-        ));
-    }
-
-    #[test]
-    fn rejects_a_keyword_written_as_a_literal() {
-        let error = read_keyword(&parsed(&parse_quote!(#[client(authentication = "none")])))
-            .expect_err("a string literal is not a keyword");
-
-        assert!(matches!(
-            error,
-            AttributeArgumentsError::UnexpectedArgument { expected, .. } if expected == "keyword"
-        ));
-    }
-
-    #[test]
-    fn reports_a_leftover_argument_of_a_keyword_under_its_path() {
-        let error = read_keyword(&parsed(
-            &parse_quote!(#[client(authentication = none(scopes = ["openid"]))]),
-        ))
-        .expect_err("the keyword does not accept the argument");
+        .expect_err("the variant does not accept the argument");
 
         assert!(matches!(
             error,
             AttributeArgumentsError::UnrecognizedArgument { argument, attribute_path }
-                if argument == "scopes" && attribute_path == "client::none"
+                if argument == "scopes" && attribute_path == "client::authentication"
         ));
     }
 

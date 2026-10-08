@@ -1,6 +1,0 @@
-mod jwks_secret_storage_uri_parses_a_file_path;
-mod jwks_secret_storage_uri_parses_the_memory_scheme;
-mod jwks_secret_storage_uri_rejects_a_malformed_storage_uri;
-mod jwks_secret_storage_uri_rejects_a_postgres_storage;
-mod resolve_selects_file_storage;
-mod resolve_selects_memory_storage;

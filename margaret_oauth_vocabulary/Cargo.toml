@@ -11,9 +11,12 @@ publish.workspace = true
 autotests = false
 
 [dependencies]
+aws-lc-rs = { workspace = true }
+base64ct = { workspace = true, features = ["alloc"] }
 form_urlencoded = { workspace = true }
 headers = { workspace = true }
 margaret_registered_claims = { workspace = true }
+margaret_token_digest = { workspace = true }
 oauth2 = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

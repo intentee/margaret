@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
-use margaret_https_url::https_url_error::HttpsUrlError;
+use margaret_https_url::https_url_rejection::HttpsUrlRejection;
 
 use crate::metadata_endpoint::MetadataEndpoint;
 
@@ -10,7 +10,7 @@ use crate::metadata_endpoint::MetadataEndpoint;
 pub enum ProviderMetadataRejection {
     Endpoint {
         endpoint: MetadataEndpoint,
-        source: HttpsUrlError,
+        rejection: HttpsUrlRejection,
     },
     IssuerMismatch {
         expected: &'static str,
@@ -24,9 +24,13 @@ pub enum ProviderMetadataRejection {
 impl Display for ProviderMetadataRejection {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         match self {
-            Self::Endpoint { endpoint, source } => {
-                write!(formatter, "the provider {endpoint} is rejected: {source}")
-            }
+            Self::Endpoint {
+                endpoint,
+                rejection,
+            } => write!(
+                formatter,
+                "the provider {endpoint} is rejected: {rejection}"
+            ),
             Self::IssuerMismatch { expected, found } => write!(
                 formatter,
                 "the provider metadata names the issuer '{found}' instead of '{expected}'"
@@ -40,7 +44,7 @@ impl Display for ProviderMetadataRejection {
 
 #[cfg(test)]
 mod tests {
-    use margaret_https_url::https_url_error::HttpsUrlError;
+    use margaret_https_url::https_url_rejection::HttpsUrlRejection;
 
     use super::ProviderMetadataRejection;
     use crate::metadata_endpoint::MetadataEndpoint;
@@ -50,7 +54,7 @@ mod tests {
         let described = [
             ProviderMetadataRejection::Endpoint {
                 endpoint: MetadataEndpoint::TokenEndpoint,
-                source: HttpsUrlError::NotHttps {
+                rejection: HttpsUrlRejection::NotHttps {
                     scheme: "http".to_string(),
                 },
             },

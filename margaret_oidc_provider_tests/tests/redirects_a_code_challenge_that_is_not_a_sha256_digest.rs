@@ -28,6 +28,10 @@ async fn redirects_a_code_challenge_that_is_not_a_sha256_digest() {
     let redirection = Redirection::of(&response);
 
     assert_eq!(redirection.parameter("error"), "invalid_request");
+    assert_eq!(
+        redirection.parameter("error_description"),
+        "the code challenge is not a sha-256 digest"
+    );
     assert_eq!(redirection.parameter("iss"), "https://localhost");
     assert_eq!(redirection.parameter("state"), "af0ifjsldkj");
 

@@ -330,6 +330,11 @@ pub enum RequestBindingError {
     MixedBearerTokenCarriers { subject: String },
 
     #[error(
+        "argument #{parameter} of {subject} addresses its bearer token in a way its type cannot verify: a VerifiedJwt names `issuer = <tag>` or `resource = <tag>`, an IntrospectedToken names `client = <tag>`"
+    )]
+    MismatchedBearerTokenAddressee { subject: String, parameter: String },
+
+    #[error(
         "argument #{parameter} of {subject} introspects the bearer token with the oauth client '{client}', which the container does not plan"
     )]
     UnplannedOAuthClient {

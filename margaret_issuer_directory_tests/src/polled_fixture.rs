@@ -54,6 +54,6 @@ impl PolledFixture {
 
     #[must_use]
     pub fn trusted(&self, trust: TokenTrust) -> TrustedIssuer {
-        TrustedIssuer::create(Arc::clone(&self.key_set), trust)
+        TrustedIssuer::polled(Arc::clone(&self.key_set), trust)
     }
 }

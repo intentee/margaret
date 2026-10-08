@@ -3,7 +3,6 @@ use std::io;
 use std::path::PathBuf;
 
 use thiserror::Error;
-use toml::de;
 
 use margaret_accepted_clients_codegen::accepted_clients_codegen_error::AcceptedClientsCodegenError;
 use margaret_asset_bag_codegen::asset_bag_codegen_error::AssetBagCodegenError;
@@ -70,12 +69,12 @@ pub enum CodegenError {
     },
 
     #[error(
-        "a constructor injects the asset responder, but no esbuild metafile was found at the workspace root"
+        "a constructor injects the asset responder, but no esbuild metafile was found in the manifest directory"
     )]
     AssetResponderWithoutMetafile,
 
     #[error(
-        "a module imports the asset macro, but no esbuild metafile was found at the workspace root"
+        "a module imports the asset macro, but no esbuild metafile was found in the manifest directory"
     )]
     AssetMacroWithoutMetafile,
 
@@ -155,18 +154,6 @@ pub enum CodegenError {
     ManifestDirectory {
         #[source]
         source: VarError,
-    },
-
-    #[error("no Cargo workspace root was found above the manifest directory '{start}'")]
-    WorkspaceRootNotFound { start: PathBuf },
-
-    #[error("failed to read the workspace manifest '{path}': {source}")]
-    ReadWorkspaceManifest { path: PathBuf, source: io::Error },
-
-    #[error("failed to parse the workspace manifest '{path}': {source}")]
-    ParseWorkspaceManifest {
-        path: PathBuf,
-        source: Box<de::Error>,
     },
 
     #[error("failed to create the generated directory '{path}': {source}")]

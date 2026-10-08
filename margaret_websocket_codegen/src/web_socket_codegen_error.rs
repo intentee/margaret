@@ -2,7 +2,6 @@ use thiserror::Error;
 
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
-use margaret_container::container_error::ContainerError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 
@@ -12,12 +11,6 @@ pub enum WebSocketCodegenError {
     AttributeArguments {
         #[from]
         source: AttributeArgumentsError,
-    },
-
-    #[error(transparent)]
-    Container {
-        #[from]
-        source: ContainerError,
     },
 
     #[error("failed to read a websocket attribute: {source}")]
@@ -53,11 +46,15 @@ pub enum WebSocketCodegenError {
     #[error("'{message}' has method '{method}', which is not a snake_case identifier")]
     InvalidMethod { message: String, method: String },
 
-    #[error("request '{message}' must declare 'response = single' or 'response = stream'")]
+    #[error(
+        "request '{message}' must declare its response as a variant of margaret::framework::websocket::web_socket_response::WebSocketResponse"
+    )]
     MissingCardinality { message: String },
 
-    #[error("request '{message}' has an invalid cardinality; expected 'single' or 'stream'")]
-    InvalidCardinality { message: String },
+    #[error(
+        "request '{message}' declares the response '{written}', which is not a variant of margaret::framework::websocket::web_socket_response::WebSocketResponse"
+    )]
+    UnknownCardinality { message: String, written: String },
 
     #[error("'{message}' declares a response cardinality but is not a request")]
     CardinalityOnNonRequest { message: String },

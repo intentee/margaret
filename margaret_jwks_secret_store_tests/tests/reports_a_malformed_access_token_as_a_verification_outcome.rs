@@ -7,10 +7,11 @@ use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_signer_tests::unix_time::unix_time;
 
-#[test]
-fn reports_a_malformed_access_token_as_a_verification_outcome() {
+#[tokio::test]
+async fn reports_a_malformed_access_token_as_a_verification_outcome() {
     assert!(matches!(
         rolled_store(fresh_p256_secret())
+            .await
             .verify_access_token::<Value>("not-a-valid-jwt", unix_time(500)),
         JwksSecretVerificationResult::Rejected(JwtRejection::Jws(JwsRejection::NotCompactJws))
     ));

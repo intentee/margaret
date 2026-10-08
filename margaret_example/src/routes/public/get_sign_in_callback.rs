@@ -11,6 +11,7 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::oidc_sign_in::sign_in_completion::SignInCompletion;
 use margaret::framework::oidc_sign_in::signed_in::SignedIn;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::auth::sign_in_claims::SignInClaims;
 use crate::forms::session_cookie::SessionCookie;
@@ -19,12 +20,7 @@ use crate::margaret::routes::Routes;
 use crate::stores::user_store::UserStore;
 
 #[singleton]
-#[responds_to_http(
-    method = "get",
-    name = "get_sign_in_callback",
-    path = "/sign-in/callback",
-    server = "public"
-)]
+#[responds_to_http(method = RouteMethod::Get, path = "/sign-in/callback", server = "public")]
 pub struct GetSignInCallback {
     sign_in_flow: Arc<SignInFlow>,
     users: Arc<UserStore>,

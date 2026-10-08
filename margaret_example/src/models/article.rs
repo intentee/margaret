@@ -4,6 +4,7 @@ use rust_decimal::Decimal;
 use uuid::Uuid;
 
 use margaret::framework::macros::model;
+use margaret::framework::model::on_delete::OnDelete;
 
 use crate::models::article_status::ArticleStatus;
 use crate::models::author::Author;
@@ -31,7 +32,7 @@ pub struct Article {
     #[index]
     pub created_at: DateTime<Utc>,
     #[column]
-    #[foreign_key(on_delete = cascade)]
+    #[foreign_key(on_delete = OnDelete::Cascade)]
     #[index]
     pub author: Author,
 }

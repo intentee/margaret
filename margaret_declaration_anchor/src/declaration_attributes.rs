@@ -1,9 +1,9 @@
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 
 pub(crate) const DECLARATION_ATTRIBUTES: [FrameworkAttribute; 5] = [
-    FrameworkAttribute::AcceptsOAuthClient,
+    FrameworkAttribute::ActsAsOAuthClient,
+    FrameworkAttribute::AdmitsOAuthClient,
+    FrameworkAttribute::IssuesResourceTokens,
     FrameworkAttribute::IssuesTokens,
-    FrameworkAttribute::OAuthClient,
-    FrameworkAttribute::ProvidesJwksEndpoint,
-    FrameworkAttribute::TrustsOidcIssuer,
+    FrameworkAttribute::VerifiesTokensFromIssuer,
 ];

@@ -9,7 +9,6 @@ use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 use crate::assets_directory_name::ASSETS_DIRECTORY_NAME;
 use crate::build::build;
 use crate::codegen_error::CodegenError;
-use crate::workspace_root::workspace_root;
 
 fn read_metafile(metafile_path: &Path) -> Result<Option<String>, CodegenError> {
     match fs::read_to_string(metafile_path) {
@@ -25,9 +24,8 @@ fn read_metafile(metafile_path: &Path) -> Result<Option<String>, CodegenError> {
 fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
     let host_source = manifest_directory.join("src");
     let generated_directory = manifest_directory.join(UMBRELLA_MODULE_NAME);
-    let location = workspace_root(manifest_directory)?;
-    let metafile_path = location.root().join("esbuild-meta.json");
-    let assets_directory = location.root().join(ASSETS_DIRECTORY_NAME);
+    let metafile_path = manifest_directory.join("esbuild-meta.json");
+    let assets_directory = manifest_directory.join(ASSETS_DIRECTORY_NAME);
     let crate_root = CrateRoot::new("crate", host_source);
 
     fs::create_dir_all(&generated_directory).map_err(|source| CodegenError::CreateDirectory {
@@ -37,13 +35,8 @@ fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
 
     let metafile_contents = read_metafile(&metafile_path)?;
 
-    build(
-        &crate_root,
-        metafile_contents.as_deref(),
-        &assets_directory,
-        location.embed_relative(),
-    )?
-    .write_to(&generated_directory)?;
+    build(&crate_root, metafile_contents.as_deref(), &assets_directory)?
+        .write_to(&generated_directory)?;
 
     println!(
         "cargo:rerun-if-changed={}",
@@ -82,21 +75,20 @@ mod tests {
 pub mod margaret;
 
 #[singleton]
+#[console_command(name = \"inspect\")]
 struct Config;
 
 impl Config {
     #[constructor]
     fn create() -> anyhow::Result<Self> {}
+
+    #[process]
+    fn run(&self) -> anyhow::Result<CommandOutcome> {}
 }
 ";
 
     fn host_crate(lib_source: &str) -> SourceCrate {
-        let host = SourceCrate::new(lib_source);
-
-        fs::write(host.root().join("Cargo.toml"), "[workspace]\n")
-            .expect("the workspace manifest is written");
-
-        host
+        SourceCrate::new(lib_source)
     }
 
     fn read_generated(manifest_directory: &Path, name: &str) -> String {
@@ -131,7 +123,16 @@ pub mod margaret;
 use crate::margaret::asset_bag::asset;
 
 #[singleton]
+#[console_command(name = \"inspect\")]
 struct Config;
+
+impl Config {
+    #[constructor]
+    fn create() -> anyhow::Result<Self> {}
+
+    #[process]
+    fn run(&self) -> anyhow::Result<CommandOutcome> {}
+}
 ";
 
     #[test]
@@ -154,6 +155,7 @@ struct Config;
 pub mod margaret;
 
 #[singleton]
+#[console_command(name = \"assets\")]
 struct AssetRoute {
     responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
 }
@@ -163,6 +165,9 @@ impl AssetRoute {
     fn create(
         responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
     ) -> anyhow::Result<Self> {}
+
+    #[process]
+    fn run(&self) -> anyhow::Result<CommandOutcome> {}
 }
 ";
 
@@ -206,20 +211,6 @@ impl AssetRoute {
             error
                 .to_string()
                 .contains("failed to read the esbuild metafile")
-        );
-    }
-
-    #[test]
-    fn reports_a_manifest_without_a_workspace_root() {
-        let host = SourceCrate::new("");
-
-        let error = generate_into(host.root())
-            .expect_err("a manifest without a workspace root is reported");
-
-        assert!(
-            error
-                .to_string()
-                .contains("no Cargo workspace root was found")
         );
     }
 

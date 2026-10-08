@@ -1,36 +1,59 @@
+use quote::ToTokens;
+use syn::Path;
+
 use margaret_attribute_arguments::attribute_arguments_reader::AttributeArgumentsReader;
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
+use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 use margaret_attributes::tag::Tag;
 use margaret_declaration_anchor::declaration_anchor::declaration_anchor;
 use margaret_https_url::https_url::HttpsUrl;
+use margaret_https_url::https_url_parsing::HttpsUrlParsing;
+use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 use margaret_registered_claims::audience::Audience;
+use margaret_registered_claims::audience_parsing::AudienceParsing;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
+use crate::declared_issuer_keys::DeclaredIssuerKeys;
 use crate::declared_trust::DeclaredTrust;
-use crate::trust_attribute::TrustAttribute;
+use crate::issuer_key_sources::ISSUER_KEY_SOURCES;
 use crate::trust_source::TrustSource;
 use crate::trusted_issuer_codegen_error::TrustedIssuerCodegenError;
 
 fn trust_source(
+    index: &AttributeIndex,
+    anchor: &IndexedItem,
+    variant: &Path,
     reader: &mut AttributeArgumentsReader,
-    attribute: TrustAttribute,
-    anchor: &str,
 ) -> Result<TrustSource, TrustedIssuerCodegenError> {
-    match attribute {
-        TrustAttribute::ProvidesJwksEndpoint => Ok(TrustSource::JwksEndpoint {
-            jwks_uri: reader
-                .take_string("jwks_uri")?
-                .ok_or_else(|| TrustedIssuerCodegenError::MissingJwksUri {
-                    anchor: anchor.to_string(),
-                })?
-                .parse::<HttpsUrl>()
-                .map_err(|source| TrustedIssuerCodegenError::MalformedJwksUri {
-                    anchor: anchor.to_string(),
-                    source,
-                })?,
+    let path = anchor.canonical_path().to_string();
+
+    match index
+        .resolve_item_path(anchor, variant)
+        .as_ref()
+        .and_then(|resolved| ISSUER_KEY_SOURCES.variant(resolved))
+    {
+        None => Err(TrustedIssuerCodegenError::UnknownIssuerKeys {
+            anchor: path,
+            written: variant.to_token_stream().to_string(),
         }),
-        TrustAttribute::TrustsOidcIssuer => Ok(TrustSource::Discovery),
+        Some(DeclaredIssuerKeys::Discovered) => Ok(TrustSource::Discovery),
+        Some(DeclaredIssuerKeys::Published) => Ok(TrustSource::JwksEndpoint {
+            jwks_uri: match HttpsUrl::parse(&reader.take_string("jwks_uri")?.ok_or_else(|| {
+                TrustedIssuerCodegenError::MissingJwksUri {
+                    anchor: path.clone(),
+                }
+            })?) {
+                HttpsUrlParsing::Accepted(jwks_uri) => jwks_uri,
+                HttpsUrlParsing::Rejected(rejection) => {
+                    return Err(TrustedIssuerCodegenError::MalformedJwksUri {
+                        anchor: path,
+                        rejection,
+                    });
+                }
+            },
+        }),
     }
 }
 
@@ -44,54 +67,54 @@ impl<'index> TrustDeclaration<'index> {
     pub(crate) fn read(
         index: &'index AttributeIndex,
         matched: &MatchedAttribute<'index>,
-        attribute: TrustAttribute,
     ) -> Result<Self, TrustedIssuerCodegenError> {
-        let framework_attribute = attribute.framework_attribute();
-        let anchor = declaration_anchor(index, matched, framework_attribute)?.item;
+        let anchor =
+            declaration_anchor(index, matched, FrameworkAttribute::VerifiesTokensFromIssuer)?.item;
         let path = anchor.canonical_path().to_string();
-        let attribute_name = framework_attribute.name();
 
         matched.args()?.interpret(|reader| {
             let tag = reader
                 .take_positional_path()
                 .ok_or_else(|| TrustedIssuerCodegenError::MissingTag {
                     anchor: path.clone(),
-                    attribute: attribute_name,
                 })
                 .and_then(|tag| {
                     Tag::from_path(&tag).ok_or_else(|| TrustedIssuerCodegenError::MalformedTag {
                         anchor: path.clone(),
-                        attribute: attribute_name,
                     })
                 })?;
-            let audience = reader
-                .take_string("audience")?
-                .ok_or_else(|| TrustedIssuerCodegenError::MissingAudience {
+            let AudienceParsing::Accepted(audience) =
+                Audience::parse(&reader.take_string("audience")?.ok_or_else(|| {
+                    TrustedIssuerCodegenError::MissingAudience {
+                        anchor: path.clone(),
+                    }
+                })?)
+            else {
+                return Err(TrustedIssuerCodegenError::EmptyAudience {
                     anchor: path.clone(),
-                    attribute: attribute_name,
-                })?
-                .parse::<Audience>()
-                .map_err(|source| TrustedIssuerCodegenError::MalformedAudience {
-                    anchor: path.clone(),
-                    attribute: attribute_name,
-                    source,
-                })?;
+                });
+            };
             let issuer = reader
                 .take_string("issuer")?
                 .ok_or_else(|| TrustedIssuerCodegenError::MissingIssuer {
                     anchor: path.clone(),
-                    attribute: attribute_name,
                 })?
                 .parse::<IssuerIdentifier>()
                 .map_err(|source| TrustedIssuerCodegenError::MalformedIssuer {
                     anchor: path.clone(),
-                    attribute: attribute_name,
                     source,
+                })?;
+            let source = reader
+                .take_variant(ItemNamingArgument::Keys.key(), |variant, keys| {
+                    trust_source(index, anchor, variant, keys)
+                })?
+                .ok_or_else(|| TrustedIssuerCodegenError::MissingIssuerKeys {
+                    anchor: path.clone(),
                 })?;
 
             Ok(Self {
                 issuer,
-                source: trust_source(reader, attribute, &path)?,
+                source,
                 trust: DeclaredTrust {
                     anchor,
                     audience,
@@ -124,10 +147,10 @@ mod tests {
     fn rejects_a_trust_without_a_tag() {
         assert_eq!(
             rejection(
-                "#[trusts_oidc_issuer(audience = \"a\", issuer = \"https://issuer.example\")]\npub struct Partner;\n"
+                "#[verifies_tokens_from_issuer(audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             )
             .to_string(),
-            "#[trusts_oidc_issuer] on 'crate::Partner' does not name a tag"
+            "#[verifies_tokens_from_issuer] on 'crate::Partner' does not name a tag"
         );
     }
 
@@ -135,10 +158,10 @@ mod tests {
     fn rejects_a_tag_that_is_not_a_plain_name() {
         assert_eq!(
             rejection(
-                "#[trusts_oidc_issuer(partner::tag, audience = \"a\", issuer = \"https://issuer.example\")]\npub struct Partner;\n"
+                "#[verifies_tokens_from_issuer(partner::tag, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             )
             .to_string(),
-            "#[trusts_oidc_issuer] on 'crate::Partner' names a tag that is not a single plain name"
+            "#[verifies_tokens_from_issuer] on 'crate::Partner' names a tag that is not a single plain name"
         );
     }
 
@@ -146,10 +169,10 @@ mod tests {
     fn rejects_a_trust_without_an_audience() {
         assert_eq!(
             rejection(
-                "#[trusts_oidc_issuer(partner, issuer = \"https://issuer.example\")]\npub struct Partner;\n"
+                "#[verifies_tokens_from_issuer(partner, issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             )
             .to_string(),
-            "#[trusts_oidc_issuer] on 'crate::Partner' does not declare the audience of the trusted tokens"
+            "#[verifies_tokens_from_issuer] on 'crate::Partner' does not declare the audience of the verified tokens"
         );
     }
 
@@ -157,9 +180,9 @@ mod tests {
     fn rejects_an_empty_audience() {
         assert!(matches!(
             rejection(
-                "#[trusts_oidc_issuer(partner, audience = \"\", issuer = \"https://issuer.example\")]\npub struct Partner;\n"
+                "#[verifies_tokens_from_issuer(partner, audience = \"\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             ),
-            TrustedIssuerCodegenError::MalformedAudience { anchor, attribute: "trusts_oidc_issuer", .. }
+            TrustedIssuerCodegenError::EmptyAudience { anchor }
                 if anchor == "crate::Partner"
         ));
     }
@@ -167,9 +190,9 @@ mod tests {
     #[test]
     fn rejects_a_trust_without_an_issuer() {
         assert_eq!(
-            rejection("#[trusts_oidc_issuer(partner, audience = \"a\")]\npub struct Partner;\n")
+            rejection("#[verifies_tokens_from_issuer(partner, audience = \"a\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n")
                 .to_string(),
-            "#[trusts_oidc_issuer] on 'crate::Partner' does not declare the issuer of the trusted tokens"
+            "#[verifies_tokens_from_issuer] on 'crate::Partner' does not declare the issuer of the verified tokens"
         );
     }
 
@@ -177,21 +200,43 @@ mod tests {
     fn rejects_an_issuer_over_plain_http() {
         assert!(
             rejection(
-                "#[provides_jwks_endpoint(ci, audience = \"a\", issuer = \"http://ci.example\", jwks_uri = \"https://ci.example/jwks\")]\npub struct Ci;\n"
+                "#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"http://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://ci.example/jwks\"))]\npub struct Ci;\n"
             )
             .to_string()
-            .starts_with("the issuer #[provides_jwks_endpoint] declares on 'crate::Ci' is malformed: ")
+            .starts_with("the issuer #[verifies_tokens_from_issuer] declares on 'crate::Ci' is malformed: ")
         );
+    }
+
+    #[test]
+    fn rejects_a_trust_without_its_keys() {
+        assert!(matches!(
+            rejection(
+                "#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\")]\npub struct Partner;\n"
+            ),
+            TrustedIssuerCodegenError::MissingIssuerKeys { anchor } if anchor == "crate::Partner"
+        ));
+    }
+
+    #[test]
+    fn rejects_keys_that_are_not_a_variant() {
+        assert!(matches!(
+            rejection(
+                "#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Rotated)]\npub struct Partner;\n"
+            ),
+            TrustedIssuerCodegenError::UnknownIssuerKeys { anchor, written }
+                if anchor == "crate::Partner"
+                    && written == "margaret :: framework :: trusted_issuer :: issuer_keys :: IssuerKeys :: Rotated"
+        ));
     }
 
     #[test]
     fn rejects_a_jwks_endpoint_trust_without_a_jwks_uri() {
         assert_eq!(
             rejection(
-                "#[provides_jwks_endpoint(ci, audience = \"a\", issuer = \"https://ci.example\")]\npub struct Ci;\n"
+                "#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published)]\npub struct Ci;\n"
             )
             .to_string(),
-            "#[provides_jwks_endpoint] on 'crate::Ci' does not declare the jwks_uri of the issuer"
+            "#[verifies_tokens_from_issuer] on 'crate::Ci' publishes its keys without declaring their jwks_uri"
         );
     }
 
@@ -199,10 +244,10 @@ mod tests {
     fn rejects_a_plaintext_jwks_uri() {
         assert_eq!(
             rejection(
-                "#[provides_jwks_endpoint(ci, audience = \"a\", issuer = \"https://ci.example\", jwks_uri = \"http://ci.example/jwks\")]\npub struct Ci;\n"
+                "#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"http://ci.example/jwks\"))]\npub struct Ci;\n"
             )
             .to_string(),
-            "the jwks_uri #[provides_jwks_endpoint] declares on 'crate::Ci' is rejected: the url uses the 'http' scheme instead of https"
+            "the jwks_uri #[verifies_tokens_from_issuer] declares on 'crate::Ci' is rejected: the url uses the 'http' scheme instead of https"
         );
     }
 
@@ -210,7 +255,7 @@ mod tests {
     fn rejects_a_jwks_uri_on_a_discovered_trust() {
         assert!(matches!(
             rejection(
-                "#[trusts_oidc_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\", jwks_uri = \"https://issuer.example/jwks\")]\npub struct Partner;\n"
+                "#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\", jwks_uri = \"https://issuer.example/jwks\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnrecognizedArgument { argument, .. }
@@ -222,7 +267,7 @@ mod tests {
     fn rejects_an_audience_that_is_not_a_string() {
         assert!(matches!(
             rejection(
-                "#[trusts_oidc_issuer(partner, audience = api, issuer = \"https://issuer.example\")]\npub struct Partner;\n"
+                "#[verifies_tokens_from_issuer(partner, audience = api, issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnexpectedArgument { key, .. }
@@ -234,7 +279,7 @@ mod tests {
     fn rejects_an_issuer_that_is_not_a_string() {
         assert!(matches!(
             rejection(
-                "#[trusts_oidc_issuer(partner, audience = \"api\", issuer = 5)]\npub struct Partner;\n"
+                "#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = 5, keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnexpectedArgument { key, .. }
@@ -246,7 +291,7 @@ mod tests {
     fn rejects_a_jwks_uri_that_is_not_a_string() {
         assert!(matches!(
             rejection(
-                "#[provides_jwks_endpoint(ci, audience = \"a\", issuer = \"https://ci.example\", jwks_uri = jwks)]\npub struct Ci;\n"
+                "#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = jwks))]\npub struct Ci;\n"
             ),
             TrustedIssuerCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnexpectedArgument { key, .. }
@@ -258,7 +303,7 @@ mod tests {
     fn rejects_a_trust_anchored_by_a_singleton() {
         assert!(matches!(
             rejection(
-                "#[singleton]\n#[trusts_oidc_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\")]\npub struct Partner;\n"
+                "#[singleton]\n#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::Anchor(DeclarationAnchorError::DeclaredAsSingleton { path, .. })
                 if path == "crate::Partner"
@@ -268,10 +313,10 @@ mod tests {
     #[test]
     fn reports_unparseable_trust_arguments() {
         assert!(matches!(
-            rejection("#[provides_jwks_endpoint(= 5)]\npub struct Ci;\n"),
+            rejection("#[verifies_tokens_from_issuer(= 5, keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published)]\npub struct Ci;\n"),
             TrustedIssuerCodegenError::Index(AttributeError::Arguments(
                 AttributeArgumentsError::Malformed { attribute_path, .. }
-            )) if attribute_path == "provides_jwks_endpoint"
+            )) if attribute_path == "verifies_tokens_from_issuer"
         ));
     }
 }

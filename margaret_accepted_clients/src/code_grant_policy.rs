@@ -7,7 +7,6 @@ use crate::refresh_token_grant::RefreshTokenGrant;
 pub struct CodeGrantPolicy {
     pub consent: ConsentPolicy,
     pub id_token_signing: IdTokenSigning,
-    pub redirect_uris: &'static [&'static str],
     pub refresh: RefreshTokenGrant,
     pub scopes: &'static [&'static str],
 }

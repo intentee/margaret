@@ -18,6 +18,7 @@ use crate::jws_rejection::JwsRejection;
 use crate::jws_verification::JwsVerification;
 use crate::key_exclusion::KeyExclusion;
 use crate::key_id::KeyId;
+use crate::key_selection::KeySelection;
 use crate::key_set_assembly::KeySetAssembly;
 use crate::key_set_composition::KeySetComposition;
 use crate::key_set_document::KeySetDocument;
@@ -25,6 +26,7 @@ use crate::key_set_document_parsing::KeySetDocumentParsing;
 use crate::key_set_document_rejection::KeySetDocumentRejection;
 use crate::parameter_value::ParameterValue;
 use crate::published_jwk::PublishedJwk;
+use crate::selected_material::SelectedMaterial;
 use crate::signature_check::SignatureCheck;
 use crate::verification_key::VerificationKey;
 use crate::verification_material::VerificationMaterial;
@@ -158,7 +160,10 @@ impl VerificationKeySet {
                 return ControlFlow::Break(JwsRejection::UnsupportedAlgorithm { alg: alg.clone() });
             }
         };
-        let material = self.material_for(kid.as_ref(), algorithm)?;
+        let SelectedMaterial {
+            material,
+            selection,
+        } = self.material_for(kid.as_ref(), algorithm)?;
 
         match material.check(signing_input.as_bytes(), signature) {
             SignatureCheck::LengthMismatch { expected, found } => {
@@ -166,7 +171,11 @@ impl VerificationKeySet {
             }
             SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws { kid: kid.as_ref() }),
             SignatureCheck::Mismatch(source) => {
-                ControlFlow::Break(JwsRejection::SignatureMismatch { algorithm, source })
+                ControlFlow::Break(JwsRejection::SignatureMismatch {
+                    algorithm,
+                    selection,
+                    source,
+                })
             }
         }
     }
@@ -175,10 +184,15 @@ impl VerificationKeySet {
         &self,
         kid: Option<&KeyId>,
         algorithm: JwsAlgorithm,
-    ) -> ControlFlow<JwsRejection, &VerificationMaterial> {
+    ) -> ControlFlow<JwsRejection, SelectedMaterial<'_>> {
         match kid {
             Some(kid) => match self.identified.get(kid) {
-                Some(material) if material.admits(algorithm) => ControlFlow::Continue(material),
+                Some(material) if material.admits(algorithm) => {
+                    ControlFlow::Continue(SelectedMaterial {
+                        material,
+                        selection: KeySelection::ByKeyId,
+                    })
+                }
                 Some(material) => ControlFlow::Break(JwsRejection::AlgorithmMismatch {
                     key: material.algorithm(),
                     token: algorithm,
@@ -193,8 +207,12 @@ impl VerificationKeySet {
                 .collect::<Vec<&VerificationMaterial>>()
                 .as_slice()
             {
-                [material] => ControlFlow::Continue(*material),
-                candidates => ControlFlow::Break(JwsRejection::MissingKeyId {
+                [] => ControlFlow::Break(JwsRejection::NoKeyForAlgorithm { algorithm }),
+                [material] => ControlFlow::Continue(SelectedMaterial {
+                    material,
+                    selection: KeySelection::SoleKeyOfAlgorithm,
+                }),
+                candidates => ControlFlow::Break(JwsRejection::KeyIdRequired {
                     candidates: candidates.len(),
                 }),
             },

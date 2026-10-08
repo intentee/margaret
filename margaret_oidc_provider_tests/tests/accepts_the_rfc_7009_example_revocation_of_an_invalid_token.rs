@@ -1,4 +1,9 @@
+use std::sync::Arc;
+
+use margaret_accepted_clients::registered_code_grant::RegisteredCodeGrant;
 use margaret_accepted_clients_tests::asserting_client::AssertingClient;
+use margaret_accepted_clients_tests::fixture_client_assertions::FixtureClientAssertions;
+use margaret_oidc_provider_tests::fixture_authorization_grants::FixtureAuthorizationGrants;
 use margaret_oidc_provider_tests::fixture_clients::FixtureClients;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::rfc_example_client::RFC_EXAMPLE_CLIENT;
@@ -10,10 +15,16 @@ const REQUEST_BODY: &str = include_str!("../fixtures/rfc7009/section_2_1_request
 async fn accepts_the_rfc_7009_example_revocation_of_an_invalid_token() {
     let fixture = ProviderFixture::serving(
         FixtureClients {
-            asserting: vec![AssertingClient::holding_its_keys(
-                RFC_EXAMPLE_CLIENT,
-                RFC_EXAMPLE_PRIVILEGES,
-            )],
+            asserting: vec![
+                AssertingClient::holding_its_keys(
+                    RFC_EXAMPLE_CLIENT,
+                    RFC_EXAMPLE_PRIVILEGES,
+                    Arc::new(FixtureClientAssertions::default()),
+                    RegisteredCodeGrant::Withheld,
+                )
+                .await,
+            ],
+            grants: Arc::new(FixtureAuthorizationGrants::undisturbed()),
             public: Vec::new(),
         },
         Vec::new(),

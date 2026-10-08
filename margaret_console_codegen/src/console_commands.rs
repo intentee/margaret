@@ -4,50 +4,14 @@ use quote::format_ident;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
-use margaret_attributes::indexed_item::IndexedItem;
-use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::container_bindings::ContainerBindings;
-use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
-use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
-use margaret_injection_codegen::request_binding_marker::request_binding_marker;
-use margaret_serve_input_codegen::serve_input::ServeInput;
+use margaret_injection_codegen::runner_signature::RunnerSignature;
+use margaret_serve_input_codegen::has_spiffe_http_client::has_spiffe_http_client;
 
 use crate::console_codegen_error::ConsoleCodegenError;
 use crate::console_command::ConsoleCommand;
 use crate::console_command_arguments::ConsoleCommandArguments;
-
-fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, runner: &IndexedMethod) -> bool {
-    parameters(runner)
-        .iter()
-        .any(|view| is_cancellation_token(index, item, view.declared))
-}
-
-fn validate_runner(
-    index: &AttributeIndex,
-    item: &IndexedItem,
-    runner: &IndexedMethod,
-    command: &str,
-) -> Result<(), ConsoleCodegenError> {
-    for view in parameters(runner) {
-        if let Some(name) = request_binding_marker(view.attributes) {
-            return Err(ConsoleCodegenError::ConsoleCommandRunnerRequestBinding {
-                command: command.to_string(),
-                parameter: view.holder.to_string(),
-                marker: name.name().to_string(),
-            });
-        }
-
-        if !is_cancellation_token(index, item, view.declared) {
-            return Err(ConsoleCodegenError::ConsoleCommandRunnerArgument {
-                command: command.to_string(),
-                parameter: view.holder.to_string(),
-            });
-        }
-    }
-
-    Ok(())
-}
 
 pub(crate) fn console_commands(
     index: &AttributeIndex,
@@ -70,17 +34,36 @@ pub(crate) fn console_commands(
         let accessor = format_ident!("{}", identifier.field());
         let runner = process_method(item)?;
 
-        validate_runner(index, item, runner, &command)?;
+        let takes_token = match RunnerSignature::of(index, item, runner) {
+            RunnerSignature::Accepted { takes_token } => takes_token,
+            RunnerSignature::RejectedArgument { parameter } => {
+                return Err(ConsoleCodegenError::ConsoleCommandRunnerArgument {
+                    command,
+                    parameter: parameter.to_string(),
+                });
+            }
+            RunnerSignature::RejectedRequestBinding { marker, parameter } => {
+                return Err(ConsoleCodegenError::ConsoleCommandRunnerRequestBinding {
+                    command,
+                    parameter: parameter.to_string(),
+                    marker: marker.name().to_string(),
+                });
+            }
+        };
 
-        let provided = bindings.provider_serve_inputs(item.canonical_path())?;
-        let serve_inputs = provided.inputs.to_vec();
-        let serve_input_slots = provided.slots.to_vec();
+        let serve_inputs = bindings
+            .provider_serve_inputs(item.canonical_path())?
+            .to_vec();
+
+        if has_spiffe_http_client(serve_inputs.iter().map(|slotted| &slotted.input)) {
+            return Err(ConsoleCodegenError::ConsoleCommandInjectsSpiffeHttpClient { command });
+        }
 
         if serve_inputs
             .iter()
-            .any(|input| matches!(input, ServeInput::SpiffeHttpClient))
+            .any(|slotted| slotted.input.reads_server_origins())
         {
-            return Err(ConsoleCodegenError::ConsoleCommandInjectsSpiffeHttpClient { command });
+            return Err(ConsoleCodegenError::ConsoleCommandDependsOnRouteUrl { command });
         }
 
         let existing = commands.insert(
@@ -89,12 +72,11 @@ pub(crate) fn console_commands(
                 accessor,
                 serve_inputs,
                 command_path: command.clone(),
-                serve_input_slots,
                 construction_root: item.canonical_path().clone(),
                 description,
                 is_async: runner.signature().asyncness.is_some(),
                 name: name.clone(),
-                takes_token: runner_takes_token(index, item, runner),
+                takes_token,
             },
         );
 

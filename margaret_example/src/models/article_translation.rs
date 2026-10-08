@@ -1,6 +1,7 @@
 use uuid::Uuid;
 
 use margaret::framework::macros::model;
+use margaret::framework::model::on_delete::OnDelete;
 
 use crate::models::article::Article;
 
@@ -9,7 +10,7 @@ use crate::models::article::Article;
 #[foreign_key(
     columns = [article_id],
     references = Article,
-    on_delete = cascade
+    on_delete = OnDelete::Cascade
 )]
 #[derive(Clone)]
 pub struct ArticleTranslation {

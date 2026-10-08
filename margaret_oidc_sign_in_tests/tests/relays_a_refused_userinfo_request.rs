@@ -9,10 +9,10 @@ use margaret_authorization_server_client_tests::secret_basic_authentication::sec
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_jwks_secret_store_tests::fixture_roller::fixture_roller;
-use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
 use margaret_oidc_sign_in::signed_in::SignedIn;
 use margaret_oidc_sign_in::userinfo_fetch::UserinfoFetch;
 use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
+use margaret_oidc_sign_in_tests::fixture_sign_in_flow::fixture_sign_in_flow;
 use margaret_route_method::route_method::RouteMethod;
 
 #[tokio::test]
@@ -29,9 +29,9 @@ async fn relays_a_refused_userinfo_request() {
         ),
     )
     .await;
-    let flow = SignInFlow::create(
+    let flow = fixture_sign_in_flow(
         Arc::new(server.client(secret_basic_authentication())),
-        fixture_roller(),
+        fixture_roller().await,
     );
 
     let fetched = flow

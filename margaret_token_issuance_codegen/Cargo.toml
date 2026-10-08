@@ -17,6 +17,7 @@ margaret_generated_module = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_umbrella_path = { workspace = true }
 quote = { workspace = true }
+syn = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

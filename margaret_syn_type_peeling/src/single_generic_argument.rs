@@ -10,11 +10,11 @@ pub fn single_generic_argument(segment: &PathSegment) -> Option<&Type> {
     };
 
     let mut arguments = arguments.args.iter();
+    let Some(GenericArgument::Type(generic_type)) = arguments.next() else {
+        return None;
+    };
 
-    match (arguments.next(), arguments.next()) {
-        (Some(GenericArgument::Type(generic_type)), None) => Some(generic_type),
-        _ => None,
-    }
+    arguments.next().is_none().then_some(generic_type)
 }
 
 #[cfg(test)]

@@ -1,6 +1,4 @@
-use std::str::FromStr;
-
-use crate::oauth_vocabulary_error::OAuthVocabularyError;
+use crate::code_challenge_method_parsing::CodeChallengeMethodParsing;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CodeChallengeMethod {
@@ -9,23 +7,18 @@ pub enum CodeChallengeMethod {
 
 impl CodeChallengeMethod {
     #[must_use]
+    pub fn parse(value: &str) -> CodeChallengeMethodParsing {
+        if value == Self::S256.wire_name() {
+            CodeChallengeMethodParsing::Accepted(Self::S256)
+        } else {
+            CodeChallengeMethodParsing::Unsupported
+        }
+    }
+
+    #[must_use]
     pub fn wire_name(self) -> &'static str {
         match self {
             Self::S256 => "S256",
-        }
-    }
-}
-
-impl FromStr for CodeChallengeMethod {
-    type Err = OAuthVocabularyError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        if value == Self::S256.wire_name() {
-            Ok(Self::S256)
-        } else {
-            Err(OAuthVocabularyError::UnsupportedCodeChallengeMethod {
-                value: value.to_string(),
-            })
         }
     }
 }

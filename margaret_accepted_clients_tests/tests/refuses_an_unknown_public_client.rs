@@ -9,7 +9,6 @@ use margaret_accepted_clients::registered_client::RegisteredClient;
 use margaret_accepted_clients_tests::accepted_clients_of::accepted_clients_of;
 use margaret_accepted_clients_tests::fixture_client::fixture_client;
 use margaret_http::request_authorization::RequestAuthorization;
-use margaret_provider_state_storage::memory_provider_state::MemoryProviderState;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[tokio::test]
@@ -26,7 +25,6 @@ async fn refuses_an_unknown_public_client() {
                     client_id: Some("portal".to_string()),
                     ..ClientAuthenticationParameters::default()
                 },
-                &MemoryProviderState::create(),
                 NumericDate::from(Utc::now()),
             )
             .await,

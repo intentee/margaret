@@ -1,4 +1,3 @@
-use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::struct_shape::StructShape;
 
 use crate::constructor_outcome::ConstructorOutcome;
@@ -25,10 +24,6 @@ pub(crate) enum DirectConstruction {
         accessor: String,
         dependencies: Vec<DependencyKind>,
     },
-    Resolved {
-        dependencies: Vec<DependencyKind>,
-        resolver: CanonicalPath,
-    },
 }
 
 impl DirectConstruction {
@@ -36,8 +31,7 @@ impl DirectConstruction {
         match self {
             DirectConstruction::Constructor { dependencies, .. }
             | DirectConstruction::FrameworkConstructor { dependencies, .. }
-            | DirectConstruction::FrameworkAccessor { dependencies, .. }
-            | DirectConstruction::Resolved { dependencies, .. } => dependencies,
+            | DirectConstruction::FrameworkAccessor { dependencies, .. } => dependencies,
             DirectConstruction::Fieldless { .. } | DirectConstruction::FrameworkUnit => &[],
         }
     }

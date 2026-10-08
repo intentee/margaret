@@ -1,7 +1,9 @@
+mod declared_issuer_keys;
 pub mod declared_trust;
 pub mod declared_trusts;
+mod issuer_key_sources;
+pub mod own_trust;
 pub mod render_trusted_issuers;
-mod trust_attribute;
 mod trust_declaration;
 mod trust_source;
 pub mod trusted_issuer_binding;

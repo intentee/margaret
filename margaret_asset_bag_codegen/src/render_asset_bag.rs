@@ -92,7 +92,6 @@ fn asset_macro_tokens(
 fn asset_responder(
     ServedAssets {
         assets_directory_name,
-        embed_relative,
         served_tails,
     }: &ServedAssets,
     output_paths: &BTreeSet<String>,
@@ -107,12 +106,7 @@ fn asset_responder(
         declaration: quote! { pub mod #responder_module_identifier; },
         module: GeneratedModuleTokens::new(
             format!("{root_module}/{responder_module}"),
-            render_asset_responder(
-                &served,
-                assets_directory_name,
-                embed_relative,
-                responder_type,
-            ),
+            render_asset_responder(&served, assets_directory_name, responder_type),
         ),
     })
 }
@@ -258,7 +252,6 @@ mod tests {
     fn served(served_tails: &[&str]) -> ServedAssets {
         ServedAssets {
             assets_directory_name: "assets".to_string(),
-            embed_relative: "..".to_string(),
             served_tails: served_tails
                 .iter()
                 .map(|tail| (*tail).to_string())

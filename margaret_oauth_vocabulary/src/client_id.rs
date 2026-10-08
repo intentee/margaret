@@ -1,7 +1,6 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
-use std::str::FromStr;
 
 use serde::Deserialize;
 use serde::Deserializer;
@@ -10,8 +9,10 @@ use serde::Serializer;
 use serde::de::Error;
 
 use margaret_registered_claims::audience::Audience;
+use margaret_registered_claims::audience_parsing::AudienceParsing;
 
-use crate::oauth_vocabulary_error::OAuthVocabularyError;
+use crate::client_id_parsing::ClientIdParsing;
+use crate::client_id_rejection::ClientIdRejection;
 use crate::visible_characters::visible_characters;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -20,6 +21,19 @@ pub struct ClientId {
 }
 
 impl ClientId {
+    #[must_use]
+    pub fn parse(value: &str) -> ClientIdParsing {
+        let AudienceParsing::Accepted(audience) = Audience::parse(value) else {
+            return ClientIdParsing::Rejected(ClientIdRejection::Empty);
+        };
+
+        if visible_characters(value) {
+            ClientIdParsing::Accepted(Self { audience })
+        } else {
+            ClientIdParsing::Rejected(ClientIdRejection::InvisibleCharacter)
+        }
+    }
+
     #[must_use]
     pub fn as_str(&self) -> &str {
         self.audience.as_str()
@@ -32,29 +46,14 @@ impl Display for ClientId {
     }
 }
 
-impl FromStr for ClientId {
-    type Err = OAuthVocabularyError;
-
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
-        let audience = value
-            .parse()
-            .map_err(|source| OAuthVocabularyError::ClientIdNotAnAudience { source })?;
-
-        if visible_characters(value) {
-            Ok(Self { audience })
-        } else {
-            Err(OAuthVocabularyError::ClientIdInvisibleCharacter)
-        }
-    }
-}
-
 impl<'de> Deserialize<'de> for ClientId {
     fn deserialize<TDeserializer: Deserializer<'de>>(
         deserializer: TDeserializer,
     ) -> std::result::Result<Self, TDeserializer::Error> {
-        String::deserialize(deserializer)?
-            .parse()
-            .map_err(TDeserializer::Error::custom)
+        match Self::parse(&String::deserialize(deserializer)?) {
+            ClientIdParsing::Accepted(client_id) => Ok(client_id),
+            ClientIdParsing::Rejected(rejection) => Err(TDeserializer::Error::custom(rejection)),
+        }
     }
 }
 

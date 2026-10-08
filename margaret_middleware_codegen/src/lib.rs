@@ -20,14 +20,12 @@ mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
-    use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_tag_codegen::tag_pool::TagPool;
+    use margaret_tag_codegen_tests::collected_tags::collected_tags;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
-    use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
 
     use crate::fold_layers::fold_layers;
     use crate::layer_application::LayerApplication;
@@ -53,12 +51,7 @@ mod tests {
         BindingRegistries::collect(
             index,
             ViewsAvailability::Available,
-            &TagPool::collect(
-                index,
-                &DeclaredTrusts::read(index).expect("the trusts are read"),
-                &DeclaredOAuthClients::read(index).expect("the oauth clients are read"),
-            )
-            .expect("the tags are collected"),
+            &collected_tags(index),
             &empty_bindings(),
         )
         .expect("the binding registries are collected")
@@ -66,12 +59,7 @@ mod tests {
 
     fn wrappers_for(lib_source: &str) -> String {
         let index = IndexedSource::new(lib_source).index;
-        let tags = TagPool::collect(
-            &index,
-            &DeclaredTrusts::read(&index).expect("the trusts are read"),
-            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-        )
-        .expect("the tags are collected");
+        let tags = collected_tags(&index);
         let plans = MiddlewarePlans::collect(&index, &registries_for(&index), &tags)
             .expect("the middleware plans are collected");
 
@@ -86,18 +74,9 @@ mod tests {
     fn plans_rejection_for(lib_source: &str) -> MiddlewareCodegenError {
         let index = IndexedSource::new(lib_source).index;
 
-        MiddlewarePlans::collect(
-            &index,
-            &registries_for(&index),
-            &TagPool::collect(
-                &index,
-                &DeclaredTrusts::read(&index).expect("the trusts are read"),
-                &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-            )
-            .expect("the tags are collected"),
-        )
-        .err()
-        .expect("the middleware plans fail to collect")
+        MiddlewarePlans::collect(&index, &registries_for(&index), &collected_tags(&index))
+            .err()
+            .expect("the middleware plans fail to collect")
     }
 
     fn plans_error_for(lib_source: &str) -> String {
@@ -106,12 +85,7 @@ mod tests {
 
     fn layers_for(lib_source: &str) -> Result<Vec<LayerApplication>, MiddlewareCodegenError> {
         let index = IndexedSource::new(lib_source).index;
-        let tags = TagPool::collect(
-            &index,
-            &DeclaredTrusts::read(&index).expect("the trusts are read"),
-            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-        )
-        .expect("the tags are collected");
+        let tags = collected_tags(&index);
         let plans = MiddlewarePlans::collect(&index, &registries_for(&index), &tags)
             .expect("the middleware plans are collected");
         let selected = index.select_framework_attribute(FrameworkAttribute::Middleware);
@@ -133,9 +107,9 @@ mod tests {
     fn rejects_a_middleware_reference_that_names_a_jwks_endpoint() {
         assert!(
             layers_error_for(
-                "#[provides_jwks_endpoint(auth, audience = \"api\", issuer = \"https://auth.example\", jwks_uri = \"https://auth.example/jwks\")]\nstruct Endpoint;\n\n#[middleware(auth)]\nstruct Site;\n"
+                "#[verifies_tokens_from_issuer(auth, audience = \"api\", issuer = \"https://auth.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://auth.example/jwks\"))]\nstruct Endpoint;\n\n#[middleware(auth)]\nstruct Site;\n"
             )
-            .contains("which is a jwks endpoint provider, not a middleware handler")
+            .contains("which is a trusted issuer with published keys, not a middleware handler")
         );
     }
 
@@ -161,7 +135,8 @@ impl Guard {
             source
                 .contains("implmargaret::framework::http::http_middleware::HttpMiddlewareforGuard")
         );
-        assert!(source.contains("self.inner.process(request,next)"));
+        assert!(source.contains("letargument_1=request;"));
+        assert!(source.contains("self.inner.process(argument_1,next)"));
     }
 
     #[test]
@@ -181,7 +156,7 @@ impl Guard {
 ",
         );
 
-        assert!(source.contains("self.inner.process(request,next).await"));
+        assert!(source.contains("self.inner.process(argument_1,next).await"));
     }
 
     #[test]
@@ -193,7 +168,7 @@ impl Guard {
         assert!(source.contains(
             "pubstructTracer{pubinner:std::sync::Arc<crate::Tracer>,pubroutes:std::sync::Arc<super::super::routes::Routes>,}"
         ));
-        assert!(source.contains("self.inner.process(request,next,&self.routes)"));
+        assert!(source.contains("self.inner.process(argument_1,next,&self.routes)"));
     }
 
     #[test]
@@ -217,7 +192,7 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(request)"));
+        assert!(source.contains("self.inner.process(argument_1)"));
     }
 
     #[test]
@@ -294,12 +269,7 @@ impl Guard {
         let index = IndexedSource::new(
             "#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\n#[middleware(guard)]\nstruct Site;\n",
         ).index;
-        let tags = TagPool::collect(
-            &index,
-            &DeclaredTrusts::read(&index).expect("the trusts are read"),
-            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
-        )
-        .expect("the tags are collected");
+        let tags = collected_tags(&index);
         let site = index
             .select_framework_attribute(FrameworkAttribute::Middleware)
             .next()
@@ -459,12 +429,12 @@ impl Guard {
         );
 
         assert!(source.contains(
-            "letdata=margaret::framework::validation::validate::validate(&request.inputs.query,);"
+            "letargument_1=margaret::framework::validation::validate::validate(&request.inputs.query,);"
         ));
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(data,next)"));
+        assert!(source.contains("self.inner.process(argument_1,next)"));
     }
 
     #[test]
@@ -484,7 +454,7 @@ impl Guard {
         );
 
         assert!(source.contains(
-            "letdata=matchmargaret::framework::http_validation::require_input::require_input(margaret::framework::validation::validate::validate(&request.inputs.cookies,),)"
+            "letargument_1=matchmargaret::framework::http_validation::require_input::require_input(margaret::framework::validation::validate::validate(&request.inputs.cookies,),)"
         ));
         assert!(
             source
@@ -494,7 +464,7 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(data)"));
+        assert!(source.contains("self.inner.process(argument_1)"));
     }
 
     #[test]
@@ -517,12 +487,12 @@ impl Guard {
         );
 
         assert!(source.contains(
-            "letfilters=matchmargaret::framework::http_validation::require_input::require_input(margaret::framework::validation::validate::validate(&request.inputs.query,),)"
+            "letargument_2=matchmargaret::framework::http_validation::require_input::require_input(margaret::framework::validation::validate::validate(&request.inputs.query,),)"
         ));
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(request,filters,next)"));
+        assert!(source.contains("self.inner.process(argument_1,argument_2,next)"));
     }
 
     #[test]
@@ -548,7 +518,7 @@ impl Tracer {
     }
 
     #[test]
-    fn disambiguates_wrapper_parameters_named_request_and_next() {
+    fn keeps_the_wrapper_bindings_clear_of_parameters_named_request_and_next() {
         let source = wrappers_for(
             r"use margaret::framework::http_validation::request_input::RequestInput;
 
@@ -567,13 +537,13 @@ impl Guard {
         );
 
         assert!(source.contains(
-            "asyncfnprocess(&self,request_2:&margaret::framework::http::request::Request,next_2:margaret::framework::http::next::Next,)"
+            "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("letnext=request_2;"));
+        assert!(source.contains("letargument_1=request;"));
         assert!(source.contains(
-            "margaret::framework::validation::validate::validate(&request_2.inputs.query,)"
+            "margaret::framework::validation::validate::validate(&request.inputs.query,)"
         ));
-        assert!(source.contains("self.inner.process(next,request,next_2)"));
+        assert!(source.contains("self.inner.process(argument_1,argument_2,next)"));
     }
 
     #[test]

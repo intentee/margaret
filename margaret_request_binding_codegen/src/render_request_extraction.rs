@@ -12,24 +12,19 @@ fn authenticated_user_resolver(
     requirement: AuthenticatedUserRequirement,
     challenge: &AuthenticatedUserChallenge,
 ) -> TokenStream {
-    match (requirement, challenge) {
-        (AuthenticatedUserRequirement::Optional, _) => quote! {
+    match requirement {
+        AuthenticatedUserRequirement::Optional => quote! {
             margaret::framework::identity::optional_authenticated_user::optional_authenticated_user
         },
-        (
-            AuthenticatedUserRequirement::Required,
+        AuthenticatedUserRequirement::Required => match challenge {
             AuthenticatedUserChallenge::Bearer { .. }
-            | AuthenticatedUserChallenge::Introspection { .. },
-        ) => {
-            quote! {
+            | AuthenticatedUserChallenge::Introspection { .. } => quote! {
                 margaret::framework::identity::require_bearer_authenticated_user::require_bearer_authenticated_user
-            }
-        }
-        (AuthenticatedUserRequirement::Required, AuthenticatedUserChallenge::Unchallenged) => {
-            quote! {
+            },
+            AuthenticatedUserChallenge::Unchallenged => quote! {
                 margaret::framework::identity::require_authenticated_user::require_authenticated_user
-            }
-        }
+            },
+        },
     }
 }
 
@@ -95,15 +90,9 @@ pub fn render_request_extraction(
                 margaret::framework::http::requirement::Requirement::Unmet(response) => #continuation_return,
             };
         },
-        RequestBinding::CurrentRequest => {
-            if holder == request_local {
-                TokenStream::new()
-            } else {
-                quote! {
-                    let #holder = #request_local;
-                }
-            }
-        }
+        RequestBinding::CurrentRequest => quote! {
+            let #holder = #request_local;
+        },
         RequestBinding::AssetBag => quote! {
             let #holder = ::margaret::framework::asset_bag::asset_bag::AssetBag::new();
         },

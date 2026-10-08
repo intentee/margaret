@@ -8,6 +8,7 @@ use rustls::Error;
 use rustls::RootCertStore;
 use rustls::SignatureScheme;
 use rustls::client::danger::HandshakeSignatureValid;
+use rustls::crypto::CryptoProvider;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::UnixTime;
 use rustls::server::WebPkiClientVerifier;
@@ -30,12 +31,17 @@ impl SvidClientCertVerifier {
     /// # Errors
     ///
     /// Returns `SvidError::ClientVerifier`.
-    pub fn new(root_store: RootCertStore, spiffe_trust_domain: &str) -> Result<Self, SvidError> {
+    pub fn new(
+        root_store: RootCertStore,
+        spiffe_trust_domain: &str,
+        crypto_provider: Arc<CryptoProvider>,
+    ) -> Result<Self, SvidError> {
         let spiffe_trust_domain = TrustDomain::new(spiffe_trust_domain)
             .map_err(|source| SvidError::TrustDomain { source })?;
-        let inner_verifier = WebPkiClientVerifier::builder(Arc::new(root_store))
-            .build()
-            .map_err(|source| SvidError::ClientVerifier { source })?;
+        let inner_verifier =
+            WebPkiClientVerifier::builder_with_provider(Arc::new(root_store), crypto_provider)
+                .build()
+                .map_err(|source| SvidError::ClientVerifier { source })?;
 
         Ok(Self {
             inner_verifier,

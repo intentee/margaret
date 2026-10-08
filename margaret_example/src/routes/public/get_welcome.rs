@@ -2,11 +2,12 @@ use margaret::framework::http::forward::Forward;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::margaret::forwarders::public::Forwarder;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/welcome", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/welcome", server = "public")]
 pub struct GetWelcome;
 
 impl GetWelcome {

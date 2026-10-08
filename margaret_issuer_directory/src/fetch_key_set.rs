@@ -59,6 +59,9 @@ pub(crate) async fn fetch_key_set(
         IssuerDocument::Failed(failure) => {
             KeySetPoll::Failed(KeySetPollFailure::DocumentExchange(failure))
         }
+        IssuerDocument::Oversized { max_bytes } => {
+            KeySetPoll::Failed(KeySetPollFailure::DocumentOversized { max_bytes })
+        }
         IssuerDocument::UnexpectedStatus(status) => {
             KeySetPoll::Failed(KeySetPollFailure::DocumentStatus(status))
         }
