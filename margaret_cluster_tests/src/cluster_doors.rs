@@ -5,6 +5,8 @@ use std::sync::Arc;
 use rustls::ServerConfig;
 use url::Url;
 
+use margaret_cluster_fixture::margaret::routes::Routes;
+
 use crate::cluster_server::ClusterServer;
 use crate::front_door_url::front_door_url;
 use crate::relay_destination::RelayDestination;
@@ -43,6 +45,22 @@ impl ClusterDoors {
             ClusterServer::Identity => self.identity.port(),
             ClusterServer::Public => self.public.port(),
         })
+    }
+
+    #[must_use]
+    pub fn routes(&self) -> Routes {
+        Routes::from_origins(
+            Arc::from(
+                self.url(ClusterServer::Identity)
+                    .origin()
+                    .ascii_serialization(),
+            ),
+            Arc::from(
+                self.url(ClusterServer::Public)
+                    .origin()
+                    .ascii_serialization(),
+            ),
+        )
     }
 
     pub async fn close(self) {

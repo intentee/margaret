@@ -8,7 +8,12 @@ use crate::models::access_token_holder::AccessTokenHolder;
 use crate::routes::public::subject_answer::SubjectAnswer;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Get, path = "/holder", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Get,
+    name = "get_holder",
+    path = "/holder",
+    server = "public",
+)]
 pub struct GetHolder;
 
 impl GetHolder {

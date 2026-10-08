@@ -11,7 +11,12 @@ use crate::models::note::Note;
 use crate::stores::note_store::NoteStore;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Delete, path = "/notes/{note}", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Delete,
+    name = "delete_note",
+    path = "/notes/{note}",
+    server = "public",
+)]
 pub struct DeleteNote {
     notes: Arc<NoteStore>,
 }

@@ -12,7 +12,12 @@ use margaret::framework::route_method::route_method::RouteMethod;
 use crate::stores::upload_store::UploadStore;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Get, path = "/uploads/{upload}", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Get,
+    name = "get_upload",
+    path = "/uploads/{upload}",
+    server = "public",
+)]
 pub struct GetUpload {
     uploads: Arc<UploadStore>,
 }

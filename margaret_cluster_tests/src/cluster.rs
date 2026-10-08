@@ -9,6 +9,7 @@ use reqwest::Client;
 use tempfile::NamedTempFile;
 use url::Url;
 
+use margaret_cluster_fixture::margaret::routes::Routes;
 use margaret_cluster_fixture::margaret::schema::schema;
 use margaret_cluster_fixture::margaret::token_issuance::TOKEN_ISSUANCE;
 use margaret_database_tests::apply_schema::apply_schema;
@@ -120,6 +121,16 @@ impl Cluster {
     #[must_use]
     pub fn instance_url(&self, index: usize, server: ClusterServer) -> Url {
         self.members[index].doors.url(server)
+    }
+
+    #[must_use]
+    pub fn instance_routes(&self, index: usize) -> Routes {
+        self.members[index].doors.routes()
+    }
+
+    #[must_use]
+    pub fn routes(&self) -> Routes {
+        self.front_door.doors.routes()
     }
 
     pub async fn add_member(&mut self) -> usize {

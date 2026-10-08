@@ -5,7 +5,12 @@ use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Get, path = "/health", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Get,
+    name = "get_health",
+    path = "/health",
+    server = "public",
+)]
 pub struct GetHealth;
 
 impl GetHealth {

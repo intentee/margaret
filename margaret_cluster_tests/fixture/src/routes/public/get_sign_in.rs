@@ -11,7 +11,12 @@ use margaret::framework::route_method::route_method::RouteMethod;
 use crate::margaret::oauth_clients::cluster::SignInFlow;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Get, path = "/sign-in", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Get,
+    name = "get_sign_in",
+    path = "/sign-in",
+    server = "public",
+)]
 pub struct GetSignIn {
     sign_in_flow: Arc<SignInFlow>,
 }

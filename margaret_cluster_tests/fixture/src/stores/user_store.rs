@@ -11,6 +11,8 @@ use crate::models::user::User;
 use crate::stores::cluster_store_error::ClusterStoreError;
 use crate::system_clock::SystemClock;
 
+const END_SESSION: &str = "DELETE FROM user_sessions WHERE id = $1";
+
 const FIND_SESSION_USER: &str = "SELECT user_sessions.authenticated_at, users.id, users.name \
      FROM user_sessions JOIN users ON users.id = user_sessions.user_id \
      WHERE user_sessions.id = $1";
@@ -47,6 +49,20 @@ impl UserStore {
     #[constructor]
     pub fn create(clock: Arc<SystemClock>, database: Arc<Database>) -> anyhow::Result<Self> {
         Ok(Self { clock, database })
+    }
+
+    /// # Errors
+    ///
+    /// Returns `ClusterStoreError` when the session cannot be ended.
+    pub async fn end_session(&self, session: Uuid) -> Result<(), ClusterStoreError> {
+        self.database
+            .client()
+            .await
+            .map_err(ClusterStoreError::Unavailable)?
+            .execute(END_SESSION, &[&session])
+            .await
+            .map_err(ClusterStoreError::EndSession)
+            .map(|_ended| ())
     }
 
     /// # Errors

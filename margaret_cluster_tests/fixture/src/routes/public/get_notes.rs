@@ -10,7 +10,12 @@ use margaret::framework::route_method::route_method::RouteMethod;
 use crate::stores::note_store::NoteStore;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Get, path = "/notes", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Get,
+    name = "get_notes",
+    path = "/notes",
+    server = "public",
+)]
 pub struct GetNotes {
     notes: Arc<NoteStore>,
 }

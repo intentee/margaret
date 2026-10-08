@@ -10,7 +10,12 @@ use crate::models::note::Note;
 use crate::views::note_view::NoteViewProps;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Get, path = "/notes/{note}/view", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Get,
+    name = "get_note_view",
+    path = "/notes/{note}/view",
+    server = "public",
+)]
 pub struct GetNoteView;
 
 impl GetNoteView {

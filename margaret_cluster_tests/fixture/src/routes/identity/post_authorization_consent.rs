@@ -18,8 +18,9 @@ use crate::models::user::User;
 #[responds_to_http(
     max_body_bytes = 8_388_608,
     method = RouteMethod::Post,
+    name = "post_authorization_consent",
     path = "/authorize/consent",
-    server = "identity"
+    server = "identity",
 )]
 pub struct PostAuthorizationConsent {
     consent_endpoint: Arc<ConsentEndpoint>,

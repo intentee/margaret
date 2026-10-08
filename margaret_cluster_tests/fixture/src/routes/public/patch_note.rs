@@ -17,8 +17,9 @@ use crate::stores::note_store::NoteStore;
 #[responds_to_http(
     max_body_bytes = 8_388_608,
     method = RouteMethod::Patch,
+    name = "patch_note",
     path = "/notes/{note}",
-    server = "public"
+    server = "public",
 )]
 pub struct PatchNote {
     notes: Arc<NoteStore>,

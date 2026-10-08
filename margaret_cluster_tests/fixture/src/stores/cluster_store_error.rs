@@ -8,6 +8,9 @@ pub enum ClusterStoreError {
     #[error("failed to delete the note: {0}")]
     DeleteNote(#[source] tokio_postgres::Error),
 
+    #[error("failed to end the session: {0}")]
+    EndSession(#[source] tokio_postgres::Error),
+
     #[error("failed to find the note: {0}")]
     FindNote(#[source] tokio_postgres::Error),
 

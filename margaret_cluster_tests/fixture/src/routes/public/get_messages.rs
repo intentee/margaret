@@ -10,7 +10,12 @@ use margaret::framework::route_method::route_method::RouteMethod;
 use crate::stores::message_store::MessageStore;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Get, path = "/messages", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Get,
+    name = "get_messages",
+    path = "/messages",
+    server = "public",
+)]
 pub struct GetMessages {
     messages: Arc<MessageStore>,
 }

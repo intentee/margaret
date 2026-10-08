@@ -28,11 +28,13 @@ margaret_http_uploaded_file = { workspace = true }
 margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jws_verification = { workspace = true }
+margaret_oidc_provider_tests = { path = "../margaret_oidc_provider_tests" }
 margaret_process_tests = { path = "../margaret_process_tests" }
 margaret_route_method = { workspace = true }
 margaret_sync_holder = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }

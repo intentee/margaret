@@ -8,7 +8,12 @@ use crate::models::introspected_caller::IntrospectedCaller;
 use crate::routes::public::subject_answer::SubjectAnswer;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Get, path = "/introspected", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Get,
+    name = "get_introspected",
+    path = "/introspected",
+    server = "public",
+)]
 pub struct GetIntrospected;
 
 impl GetIntrospected {

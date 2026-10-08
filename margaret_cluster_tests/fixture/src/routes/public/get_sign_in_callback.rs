@@ -20,7 +20,12 @@ use crate::margaret::routes::Routes;
 use crate::stores::user_store::UserStore;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Get, path = "/sign-in/callback", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Get,
+    name = "get_sign_in_callback",
+    path = "/sign-in/callback",
+    server = "public",
+)]
 pub struct GetSignInCallback {
     sign_in_flow: Arc<SignInFlow>,
     users: Arc<UserStore>,

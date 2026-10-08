@@ -23,8 +23,9 @@ struct StoredUpload {
 #[responds_to_http(
     max_body_bytes = 8_388_608,
     method = RouteMethod::Post,
+    name = "post_upload",
     path = "/uploads",
-    server = "public"
+    server = "public",
 )]
 pub struct PostUpload {
     uploads: Arc<UploadStore>,

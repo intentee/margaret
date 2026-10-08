@@ -16,8 +16,9 @@ use crate::stores::note_store::NoteStore;
 #[responds_to_http(
     max_body_bytes = 8_388_608,
     method = RouteMethod::Post,
+    name = "post_note",
     path = "/notes",
-    server = "public"
+    server = "public",
 )]
 pub struct PostNote {
     notes: Arc<NoteStore>,

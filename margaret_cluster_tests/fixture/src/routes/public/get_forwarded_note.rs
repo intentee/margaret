@@ -9,8 +9,9 @@ use crate::margaret::forwarders::public::Forwarder;
 #[singleton]
 #[responds_to_http(
     method = RouteMethod::Get,
+    name = "get_forwarded_note",
     path = "/forwarded-notes/{note_id}",
-    server = "public"
+    server = "public",
 )]
 pub struct GetForwardedNote;
 

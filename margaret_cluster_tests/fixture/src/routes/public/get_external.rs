@@ -8,7 +8,12 @@ use crate::models::external_caller::ExternalCaller;
 use crate::routes::public::subject_answer::SubjectAnswer;
 
 #[singleton]
-#[responds_to_http(method = RouteMethod::Get, path = "/external", server = "public")]
+#[responds_to_http(
+    method = RouteMethod::Get,
+    name = "get_external",
+    path = "/external",
+    server = "public",
+)]
 pub struct GetExternal;
 
 impl GetExternal {
