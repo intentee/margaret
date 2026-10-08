@@ -17,6 +17,7 @@ path = "tests/main.rs"
 async-trait = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
+cookie = { workspace = true }
 futures-util = { workspace = true }
 margaret = { workspace = true, features = ["runtime"] }
 margaret_accepted_clients_tests = { path = "../margaret_accepted_clients_tests" }
@@ -40,6 +41,7 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "process", "rt-multi-thread", "time"] }
 tokio-rustls = { workspace = true }
+tokio-tungstenite = { workspace = true }
 tokio-util = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }

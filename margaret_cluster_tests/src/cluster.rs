@@ -61,7 +61,7 @@ pub struct Cluster {
     front_door: FrontDoor,
     launch: InstanceLaunch,
     members: Vec<ClusterMember>,
-    tls: TlsFixture,
+    pub tls: TlsFixture,
 }
 
 impl Cluster {
