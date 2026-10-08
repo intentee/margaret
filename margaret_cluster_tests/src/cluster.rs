@@ -175,24 +175,14 @@ impl Cluster {
     ///
     /// Panics when the instance is not running.
     pub async fn crash(&mut self, index: usize) {
-        self.drain(index);
-        self.running
-            .remove(&index)
-            .expect("the instance is running")
-            .kill()
-            .await;
+        self.withdrawn(index).kill().await;
     }
 
     /// # Panics
     ///
     /// Panics when the instance is not running.
     pub async fn stop(&mut self, index: usize) -> ExitStatus {
-        self.drain(index);
-        self.running
-            .remove(&index)
-            .expect("the instance is running")
-            .terminate()
-            .await
+        self.withdrawn(index).terminate().await
     }
 
     /// # Panics
@@ -244,5 +234,13 @@ impl Cluster {
 
         self.front_door.doors.close().await;
         self.external_issuer.close().await;
+    }
+
+    fn withdrawn(&mut self, index: usize) -> ClusterInstance {
+        self.drain(index);
+        self.client = cluster_client(&self.tls.certificate_authority);
+        self.running
+            .remove(&index)
+            .expect("the instance is running")
     }
 }
