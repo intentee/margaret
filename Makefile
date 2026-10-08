@@ -20,6 +20,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_client_assertions_schema \
 	-p margaret_client_credentials \
 	-p margaret_client_credentials_tests \
+	-p margaret_cluster_tests \
 	-p margaret_codegen \
 	-p margaret_codegen_tests \
 	-p margaret_codegen_tokens \
@@ -294,13 +295,15 @@ POSTGRES_FEATURES := \
 	--features margaret_schema_postgres_tests/tests_that_use_postgres \
 	--features margaret_store_contract_tests/tests_that_use_postgres
 
-POSTGRES_TESTS := package(margaret_schema_postgres_tests) | binary_id(margaret_store_contract_tests::database)
+POSTGRES_TESTS := package(margaret_schema_postgres_tests) | binary_id(margaret_store_contract_tests::database) | binary_id(margaret_cluster_tests::integration)
 
 POSTGRES_IMAGE_NAME := postgres
 POSTGRES_IMAGE_TAG := 18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
 
 export POSTGRES_IMAGE_NAME
 export POSTGRES_IMAGE_TAG
+
+CLUSTER_FEATURES := --features margaret_cluster_tests/tests_that_use_cluster
 
 EXAMPLE_POSTGRES_FEATURES := --features margaret_example_tests/tests_that_use_postgres
 
@@ -329,7 +332,7 @@ node_modules: package.json
 
 .PHONY: clippy
 clippy:
-	cargo clippy --workspace --all-targets $(POSTGRES_FEATURES) $(EXAMPLE_POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) -- -D warnings
+	cargo clippy --workspace --all-targets $(POSTGRES_FEATURES) $(EXAMPLE_POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) -- -D warnings
 	cargo clippy $(RUNTIME_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
 	cargo clippy $(GENERATED_CODE_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
 	cargo clippy -p margaret --all-targets --no-default-features -- -D warnings
@@ -342,10 +345,10 @@ clippy:
 .PHONY: coverage
 coverage: node_modules openid-conformance-images postgres-image
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset 'none()' --no-tests pass
+	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset 'none()' --no-tests pass
 	docker run --rm --user postgres $(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG) initdb --auth trust --no-sync --pgdata /tmp/warm
-	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset '$(POSTGRES_TESTS)'
-	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset 'not ($(POSTGRES_TESTS))'
+	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset '$(POSTGRES_TESTS)'
+	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset 'not ($(POSTGRES_TESTS))'
 	cargo llvm-cov report --json --output-path target/llvm-cov.json
 	cargo llvm-cov report --lcov --output-path target/lcov.info
 	cargo llvm-cov report
@@ -372,6 +375,7 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_client_assertions_schema=100 \
 		--gated margaret_client_credentials=100 \
 		--gated margaret_client_credentials_tests=100 \
+		--gated margaret_cluster_tests=100 \
 		--gated margaret_codegen=100 \
 		--gated margaret_codegen_tests=100 \
 		--gated margaret_codegen_tokens=100 \
@@ -520,13 +524,17 @@ postgres-image:
 .PHONY: test
 test: test.integration
 
+.PHONY: test.cluster
+test.cluster: postgres-image
+	cargo nextest run -p margaret_cluster_tests $(CLUSTER_FEATURES)
+
 .PHONY: test.conformance
 test.conformance: openid-conformance-images
 	cargo nextest run -p margaret_openid_conformance_tests $(OPENID_CONFORMANCE_FEATURES)
 
 .PHONY: test.integration
 test.integration: openid-conformance-images postgres-image
-	cargo nextest run --workspace $(POSTGRES_FEATURES) $(EXAMPLE_POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES)
+	cargo nextest run --workspace $(POSTGRES_FEATURES) $(EXAMPLE_POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES)
 
 .PHONY: test.unit
 test.unit:

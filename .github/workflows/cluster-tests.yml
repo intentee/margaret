@@ -1,0 +1,23 @@
+name: cluster tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  cluster:
+    name: cluster
+    runs-on: ovh-linux-x64-b3-16
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.137
+
+      - name: run the cluster tests
+        run: make test.cluster
