@@ -98,6 +98,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_spiffe_svid_server \
 	-p margaret_spiffe_svid_server_tests \
 	-p margaret_spiffe_svid_tests \
+	-p margaret_store_contract_tests \
 	-p margaret_subject_token_exchange \
 	-p margaret_subject_token_exchange_tests \
 	-p margaret_syn_type_peeling \
@@ -419,6 +420,7 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_spiffe_svid_server=100 \
 		--gated margaret_spiffe_svid_server_tests=100 \
 		--gated margaret_spiffe_svid_tests=100 \
+		--gated margaret_store_contract_tests=100 \
 		--gated margaret_subject_token_exchange=100 \
 		--gated margaret_subject_token_exchange_tests=100 \
 		--gated margaret_syn_type_peeling=100 \

@@ -3936,6 +3936,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_store_contract_tests"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "futures-util",
+ "margaret_accepted_clients",
+ "margaret_accepted_clients_tests",
+ "margaret_authorization_grants",
+ "margaret_jwks_keygen",
+ "margaret_jwks_keygen_tests",
+ "margaret_jwks_roller",
+ "margaret_jwks_roller_tests",
+ "margaret_oauth_vocabulary",
+ "margaret_oidc_provider_tests",
+ "margaret_registered_claims",
+ "margaret_token_digest",
+ "tokio",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "margaret_subject_token_exchange"
 version = "0.1.0"
 dependencies = [

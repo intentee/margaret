@@ -118,6 +118,7 @@ members = [
     "margaret_spiffe_svid_server",
     "margaret_spiffe_svid_server_tests",
     "margaret_spiffe_svid_tests",
+    "margaret_store_contract_tests",
     "margaret_subject_token_exchange",
     "margaret_subject_token_exchange_tests",
     "margaret_syn_type_peeling",
