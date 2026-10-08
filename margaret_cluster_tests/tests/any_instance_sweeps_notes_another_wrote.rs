@@ -46,7 +46,7 @@ async fn any_instance_sweeps_notes_another_wrote() {
 
     assert_eq!(read_on_survivor().await, StatusCode::OK);
 
-    poll_until(async || read_on_survivor().await == StatusCode::NOT_FOUND).await;
+    poll_until(|| async { read_on_survivor().await == StatusCode::NOT_FOUND }).await;
 
     cluster.close().await;
 }

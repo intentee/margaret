@@ -38,7 +38,7 @@ async fn acquired_tokens(cluster: &Cluster) -> i64 {
 async fn a_service_acquires_a_token_through_a_peer() {
     let mut cluster = Cluster::start(cluster_binary(), 1).await;
 
-    poll_until(async || attempts(&cluster).await == 1).await;
+    poll_until(|| async { attempts(&cluster).await == 1 }).await;
 
     let acquired_before = acquired_tokens(&cluster).await;
     let unadmitted = cluster.add_member().await;
@@ -47,7 +47,7 @@ async fn a_service_acquires_a_token_through_a_peer() {
         .launch(&[unadmitted], InstanceAdmission::Withheld)
         .await;
 
-    poll_until(async || attempts(&cluster).await == 2).await;
+    poll_until(|| async { attempts(&cluster).await == 2 }).await;
 
     assert_eq!(acquired_tokens(&cluster).await, acquired_before + 1);
 
