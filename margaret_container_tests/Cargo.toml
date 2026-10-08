@@ -9,6 +9,7 @@ autotests = false
 margaret_attribute_arguments = { workspace = true }
 margaret_attributes = { workspace = true }
 margaret_container = { workspace = true }
+margaret_database_codegen = { workspace = true }
 margaret_generated_module = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
 margaret_token_issuance_codegen = { workspace = true }

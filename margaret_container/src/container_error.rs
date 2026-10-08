@@ -58,18 +58,9 @@ pub enum ContainerError {
     MissingTokenIssuance { provider: String },
 
     #[error(
-        "the framework provider '{provider}' needs a singleton declared with #[{attribute}], but none is declared"
+        "the framework provider '{provider}' keeps its state in the application database, but no struct declares #[postgres_database]"
     )]
-    MissingDeclaredSingleton {
-        attribute: &'static str,
-        provider: String,
-    },
-
-    #[error("more than one singleton is declared with #[{attribute}]: {paths}")]
-    AmbiguousDeclaredSingleton {
-        attribute: &'static str,
-        paths: String,
-    },
+    MissingPostgresDatabase { provider: String },
 
     #[error(
         "parameter '{parameter}' of singleton '{singleton}' injects '{provider}', which only the framework may inject"

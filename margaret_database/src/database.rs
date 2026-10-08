@@ -48,6 +48,7 @@ impl Database {
 
 #[cfg(test)]
 mod tests {
+    use deadpool_postgres::PoolError;
     use tokio::net::TcpListener;
 
     use super::Database;
@@ -72,7 +73,7 @@ mod tests {
                     .expect("the url is a postgres url"),
             )
             .await,
-            Err(DatabaseError::Unavailable(_))
+            Err(DatabaseError::Unavailable(PoolError::Backend(source))) if source.as_db_error().is_none()
         ));
     }
 }

@@ -14,11 +14,12 @@ use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
-use margaret_container::singleton_declaration::SingletonDeclaration;
 use margaret_container::url_source::UrlSource;
 use margaret_http_codegen::declared_routes::DeclaredRoutes;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 
+use crate::authorization_grants_store_canonical_path::authorization_grants_store_canonical_path;
+use crate::client_assertions_store_canonical_path::client_assertions_store_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
 
 fn constructed(
@@ -79,7 +80,7 @@ fn code_grant_dependencies(
                 .chain(route_urls)
                 .collect(),
         ),
-        FrameworkDependency::DeclaredSingleton(SingletonDeclaration::StoresAuthorizationGrants),
+        FrameworkDependency::Provider(authorization_grants_store_canonical_path()),
     ])
 }
 
@@ -88,7 +89,7 @@ fn confidential_dependencies(client: &AcceptedClientDeclaration) -> [FrameworkDe
         constant(client, AcceptedClientConstant::AcceptedClient),
         constant(client, AcceptedClientConstant::ConfidentialPrivileges),
         item(client, AcceptedClientItem::ClientKeySet),
-        FrameworkDependency::DeclaredSingleton(SingletonDeclaration::RemembersClientAssertions),
+        FrameworkDependency::Provider(client_assertions_store_canonical_path()),
     ]
 }
 

@@ -1,5 +1,6 @@
 pub mod app_name;
 pub mod auth;
+pub mod blog_database;
 pub mod commands;
 pub mod deployment_environment;
 pub mod english_greeter;

@@ -4,6 +4,7 @@ use margaret_authorization_grants::family_opening::FamilyOpening;
 use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
 use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 
+use crate::contract_instant::contract_instant;
 use crate::contract_refresh_family::contract_refresh_family;
 use crate::contract_token::contract_token;
 
@@ -17,7 +18,7 @@ pub async fn opened_refresh_family_resolves_its_first_token(store: &dyn StoresAu
 
     assert_eq!(
         store
-            .open_refresh_family(family, record.clone(), first_token)
+            .open_refresh_family(family, record.clone(), first_token, contract_instant())
             .await
             .expect("the store opens the refresh family"),
         FamilyOpening::Opened

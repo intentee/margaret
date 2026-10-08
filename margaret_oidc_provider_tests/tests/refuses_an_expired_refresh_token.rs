@@ -17,6 +17,7 @@ const EXPIRED_REFRESH_TOKEN: &str = "a-refresh-token-of-an-expired-family";
 #[tokio::test]
 async fn refuses_an_expired_refresh_token() {
     let fixture = ProviderFixture::start(Vec::new()).await;
+    let now = Utc::now();
 
     fixture
         .clients
@@ -24,13 +25,14 @@ async fn refuses_an_expired_refresh_token() {
         .open_refresh_family(
             Uuid::new_v4(),
             RefreshFamily {
-                auth_time: Utc::now(),
+                auth_time: now,
                 client_id: "portal".to_string(),
-                expires_at: NumericDate::from(Utc::now()),
+                expires_at: NumericDate::from(now),
                 scopes: BTreeSet::from([Scope::openid()]),
                 subject: END_USER_SUBJECT,
             },
             TokenDigest::of(EXPIRED_REFRESH_TOKEN),
+            NumericDate::from(now),
         )
         .await
         .expect("the fixture store opens the family");

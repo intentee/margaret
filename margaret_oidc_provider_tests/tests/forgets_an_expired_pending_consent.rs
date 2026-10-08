@@ -14,6 +14,7 @@ use margaret_registered_claims::numeric_date::NumericDate;
 async fn forgets_an_expired_pending_consent() {
     let fixture = ProviderFixture::start(Vec::new()).await;
     let id = Uuid::new_v4();
+    let now = NumericDate::from(Utc::now());
 
     fixture
         .clients
@@ -21,10 +22,11 @@ async fn forgets_an_expired_pending_consent() {
         .hold_pending_authorization(
             id,
             PendingAuthorization {
-                expires_at: NumericDate::from(Utc::now()),
+                expires_at: now,
                 grant: fixture_authorization_grant("spa", SPA_CALLBACK),
                 state: None,
             },
+            now,
         )
         .await
         .expect("the fixture store holds the consent");

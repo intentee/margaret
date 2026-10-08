@@ -50,6 +50,7 @@ mod tests {
     use margaret_container::framework_injection_role::FrameworkInjectionRole;
     use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_http_codegen::declared_routes::DeclaredRoutes;
     use margaret_http_codegen::http_plan::HttpPlan;
     use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
@@ -206,6 +207,7 @@ mod tests {
             index,
             &scan(index).expect("the serve inputs are scanned"),
             &handlers,
+            &DeclaredPostgresDatabase::Absent,
             &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")

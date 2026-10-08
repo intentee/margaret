@@ -12,10 +12,15 @@ members = [
     "margaret_attributes",
     "margaret_attributes_tests",
     "margaret_authorization_grants",
+    "margaret_authorization_grants_database",
+    "margaret_authorization_grants_schema",
     "margaret_authorization_server_client",
     "margaret_authorization_server_client_tests",
     "margaret_bearer_token_verification",
     "margaret_bearer_token_verification_tests",
+    "margaret_client_assertions_database",
+    "margaret_client_assertions_schema",
+    "margaret_cluster_tests/fixture",
     "margaret_client_credentials",
     "margaret_client_credentials_tests",
     "margaret_codegen",
@@ -45,11 +50,14 @@ members = [
     "margaret_container",
     "margaret_container_tests",
     "margaret_database",
+    "margaret_database_codegen",
+    "margaret_database_tests",
     "margaret_deadline",
     "margaret_declaration_anchor",
     "margaret_environment_variable",
     "margaret_environment_variable_codegen",
     "margaret_example",
+    "margaret_example_tests",
     "margaret_generated_module",
     "margaret_http",
     "margaret_http_codegen",
@@ -111,6 +119,8 @@ members = [
     "margaret_service",
     "margaret_service_codegen",
     "margaret_service_tests",
+    "margaret_signing_keys_database",
+    "margaret_signing_keys_schema",
     "margaret_spiffe_svid",
     "margaret_spiffe_svid_bundle",
     "margaret_spiffe_svid_bundle_tests",
@@ -231,8 +241,12 @@ margaret_asset_bag_codegen = { path = "margaret_asset_bag_codegen", version = "0
 margaret_attribute_arguments = { path = "margaret_attribute_arguments", version = "0.4.0" }
 margaret_attributes = { path = "margaret_attributes", version = "0.4.0" }
 margaret_authorization_grants = { path = "margaret_authorization_grants", version = "0.1.0" }
+margaret_authorization_grants_database = { path = "margaret_authorization_grants_database", version = "0.1.0" }
+margaret_authorization_grants_schema = { path = "margaret_authorization_grants_schema", version = "0.1.0" }
 margaret_authorization_server_client = { path = "margaret_authorization_server_client", version = "0.1.0" }
 margaret_bearer_token_verification = { path = "margaret_bearer_token_verification", version = "0.1.0" }
+margaret_client_assertions_database = { path = "margaret_client_assertions_database", version = "0.1.0" }
+margaret_client_assertions_schema = { path = "margaret_client_assertions_schema", version = "0.1.0" }
 margaret_client_credentials = { path = "margaret_client_credentials", version = "0.1.0" }
 margaret_codegen = { path = "margaret_codegen", version = "0.4.0" }
 margaret_codegen_tokens = { path = "margaret_codegen_tokens", version = "0.4.0" }
@@ -242,6 +256,7 @@ margaret_console_codegen = { path = "margaret_console_codegen", version = "0.4.0
 margaret_construction = { path = "margaret_construction", version = "0.1.0" }
 margaret_container = { path = "margaret_container", version = "0.4.0" }
 margaret_database = { path = "margaret_database", version = "0.1.0" }
+margaret_database_codegen = { path = "margaret_database_codegen", version = "0.1.0" }
 margaret_deadline = { path = "margaret_deadline", version = "0.1.0" }
 margaret_declaration_anchor = { path = "margaret_declaration_anchor", version = "0.1.0" }
 margaret_environment_variable = { path = "margaret_environment_variable", version = "0.1.0" }
@@ -292,6 +307,8 @@ margaret_schema_identifier_naming = { path = "margaret_schema_identifier_naming"
 margaret_serve_input_codegen = { path = "margaret_serve_input_codegen", version = "0.4.0" }
 margaret_service = { path = "margaret_service", version = "0.1.0" }
 margaret_service_codegen = { path = "margaret_service_codegen", version = "0.4.0" }
+margaret_signing_keys_database = { path = "margaret_signing_keys_database", version = "0.1.0" }
+margaret_signing_keys_schema = { path = "margaret_signing_keys_schema", version = "0.1.0" }
 margaret_spiffe_svid = { path = "margaret_spiffe_svid", version = "0.1.0" }
 margaret_spiffe_svid_bundle = { path = "margaret_spiffe_svid_bundle", version = "0.1.0" }
 margaret_spiffe_svid_client = { path = "margaret_spiffe_svid_client", version = "0.1.0" }

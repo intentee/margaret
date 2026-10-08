@@ -29,6 +29,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 margaret_attributes_tests = { path = "../margaret_attributes_tests" }
+margaret_database_codegen = { workspace = true }
 margaret_oauth_client_codegen = { workspace = true }
 margaret_tag_codegen_tests = { path = "../margaret_tag_codegen_tests" }
 margaret_token_issuance_codegen = { workspace = true }

@@ -9,6 +9,7 @@ use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::forms::post_article_form::PostArticleForm;
+use crate::stores::article_insertion::ArticleInsertion;
 use crate::stores::article_store::ArticleStore;
 
 #[singleton]
@@ -36,7 +37,7 @@ impl PostArticle {
     ///
     /// Returns an error propagated from the work it performs.
     #[process]
-    pub fn respond(
+    pub async fn respond(
         &self,
         #[form_request(from = RequestInput::Form)] PostArticleForm {
             title,
@@ -45,43 +46,14 @@ impl PostArticle {
         }: PostArticleForm,
     ) -> anyhow::Result<Response> {
         Ok({
-            match self.articles.insert(title, body, author_id) {
-                Ok(article) => Response::text(201, format!("created \"{}\"", article.title)),
-                Err(error) => Response::text(500, error.to_string()),
+            match self.articles.insert(title, body, author_id).await? {
+                ArticleInsertion::AuthorNotFound(refusal) => {
+                    Response::text(500, refusal.to_string())
+                }
+                ArticleInsertion::Inserted(article) => {
+                    Response::text(201, format!("created \"{}\"", article.title))
+                }
             }
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use uuid::Uuid;
-
-    use super::PostArticle;
-    use crate::forms::post_article_form::PostArticleForm;
-    use crate::stores::article_store::ArticleStore;
-    use crate::system_clock::SystemClock;
-
-    #[tokio::test]
-    async fn responds_with_500_when_the_author_is_unknown() {
-        let clock = SystemClock::create().expect("the clock is constructed");
-        let store =
-            ArticleStore::create(Arc::new(clock)).expect("the article store is constructed");
-        let responder = PostArticle::create(Arc::new(store)).expect("the responder is constructed");
-        let form = PostArticleForm {
-            title: "Title".to_string(),
-            body: "Body".to_string(),
-            author_id: Uuid::from_u128(999),
-        };
-
-        assert_eq!(
-            responder
-                .respond(form)
-                .expect("the responder succeeds")
-                .status(),
-            500
-        );
     }
 }

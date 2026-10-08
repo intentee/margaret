@@ -33,7 +33,6 @@ impl FromStr for DatabaseUrl {
 #[cfg(test)]
 mod tests {
     use super::DatabaseUrl;
-    use crate::database_error::DatabaseError;
 
     #[test]
     fn reads_the_connection_of_a_postgres_url() {
@@ -47,10 +46,13 @@ mod tests {
 
     #[test]
     fn rejects_a_value_that_is_not_a_postgres_url() {
-        assert!(matches!(
-            "postgresql://localhost:not-a-port/blog".parse::<DatabaseUrl>(),
-            Err(DatabaseError::MalformedUrl(_))
-        ));
+        assert_eq!(
+            "postgresql://localhost:not-a-port/blog"
+                .parse::<DatabaseUrl>()
+                .expect_err("the value is not a postgres url")
+                .to_string(),
+            "the database url is malformed: invalid connection string"
+        );
     }
 
     #[test]

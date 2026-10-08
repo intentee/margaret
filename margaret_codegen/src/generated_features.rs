@@ -49,14 +49,16 @@ impl GeneratedFeatures {
                 || has_services
                 || features.contains(GeneratedFeature::Websockets),
         );
-        features.enable_if(
+        features
+    }
+
+    pub(crate) fn enable_console(&mut self, index: &AttributeIndex) {
+        self.enable_if(
             GeneratedFeature::Console,
             index.has_framework_attribute(FrameworkAttribute::ConsoleCommand)
-                || features.contains(GeneratedFeature::Serves)
-                || features.contains(GeneratedFeature::Schema),
+                || self.contains(GeneratedFeature::Serves)
+                || self.contains(GeneratedFeature::Schema),
         );
-
-        features
     }
 
     pub(crate) fn contains(&self, feature: GeneratedFeature) -> bool {

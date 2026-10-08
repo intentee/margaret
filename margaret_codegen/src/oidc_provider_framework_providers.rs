@@ -7,7 +7,6 @@ use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
-use margaret_container::singleton_declaration::SingletonDeclaration;
 use margaret_oidc_provider_codegen::authorization_endpoint_url_path::authorization_endpoint_url_path;
 use margaret_oidc_provider_codegen::oidc_provider_item::OidcProviderItem;
 use margaret_oidc_provider_codegen::oidc_provider_item_path::oidc_provider_item_path;
@@ -17,6 +16,7 @@ use margaret_tag_codegen::subject_token_exchanger_binding::SubjectTokenExchanger
 use margaret_trusted_issuer_codegen::trusted_issuer_item::TrustedIssuerItem;
 use margaret_trusted_issuer_codegen::trusted_issuer_item_path::trusted_issuer_item_path;
 
+use crate::authorization_grants_store_canonical_path::authorization_grants_store_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
 
 fn constructed(
@@ -111,9 +111,7 @@ pub(crate) fn oidc_provider_framework_providers(
         ),
         endpoint(
             vec![
-                FrameworkDependency::DeclaredSingleton(
-                    SingletonDeclaration::StoresAuthorizationGrants,
-                ),
+                FrameworkDependency::Provider(authorization_grants_store_canonical_path()),
                 FrameworkDependency::TokenIssuance,
             ],
             OidcProviderItem::ConsentEndpoint,
@@ -147,9 +145,7 @@ pub(crate) fn oidc_provider_framework_providers(
             vec![
                 item(OidcProviderItem::AcceptedClients),
                 secret_store(),
-                FrameworkDependency::DeclaredSingleton(
-                    SingletonDeclaration::StoresAuthorizationGrants,
-                ),
+                FrameworkDependency::Provider(authorization_grants_store_canonical_path()),
                 aggregate(ProviderAggregate::AcceptedResources),
             ],
             OidcProviderItem::RevocationEndpoint,

@@ -4,6 +4,7 @@ use uuid::Uuid;
 use margaret_authorization_grants::code_redemption::CodeRedemption;
 use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 
+use crate::contract_instant::contract_instant;
 use crate::contract_issued_code::contract_issued_code;
 use crate::contract_token::contract_token;
 use crate::racing_instances::RACING_INSTANCES;
@@ -21,7 +22,7 @@ pub async fn concurrent_code_redemptions_admit_one(store: &dyn StoresAuthorizati
     let issued = contract_issued_code();
 
     store
-        .issue_code(code, issued.clone())
+        .issue_code(code, issued.clone(), contract_instant())
         .await
         .expect("the store issues the code");
 

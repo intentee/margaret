@@ -53,6 +53,7 @@ mod tests {
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -88,6 +89,7 @@ mod tests {
             &index,
             &scan(&index).expect("the serve inputs are scanned"),
             &[],
+            &DeclaredPostgresDatabase::Absent,
             &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")

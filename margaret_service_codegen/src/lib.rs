@@ -25,6 +25,7 @@ mod tests {
     use margaret_container::framework_injection_role::FrameworkInjectionRole;
     use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_http_codegen::server_uploads::ServerUploads;
@@ -40,9 +41,15 @@ mod tests {
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[], &DeclaredTokenIssuance::Absent)
-            .expect("the container is rendered")
-            .bindings
+        render_container(
+            index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container is rendered")
+        .bindings
     }
 
     fn serve_roots(index: &AttributeIndex) -> Vec<CanonicalPath> {
@@ -298,6 +305,7 @@ impl Flusher {
                     provided: service.concrete_path.clone(),
                 })
                 .collect::<Vec<FrameworkProvider>>(),
+            &DeclaredPostgresDatabase::Absent,
             &DeclaredTokenIssuance::Absent,
         )
         .expect("the container is rendered")

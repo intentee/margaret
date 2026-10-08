@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::token_digest::TokenDigest;
 
 use crate::code_redemption::CodeRedemption;
@@ -22,7 +23,8 @@ pub trait StoresAuthorizationGrants: Send + Sync {
     /// Returns an error when the application cannot reach its storage.
     async fn find_refresh_token(&self, token: TokenDigest) -> anyhow::Result<RefreshTokenLookup>;
 
-    /// Holds the pending authorization until a single take removes it.
+    /// Holds the pending authorization until a single take removes it, and forgets every pending
+    /// authorization that expired at or before `now`.
     ///
     /// # Errors
     ///
@@ -31,17 +33,25 @@ pub trait StoresAuthorizationGrants: Send + Sync {
         &self,
         id: Uuid,
         pending: PendingAuthorization,
+        now: NumericDate,
     ) -> anyhow::Result<()>;
 
-    /// Holds the issued code until its redemption.
+    /// Holds the issued code until it expires, and forgets every code that expired at or before
+    /// `now`.
     ///
     /// # Errors
     ///
     /// Returns an error when the application cannot reach its storage.
-    async fn issue_code(&self, code: TokenDigest, issued: IssuedCode) -> anyhow::Result<()>;
+    async fn issue_code(
+        &self,
+        code: TokenDigest,
+        issued: IssuedCode,
+        now: NumericDate,
+    ) -> anyhow::Result<()>;
 
     /// Opens the family with its first token, atomically across every instance, unless the family
-    /// was revoked before, which it reports as revoked.
+    /// was revoked before, which it reports as revoked; forgets every family, with its tokens, and
+    /// every revocation that expired at or before `now`.
     ///
     /// # Errors
     ///
@@ -51,6 +61,7 @@ pub trait StoresAuthorizationGrants: Send + Sync {
         family: Uuid,
         record: RefreshFamily,
         first_token: TokenDigest,
+        now: NumericDate,
     ) -> anyhow::Result<FamilyOpening>;
 
     /// Redeems the code for the family exactly once across every instance, reporting every later
@@ -61,15 +72,17 @@ pub trait StoresAuthorizationGrants: Send + Sync {
     /// Returns an error when the application cannot reach its storage.
     async fn redeem_code(&self, code: TokenDigest, family: Uuid) -> anyhow::Result<CodeRedemption>;
 
-    /// Revokes the family for good, including a family that is not opened yet.
+    /// Revokes the family until it expires; a family that is not opened yet stays revoked for the
+    /// refresh family lifetime after `now`.
     ///
     /// # Errors
     ///
     /// Returns an error when the application cannot reach its storage.
-    async fn revoke_refresh_family(&self, family: Uuid) -> anyhow::Result<()>;
+    async fn revoke_refresh_family(&self, family: Uuid, now: NumericDate) -> anyhow::Result<()>;
 
     /// Replaces the presented current token with the next one exactly once across every instance,
-    /// reporting every other rotation of the same token as superseded.
+    /// reporting every other rotation of the same token as superseded; forgets every family, with
+    /// its tokens, and every revocation that expired at or before `now`.
     ///
     /// # Errors
     ///
@@ -78,6 +91,7 @@ pub trait StoresAuthorizationGrants: Send + Sync {
         &self,
         presented: TokenDigest,
         next: TokenDigest,
+        now: NumericDate,
     ) -> anyhow::Result<RefreshRotation>;
 
     /// Removes and returns the pending authorization exactly once across every instance.

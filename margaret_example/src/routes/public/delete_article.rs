@@ -29,12 +29,12 @@ impl DeleteArticle {
     ///
     /// Returns an error propagated from the work it performs.
     #[process]
-    pub fn respond(
+    pub async fn respond(
         &self,
         #[route_parameter(from = "article")] Article { id, title, .. }: Article,
     ) -> anyhow::Result<Response> {
         Ok({
-            self.articles.remove(id);
+            self.articles.remove(id).await?;
 
             Response::text(200, format!("deleted \"{title}\""))
         })

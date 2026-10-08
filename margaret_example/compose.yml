@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE_NAME}:${POSTGRES_IMAGE_TAG}
+    environment:
+      POSTGRES_DB: margaret_example
+      POSTGRES_PASSWORD: margaret_example
+      POSTGRES_USER: margaret_example
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - --dbname
+        - margaret_example
+        - --host
+        - 127.0.0.1
+        - --username
+        - margaret_example
+      interval: 1s
+    ports:
+      - 127.0.0.1::5432

@@ -14,6 +14,7 @@ const EXPIRED_CODE: &str = "an-authorization-code-that-expired";
 #[tokio::test]
 async fn refuses_an_expired_authorization_code() {
     let fixture = ProviderFixture::start(Vec::new()).await;
+    let now = NumericDate::from(Utc::now());
 
     fixture
         .clients
@@ -21,9 +22,10 @@ async fn refuses_an_expired_authorization_code() {
         .issue_code(
             TokenDigest::of(EXPIRED_CODE),
             IssuedCode {
-                expires_at: NumericDate::from(Utc::now()),
+                expires_at: now,
                 grant: fixture_authorization_grant("portal", PORTAL_CALLBACK),
             },
+            now,
         )
         .await
         .expect("the fixture store issues the code");

@@ -8,3 +8,5 @@ pub mod ci_runner;
 pub mod translation_note;
 pub mod translation_review;
 pub mod user;
+pub mod user_account;
+pub mod user_session;

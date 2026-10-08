@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use margaret_authorization_grants::pending_authorization::PendingAuthorization;
+use margaret_authorization_grants::refresh_family_lifetime::REFRESH_FAMILY_LIFETIME;
 use margaret_authorization_grants::refresh_rotation::RefreshRotation;
+use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::random_token::random_token;
 use margaret_token_digest::token_digest::TokenDigest;
 
@@ -30,6 +32,15 @@ impl FixtureGrantRecords {
         })
     }
 
+    pub(crate) fn revoke(&mut self, family: Uuid, now: NumericDate) {
+        self.families.insert(
+            family,
+            FixtureFamily::Revoked {
+                expires_at: now.after(REFRESH_FAMILY_LIFETIME),
+            },
+        );
+    }
+
     pub(crate) fn rotate_current(
         &mut self,
         interference: GrantInterference,
@@ -52,6 +63,24 @@ impl FixtureGrantRecords {
                 RefreshRotation::Rotated
             }
         }
+    }
+
+    pub(crate) fn sweep_codes(&mut self, now: NumericDate) {
+        self.codes.retain(|_, code| code.expires_at() > now);
+    }
+
+    pub(crate) fn sweep_families(&mut self, now: NumericDate) {
+        self.families.retain(|_, family| family.expires_at() > now);
+
+        let Self {
+            families, tokens, ..
+        } = self;
+
+        tokens.retain(|_, token| families.contains_key(&token.family));
+    }
+
+    pub(crate) fn sweep_pending(&mut self, now: NumericDate) {
+        self.pending.retain(|_, pending| pending.expires_at > now);
     }
 
     fn supersede(&mut self, presented: TokenDigest, next: TokenDigest, family: Uuid) {

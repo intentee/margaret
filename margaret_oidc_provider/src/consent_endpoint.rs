@@ -65,7 +65,11 @@ impl ConsentEndpoint {
                 let code = random_token();
 
                 self.grants
-                    .issue_code(TokenDigest::of(&code), IssuedCode::issued_at(now, grant))
+                    .issue_code(
+                        TokenDigest::of(&code),
+                        IssuedCode::issued_at(now, grant),
+                        now,
+                    )
                     .await
                     .map_err(ProviderError::IssueCode)
                     .map(|()| ConsentOutcome::Redirected(redirection.code(&code)))

@@ -31,7 +31,7 @@ impl GetArticles {
     ///
     /// Returns an error propagated from the work it performs.
     #[process]
-    pub fn respond(
+    pub async fn respond(
         &self,
         routes: &Routes,
         #[form_request(from = RequestInput::Query)] GetArticlesForm { author }: GetArticlesForm,
@@ -41,6 +41,7 @@ impl GetArticles {
             let links = self
                 .articles
                 .all()
+                .await?
                 .into_iter()
                 .filter(|article| match author {
                     Some(author) => article.author.name == author,

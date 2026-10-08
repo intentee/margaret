@@ -1924,12 +1924,15 @@ dependencies = [
  "margaret_access_token_minter",
  "margaret_asset_bag",
  "margaret_authorization_grants",
+ "margaret_authorization_grants_database",
  "margaret_authorization_server_client",
  "margaret_bearer_token_verification",
+ "margaret_client_assertions_database",
  "margaret_client_credentials",
  "margaret_codegen",
  "margaret_console",
  "margaret_construction",
+ "margaret_database",
  "margaret_environment_variable",
  "margaret_http",
  "margaret_http_uploaded_file",
@@ -1959,6 +1962,7 @@ dependencies = [
  "margaret_route_method",
  "margaret_route_parameter_binding",
  "margaret_service",
+ "margaret_signing_keys_database",
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_bundle",
  "margaret_spiffe_svid_client",
@@ -1977,6 +1981,7 @@ dependencies = [
  "margaret_websocket",
  "margaret_websocket_session",
  "oauth2",
+ "tokio-postgres",
 ]
 
 [[package]]
@@ -2130,7 +2135,38 @@ dependencies = [
  "margaret_oauth_vocabulary",
  "margaret_registered_claims",
  "margaret_token_digest",
+ "serde",
  "url",
+ "uuid",
+]
+
+[[package]]
+name = "margaret_authorization_grants_database"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "futures-util",
+ "margaret_authorization_grants",
+ "margaret_authorization_grants_schema",
+ "margaret_database",
+ "margaret_model",
+ "margaret_oauth_vocabulary",
+ "margaret_registered_claims",
+ "margaret_token_digest",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio-postgres",
+ "uuid",
+]
+
+[[package]]
+name = "margaret_authorization_grants_schema"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "margaret_macros",
  "uuid",
 ]
 
@@ -2236,6 +2272,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_client_assertions_database"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures-util",
+ "margaret_accepted_clients",
+ "margaret_database",
+ "margaret_model",
+ "margaret_registered_claims",
+ "margaret_token_digest",
+ "thiserror 2.0.18",
+ "tokio-postgres",
+]
+
+[[package]]
+name = "margaret_client_assertions_schema"
+version = "0.1.0"
+dependencies = [
+ "margaret_macros",
+]
+
+[[package]]
 name = "margaret_client_credentials"
 version = "0.1.0"
 dependencies = [
@@ -2269,6 +2328,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_cluster_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "cookie",
+ "margaret",
+ "maud",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "url",
+ "uuid",
+ "validator",
+]
+
+[[package]]
 name = "margaret_codegen"
 version = "0.4.0"
 dependencies = [
@@ -2277,8 +2358,11 @@ dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
  "margaret_attributes_tests",
+ "margaret_authorization_grants_schema",
+ "margaret_client_assertions_schema",
  "margaret_console_codegen",
  "margaret_container",
+ "margaret_database_codegen",
  "margaret_environment_variable_codegen",
  "margaret_generated_module",
  "margaret_http_codegen",
@@ -2292,6 +2376,7 @@ dependencies = [
  "margaret_schema_codegen",
  "margaret_serve_input_codegen",
  "margaret_service_codegen",
+ "margaret_signing_keys_schema",
  "margaret_tag_codegen",
  "margaret_token_issuance_codegen",
  "margaret_trusted_issuer_codegen",
@@ -2575,6 +2660,7 @@ dependencies = [
  "margaret_attributes_tests",
  "margaret_codegen_tokens",
  "margaret_container",
+ "margaret_database_codegen",
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_injection_codegen",
@@ -2604,6 +2690,7 @@ dependencies = [
  "margaret_attributes_tests",
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
+ "margaret_database_codegen",
  "margaret_environment_variable_codegen",
  "margaret_generated_module",
  "margaret_input_weaving",
@@ -2624,6 +2711,7 @@ dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
  "margaret_container",
+ "margaret_database_codegen",
  "margaret_environment_variable_codegen",
  "margaret_generated_module",
  "margaret_serve_input_codegen",
@@ -2642,6 +2730,27 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-postgres",
+]
+
+[[package]]
+name = "margaret_database_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attribute_arguments",
+ "margaret_attributes",
+ "margaret_attributes_tests",
+ "margaret_declaration_anchor",
+ "margaret_environment_variable_codegen",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "margaret_database_tests"
+version = "0.1.0"
+dependencies = [
+ "ephemeral-postgres",
+ "margaret_database",
+ "margaret_model",
 ]
 
 [[package]]
@@ -2693,10 +2802,8 @@ dependencies = [
  "chrono",
  "clap",
  "cookie",
- "dashmap",
  "margaret",
  "maud",
- "moka",
  "rust_decimal",
  "serde",
  "serde_json",
@@ -2708,6 +2815,17 @@ dependencies = [
  "url",
  "uuid",
  "validator",
+]
+
+[[package]]
+name = "margaret_example_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret",
+ "margaret_database_tests",
+ "margaret_example",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -2768,6 +2886,7 @@ dependencies = [
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
  "margaret_container",
+ "margaret_database_codegen",
  "margaret_generated_module",
  "margaret_injection_codegen",
  "margaret_item_naming_argument",
@@ -3245,6 +3364,7 @@ dependencies = [
  "margaret_attributes_tests",
  "margaret_codegen_tokens",
  "margaret_container",
+ "margaret_database_codegen",
  "margaret_generated_module",
  "margaret_injection_codegen",
  "margaret_oauth_client_codegen",
@@ -3396,6 +3516,7 @@ dependencies = [
  "margaret_attributes",
  "margaret_attributes_tests",
  "margaret_container",
+ "margaret_database_codegen",
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_jwks_codegen",
@@ -3611,6 +3732,7 @@ dependencies = [
  "margaret_attributes_tests",
  "margaret_codegen_tokens",
  "margaret_container",
+ "margaret_database_codegen",
  "margaret_generated_module",
  "margaret_injection_codegen",
  "margaret_item_naming_argument",
@@ -3686,8 +3808,7 @@ name = "margaret_schema_postgres_tests"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "ephemeral-postgres",
- "margaret_database",
+ "margaret_database_tests",
  "margaret_model",
  "margaret_schema_postgres_fixture",
  "rust_decimal",
@@ -3749,6 +3870,7 @@ dependencies = [
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
  "margaret_container",
+ "margaret_database_codegen",
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_injection_codegen",
@@ -3777,6 +3899,30 @@ dependencies = [
  "tokio",
  "tokio-util",
  "trzcina",
+]
+
+[[package]]
+name = "margaret_signing_keys_database"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures-util",
+ "margaret_database",
+ "margaret_jwks_keygen",
+ "margaret_jwks_roller",
+ "margaret_model",
+ "margaret_signing_keys_schema",
+ "thiserror 2.0.18",
+ "tokio-postgres",
+ "zeroize",
+]
+
+[[package]]
+name = "margaret_signing_keys_schema"
+version = "0.1.0"
+dependencies = [
+ "margaret_macros",
 ]
 
 [[package]]
@@ -3948,18 +4094,25 @@ dependencies = [
 name = "margaret_store_contract_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "futures-util",
  "margaret_accepted_clients",
  "margaret_accepted_clients_tests",
  "margaret_authorization_grants",
+ "margaret_authorization_grants_database",
+ "margaret_client_assertions_database",
+ "margaret_cluster_fixture",
+ "margaret_database_tests",
  "margaret_jwks_keygen",
  "margaret_jwks_keygen_tests",
  "margaret_jwks_roller",
  "margaret_jwks_roller_tests",
+ "margaret_model",
  "margaret_oauth_vocabulary",
  "margaret_oidc_provider_tests",
  "margaret_registered_claims",
+ "margaret_signing_keys_database",
  "margaret_token_digest",
  "tokio",
  "url",
@@ -4273,6 +4426,7 @@ dependencies = [
  "margaret_attributes_tests",
  "margaret_codegen_tokens",
  "margaret_container",
+ "margaret_database_codegen",
  "margaret_generated_module",
  "margaret_serve_input_codegen",
  "margaret_tag_codegen",
@@ -4314,6 +4468,7 @@ dependencies = [
  "margaret_attributes_tests",
  "margaret_codegen_tokens",
  "margaret_container",
+ "margaret_database_codegen",
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_injection_codegen",

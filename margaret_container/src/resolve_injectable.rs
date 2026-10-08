@@ -27,7 +27,8 @@ fn resolved_single(
         }),
         Some(ProviderBinding {
             injection:
-                FrameworkInjectionRole::OAuthClient(_)
+                FrameworkInjectionRole::FrameworkState
+                | FrameworkInjectionRole::OAuthClient(_)
                 | FrameworkInjectionRole::Runner
                 | FrameworkInjectionRole::TrustedIssuer(_),
             ..

@@ -6,6 +6,7 @@ use crate::foreign_key::ForeignKey;
 use crate::framework_namespace::FRAMEWORK_NAMESPACE;
 use crate::index::Index;
 use crate::on_delete::OnDelete;
+use crate::qualified_framework_table::qualified_framework_table;
 use crate::schema::Schema;
 use crate::table::Table;
 use crate::unique_constraint::UniqueConstraint;
@@ -17,11 +18,7 @@ fn quote_identifier(identifier: &str) -> String {
 fn qualified_table(namespace: TableNamespace, table: &str) -> String {
     match namespace {
         TableNamespace::Application => quote_identifier(table),
-        TableNamespace::Framework => format!(
-            "{}.{}",
-            quote_identifier(FRAMEWORK_NAMESPACE),
-            quote_identifier(table)
-        ),
+        TableNamespace::Framework => qualified_framework_table(table),
     }
 }
 

@@ -51,6 +51,7 @@ impl GetSignInCallback {
                     ..
                 }) => self
                     .signed_in(&subject, routes)
+                    .await?
                     .set_cookie(&transaction_removal),
                 SignInCompletion::Refused(refusal) => Response::text(403, refusal.to_string()),
                 SignInCompletion::SigningKeysAwaited => Response::text(
@@ -64,9 +65,9 @@ impl GetSignInCallback {
         )
     }
 
-    fn signed_in(&self, subject: &str, routes: &Routes) -> Response {
-        match Uuid::parse_str(subject) {
-            Ok(user_id) => match self.users.start_session(user_id) {
+    async fn signed_in(&self, subject: &str, routes: &Routes) -> anyhow::Result<Response> {
+        Ok(match Uuid::parse_str(subject) {
+            Ok(user_id) => match self.users.start_session(user_id).await? {
                 Some(session) => Redirect::see_other(routes.public.get_profile.url())
                     .into_response()
                     .set_cookie(&SessionCookie::issued(session)),
@@ -76,6 +77,6 @@ impl GetSignInCallback {
                 403,
                 format!("The signed-in subject is not a reader of the blog: {error}"),
             ),
-        }
+        })
     }
 }

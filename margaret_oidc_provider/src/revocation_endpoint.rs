@@ -70,17 +70,14 @@ impl RevocationEndpoint {
             ));
         };
         let now = Utc::now();
-        let client = match authenticated_client(
-            &self.clients,
-            request,
-            &client_authentication,
-            NumericDate::from(now),
-        )
-        .await?
-        {
-            ControlFlow::Break(refusal) => return Ok(refusal),
-            ControlFlow::Continue(registered) => &registered.client,
-        };
+        let instant = NumericDate::from(now);
+        let client =
+            match authenticated_client(&self.clients, request, &client_authentication, instant)
+                .await?
+            {
+                ControlFlow::Break(refusal) => return Ok(refusal),
+                ControlFlow::Continue(registered) => &registered.client,
+            };
 
         if let JwtVerification::Verified(_) =
             self.secret_store
@@ -103,7 +100,7 @@ impl RevocationEndpoint {
                 if record.client_id == client.client_id =>
             {
                 self.grants
-                    .revoke_refresh_family(family)
+                    .revoke_refresh_family(family, instant)
                     .await
                     .map_err(ProviderError::RevokeRefreshFamily)
                     .map(|()| revoked_or_invalid())

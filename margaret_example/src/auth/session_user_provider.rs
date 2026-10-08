@@ -34,7 +34,7 @@ impl SessionUserProvider {
     ///
     /// Returns an error propagated from the work it performs.
     #[infer_from_request]
-    pub fn infer_session_user(
+    pub async fn infer_session_user(
         &self,
         #[form_request(from = RequestInput::Cookie)] cookie: SessionCookie,
     ) -> anyhow::Result<AuthenticatedUserOutcome<User>> {
@@ -48,7 +48,7 @@ impl SessionUserProvider {
                 ));
             };
 
-            match self.users.find_user_by_session(session) {
+            match self.users.find_user_by_session(session).await? {
                 Some(user) => AuthenticatedUserOutcome::Authenticated(user),
                 None => AuthenticatedUserOutcome::Anonymous,
             }

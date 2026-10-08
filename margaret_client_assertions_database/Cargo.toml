@@ -1,0 +1,25 @@
+[package]
+name = "margaret_client_assertions_database"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Remembers the client assertions a Margaret provider accepted in its declared Postgres database."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+futures-util = { workspace = true }
+margaret_accepted_clients = { workspace = true }
+margaret_database = { workspace = true }
+margaret_model = { workspace = true }
+margaret_registered_claims = { workspace = true }
+margaret_token_digest = { workspace = true }
+thiserror = { workspace = true }
+tokio-postgres = { workspace = true }
+
+[lints]
+workspace = true

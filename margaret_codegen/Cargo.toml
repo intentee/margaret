@@ -14,8 +14,11 @@ margaret_accepted_clients_codegen = { workspace = true }
 margaret_asset_bag_codegen = { workspace = true }
 margaret_attribute_arguments = { workspace = true }
 margaret_attributes = { workspace = true }
+margaret_authorization_grants_schema = { workspace = true }
+margaret_client_assertions_schema = { workspace = true }
 margaret_console_codegen = { workspace = true }
 margaret_container = { workspace = true }
+margaret_database_codegen = { workspace = true }
 margaret_environment_variable_codegen = { workspace = true }
 margaret_generated_module = { workspace = true }
 margaret_http_codegen = { workspace = true }
@@ -29,6 +32,7 @@ margaret_request_binding_codegen = { workspace = true }
 margaret_schema_codegen = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
 margaret_service_codegen = { workspace = true }
+margaret_signing_keys_schema = { workspace = true }
 margaret_tag_codegen = { workspace = true }
 margaret_token_issuance_codegen = { workspace = true }
 margaret_trusted_issuer_codegen = { workspace = true }

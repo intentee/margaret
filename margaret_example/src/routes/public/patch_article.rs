@@ -36,7 +36,7 @@ impl PatchArticle {
     ///
     /// Returns an error propagated from the work it performs.
     #[process]
-    pub fn respond(
+    pub async fn respond(
         &self,
         #[route_parameter(from = "article")] Article {
             id,
@@ -57,18 +57,20 @@ impl PatchArticle {
             let title = title.unwrap_or(current_title);
             let body = body.unwrap_or(current_body);
 
-            self.articles.save(Article {
-                id,
-                title: title.clone(),
-                body,
-                cover,
-                published,
-                price,
-                reading_minutes,
-                status,
-                created_at,
-                author,
-            });
+            self.articles
+                .save(&Article {
+                    id,
+                    title: title.clone(),
+                    body,
+                    cover,
+                    published,
+                    price,
+                    reading_minutes,
+                    status,
+                    created_at,
+                    author,
+                })
+                .await?;
 
             Response::text(200, format!("updated \"{title}\""))
         })

@@ -4,6 +4,7 @@ use margaret_authorization_grants::family_opening::FamilyOpening;
 use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
 use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 
+use crate::contract_instant::contract_instant;
 use crate::contract_refresh_family::contract_refresh_family;
 use crate::contract_token::contract_token;
 
@@ -15,15 +16,16 @@ pub async fn refresh_family_revoked_before_opening_never_opens(
 ) {
     let family = Uuid::new_v4();
     let first_token = contract_token();
+    let now = contract_instant();
 
     store
-        .revoke_refresh_family(family)
+        .revoke_refresh_family(family, now)
         .await
         .expect("the store revokes the refresh family");
 
     assert_eq!(
         store
-            .open_refresh_family(family, contract_refresh_family(), first_token)
+            .open_refresh_family(family, contract_refresh_family(), first_token, now)
             .await
             .expect("the store opens refresh families"),
         FamilyOpening::Revoked

@@ -20,10 +20,24 @@ url = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 margaret_accepted_clients_tests = { path = "../margaret_accepted_clients_tests" }
+margaret_authorization_grants_database = { workspace = true }
+margaret_client_assertions_database = { workspace = true }
+margaret_cluster_fixture = { path = "../margaret_cluster_tests/fixture" }
+margaret_database_tests = { path = "../margaret_database_tests" }
 margaret_jwks_roller_tests = { path = "../margaret_jwks_roller_tests" }
+margaret_model = { workspace = true }
 margaret_oidc_provider_tests = { path = "../margaret_oidc_provider_tests" }
+margaret_signing_keys_database = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
+
+[features]
+tests_that_use_postgres = []
+
+[[test]]
+name = "database"
+path = "tests/database/main.rs"
 
 [[test]]
 name = "main"

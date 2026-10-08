@@ -1,24 +1,43 @@
 use std::sync::Arc;
 
-use dashmap::DashMap;
 use uuid::Uuid;
 
+use margaret::framework::database::database::Database;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::singleton;
+use margaret::framework::tokio_postgres::Row;
 
 use crate::models::user::User;
-use crate::stores::user_session::UserSession;
+use crate::stores::blog_store_error::BlogStoreError;
 use crate::system_clock::SystemClock;
 
-pub use super::milo_session::MILO_SESSION;
+const FIND_SESSION_USER: &str = "SELECT user_sessions.authenticated_at, users.id, users.name \
+     FROM user_sessions JOIN users ON users.id = user_sessions.user_id \
+     WHERE user_sessions.id = $1";
 
-const MILO: Uuid = Uuid::from_u128(3);
+const FIND_USER_NAME: &str = "SELECT name FROM users WHERE id = $1";
+
+const START_SESSION: &str = "INSERT INTO user_sessions (id, authenticated_at, user_id) \
+     SELECT $1, $2, users.id FROM users WHERE users.id = $3";
+
+fn session_user(row: &Row) -> Result<User, BlogStoreError> {
+    Ok(User {
+        authenticated_at: row
+            .try_get("authenticated_at")
+            .map_err(BlogStoreError::MalformedSessionRow)?,
+        id: row
+            .try_get("id")
+            .map_err(BlogStoreError::MalformedSessionRow)?,
+        name: row
+            .try_get("name")
+            .map_err(BlogStoreError::MalformedSessionRow)?,
+    })
+}
 
 #[singleton]
 pub struct UserStore {
     clock: Arc<SystemClock>,
-    names: DashMap<Uuid, String>,
-    sessions: DashMap<Uuid, UserSession>,
+    database: Arc<Database>,
 }
 
 impl UserStore {
@@ -26,90 +45,60 @@ impl UserStore {
     ///
     /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub fn create(clock: Arc<SystemClock>) -> anyhow::Result<Self> {
-        Ok({
-            let names = DashMap::new();
-            let sessions = DashMap::new();
-
-            names.insert(MILO, "Milo".to_string());
-            sessions.insert(
-                MILO_SESSION,
-                UserSession {
-                    authenticated_at: clock.now(),
-                    user_id: MILO,
-                },
-            );
-
-            Self {
-                clock,
-                names,
-                sessions,
-            }
-        })
+    pub fn create(clock: Arc<SystemClock>, database: Arc<Database>) -> anyhow::Result<Self> {
+        Ok(Self { clock, database })
     }
 
-    #[must_use]
-    pub fn find_user_by_session(&self, session: Uuid) -> Option<User> {
-        self.sessions.get(&session).and_then(|session| {
-            self.names.get(&session.user_id).map(|name| User {
-                authenticated_at: session.authenticated_at,
-                id: session.user_id,
-                name: name.value().clone(),
+    /// # Errors
+    ///
+    /// Returns `BlogStoreError` when the session cannot be read.
+    pub async fn find_user_by_session(
+        &self,
+        session: Uuid,
+    ) -> Result<Option<User>, BlogStoreError> {
+        self.database
+            .client()
+            .await
+            .map_err(BlogStoreError::Unavailable)?
+            .query_opt(FIND_SESSION_USER, &[&session])
+            .await
+            .map_err(BlogStoreError::FindSessionUser)?
+            .as_ref()
+            .map(session_user)
+            .transpose()
+    }
+
+    /// # Errors
+    ///
+    /// Returns `BlogStoreError` when the user cannot be read.
+    pub async fn find_user_name(&self, id: Uuid) -> Result<Option<String>, BlogStoreError> {
+        self.database
+            .client()
+            .await
+            .map_err(BlogStoreError::Unavailable)?
+            .query_opt(FIND_USER_NAME, &[&id])
+            .await
+            .map_err(BlogStoreError::FindUserName)?
+            .map(|row| {
+                row.try_get("name")
+                    .map_err(BlogStoreError::MalformedUserRow)
             })
-        })
+            .transpose()
     }
 
-    #[must_use]
-    pub fn find_user_name(&self, id: Uuid) -> Option<String> {
-        self.names.get(&id).map(|name| name.value().clone())
-    }
+    /// # Errors
+    ///
+    /// Returns `BlogStoreError` when the session cannot be stored.
+    pub async fn start_session(&self, user_id: Uuid) -> Result<Option<Uuid>, BlogStoreError> {
+        let session = Uuid::new_v4();
 
-    #[must_use]
-    pub fn start_session(&self, user_id: Uuid) -> Option<Uuid> {
-        self.names.contains_key(&user_id).then(|| {
-            let session = Uuid::new_v4();
-
-            self.sessions.insert(
-                session,
-                UserSession {
-                    authenticated_at: self.clock.now(),
-                    user_id,
-                },
-            );
-
-            session
-        })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use uuid::Uuid;
-
-    use super::MILO_SESSION;
-    use super::UserStore;
-    use crate::system_clock::SystemClock;
-
-    #[test]
-    fn finds_the_seeded_user_by_their_session() {
-        assert_eq!(
-            UserStore::create(Arc::new(SystemClock))
-                .expect("the user store is constructed")
-                .find_user_by_session(MILO_SESSION)
-                .map(|user| user.name),
-            Some("Milo".to_string())
-        );
-    }
-
-    #[test]
-    fn finds_no_user_for_an_unknown_session() {
-        assert!(
-            UserStore::create(Arc::new(SystemClock))
-                .expect("the user store is constructed")
-                .find_user_by_session(Uuid::from_u128(1))
-                .is_none()
-        );
+        self.database
+            .client()
+            .await
+            .map_err(BlogStoreError::Unavailable)?
+            .execute(START_SESSION, &[&session, &self.clock.now(), &user_id])
+            .await
+            .map_err(BlogStoreError::StartSession)
+            .map(|started| (started == 1).then_some(session))
     }
 }

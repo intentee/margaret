@@ -23,6 +23,7 @@ use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::plan_container::plan_container;
 use margaret_container::planned_container::PlannedContainer;
+use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::declared_routes::DeclaredRoutes;
 use margaret_http_codegen::http_artifacts::HttpArtifacts;
@@ -70,9 +71,12 @@ use crate::build_oauth_client_artifacts::build_oauth_client_artifacts;
 use crate::build_oidc_provider_artifacts::build_oidc_provider_artifacts;
 use crate::build_trusted_issuer_artifacts::build_trusted_issuer_artifacts;
 use crate::codegen_error::CodegenError;
+use crate::enabled_framework_schemas::enabled_framework_schemas;
 use crate::format_pass::format_pass;
 use crate::framework_declarations::FrameworkDeclarations;
 use crate::framework_modules::FrameworkModules;
+use crate::framework_schema_models::framework_schema_models;
+use crate::framework_state_providers::framework_state_providers;
 use crate::generated_code::GeneratedCode;
 use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
@@ -104,6 +108,7 @@ fn framework_providers(
     accepted_clients: &DeclaredAcceptedClients,
     exchanger_bindings: &[SubjectTokenExchangerBinding],
     routes: &DeclaredRoutes,
+    database: &DeclaredPostgresDatabase,
 ) -> Result<Vec<FrameworkProvider>, CodegenError> {
     let mut framework_providers = vec![FrameworkProvider {
         construction: FrameworkConstruction::Unit,
@@ -111,6 +116,7 @@ fn framework_providers(
         injection: FrameworkInjectionRole::Unmarked,
         provided: asset_responder_canonical_path(),
     }];
+    framework_providers.extend(framework_state_providers(database));
     framework_providers.extend(jwks_framework_providers());
     framework_providers.extend(trusted_issuer_framework_providers(trusts));
     framework_providers.extend(own_trusted_issuer_framework_providers(own_trusts));
@@ -359,11 +365,6 @@ fn render_role_modules(
         ));
     }
 
-    if features.contains(GeneratedFeature::Schema) {
-        let models = models(index)?;
-        modules.push(render_schema(&models, &[]));
-    }
-
     let console_roots = if features.contains(GeneratedFeature::Console) {
         let plan = ConsolePlan::build(index, bindings)?;
         let console = render_console(
@@ -512,6 +513,7 @@ pub fn build(
         .build();
     let mut features = GeneratedFeatures::from_index(&index);
     let registry = scan(&index)?;
+    let database = DeclaredPostgresDatabase::read(&index)?;
     let token_issuance = DeclaredTokenIssuance::read(&index)?;
     let trusts = DeclaredTrusts::read(&index)?;
     let oauth_clients = DeclaredOAuthClients::read(&index)?;
@@ -544,13 +546,26 @@ pub fn build(
         &accepted_clients,
         &exchanger_bindings,
         &declared_routes,
+        &database,
     )?;
-    let planned_container =
-        plan_container(&index, &registry, &framework_providers, &token_issuance)?;
+    let planned_container = plan_container(
+        &index,
+        &registry,
+        &framework_providers,
+        &database,
+        &token_issuance,
+    )?;
     let bindings = planned_container.bindings();
+    let framework_models = framework_schema_models(&enabled_framework_schemas(bindings))?;
     let mut module_tokens =
         asset_bag_modules(&index, metafile_contents, bindings, assets_directory)?;
     features.enable_if(GeneratedFeature::AssetBag, !module_tokens.is_empty());
+    features.enable_if(GeneratedFeature::Schema, !framework_models.is_empty());
+    features.enable_console(&index);
+
+    if features.contains(GeneratedFeature::Schema) {
+        module_tokens.push(render_schema(&models(&index)?, &framework_models));
+    }
 
     module_tokens.extend(issuance_modules(
         &token_issuance,
@@ -601,6 +616,8 @@ mod tests {
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_attributes_tests::source_crate::SourceCrate;
+    use margaret_container::container_error::ContainerError;
+    use margaret_database_codegen::database_codegen_error::DatabaseCodegenError;
     use margaret_generated_module::generated_module::GeneratedModule;
     use margaret_http_codegen::http_codegen_error::HttpCodegenError;
     use margaret_tag_codegen::tag_error::TagError;
@@ -653,6 +670,28 @@ impl Greet {
     #[process]
     fn run(&self) -> anyhow::Result<CommandOutcome> {}
 }
+";
+
+    const DATABASE_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/articles\", server = \"public\")]
+struct ListArticles {
+    database: std::sync::Arc<margaret::framework::database::database::Database>,
+}
+
+impl ListArticles {
+    #[constructor]
+    fn create(database: std::sync::Arc<margaret::framework::database::database::Database>) -> anyhow::Result<Self> {}
+
+    #[process]
+    fn respond(&self) -> anyhow::Result<Response> {}
+}
+
+#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\")]
+struct ApplicationDatabase;
 ";
 
     const MODELS_CRATE: &str = "\
@@ -985,11 +1024,8 @@ impl GetJwks {
     fn respond(&self) -> anyhow::Result<Response> {}
 }
 
-#[singleton]
-#[stores_signing_keys]
-struct SigningKeyStore;
-
-impl margaret::framework::jwks_roller::stores_signing_keys::StoresSigningKeys for SigningKeyStore {}
+#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\")]
+struct ApplicationDatabase;
 ";
 
     const JWKS_MULTI_CLIENT_CRATE: &str = "\
@@ -1043,11 +1079,8 @@ impl PostMint {
     fn respond(&self) -> anyhow::Result<Response> {}
 }
 
-#[singleton]
-#[stores_signing_keys]
-struct SigningKeyStore;
-
-impl margaret::framework::jwks_roller::stores_signing_keys::StoresSigningKeys for SigningKeyStore {}
+#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\")]
+struct ApplicationDatabase;
 ";
 
     const SPIFFE_HTTP_CLIENT_CRATE: &str = "\
@@ -1317,7 +1350,7 @@ impl GetIdentity {
         ));
         assert!(construction.contains(".public_jwks_handler()"));
         assert!(construction.contains(
-            "crate::margaret::jwks::JwksRoller::create(::std::sync::Arc::<crate::SigningKeyStore>::clone(&signing_key_store),"
+            "crate::margaret::jwks::JwksRoller::create(::std::sync::Arc::<margaret::framework::signing_keys_database::database_signing_keys::DatabaseSigningKeys,>::clone(&framework_signing_keys_database_database_signing_keys_database_signing_keys,),"
         ));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
@@ -1561,11 +1594,8 @@ impl SignIn {
     fn respond(&self) -> anyhow::Result<Response> {}
 }
 
-#[singleton]
-#[stores_signing_keys]
-struct SigningKeyStore;
-
-impl margaret::framework::jwks_roller::stores_signing_keys::StoresSigningKeys for SigningKeyStore {}
+#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\")]
+struct ApplicationDatabase;
 ";
 
     const OIDC_PROVIDER_CRATE: &str = "\
@@ -1734,23 +1764,8 @@ impl PostConsent {
 }
 
 
-#[singleton]
-#[stores_signing_keys]
-struct SigningKeyStore;
-
-impl margaret::framework::jwks_roller::stores_signing_keys::StoresSigningKeys for SigningKeyStore {}
-
-#[singleton]
-#[stores_authorization_grants]
-struct GrantStore;
-
-impl margaret::framework::authorization_grants::stores_authorization_grants::StoresAuthorizationGrants for GrantStore {}
-
-#[singleton]
-#[remembers_client_assertions]
-struct AssertionLedger;
-
-impl margaret::framework::accepted_clients::remembers_client_assertions::RemembersClientAssertions for AssertionLedger {}
+#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\")]
+struct ApplicationDatabase;
 ";
 
     #[test]
@@ -1792,13 +1807,22 @@ impl margaret::framework::accepted_clients::remembers_client_assertions::Remembe
             "crate::margaret::oidc_provider::subject_token_exchangers::ci::SubjectTokenExchanger::create(::std::sync::Arc::<crate::margaret::trusted_issuers::ci::TrustedIssuer,>::clone(&margaret_trusted_issuers_ci_trusted_issuer),::std::sync::Arc::<crate::CiExchanger>::clone(&ci_exchanger),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::oidc_provider::ConsentEndpoint::create(::std::sync::Arc::<crate::GrantStore>::clone(&grant_store),crate::margaret::token_issuance::TOKEN_ISSUANCE,)"
+            "crate::margaret::oidc_provider::ConsentEndpoint::create(::std::sync::Arc::<margaret::framework::authorization_grants_database::database_authorization_grants::DatabaseAuthorizationGrants,>::clone(&framework_authorization_grants_database_database_authorization_grants_database_authorization_grants,),crate::margaret::token_issuance::TOKEN_ISSUANCE,)"
         ));
         assert!(construction.contains(
-            "crate::margaret::oidc_provider::RevocationEndpoint::create(::std::sync::Arc::<crate::margaret::oidc_provider::AcceptedClients,>::clone(&margaret_oidc_provider_accepted_clients),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),::std::sync::Arc::<crate::GrantStore>::clone(&grant_store),crate::margaret::accepted_clients::accepted_resources::ACCEPTED_RESOURCES,)"
+            "crate::margaret::oidc_provider::RevocationEndpoint::create(::std::sync::Arc::<crate::margaret::oidc_provider::AcceptedClients,>::clone(&margaret_oidc_provider_accepted_clients),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),::std::sync::Arc::<margaret::framework::authorization_grants_database::database_authorization_grants::DatabaseAuthorizationGrants,>::clone(&framework_authorization_grants_database_database_authorization_grants_database_authorization_grants,),crate::margaret::accepted_clients::accepted_resources::ACCEPTED_RESOURCES,)"
         ));
-        assert!(!module(&code, "serve").contains("read_required"));
-        assert!(!has_module(&code, "schema"));
+        assert!(
+            module(&code, "serve")
+                .split_whitespace()
+                .collect::<String>()
+                .contains("letserve_input_0=matchmargaret::framework::environment_variable::read_required::read_required::<margaret::framework::database::database_url::DatabaseUrl,>(\"APPLICATION_DATABASE_URL\")")
+        );
+        assert!(!module(&code, "serve").contains("serve_input_1"));
+        assert!(module(&code, "schema").contains("framework_tables"));
+        assert!(module(&code, "schema").contains("\"pending_authorizations\""));
+        assert!(module(&code, "schema").contains("\"client_assertions\""));
+        assert!(module(&code, "schema").contains("\"signing_key_sets\""));
         assert!(
             module(&code, "serve")
                 .split_whitespace()
@@ -1819,15 +1843,15 @@ impl margaret::framework::accepted_clients::remembers_client_assertions::Remembe
 
         assert!(module(&code, "mod").contains("pub mod accepted_clients;"));
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::portal_client::RegisteredClient::private_key_jwt_with_code_grant(crate::margaret::accepted_clients::clients::portal_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::portal_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_client_key_set),::std::sync::Arc::<crate::AssertionLedger>::clone(&assertion_ledger),crate::margaret::accepted_clients::clients::portal_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://portal.fixture/callback\"),]),::std::sync::Arc::<crate::GrantStore>::clone(&grant_store),)"
+            "crate::margaret::accepted_clients::clients::portal_client::RegisteredClient::private_key_jwt_with_code_grant(crate::margaret::accepted_clients::clients::portal_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::portal_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_client_key_set),::std::sync::Arc::<margaret::framework::client_assertions_database::database_client_assertions::DatabaseClientAssertions,>::clone(&framework_client_assertions_database_database_client_assertions_database_client_assertions,),crate::margaret::accepted_clients::clients::portal_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://portal.fixture/callback\"),]),::std::sync::Arc::<margaret::framework::authorization_grants_database::database_authorization_grants::DatabaseAuthorizationGrants,>::clone(&framework_authorization_grants_database_database_authorization_grants_database_authorization_grants,),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::service_client::RegisteredClient::private_key_jwt(crate::margaret::accepted_clients::clients::service_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::service_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::service_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_service_client_client_key_set),::std::sync::Arc::<crate::AssertionLedger>::clone(&assertion_ledger),)"
+            "crate::margaret::accepted_clients::clients::service_client::RegisteredClient::private_key_jwt(crate::margaret::accepted_clients::clients::service_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::service_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::service_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_service_client_client_key_set),::std::sync::Arc::<margaret::framework::client_assertions_database::database_client_assertions::DatabaseClientAssertions,>::clone(&framework_client_assertions_database_database_client_assertions_database_client_assertions,),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::kiosk_client::RegisteredClient::public_with_code_grant(crate::margaret::accepted_clients::clients::kiosk_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::kiosk_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://kiosk.fixture/callback\"),]),::std::sync::Arc::<crate::GrantStore>::clone(&grant_store),)"
+            "crate::margaret::accepted_clients::clients::kiosk_client::RegisteredClient::public_with_code_grant(crate::margaret::accepted_clients::clients::kiosk_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::kiosk_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://kiosk.fixture/callback\"),]),::std::sync::Arc::<margaret::framework::authorization_grants_database::database_authorization_grants::DatabaseAuthorizationGrants,>::clone(&framework_authorization_grants_database_database_authorization_grants_database_authorization_grants,),)"
         ));
-        assert!(!module(&code, "serve").contains("serve_input"));
+        assert!(!module(&code, "serve").contains("serve_input_1"));
         assert!(construction.contains(
             "crate::margaret::accepted_clients::clients::spa_client::RegisteredClient::public(crate::margaret::accepted_clients::clients::spa_client::accepted_client::ACCEPTED_CLIENT,)"
         ));
@@ -2008,14 +2032,14 @@ impl GetDiscovery {
             .collect();
 
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client,),::std::sync::Arc::<crate::margaret::jwks::JwksRoller,>::clone(&margaret_jwks_jwks_roller),serve_input_0,crate::margaret::oauth_clients::partner_client::sign_in_scopes::SIGN_IN_SCOPES,).map_err(margaret::framework::anyhow::Error::from)"
+            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client,),::std::sync::Arc::<crate::margaret::jwks::JwksRoller,>::clone(&margaret_jwks_jwks_roller),serve_input_1,crate::margaret::oauth_clients::partner_client::sign_in_scopes::SIGN_IN_SCOPES,).map_err(margaret::framework::anyhow::Error::from)"
         ));
         assert!(
             module(&code, "serve")
                 .split_whitespace()
                 .collect::<String>()
                 .contains(
-                    "letserve_input_0=margaret::framework::http::build_url::build_url(&origin_public,&[margaret::framework::http::url_segment::UrlSegment::Literal(\"/sign-in/callback\",),],);"
+                    "letserve_input_1=margaret::framework::http::build_url::build_url(&origin_public,&[margaret::framework::http::url_segment::UrlSegment::Literal(\"/sign-in/callback\",),],);"
                 )
         );
     }
@@ -2176,15 +2200,15 @@ impl GetDiscovery {
                 .split_whitespace()
                 .collect::<String>()
                 .contains(
-                    "letserve_input_0=margaret::framework::http::build_url::build_url(&origin_public,&[margaret::framework::http::url_segment::UrlSegment::Literal(\"/blog/callback\")],);"
+                    "letserve_input_1=margaret::framework::http::build_url::build_url(&origin_public,&[margaret::framework::http::url_segment::UrlSegment::Literal(\"/blog/callback\")],);"
                 )
         );
-        assert!(!module(&code, "serve").contains("serve_input_1"));
+        assert!(!module(&code, "serve").contains("serve_input_2"));
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::blog_app::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([serve_input_0.clone()]),"
+            "crate::margaret::accepted_clients::clients::blog_app::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([serve_input_1.clone()]),"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::blog::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::blog::AuthorizationServerClient,>::clone(&margaret_oauth_clients_blog_authorization_server_client),::std::sync::Arc::<crate::margaret::jwks::JwksRoller,>::clone(&margaret_jwks_jwks_roller),serve_input_0,crate::margaret::oauth_clients::blog::sign_in_scopes::SIGN_IN_SCOPES,)"
+            "crate::margaret::oauth_clients::blog::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::blog::AuthorizationServerClient,>::clone(&margaret_oauth_clients_blog_authorization_server_client),::std::sync::Arc::<crate::margaret::jwks::JwksRoller,>::clone(&margaret_jwks_jwks_roller),serve_input_1,crate::margaret::oauth_clients::blog::sign_in_scopes::SIGN_IN_SCOPES,)"
         ));
         assert_eq!(
             module(&code, "oauth_clients/blog/sign_in_scopes"),
@@ -2320,11 +2344,8 @@ struct Issuer;
 #[issues_resource_tokens(attachments, audience = \"attachments\")]
 struct AttachmentsResource;
 
-#[singleton]
-#[stores_signing_keys]
-struct SigningKeyStore;
-
-impl margaret::framework::jwks_roller::stores_signing_keys::StoresSigningKeys for SigningKeyStore {}
+#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\")]
+struct ApplicationDatabase;
 
 struct Claims;
 
@@ -2459,11 +2480,8 @@ impl GetJwks {
     fn respond(&self) -> anyhow::Result<Response> {}
 }
 
-#[singleton]
-#[stores_signing_keys]
-struct SigningKeyStore;
-
-impl margaret::framework::jwks_roller::stores_signing_keys::StoresSigningKeys for SigningKeyStore {}
+#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\")]
+struct ApplicationDatabase;
 ";
 
     #[test]
@@ -2505,11 +2523,8 @@ impl GetJwks {
     fn respond(&self) -> anyhow::Result<Response> {}
 }
 
-#[singleton]
-#[stores_signing_keys]
-struct SigningKeyStore;
-
-impl margaret::framework::jwks_roller::stores_signing_keys::StoresSigningKeys for SigningKeyStore {}
+#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\")]
+struct ApplicationDatabase;
 ";
 
     #[test]
@@ -3249,6 +3264,54 @@ impl New {
         assert!(!run.contains("pubasyncfnrun"));
         assert!(command.contains("\"schema\""));
         assert!(run.contains("super::schema::schema()"));
+    }
+
+    #[test]
+    fn generates_only_the_framework_tables_of_the_enabled_stores() {
+        let code = generate(JWKS_ROLLER_CRATE).expect("the build succeeds");
+        let run: String = module(&code, "run").split_whitespace().collect();
+
+        assert!(module(&code, "schema").contains("\"signing_key_sets\""));
+        assert!(!module(&code, "schema").contains("\"pending_authorizations\""));
+        assert!(!module(&code, "schema").contains("\"client_assertions\""));
+        assert!(run.contains("super::schema::schema()"));
+    }
+
+    #[test]
+    fn injects_the_declared_database_into_an_application_singleton() {
+        let code = generate(DATABASE_CRATE).expect("the build succeeds");
+        let construction: String = module(&code, "container/build/serve")
+            .split_whitespace()
+            .collect();
+
+        assert!(construction.contains(
+            "crate::ListArticles::create(::std::sync::Arc::clone(&framework_database_database_database),)"
+        ));
+        assert!(!has_module(&code, "schema"));
+    }
+
+    #[test]
+    fn rejects_a_postgres_database_nothing_uses() {
+        assert!(matches!(
+            generate(
+                "#[rustfmt::skip]\npub mod margaret;\n\n#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\")]\nstruct ApplicationDatabase;\n",
+            ),
+            Err(CodegenError::Container {
+                source: ContainerError::UnconsumedDeclaration { path },
+            }) if path == "margaret::framework::database::database::Database"
+        ));
+    }
+
+    #[test]
+    fn propagates_a_database_failure() {
+        assert!(matches!(
+            generate(
+                "#[rustfmt::skip]\npub mod margaret;\n\n#[postgres_database]\nstruct ApplicationDatabase;\n",
+            ),
+            Err(CodegenError::Database {
+                source: DatabaseCodegenError::MissingUrlSource { anchor },
+            }) if anchor == "crate::ApplicationDatabase"
+        ));
     }
 
     #[test]

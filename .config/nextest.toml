@@ -6,7 +6,7 @@ filter = 'package(~_spiffe_svid)'
 slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = 'package(margaret_schema_postgres_tests)'
+filter = 'package(margaret_schema_postgres_tests) | package(margaret_example_tests) | binary_id(margaret_store_contract_tests::database)'
 slow-timeout = { period = "3s", terminate-after = 2 }
 threads-required = 'num-test-threads'
 

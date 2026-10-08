@@ -2,9 +2,9 @@ use rust_decimal::Decimal;
 use tokio_postgres::error::SqlState;
 use uuid::Uuid;
 
+use margaret_database_tests::apply_schema::apply_schema;
+use margaret_database_tests::started_database::StartedDatabase;
 use margaret_schema_postgres_fixture::margaret::schema::schema;
-use margaret_schema_postgres_tests::apply_schema::apply_schema;
-use margaret_schema_postgres_tests::started_database::StartedDatabase;
 
 const INSERT_LINE_ITEM: &str = "INSERT INTO line_items (id, price, discount, weight_kg, volume_litres) VALUES ($1, $2, $3, $4, $5)";
 

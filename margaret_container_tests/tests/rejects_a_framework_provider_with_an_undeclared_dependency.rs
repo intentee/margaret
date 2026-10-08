@@ -9,6 +9,7 @@ use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
+use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_serve_input_codegen::scan::scan;
 use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -38,6 +39,7 @@ fn rejects_a_framework_provider_whose_dependency_is_not_declared() {
         &index,
         &registry,
         &[provider_of_an_undeclared_dependency()],
+        &DeclaredPostgresDatabase::Absent,
         &DeclaredTokenIssuance::Absent,
     )
     .err()

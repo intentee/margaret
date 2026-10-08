@@ -3,10 +3,10 @@ use std::collections::HashMap;
 
 use tokio_postgres::Client;
 
+use margaret_database_tests::apply_schema::apply_schema;
+use margaret_database_tests::started_database::StartedDatabase;
 use margaret_model::table::Table;
 use margaret_schema_postgres_fixture::margaret::schema::schema;
-use margaret_schema_postgres_tests::apply_schema::apply_schema;
-use margaret_schema_postgres_tests::started_database::StartedDatabase;
 
 #[derive(Debug, Eq, PartialEq)]
 struct ForeignKeyDefinition {

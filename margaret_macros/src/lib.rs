@@ -279,22 +279,12 @@ pub fn issues_tokens(_attributes: TokenStream, item: TokenStream) -> TokenStream
 }
 
 #[proc_macro_attribute]
+pub fn postgres_database(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
 pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
-pub fn remembers_client_assertions(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
-pub fn stores_authorization_grants(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
-pub fn stores_signing_keys(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 

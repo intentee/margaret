@@ -7,6 +7,7 @@ pub mod foreign_key;
 pub mod framework_namespace;
 pub mod index;
 pub mod on_delete;
+pub mod qualified_framework_table;
 pub mod render_postgres;
 pub mod schema;
 pub mod table;

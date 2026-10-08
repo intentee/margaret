@@ -8,6 +8,7 @@ use margaret_attributes::crate_root::CrateRoot;
 use margaret_container::injectable_resolution::InjectableResolution;
 use margaret_container::render_container::render_container;
 use margaret_container::resolve_injectable::resolve_injectable;
+use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_serve_input_codegen::scan::scan;
 use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -22,9 +23,15 @@ pub fn resolve_full_fixture(consumer: &str, declared: &str) -> InjectableResolut
         .expect("the full fixture crate is indexed")
         .build();
     let registry = scan(&index).expect("the console arguments are scanned");
-    let bindings = render_container(&index, &registry, &[], &DeclaredTokenIssuance::Absent)
-        .expect("the full fixture renders")
-        .bindings;
+    let bindings = render_container(
+        &index,
+        &registry,
+        &[],
+        &DeclaredPostgresDatabase::Absent,
+        &DeclaredTokenIssuance::Absent,
+    )
+    .expect("the full fixture renders")
+    .bindings;
     let item = index
         .items()
         .iter()

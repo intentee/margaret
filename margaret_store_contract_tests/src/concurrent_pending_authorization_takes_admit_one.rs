@@ -5,6 +5,7 @@ use margaret_authorization_grants::pending_authorization::PendingAuthorization;
 use margaret_authorization_grants::pending_authorization_take::PendingAuthorizationTake;
 use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 
+use crate::contract_instant::contract_instant;
 use crate::contract_pending_authorization::contract_pending_authorization;
 use crate::racing_instances::RACING_INSTANCES;
 
@@ -18,7 +19,7 @@ pub async fn concurrent_pending_authorization_takes_admit_one(
     let pending = contract_pending_authorization();
 
     store
-        .hold_pending_authorization(id, pending.clone())
+        .hold_pending_authorization(id, pending.clone(), contract_instant())
         .await
         .expect("the store holds the pending authorization");
 

@@ -38,6 +38,7 @@ mod tests {
     use margaret_container::framework_injection_role::FrameworkInjectionRole;
     use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
@@ -148,9 +149,15 @@ impl RespondsToWebSocketNotification for Typist {
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[], &DeclaredTokenIssuance::Absent)
-            .expect("the container renders")
-            .bindings
+        render_container(
+            index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings
     }
 
     fn collect_registries(
@@ -928,6 +935,7 @@ impl Bad {
                     "TrustedIssuer".to_string(),
                 ]),
             }],
+            &DeclaredPostgresDatabase::Absent,
             &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")

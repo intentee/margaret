@@ -65,6 +65,7 @@ mod tests {
     use margaret_container::framework_injection_role::FrameworkInjectionRole;
     use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_injection_codegen::process_method::process_method;
     use margaret_route_parameter_codegen::route_path::RoutePath;
     use margaret_serve_input_codegen::scan::scan;
@@ -101,9 +102,15 @@ struct User;
         let index = IndexedSource::new("").index;
         let registry = scan(&index).expect("the empty console argument registry is scanned");
 
-        render_container(&index, &registry, &[], &DeclaredTokenIssuance::Absent)
-            .expect("the empty container is rendered")
-            .bindings
+        render_container(
+            &index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the empty container is rendered")
+        .bindings
     }
 
     fn trusted_issuer_provider(tag: &str) -> FrameworkProvider {
@@ -161,6 +168,7 @@ struct User;
                 oauth_client_provider("partner_client"),
                 oauth_client_provider("second_client"),
             ],
+            &DeclaredPostgresDatabase::Absent,
             &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")
@@ -645,9 +653,15 @@ impl SessionUserProvider {
     fn collects_the_console_arguments_a_binding_pulls_in() {
         let index = IndexedSource::new(&provider_source(CONSOLE_ARGUMENT_PROVIDER)).index;
         let registry = scan(&index).expect("the console arguments are scanned");
-        let bindings = render_container(&index, &registry, &[], &DeclaredTokenIssuance::Absent)
-            .expect("the container renders")
-            .bindings;
+        let bindings = render_container(
+            &index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings;
         let registries = collect_registries(&index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
         let providers = registries.providers();
@@ -1288,6 +1302,7 @@ struct SecondClient;
                 },
                 ..trusted_issuer_provider("partner")
             }],
+            &DeclaredPostgresDatabase::Absent,
             &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")

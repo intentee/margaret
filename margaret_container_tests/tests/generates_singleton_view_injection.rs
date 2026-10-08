@@ -11,6 +11,7 @@ use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_container_tests::container_module_source::container_module_source;
+use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_serve_input_codegen::scan::scan;
 use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -46,6 +47,7 @@ fn viewed_singleton_container() -> String {
             &index,
             &serve_inputs,
             &[catalog_runtime_provider()],
+            &DeclaredPostgresDatabase::Absent,
             &DeclaredTokenIssuance::Absent,
         )
         .expect("the viewed singleton fixture renders")

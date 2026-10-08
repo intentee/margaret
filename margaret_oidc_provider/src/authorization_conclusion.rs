@@ -43,7 +43,11 @@ impl AuthorizationConclusion {
             let code = random_token();
 
             return grants
-                .issue_code(TokenDigest::of(&code), IssuedCode::issued_at(now, grant))
+                .issue_code(
+                    TokenDigest::of(&code),
+                    IssuedCode::issued_at(now, grant),
+                    now,
+                )
                 .await
                 .map_err(ProviderError::IssueCode)
                 .map(|()| AuthorizationOutcome::Redirected(redirection.code(&code)));
@@ -66,6 +70,7 @@ impl AuthorizationConclusion {
             .hold_pending_authorization(
                 id,
                 PendingAuthorization::held_at(now, grant, redirection.state),
+                now,
             )
             .await
             .map_err(ProviderError::HoldPendingAuthorization)

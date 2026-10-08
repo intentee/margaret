@@ -5,13 +5,10 @@ edition = "2024"
 publish = false
 autotests = false
 
-[dependencies]
-ephemeral-postgres = { workspace = true }
-margaret_database = { workspace = true }
-margaret_model = { workspace = true }
-
 [dev-dependencies]
 chrono = { workspace = true, features = ["clock"] }
+margaret_database_tests = { path = "../margaret_database_tests" }
+margaret_model = { workspace = true }
 margaret_schema_postgres_fixture = { path = "fixture" }
 rust_decimal = { workspace = true, features = ["db-tokio-postgres"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

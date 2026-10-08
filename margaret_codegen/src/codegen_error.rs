@@ -9,6 +9,7 @@ use margaret_asset_bag_codegen::asset_bag_codegen_error::AssetBagCodegenError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
 use margaret_container::container_error::ContainerError;
+use margaret_database_codegen::database_codegen_error::DatabaseCodegenError;
 use margaret_generated_module::generated_module_error::GeneratedModuleError;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
@@ -36,6 +37,25 @@ pub enum CodegenError {
     AssetBag {
         #[from]
         source: AssetBagCodegenError,
+    },
+
+    #[error("failed to index the framework schema crate {schema}: {source}")]
+    FrameworkSchemaIndex {
+        schema: String,
+        #[source]
+        source: AttributeError,
+    },
+
+    #[error("failed to generate the framework models: {source}")]
+    FrameworkSchemaModels {
+        #[source]
+        source: ModelCodegenError,
+    },
+
+    #[error("failed to read the postgres database: {source}")]
+    Database {
+        #[from]
+        source: DatabaseCodegenError,
     },
 
     #[error("failed to read the token issuance: {source}")]

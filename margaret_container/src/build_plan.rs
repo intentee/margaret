@@ -14,6 +14,8 @@ use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::indexed_struct::IndexedStruct;
 use margaret_attributes::item_kind::ItemKind;
 use margaret_attributes::matched_attribute::MatchedAttribute;
+use margaret_database_codegen::database_canonical_path::database_canonical_path;
+use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_environment_variable_codegen::environment_variable::EnvironmentVariable;
 use margaret_input_weaving::input_value::InputValue;
 use margaret_input_weaving::weaving_kind::WeavingKind;
@@ -346,7 +348,8 @@ fn resolve_target(
 
     match restricted_role {
         Some(
-            FrameworkInjectionRole::OAuthClient(_)
+            FrameworkInjectionRole::FrameworkState
+            | FrameworkInjectionRole::OAuthClient(_)
             | FrameworkInjectionRole::Runner
             | FrameworkInjectionRole::TrustedIssuer(_),
         ) => Err(ContainerError::FrameworkOnlyProvider {
@@ -390,6 +393,7 @@ fn resolve_framework_providers(
     index: &AttributeIndex,
     drafted: &mut DraftedContainer,
     framework_providers: &[FrameworkProvider],
+    database: &DeclaredPostgresDatabase,
     token_issuance: &DeclaredTokenIssuance,
 ) -> Result<Vec<Provider>, ContainerError> {
     let declared = declared_framework_providers(framework_providers)?;
@@ -421,7 +425,7 @@ fn resolve_framework_providers(
         }
 
         let construction =
-            resolve_framework_construction(index, framework_provider, token_issuance)?;
+            resolve_framework_construction(index, framework_provider, database, token_issuance)?;
         let identifier = allocator.allocate(&field_base(&path));
         let field_name = identifier.field().to_string();
         let type_name = identifier.type_name().to_string();
@@ -470,6 +474,7 @@ fn declared_framework_providers(
 fn framework_dependency_kind(
     index: &AttributeIndex,
     dependency: &FrameworkDependency,
+    database: &DeclaredPostgresDatabase,
     token_issuance: &DeclaredTokenIssuance,
     provided: &CanonicalPath,
 ) -> Result<DependencyKind, ContainerError> {
@@ -487,9 +492,14 @@ fn framework_dependency_kind(
                 })),
             })
         }
-        FrameworkDependency::DeclaredSingleton(declaration) => {
-            declared_singleton(index, *declaration, provided)
-        }
+        FrameworkDependency::Database => match database {
+            DeclaredPostgresDatabase::Absent => Err(ContainerError::MissingPostgresDatabase {
+                provider: provided.to_string(),
+            }),
+            DeclaredPostgresDatabase::Declared(_) => Ok(DependencyKind::Single {
+                provider_key: database_canonical_path(),
+            }),
+        },
         FrameworkDependency::Provider(provider_key)
         | FrameworkDependency::SingletonView(provider_key) => Ok(DependencyKind::Single {
             provider_key: provider_key.clone(),
@@ -514,44 +524,18 @@ fn framework_dependency_kind(
     }
 }
 
-fn declared_singleton(
-    index: &AttributeIndex,
-    declaration: SingletonDeclaration,
-    provided: &CanonicalPath,
-) -> Result<DependencyKind, ContainerError> {
-    let declared: Vec<CanonicalPath> = index
-        .select_framework_attribute(declaration.attribute())
-        .map(|matched| matched.item().canonical_path().clone())
-        .collect();
-
-    match declared.as_slice() {
-        [provider_key] => Ok(DependencyKind::Single {
-            provider_key: provider_key.clone(),
-        }),
-        [] => Err(ContainerError::MissingDeclaredSingleton {
-            attribute: declaration.attribute().name(),
-            provider: provided.to_string(),
-        }),
-        [..] => Err(ContainerError::AmbiguousDeclaredSingleton {
-            attribute: declaration.attribute().name(),
-            paths: declared
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<String>>()
-                .join(", "),
-        }),
-    }
-}
-
 fn framework_dependency_kinds(
     index: &AttributeIndex,
     dependencies: &[FrameworkDependency],
+    database: &DeclaredPostgresDatabase,
     token_issuance: &DeclaredTokenIssuance,
     provided: &CanonicalPath,
 ) -> Result<Vec<DependencyKind>, ContainerError> {
     dependencies
         .iter()
-        .map(|dependency| framework_dependency_kind(index, dependency, token_issuance, provided))
+        .map(|dependency| {
+            framework_dependency_kind(index, dependency, database, token_issuance, provided)
+        })
         .collect()
 }
 
@@ -562,6 +546,7 @@ fn resolve_framework_construction(
         provided,
         ..
     }: &FrameworkProvider,
+    database: &DeclaredPostgresDatabase,
     token_issuance: &DeclaredTokenIssuance,
 ) -> Result<DirectConstruction, ContainerError> {
     Ok(match construction {
@@ -582,6 +567,7 @@ fn resolve_framework_construction(
             dependencies: framework_dependency_kinds(
                 index,
                 dependencies,
+                database,
                 token_issuance,
                 provided,
             )?,
@@ -602,7 +588,7 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
                 FrameworkDependency::Provider(provider_key) => std::slice::from_ref(provider_key),
                 FrameworkDependency::Providers(provider_keys) => provider_keys.as_slice(),
                 FrameworkDependency::Constant(_)
-                | FrameworkDependency::DeclaredSingleton(_)
+                | FrameworkDependency::Database
                 | FrameworkDependency::EnvironmentVariable { .. }
                 | FrameworkDependency::RouteUrl(_)
                 | FrameworkDependency::SingletonView(_)
@@ -682,11 +668,17 @@ pub(crate) fn build_plan(
     index: &AttributeIndex,
     serve_inputs: &DeclaredServeInputs,
     framework_providers: &[FrameworkProvider],
+    database: &DeclaredPostgresDatabase,
     token_issuance: &DeclaredTokenIssuance,
 ) -> Result<ContainerPlan, ContainerError> {
     let mut drafted = build_drafts(index)?;
-    let resolved_framework_providers =
-        resolve_framework_providers(index, &mut drafted, framework_providers, token_issuance)?;
+    let resolved_framework_providers = resolve_framework_providers(
+        index,
+        &mut drafted,
+        framework_providers,
+        database,
+        token_issuance,
+    )?;
     let DraftedContainer {
         construction_drafts,
         provided_keys,

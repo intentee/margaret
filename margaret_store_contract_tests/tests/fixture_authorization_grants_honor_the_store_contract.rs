@@ -1,3 +1,9 @@
+use margaret_store_contract_tests::holding_a_pending_authorization_sweeps_expired_ones::holding_a_pending_authorization_sweeps_expired_ones;
+use margaret_store_contract_tests::issuing_a_code_sweeps_expired_codes::issuing_a_code_sweeps_expired_codes;
+use margaret_store_contract_tests::opening_a_refresh_family_sweeps_expired_families::opening_a_refresh_family_sweeps_expired_families;
+use margaret_store_contract_tests::rotating_a_refresh_token_sweeps_expired_families::rotating_a_refresh_token_sweeps_expired_families;
+use margaret_store_contract_tests::revoking_an_unopened_family_bars_it_for_the_refresh_family_lifetime::revoking_an_unopened_family_bars_it_for_the_refresh_family_lifetime;
+use margaret_store_contract_tests::opening_a_refresh_family_sweeps_expired_revocations::opening_a_refresh_family_sweeps_expired_revocations;
 use margaret_oidc_provider_tests::fixture_authorization_grants::FixtureAuthorizationGrants;
 
 use margaret_store_contract_tests::code_redemption_finds_no_unknown_code::code_redemption_finds_no_unknown_code;
@@ -65,5 +71,43 @@ async fn revoked_refresh_family_neither_resolves_nor_rotates_for_the_fixture_sto
 #[tokio::test]
 async fn refresh_family_revoked_before_opening_never_opens_for_the_fixture_store() {
     refresh_family_revoked_before_opening_never_opens(&FixtureAuthorizationGrants::undisturbed())
+        .await;
+}
+
+#[tokio::test]
+async fn holding_a_pending_authorization_sweeps_expired_ones_for_the_fixture_store() {
+    holding_a_pending_authorization_sweeps_expired_ones(&FixtureAuthorizationGrants::undisturbed())
+        .await;
+}
+
+#[tokio::test]
+async fn issuing_a_code_sweeps_expired_codes_for_the_fixture_store() {
+    issuing_a_code_sweeps_expired_codes(&FixtureAuthorizationGrants::undisturbed()).await;
+}
+
+#[tokio::test]
+async fn opening_a_refresh_family_sweeps_expired_families_for_the_fixture_store() {
+    opening_a_refresh_family_sweeps_expired_families(&FixtureAuthorizationGrants::undisturbed())
+        .await;
+}
+
+#[tokio::test]
+async fn rotating_a_refresh_token_sweeps_expired_families_for_the_fixture_store() {
+    rotating_a_refresh_token_sweeps_expired_families(&FixtureAuthorizationGrants::undisturbed())
+        .await;
+}
+
+#[tokio::test]
+async fn revoking_an_unopened_family_bars_it_for_the_refresh_family_lifetime_for_the_fixture_store()
+{
+    revoking_an_unopened_family_bars_it_for_the_refresh_family_lifetime(
+        &FixtureAuthorizationGrants::undisturbed(),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn opening_a_refresh_family_sweeps_expired_revocations_for_the_fixture_store() {
+    opening_a_refresh_family_sweeps_expired_revocations(&FixtureAuthorizationGrants::undisturbed())
         .await;
 }

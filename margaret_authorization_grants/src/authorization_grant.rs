@@ -2,13 +2,15 @@ use std::collections::BTreeSet;
 
 use chrono::DateTime;
 use chrono::Utc;
+use serde::Deserialize;
+use serde::Serialize;
 use url::Url;
 use uuid::Uuid;
 
 use margaret_oauth_vocabulary::code_challenge::CodeChallenge;
 use margaret_oauth_vocabulary::scope::Scope;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AuthorizationGrant {
     pub auth_time: DateTime<Utc>,
     pub client_id: String,

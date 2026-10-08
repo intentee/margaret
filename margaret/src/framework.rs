@@ -9,9 +9,13 @@ pub use margaret_asset_bag as asset_bag;
 #[cfg(feature = "runtime")]
 pub use margaret_authorization_grants as authorization_grants;
 #[cfg(feature = "runtime")]
+pub use margaret_authorization_grants_database as authorization_grants_database;
+#[cfg(feature = "runtime")]
 pub use margaret_authorization_server_client as authorization_server_client;
 #[cfg(feature = "runtime")]
 pub use margaret_bearer_token_verification as bearer_token_verification;
+#[cfg(feature = "runtime")]
+pub use margaret_client_assertions_database as client_assertions_database;
 #[cfg(feature = "runtime")]
 pub use margaret_client_credentials as client_credentials;
 #[cfg(feature = "codegen")]
@@ -22,6 +26,8 @@ pub use margaret_console as console;
 pub use margaret_construction::construct_singleton;
 #[cfg(feature = "runtime")]
 pub use margaret_construction::construction_error;
+#[cfg(feature = "runtime")]
+pub use margaret_database as database;
 #[cfg(feature = "runtime")]
 pub use margaret_environment_variable as environment_variable;
 #[cfg(feature = "runtime")]
@@ -81,6 +87,8 @@ pub use margaret_route_parameter_binding as route_parameter_binding;
 #[cfg(feature = "runtime")]
 pub use margaret_service as service;
 #[cfg(feature = "runtime")]
+pub use margaret_signing_keys_database as signing_keys_database;
+#[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid as spiffe_svid;
 #[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid_bundle as spiffe_svid_bundle;
@@ -116,6 +124,8 @@ pub use margaret_websocket as websocket;
 pub use margaret_websocket_session as websocket_session;
 #[cfg(feature = "runtime")]
 pub use oauth2;
+#[cfg(feature = "runtime")]
+pub use tokio_postgres;
 
 #[cfg(all(test, feature = "runtime"))]
 mod tests {

@@ -7,6 +7,7 @@ use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
 use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 use margaret_token_digest::token_digest::TokenDigest;
 
+use crate::contract_instant::contract_instant;
 use crate::contract_refresh_family::contract_refresh_family;
 use crate::contract_token::contract_token;
 use crate::racing_instances::RACING_INSTANCES;
@@ -23,10 +24,11 @@ pub async fn concurrent_refresh_rotations_admit_one(store: &dyn StoresAuthorizat
     let family = Uuid::new_v4();
     let record = contract_refresh_family();
     let presented = contract_token();
+    let now = contract_instant();
 
     assert_eq!(
         store
-            .open_refresh_family(family, record.clone(), presented)
+            .open_refresh_family(family, record.clone(), presented, now)
             .await
             .expect("the store opens the refresh family"),
         FamilyOpening::Opened
@@ -38,7 +40,7 @@ pub async fn concurrent_refresh_rotations_admit_one(store: &dyn StoresAuthorizat
         RacedRotation {
             next,
             rotation: store
-                .rotate_refresh_token(presented, next)
+                .rotate_refresh_token(presented, next, now)
                 .await
                 .expect("the store rotates the refresh token"),
         }

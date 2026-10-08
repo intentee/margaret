@@ -5,6 +5,7 @@ use margaret_authorization_grants::refresh_rotation::RefreshRotation;
 use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
 use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 
+use crate::contract_instant::contract_instant;
 use crate::contract_refresh_family::contract_refresh_family;
 use crate::contract_token::contract_token;
 
@@ -17,17 +18,18 @@ pub async fn revoked_refresh_family_neither_resolves_nor_rotates(
     let family = Uuid::new_v4();
     let presented = contract_token();
     let next = contract_token();
+    let now = contract_instant();
 
     assert_eq!(
         store
-            .open_refresh_family(family, contract_refresh_family(), presented)
+            .open_refresh_family(family, contract_refresh_family(), presented, now)
             .await
             .expect("the store opens the refresh family"),
         FamilyOpening::Opened
     );
 
     store
-        .revoke_refresh_family(family)
+        .revoke_refresh_family(family, now)
         .await
         .expect("the store revokes the refresh family");
 
@@ -40,7 +42,7 @@ pub async fn revoked_refresh_family_neither_resolves_nor_rotates(
     );
     assert_eq!(
         store
-            .rotate_refresh_token(presented, next)
+            .rotate_refresh_token(presented, next, now)
             .await
             .expect("the store rotates refresh tokens"),
         RefreshRotation::Unknown

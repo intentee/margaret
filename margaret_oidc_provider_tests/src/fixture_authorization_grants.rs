@@ -11,6 +11,7 @@ use margaret_authorization_grants::refresh_family::RefreshFamily;
 use margaret_authorization_grants::refresh_rotation::RefreshRotation;
 use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
 use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
+use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::token_digest::TokenDigest;
 
 use crate::fixture_code::FixtureCode;
@@ -70,7 +71,7 @@ impl StoresAuthorizationGrants for FixtureAuthorizationGrants {
                 Some(FixtureFamily::Open(_)) => RefreshTokenLookup::Superseded {
                     family: held.family,
                 },
-                Some(FixtureFamily::Revoked) | None => RefreshTokenLookup::Unknown,
+                Some(FixtureFamily::Revoked { .. }) | None => RefreshTokenLookup::Unknown,
             },
             None => RefreshTokenLookup::Unknown,
         })
@@ -80,18 +81,30 @@ impl StoresAuthorizationGrants for FixtureAuthorizationGrants {
         &self,
         id: Uuid,
         pending: PendingAuthorization,
+        now: NumericDate,
     ) -> anyhow::Result<()> {
         self.reached(GrantOperation::HoldPendingAuthorization)?;
-        self.records.lock().await.pending.insert(id, pending);
+
+        let mut records = self.records.lock().await;
+
+        records.sweep_pending(now);
+        records.pending.insert(id, pending);
 
         Ok(())
     }
 
-    async fn issue_code(&self, code: TokenDigest, issued: IssuedCode) -> anyhow::Result<()> {
+    async fn issue_code(
+        &self,
+        code: TokenDigest,
+        issued: IssuedCode,
+        now: NumericDate,
+    ) -> anyhow::Result<()> {
         self.reached(GrantOperation::IssueCode)?;
-        self.records
-            .lock()
-            .await
+
+        let mut records = self.records.lock().await;
+
+        records.sweep_codes(now);
+        records
             .codes
             .insert(code, FixtureCode::Issued(Box::new(issued)));
 
@@ -103,17 +116,20 @@ impl StoresAuthorizationGrants for FixtureAuthorizationGrants {
         family: Uuid,
         record: RefreshFamily,
         first_token: TokenDigest,
+        now: NumericDate,
     ) -> anyhow::Result<FamilyOpening> {
         self.reached(GrantOperation::OpenRefreshFamily)?;
 
         let mut records = self.records.lock().await;
 
+        records.sweep_families(now);
+
         if let GrantInterference::ReplayBeforeFamilyOpens = self.interference {
-            records.families.insert(family, FixtureFamily::Revoked);
+            records.revoke(family, now);
         }
 
         Ok(match records.families.get(&family) {
-            Some(FixtureFamily::Revoked) => FamilyOpening::Revoked,
+            Some(FixtureFamily::Revoked { .. }) => FamilyOpening::Revoked,
             Some(FixtureFamily::Open(_)) | None => {
                 records.families.insert(family, FixtureFamily::Open(record));
                 records.tokens.insert(
@@ -136,14 +152,27 @@ impl StoresAuthorizationGrants for FixtureAuthorizationGrants {
 
         Ok(match records.codes.remove(&code) {
             Some(FixtureCode::Issued(issued)) => {
-                records.codes.insert(code, FixtureCode::Redeemed { family });
+                records.codes.insert(
+                    code,
+                    FixtureCode::Redeemed {
+                        expires_at: issued.expires_at,
+                        family,
+                    },
+                );
 
                 CodeRedemption::Redeemed(issued)
             }
-            Some(FixtureCode::Redeemed { family: redeemed }) => {
-                records
-                    .codes
-                    .insert(code, FixtureCode::Redeemed { family: redeemed });
+            Some(FixtureCode::Redeemed {
+                expires_at,
+                family: redeemed,
+            }) => {
+                records.codes.insert(
+                    code,
+                    FixtureCode::Redeemed {
+                        expires_at,
+                        family: redeemed,
+                    },
+                );
 
                 CodeRedemption::AlreadyRedeemed { family: redeemed }
             }
@@ -151,13 +180,13 @@ impl StoresAuthorizationGrants for FixtureAuthorizationGrants {
         })
     }
 
-    async fn revoke_refresh_family(&self, family: Uuid) -> anyhow::Result<()> {
+    async fn revoke_refresh_family(&self, family: Uuid, now: NumericDate) -> anyhow::Result<()> {
         self.reached(GrantOperation::RevokeRefreshFamily)?;
-        self.records
-            .lock()
-            .await
-            .families
-            .insert(family, FixtureFamily::Revoked);
+
+        let mut records = self.records.lock().await;
+
+        records.sweep_families(now);
+        records.revoke(family, now);
 
         Ok(())
     }
@@ -166,16 +195,19 @@ impl StoresAuthorizationGrants for FixtureAuthorizationGrants {
         &self,
         presented: TokenDigest,
         next: TokenDigest,
+        now: NumericDate,
     ) -> anyhow::Result<RefreshRotation> {
         self.reached(GrantOperation::RotateRefreshToken)?;
 
         let mut guard = self.records.lock().await;
         let records = &mut *guard;
 
+        records.sweep_families(now);
+
         if let GrantInterference::RevocationBeforeRefreshRotates = self.interference
             && let Some(held) = records.tokens.get(&presented)
         {
-            records.families.insert(held.family, FixtureFamily::Revoked);
+            records.revoke(held.family, now);
         }
 
         Ok(match records.open_family_of(&presented) {

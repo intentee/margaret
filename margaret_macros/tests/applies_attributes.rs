@@ -72,17 +72,15 @@ use margaret_macros::issues_resource_tokens;
 use margaret_macros::issues_tokens;
 use margaret_macros::middleware;
 use margaret_macros::model;
+use margaret_macros::postgres_database;
 use margaret_macros::process;
 use margaret_macros::provides_route_parameter;
-use margaret_macros::remembers_client_assertions;
 use margaret_macros::renders_view;
 use margaret_macros::responds_to_http;
 use margaret_macros::route_parameter_value;
 use margaret_macros::scheduled_with_tick_timer;
 use margaret_macros::service;
 use margaret_macros::singleton;
-use margaret_macros::stores_authorization_grants;
-use margaret_macros::stores_signing_keys;
 use margaret_macros::verifies_tokens_from_issuer;
 use margaret_macros::websocket_message;
 use margaret_macros::websocket_session;
@@ -193,14 +191,8 @@ struct PortalClient;
 #[exchanges_tokens_from(issuer = partner)]
 struct PartnerExchanger;
 
-#[stores_authorization_grants]
-struct GrantStore;
-
-#[remembers_client_assertions]
-struct AssertionLedger;
-
-#[stores_signing_keys]
-struct SigningKeyStore;
+#[postgres_database(url_from = "PORTAL_DATABASE_URL")]
+struct PortalDatabase;
 
 #[route_parameter_value]
 struct SubjectId(String);
@@ -277,9 +269,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(size_of::<PortalClient>(), 0);
     assert_eq!(size_of::<AttachmentsResource>(), 0);
     assert_eq!(size_of::<PartnerExchanger>(), 0);
-    assert_eq!(size_of::<GrantStore>(), 0);
-    assert_eq!(size_of::<AssertionLedger>(), 0);
-    assert_eq!(size_of::<SigningKeyStore>(), 0);
+    assert_eq!(size_of::<PortalDatabase>(), 0);
     assert_eq!(size_of::<Worker>(), 0);
     assert_eq!(size_of_val(&AccountProvider), 0);
     assert_eq!(AccountProvider.infer("bearer"), "verified bearer");

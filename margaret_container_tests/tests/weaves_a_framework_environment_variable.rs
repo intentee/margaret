@@ -13,6 +13,7 @@ use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_container::rendered_container::RenderedContainer;
 use margaret_container_tests::container_module_source::container_module_source;
+use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_environment_variable_codegen::environment_variable_name::EnvironmentVariableName;
 use margaret_serve_input_codegen::scan::scan;
 use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
@@ -49,6 +50,7 @@ fn render(fixture: &str) -> Result<RenderedContainer, ContainerError> {
         &index,
         &registry,
         &[vault_provider()],
+        &DeclaredPostgresDatabase::Absent,
         &DeclaredTokenIssuance::Absent,
     )
 }

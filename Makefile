@@ -10,10 +10,14 @@ COVERAGE_PACKAGES := \
 	-p margaret_attributes \
 	-p margaret_attributes_tests \
 	-p margaret_authorization_grants \
+	-p margaret_authorization_grants_database \
+	-p margaret_authorization_grants_schema \
 	-p margaret_authorization_server_client \
 	-p margaret_authorization_server_client_tests \
 	-p margaret_bearer_token_verification \
 	-p margaret_bearer_token_verification_tests \
+	-p margaret_client_assertions_database \
+	-p margaret_client_assertions_schema \
 	-p margaret_client_credentials \
 	-p margaret_client_credentials_tests \
 	-p margaret_codegen \
@@ -26,6 +30,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_container \
 	-p margaret_container_tests \
 	-p margaret_database \
+	-p margaret_database_codegen \
+	-p margaret_database_tests \
 	-p margaret_deadline \
 	-p margaret_declaration_anchor \
 	-p margaret_environment_variable \
@@ -90,6 +96,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_service \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
+	-p margaret_signing_keys_database \
+	-p margaret_signing_keys_schema \
 	-p margaret_spiffe_svid \
 	-p margaret_spiffe_svid_bundle \
 	-p margaret_spiffe_svid_bundle_tests \
@@ -128,6 +136,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_websocket_session \
 	-p margaret_websocket_tests
 COVERAGE_EXCLUDED_PACKAGES := \
+	--exclude-from-report margaret_cluster_fixture \
 	--exclude-from-report margaret_codegen_collisions_and_diamonds_fixture \
 	--exclude-from-report margaret_codegen_copy_console_arguments_fixture \
 	--exclude-from-report margaret_codegen_environment_variable_inputs_fixture \
@@ -148,6 +157,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_self_referential_model_fixture \
 	--exclude-from-report margaret_spiffe_http_client_fixture
 GENERATED_CODE_PACKAGES := \
+	-p margaret_cluster_fixture \
 	-p margaret_codegen_collisions_and_diamonds_fixture \
 	-p margaret_codegen_copy_console_arguments_fixture \
 	-p margaret_codegen_environment_variable_inputs_fixture \
@@ -176,8 +186,12 @@ RUNTIME_PACKAGES := \
 	-p margaret_attribute_arguments \
 	-p margaret_attributes \
 	-p margaret_authorization_grants \
+	-p margaret_authorization_grants_database \
+	-p margaret_authorization_grants_schema \
 	-p margaret_authorization_server_client \
 	-p margaret_bearer_token_verification \
+	-p margaret_client_assertions_database \
+	-p margaret_client_assertions_schema \
 	-p margaret_client_credentials \
 	-p margaret_codegen \
 	-p margaret_codegen_tokens \
@@ -187,6 +201,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_construction \
 	-p margaret_container \
 	-p margaret_database \
+	-p margaret_database_codegen \
 	-p margaret_deadline \
 	-p margaret_declaration_anchor \
 	-p margaret_environment_variable \
@@ -237,6 +252,8 @@ RUNTIME_PACKAGES := \
 	-p margaret_serve_input_codegen \
 	-p margaret_service \
 	-p margaret_service_codegen \
+	-p margaret_signing_keys_database \
+	-p margaret_signing_keys_schema \
 	-p margaret_spiffe_svid \
 	-p margaret_spiffe_svid_bundle \
 	-p margaret_spiffe_svid_client \
@@ -272,15 +289,23 @@ RUNTIME_LINTS := \
 	-D clippy::unimplemented \
 	-D clippy::unwrap-used
 
-POSTGRES_FEATURES := --features margaret_schema_postgres_tests/tests_that_use_postgres
+POSTGRES_FEATURES := \
+	--features margaret_schema_postgres_tests/tests_that_use_postgres \
+	--features margaret_store_contract_tests/tests_that_use_postgres
 
-POSTGRES_TESTS := package(margaret_schema_postgres_tests)
+POSTGRES_TESTS := package(margaret_schema_postgres_tests) | binary_id(margaret_store_contract_tests::database)
 
 POSTGRES_IMAGE_NAME := postgres
 POSTGRES_IMAGE_TAG := 18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
 
 export POSTGRES_IMAGE_NAME
 export POSTGRES_IMAGE_TAG
+
+EXAMPLE_POSTGRES_FEATURES := --features margaret_example_tests/tests_that_use_postgres
+
+EXAMPLE_COMPOSE := docker compose --file margaret_example/compose.yml
+
+EXAMPLE_DATABASE_URL = postgresql://margaret_example:margaret_example@$$($(EXAMPLE_COMPOSE) port postgres 5432)/margaret_example
 
 SPIRE_FEATURES := \
 	--features margaret_spiffe_svid_tests/tests_that_use_spire \
@@ -303,7 +328,7 @@ node_modules: package.json
 
 .PHONY: clippy
 clippy:
-	cargo clippy --workspace --all-targets $(POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) -- -D warnings
+	cargo clippy --workspace --all-targets $(POSTGRES_FEATURES) $(EXAMPLE_POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) -- -D warnings
 	cargo clippy $(RUNTIME_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
 	cargo clippy $(GENERATED_CODE_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
 	cargo clippy -p margaret --all-targets --no-default-features -- -D warnings
@@ -336,10 +361,14 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_attributes=100 \
 		--gated margaret_attributes_tests=100 \
 		--gated margaret_authorization_grants=100 \
+		--gated margaret_authorization_grants_database=100 \
+		--gated margaret_authorization_grants_schema=100 \
 		--gated margaret_authorization_server_client=100 \
 		--gated margaret_authorization_server_client_tests=100 \
 		--gated margaret_bearer_token_verification=100 \
 		--gated margaret_bearer_token_verification_tests=100 \
+		--gated margaret_client_assertions_database=100 \
+		--gated margaret_client_assertions_schema=100 \
 		--gated margaret_client_credentials=100 \
 		--gated margaret_client_credentials_tests=100 \
 		--gated margaret_codegen=100 \
@@ -352,6 +381,8 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_container=100 \
 		--gated margaret_container_tests=100 \
 		--gated margaret_database=100 \
+		--gated margaret_database_codegen=100 \
+		--gated margaret_database_tests=100 \
 		--gated margaret_deadline=100 \
 		--gated margaret_declaration_anchor=100 \
 		--gated margaret_environment_variable=100 \
@@ -416,6 +447,8 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \
+		--gated margaret_signing_keys_database=100 \
+		--gated margaret_signing_keys_schema=100 \
 		--gated margaret_spiffe_svid=100 \
 		--gated margaret_spiffe_svid_bundle=100 \
 		--gated margaret_spiffe_svid_bundle_tests=100 \
@@ -454,6 +487,20 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_websocket_session=100 \
 		--gated margaret_websocket_tests=100
 
+.PHONY: example.database
+example.database:
+	$(EXAMPLE_COMPOSE) up --detach --force-recreate --renew-anon-volumes --wait
+
+.PHONY: example.migrate
+example.migrate:
+	mkdir -p target/margaret_example
+	cargo run --quiet -p margaret_example -- schema > target/margaret_example/schema.sql
+	$(EXAMPLE_COMPOSE) exec --no-TTY postgres psql --dbname margaret_example --quiet --set ON_ERROR_STOP=1 --username margaret_example < target/margaret_example/schema.sql
+
+.PHONY: example.seed
+example.seed:
+	MARGARET_EXAMPLE_DATABASE_URL=$(EXAMPLE_DATABASE_URL) cargo run --quiet -p margaret_example -- seed
+
 .PHONY: fmt
 fmt:
 	cargo fmt
@@ -477,7 +524,7 @@ test.conformance: openid-conformance-images
 
 .PHONY: test.integration
 test.integration: openid-conformance-images postgres-image
-	cargo nextest run --workspace $(POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES)
+	cargo nextest run --workspace $(POSTGRES_FEATURES) $(EXAMPLE_POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES)
 
 .PHONY: test.unit
 test.unit:

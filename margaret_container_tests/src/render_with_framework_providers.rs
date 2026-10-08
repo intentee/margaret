@@ -6,6 +6,7 @@ use margaret_container::container_error::ContainerError;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_container::rendered_container::RenderedContainer;
+use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_serve_input_codegen::scan::scan;
 use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -33,6 +34,7 @@ pub fn render_with_framework_providers(
         &index,
         &serve_inputs,
         framework_providers,
+        &DeclaredPostgresDatabase::Absent,
         &DeclaredTokenIssuance::Absent,
     )
 }

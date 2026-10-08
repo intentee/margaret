@@ -1,9 +1,9 @@
 use chrono::Utc;
 use uuid::Uuid;
 
+use margaret_database_tests::apply_schema::apply_schema;
+use margaret_database_tests::started_database::StartedDatabase;
 use margaret_schema_postgres_fixture::margaret::schema::schema;
-use margaret_schema_postgres_tests::apply_schema::apply_schema;
-use margaret_schema_postgres_tests::started_database::StartedDatabase;
 
 #[tokio::test]
 async fn applies_the_generated_schema_and_round_trips_a_model() {

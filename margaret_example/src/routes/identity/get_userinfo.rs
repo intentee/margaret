@@ -47,21 +47,21 @@ impl GetUserinfo {
     ///
     /// Returns an error when the profile claims cannot be merged with the subject.
     #[process]
-    pub fn respond(&self, request: &Request) -> anyhow::Result<Response> {
+    pub async fn respond(&self, request: &Request) -> anyhow::Result<Response> {
         Ok(match self.userinfo_endpoint.authenticate(request) {
-            UserinfoAuthentication::Authenticated(grant) => self.answer(&grant)?,
+            UserinfoAuthentication::Authenticated(grant) => self.answer(&grant).await?,
             UserinfoAuthentication::Refused(response) => response,
         })
     }
 
-    fn answer(&self, grant: &UserinfoGrant) -> anyhow::Result<Response> {
+    async fn answer(&self, grant: &UserinfoGrant) -> anyhow::Result<Response> {
         Ok(
             if grant
                 .scopes
                 .iter()
                 .any(|scope| scope.as_str() == PROFILE_SCOPE)
             {
-                match self.users.find_user_name(grant.subject) {
+                match self.users.find_user_name(grant.subject).await? {
                     Some(name) => self
                         .userinfo_endpoint
                         .answer(grant, &ProfileClaims { name })?,

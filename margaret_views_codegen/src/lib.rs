@@ -16,6 +16,7 @@ mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
@@ -28,9 +29,15 @@ mod tests {
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[], &DeclaredTokenIssuance::Absent)
-            .expect("the container renders")
-            .bindings
+        render_container(
+            index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings
     }
 
     fn generated(lib_source: &str) -> ViewsArtifacts {

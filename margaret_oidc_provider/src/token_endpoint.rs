@@ -114,9 +114,10 @@ fn unauthorized_client() -> Response {
 async fn revoked_family(
     grants: &dyn StoresAuthorizationGrants,
     family: Uuid,
+    now: NumericDate,
 ) -> Result<Response, ProviderError> {
     grants
-        .revoke_refresh_family(family)
+        .revoke_refresh_family(family, now)
         .await
         .map_err(ProviderError::RevokeRefreshFamily)
         .map(|()| replayed_refresh_token())
@@ -135,6 +136,7 @@ async fn committed_tokens(
                 family,
                 RefreshFamily::opened_by(grant, now),
                 TokenDigest::of(refresh_token),
+                now,
             )
             .await
             .map_err(ProviderError::OpenRefreshFamily)
@@ -349,7 +351,7 @@ impl TokenEndpoint {
             CodeRedemption::Redeemed(_) | CodeRedemption::Unknown => return Ok(unknown_code()),
             CodeRedemption::AlreadyRedeemed { family } => {
                 return grants
-                    .revoke_refresh_family(family)
+                    .revoke_refresh_family(family, instant)
                     .await
                     .map_err(ProviderError::RevokeRefreshFamily)
                     .map(|()| replayed_code());
@@ -528,6 +530,7 @@ impl TokenEndpoint {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(resource) => resource,
         };
+        let instant = NumericDate::from(now);
         let presented = TokenDigest::of(refresh_token);
         let RefreshFamily {
             scopes: granted,
@@ -539,8 +542,7 @@ impl TokenEndpoint {
             .map_err(ProviderError::FindRefreshToken)?
         {
             RefreshTokenLookup::Current { record, .. }
-                if record.expires_at > NumericDate::from(now)
-                    && record.client_id == client.client_id =>
+                if record.expires_at > instant && record.client_id == client.client_id =>
             {
                 record
             }
@@ -548,7 +550,7 @@ impl TokenEndpoint {
                 return Ok(unknown_refresh_token());
             }
             RefreshTokenLookup::Superseded { family } => {
-                return revoked_family(grants.as_ref(), family).await;
+                return revoked_family(grants.as_ref(), family, instant).await;
             }
         };
         let scopes = match requested.within(&granted.iter().map(Scope::as_str).collect()) {
@@ -571,12 +573,14 @@ impl TokenEndpoint {
         );
 
         match grants
-            .rotate_refresh_token(presented, next_digest)
+            .rotate_refresh_token(presented, next_digest, instant)
             .await
             .map_err(ProviderError::RotateRefreshToken)?
         {
             RefreshRotation::Rotated => Ok(prepared.response()),
-            RefreshRotation::Superseded { family } => revoked_family(grants.as_ref(), family).await,
+            RefreshRotation::Superseded { family } => {
+                revoked_family(grants.as_ref(), family, instant).await
+            }
             RefreshRotation::Unknown => Ok(unknown_refresh_token()),
         }
     }

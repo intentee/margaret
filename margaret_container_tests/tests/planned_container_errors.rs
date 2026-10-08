@@ -11,6 +11,7 @@ use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::plan_container::plan_container;
 use margaret_container::planned_container::PlannedContainer;
 use margaret_container_tests::container_module_source::container_module_source;
+use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_serve_input_codegen::scan::scan;
 use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -22,8 +23,14 @@ fn planned_container() -> PlannedContainer {
         .expect("the fixture crate is indexed")
         .build();
     let registry = scan(&index).expect("the console arguments are scanned");
-    plan_container(&index, &registry, &[], &DeclaredTokenIssuance::Absent)
-        .expect("the container is planned")
+    plan_container(
+        &index,
+        &registry,
+        &[],
+        &DeclaredPostgresDatabase::Absent,
+        &DeclaredTokenIssuance::Absent,
+    )
+    .expect("the container is planned")
 }
 
 fn missing_path() -> CanonicalPath {
@@ -65,6 +72,7 @@ fn planned_with(fixture: &str, framework_provider: FrameworkProvider) -> Planned
         &index,
         &registry,
         &[framework_provider],
+        &DeclaredPostgresDatabase::Absent,
         &DeclaredTokenIssuance::Absent,
     )
     .expect("the container is planned")
