@@ -84,6 +84,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_openid_conformance_tests \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
+	-p margaret_process_tests \
 	-p margaret_registered_claims \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_method \
@@ -435,6 +436,7 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_openid_conformance_tests=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
+		--gated margaret_process_tests=100 \
 		--gated margaret_registered_claims=100 \
 		--gated margaret_request_binding_codegen=100 \
 		--gated margaret_route_method=100 \

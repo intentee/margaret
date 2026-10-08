@@ -30,6 +30,7 @@ fn named(common_name: &str) -> DistinguishedName {
 
 pub struct FixtureCertificateAuthority {
     certificate_der: CertificateDer<'static>,
+    certificate_pem: String,
     issuer: Issuer<'static, KeyPair>,
 }
 
@@ -49,14 +50,13 @@ impl FixtureCertificateAuthority {
             KeyUsagePurpose::DigitalSignature,
         ];
 
-        let certificate_der = params
+        let certificate = params
             .self_signed(&key)
-            .expect("the CA certificate self-signs")
-            .der()
-            .clone();
+            .expect("the CA certificate self-signs");
 
         Self {
-            certificate_der,
+            certificate_der: certificate.der().clone(),
+            certificate_pem: certificate.pem(),
             issuer: Issuer::new(params, key),
         }
     }
@@ -64,6 +64,11 @@ impl FixtureCertificateAuthority {
     #[must_use]
     pub fn certificate_der(&self) -> &CertificateDer<'static> {
         &self.certificate_der
+    }
+
+    #[must_use]
+    pub fn certificate_pem(&self) -> &str {
+        &self.certificate_pem
     }
 
     /// # Panics

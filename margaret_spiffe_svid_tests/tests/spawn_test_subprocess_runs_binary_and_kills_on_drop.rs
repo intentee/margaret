@@ -3,9 +3,10 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::time::Instant;
 
-use libc::pid_t;
 use tokio::time;
 
+use margaret_process_tests::process_signal::ProcessSignal;
+use margaret_process_tests::signal_process::signal_process;
 use margaret_spiffe_svid_tests::spawn_test_subprocess::spawn_test_subprocess;
 
 #[tokio::test]
@@ -28,12 +29,9 @@ async fn runs_binary_and_kills_on_drop() {
 
     drop(child_again);
 
-    let child_pid =
-        pid_t::try_from(pid).expect("the child process id fits in a process identifier");
     let started = Instant::now();
     loop {
-        let status = unsafe { libc::kill(child_pid, 0) };
-        if status == -1 {
+        if !signal_process(pid, ProcessSignal::Null).success() {
             break;
         }
         assert!(

@@ -10,10 +10,10 @@ autotests = false
 [dev-dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-libc = { workspace = true }
 margaret_console = { workspace = true }
 margaret_http = { workspace = true }
 margaret_http_uploaded_file = { workspace = true }
+margaret_process_tests = { path = "../margaret_process_tests" }
 margaret_route_method = { workspace = true }
 margaret_service = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "test-util", "time"] }

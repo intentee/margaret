@@ -1,0 +1,49 @@
+[package]
+name = "margaret_cluster_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[[bin]]
+name = "margaret_cluster_instance"
+path = "src/main.rs"
+
+[[test]]
+name = "integration"
+path = "tests/main.rs"
+
+[dependencies]
+async-trait = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true, features = ["clock"] }
+futures-util = { workspace = true }
+margaret = { workspace = true, features = ["runtime"] }
+margaret_accepted_clients_tests = { path = "../margaret_accepted_clients_tests" }
+margaret_cluster_fixture = { path = "fixture" }
+margaret_database_tests = { path = "../margaret_database_tests" }
+margaret_http = { workspace = true }
+margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_http_uploaded_file = { workspace = true }
+margaret_jose_parameters = { workspace = true }
+margaret_jwks_keygen = { workspace = true }
+margaret_jws_verification = { workspace = true }
+margaret_process_tests = { path = "../margaret_process_tests" }
+margaret_route_method = { workspace = true }
+margaret_sync_holder = { workspace = true }
+reqwest = { workspace = true }
+rustls = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "process", "rt-multi-thread", "time"] }
+tokio-rustls = { workspace = true }
+tokio-util = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[features]
+tests_that_use_cluster = []
+
+[lints]
+workspace = true
