@@ -1,4 +1,4 @@
 #[derive(Clone)]
-pub struct IntrospectedCaller {
+pub struct NotesCaller {
     pub subject: String,
 }

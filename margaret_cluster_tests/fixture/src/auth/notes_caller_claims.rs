@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct AttachmentClaims {
+pub struct NotesCallerClaims {
     pub sub: String,
 }

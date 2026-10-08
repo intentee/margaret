@@ -4,6 +4,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
+use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_route_method::route_method::RouteMethod;
 use margaret_route_parameter_codegen::url_segment::UrlSegment;
@@ -210,6 +211,7 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
     let methods = parameterized
         .iter()
         .map(|named| route_method(named, origin));
+    let too_many_lines = too_many_lines_allow();
 
     quote! {
         pub struct #struct_ident {
@@ -218,6 +220,7 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
         }
 
         impl #struct_ident {
+            #too_many_lines
             pub(crate) fn #constructor(#origin_param: ::std::sync::Arc<str>) -> Self {
                 Self {
                     #(#cloned_inits)*

@@ -1,5 +1,8 @@
 use std::net::SocketAddr;
 use std::net::TcpListener;
+use std::sync::Arc;
+
+use margaret_cluster_fixture::margaret::routes::Routes;
 
 use crate::cluster_server::ClusterServer;
 
@@ -27,6 +30,14 @@ impl InstancePorts {
             identity: reserved_address(&identity),
             public: reserved_address(&public),
         }
+    }
+
+    #[must_use]
+    pub fn routes(&self) -> Routes {
+        Routes::from_origins(
+            Arc::from(format!("http://{}", self.identity)),
+            Arc::from(format!("http://{}", self.public)),
+        )
     }
 
     #[must_use]

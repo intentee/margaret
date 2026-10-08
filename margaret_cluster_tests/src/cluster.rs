@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::io::Write;
 use std::path::Path;
 use std::process::ExitStatus;
@@ -16,7 +17,7 @@ use margaret_database_tests::apply_schema::apply_schema;
 use margaret_database_tests::started_database::StartedDatabase;
 use margaret_http_tests::tls_fixture::TlsFixture;
 
-use crate::await_ready::await_ready;
+use crate::await_probe::await_probe;
 use crate::cluster_client::cluster_client;
 use crate::cluster_doors::ClusterDoors;
 use crate::cluster_instance::ClusterInstance;
@@ -25,9 +26,32 @@ use crate::cluster_server::ClusterServer;
 use crate::declared_port::declared_port;
 use crate::external_issuer::ExternalIssuer;
 use crate::front_door::FrontDoor;
+use crate::instance_admission::InstanceAdmission;
 use crate::instance_launch::InstanceLaunch;
+use crate::instance_listening::instance_listening;
 use crate::instance_ports::InstancePorts;
+use crate::instance_ready::instance_ready;
 use crate::relay_destination::RelayDestination;
+
+async fn await_running<TProbe: Future<Output = bool>>(
+    running: &mut HashMap<usize, ClusterInstance>,
+    members: &[ClusterMember],
+    indices: &[usize],
+    probe: impl Fn(InstancePorts) -> TProbe,
+) {
+    join_all(
+        running
+            .iter_mut()
+            .filter(|(index, _instance)| indices.contains(index))
+            .map(|(index, instance)| {
+                let ports = members[*index].ports;
+                let probe = &probe;
+
+                await_probe(instance, move || probe(ports))
+            }),
+    )
+    .await;
+}
 
 pub struct Cluster {
     running: HashMap<usize, ClusterInstance>,
@@ -175,6 +199,13 @@ impl Cluster {
     ///
     /// Panics when an instance exits before it becomes ready.
     pub async fn restart(&mut self, indices: &[usize]) {
+        self.launch(indices, InstanceAdmission::Admitted).await;
+    }
+
+    /// # Panics
+    ///
+    /// Panics when an instance exits before it becomes ready.
+    pub async fn launch(&mut self, indices: &[usize], admission: InstanceAdmission) {
         for &index in indices {
             self.running.insert(
                 index,
@@ -182,23 +213,21 @@ impl Cluster {
             );
         }
 
-        let client = &self.client;
-        let external_issuer = &self.external_issuer;
-        let members = &self.members;
-
-        join_all(
-            self.running
-                .iter_mut()
-                .filter(|(index, _instance)| indices.contains(index))
-                .map(|(index, instance)| {
-                    await_ready(instance, members[*index].ports, client, external_issuer)
-                }),
-        )
+        await_running(&mut self.running, &self.members, indices, |ports| {
+            instance_listening(&self.client, ports)
+        })
         .await;
 
-        for &index in indices {
-            self.admit(index);
+        if admission == InstanceAdmission::Admitted {
+            for &index in indices {
+                self.admit(index);
+            }
         }
+
+        await_running(&mut self.running, &self.members, indices, |ports| {
+            instance_ready(&self.client, ports, &self.external_issuer)
+        })
+        .await;
     }
 
     /// # Panics

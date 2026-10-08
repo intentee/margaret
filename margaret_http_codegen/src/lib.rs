@@ -35,6 +35,7 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes_tests::indexed_source::IndexedSource;
+    use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
@@ -1005,10 +1006,15 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     fn omits_route_members_for_a_server_without_named_routes() {
         let source = routes_source_for(ROUTES_FIXTURE);
 
+        let allow: String = too_many_lines_allow()
+            .to_string()
+            .split_whitespace()
+            .collect();
+
         assert!(source.contains("pubstructInternal{}"));
-        assert!(source.contains(
-            "implInternal{pub(crate)fnnew(_origin:::std::sync::Arc<str>)->Self{Self{}}}"
-        ));
+        assert!(source.contains(&format!(
+            "implInternal{{{allow}pub(crate)fnnew(_origin:::std::sync::Arc<str>)->Self{{Self{{}}}}}}"
+        )));
     }
 
     #[test]
@@ -1027,9 +1033,14 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 "#,
         );
 
-        assert!(source.contains(
-            "implIdentity{pub(crate)fnnew(origin:::std::sync::Arc<str>)->Self{Self{get_login:margaret::framework::http::forwardable_route::ForwardableRoute::new(origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/login\"),]),),post_consent:margaret::framework::http::route_reference::RouteReference::new(origin,::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/consent\",),]),),}}}"
-        ));
+        let allow: String = too_many_lines_allow()
+            .to_string()
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(&format!(
+            "implIdentity{{{allow}pub(crate)fnnew(origin:::std::sync::Arc<str>)->Self{{Self{{get_login:margaret::framework::http::forwardable_route::ForwardableRoute::new(origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/login\"),]),),post_consent:margaret::framework::http::route_reference::RouteReference::new(origin,::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/consent\",),]),),}}}}}}"
+        )));
     }
 
     #[test]

@@ -81,6 +81,7 @@ fn resolve_entry<'pool, 'index>(
 fn scan_bearer_tokens<'index>(
     index: &'index AttributeIndex,
     entries: &HashMap<Tag, TagEntry<'index>>,
+    clients: &DeclaredOAuthClients<'index>,
 ) -> Result<Vec<ScannedBearerToken<'index>>, TagError> {
     let mut scanned = Vec::new();
 
@@ -102,15 +103,28 @@ fn scan_bearer_tokens<'index>(
 
                 match &addressee {
                     BearerTokenAddressee::Client(tag) => {
-                        resolve_entry(entries, tag, TagExpectation::OAuthClient, &site)?
+                        resolve_entry(entries, tag, TagExpectation::OAuthClient, &site)?;
+
+                        if clients.clients.iter().any(|client| {
+                            client.tag == *tag
+                                && matches!(
+                                    client.registration,
+                                    DeclaredClientRegistration::Admitted { .. }
+                                )
+                        }) {
+                            return Err(TagError::IntrospectionThroughOwnClient {
+                                client: tag.to_string(),
+                                site,
+                            });
+                        }
                     }
                     BearerTokenAddressee::Issuer(tag) => {
-                        resolve_entry(entries, tag, TagExpectation::TokenIssuer, &site)?
+                        resolve_entry(entries, tag, TagExpectation::TokenIssuer, &site)?;
                     }
                     BearerTokenAddressee::Resource(tag) => {
-                        resolve_entry(entries, tag, TagExpectation::ResourceTokens, &site)?
+                        resolve_entry(entries, tag, TagExpectation::ResourceTokens, &site)?;
                     }
-                };
+                }
 
                 scanned.push(ScannedBearerToken {
                     addressee,
@@ -286,7 +300,7 @@ impl<'index> TagPool<'index> {
             )?;
         }
 
-        let bearer_tokens = scan_bearer_tokens(index, &entries)?;
+        let bearer_tokens = scan_bearer_tokens(index, &entries, clients)?;
 
         if let Some(unconsumed) = resources.resources().find(|resource| {
             !admitted
@@ -1368,6 +1382,21 @@ mod tests {
             Some(BearerTokenAddressee::Issuer(issuer)) if issuer.to_string() == "partner"
         ));
         assert!(pool.bearer_token(&[]).is_none());
+    }
+
+    #[test]
+    fn rejects_a_bearer_token_introspected_through_an_own_client() {
+        assert_eq!(
+            error_for(&bearer_source(
+                &format!(
+                    "{}{}",
+                    own_provider_admitting("Own"),
+                    own_client("portal", "portal_app", "PortalClient")
+                ),
+                "#[bearer_token(client = portal)] token: Option<Token>",
+            )),
+            "argument #1 of 'crate::RunnerProvider::infer' introspects its bearer token through the oauth client 'portal', which acts as a client of this application's own provider; verify the provider's resource tokens with #[bearer_token(resource = <tag>)] instead"
+        );
     }
 
     #[test]

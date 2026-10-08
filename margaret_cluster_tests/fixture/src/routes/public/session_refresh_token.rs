@@ -1,6 +1,7 @@
+use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct SessionRefreshToken {
     pub refresh_token: String,
 }

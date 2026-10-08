@@ -5,26 +5,26 @@ use margaret::framework::macros::infer_from_request;
 use margaret::framework::macros::infers_authenticated_user;
 use margaret::framework::macros::singleton;
 
-use crate::auth::attachment_claims::AttachmentClaims;
-use crate::models::attachment_uploader::AttachmentUploader;
+use crate::auth::notes_caller_claims::NotesCallerClaims;
+use crate::models::notes_caller::NotesCaller;
 
 #[singleton]
-#[infers_authenticated_user(user_model = AttachmentUploader)]
-pub struct AttachmentUploaderProvider;
+#[infers_authenticated_user(user_model = NotesCaller)]
+pub struct NotesCallerProvider;
 
-impl AttachmentUploaderProvider {
+impl NotesCallerProvider {
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
     #[infer_from_request]
-    pub fn infer_attachment_uploader(
+    pub fn infer_notes_caller(
         &self,
-        #[bearer_token(resource = attachments)] token: Option<
-            VerifiedJwt<AttachmentClaims, AccessTokenProfile>,
+        #[bearer_token(resource = notes)] token: Option<
+            VerifiedJwt<NotesCallerClaims, AccessTokenProfile>,
         >,
-    ) -> anyhow::Result<AuthenticatedUserOutcome<AttachmentUploader>> {
+    ) -> anyhow::Result<AuthenticatedUserOutcome<NotesCaller>> {
         Ok(match token {
-            Some(verified) => AuthenticatedUserOutcome::Authenticated(AttachmentUploader {
+            Some(verified) => AuthenticatedUserOutcome::Authenticated(NotesCaller {
                 subject: verified.claims.sub,
             }),
             None => AuthenticatedUserOutcome::Anonymous,

@@ -81,6 +81,11 @@ pub enum TagError {
     AmbiguousOwnRedirectRoute { admitted: String, site: String },
 
     #[error(
+        "{site} introspects its bearer token through the oauth client '{client}', which acts as a client of this application's own provider; verify the provider's resource tokens with #[bearer_token(resource = <tag>)] instead"
+    )]
+    IntrospectionThroughOwnClient { client: String, site: String },
+
+    #[error(
         "{site} acts as the admitted client '{admitted}', which does not verify its assertions with ClientKeys::Own"
     )]
     OwnClientOfPublishedKeys { admitted: String, site: String },
