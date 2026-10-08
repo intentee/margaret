@@ -275,7 +275,7 @@ impl SignInFlow {
         now: NumericDate,
     ) -> JwtVerification<SignInTransactionClaims, SignInTransactionProfile> {
         verify_serialized_jwt(
-            self.roller.jwks_secret_holder().get().key_set(),
+            self.roller.jwks_secret_holder().get().token_key_set(),
             presented,
             &self.transaction_issuance.expectation(),
             now,

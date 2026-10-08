@@ -7,15 +7,14 @@ use jsonwebtoken::decode_header;
 use jsonwebtoken::jwk::JwkSet;
 use jsonwebtoken::jwk::KeyAlgorithm;
 
-use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
-use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
+use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 
 #[test]
 fn published_jwks_loads_into_a_standard_jwt_verifier() -> Result<()> {
-    let secret = JwksSecret::fresh(SigningCurve::P256, &FixtureRsaSigningKeys::default())?;
+    let secret = fresh_secret(SigningCurve::P256);
     let claims = TestClaims {
         sub: "subject".to_string(),
     };

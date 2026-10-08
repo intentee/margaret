@@ -1,6 +1,4 @@
-pub mod first_tick;
 pub mod framework_service;
-pub mod framework_service_kind;
 pub mod render_services;
 pub mod runner_outcome;
 pub mod service_codegen_error;
@@ -33,9 +31,7 @@ mod tests {
     use margaret_serve_input_codegen::scan::scan;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
-    use crate::first_tick::FirstTick;
     use crate::framework_service::FrameworkService;
-    use crate::framework_service_kind::FrameworkServiceKind;
     use crate::render_services::render_services;
     use crate::runner_outcome::RunnerOutcome;
     use crate::service_codegen_error::ServiceCodegenError;
@@ -255,7 +251,7 @@ impl Flusher {
     }
 
     #[test]
-    fn renders_framework_ticker_and_service_adapters_beside_user_units() {
+    fn renders_framework_service_adapters_beside_user_units() {
         let index = IndexedSource::new("#[singleton]\nstruct Placeholder;\n").index;
         let framework_services = vec![
             FrameworkService {
@@ -267,20 +263,10 @@ impl Flusher {
                     "JwksRoller",
                 ]),
                 field_name: "framework_jwks_roller_server_jwks_roller_jwks_roller".to_string(),
-                is_async: false,
-                kind: FrameworkServiceKind::Ticker {
-                    first_tick: FirstTick::AfterInterval,
-                    interval: canonical(&[
-                        "margaret",
-                        "framework",
-                        "jwks_roller_server",
-                        "jwks_roll_interval",
-                        "JWKS_ROLL_INTERVAL",
-                    ]),
-                },
+                is_async: true,
                 outcome: RunnerOutcome::Fallible,
                 runner: "run".to_string(),
-                takes_token: false,
+                takes_token: true,
                 type_name: "JwksRoller".to_string(),
             },
             FrameworkService {
@@ -294,7 +280,6 @@ impl Flusher {
                 field_name: "framework_issuer_directory_issuer_directory_issuer_directory"
                     .to_string(),
                 is_async: true,
-                kind: FrameworkServiceKind::Service,
                 outcome: RunnerOutcome::Infallible,
                 runner: "run".to_string(),
                 takes_token: true,
@@ -326,17 +311,15 @@ impl Flusher {
             .split_whitespace()
             .collect();
 
-        assert!(source.contains("impltrzcina::TickerforJwksRoller"));
-        assert!(source.contains(
-            "fntick_interval(&self)->std::time::Duration{margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL}"
-        ));
-        assert!(source.contains(
-            "fnfirst_tick_timing(&self)->trzcina::FirstTickTiming{trzcina::FirstTickTiming::AfterInterval}"
-        ));
+        assert!(source.contains("impltrzcina::ServiceforJwksRoller"));
         assert!(source.contains(
             "manager.register_service(JwksRoller{inner:container.framework_jwks_roller_server_jwks_roller_jwks_roller(),});"
         ));
-        assert!(source.contains("self.inner.run()?;::std::result::Result::Ok(())"));
+        assert!(
+            source.contains(
+                "self.inner.run(cancellation_token).await?;::std::result::Result::Ok(())"
+            )
+        );
         assert!(source.contains("impltrzcina::ServiceforIssuerDirectory"));
         assert!(
             source

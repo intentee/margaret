@@ -1,8 +1,5 @@
-use anyhow::Result;
-
-use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
-use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
+use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_keygen_tests::published_key_set::published_key_set;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jws_verification::accepted_key_set_document::AcceptedKeySetDocument;
@@ -12,11 +9,11 @@ use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::key_set_document_parsing::KeySetDocumentParsing;
 
 #[test]
-fn signs_a_p384_token_that_its_published_set_verifies() -> Result<()> {
+fn signs_a_p384_token_that_its_published_set_verifies() {
     let claims = TestClaims {
         sub: "subject".to_string(),
     };
-    let secret = JwksSecret::fresh(SigningCurve::P384, &FixtureRsaSigningKeys::default())?;
+    let secret = fresh_secret(SigningCurve::P384);
     let token = claims.signed_by(secret.current());
     let KeySetDocumentParsing::Accepted(AcceptedKeySetDocument { key_set, .. }) =
         published_key_set(&secret)
@@ -29,6 +26,4 @@ fn signs_a_p384_token_that_its_published_set_verifies() -> Result<()> {
     };
 
     assert!(matches!(key_set.verify(&jws), JwsVerification::Verified(_)));
-
-    Ok(())
 }

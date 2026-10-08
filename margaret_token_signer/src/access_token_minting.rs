@@ -4,6 +4,5 @@ use crate::minted_tokens::MintedTokens;
 
 pub enum AccessTokenMinting {
     Minted(MintedTokens),
-    RefreshTokenSignedWithNextKey,
     RejectedRefreshToken(JwtRejection),
 }

@@ -1,30 +1,45 @@
 use async_trait::async_trait;
 use tokio::sync::Mutex;
-use zeroize::Zeroizing;
 
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::persisted_jwks_secret::PersistedJwksSecret;
-use margaret_jwks_roller::signing_keys_document::SigningKeysDocument;
+use margaret_jwks_keygen::signing_keys_generation::SigningKeysGeneration;
+use margaret_jwks_roller::signing_keys_creation::SigningKeysCreation;
+use margaret_jwks_roller::signing_keys_replacement::SigningKeysReplacement;
+use margaret_jwks_roller::signing_keys_revision::SigningKeysRevision;
 use margaret_jwks_roller::stored_signing_keys::StoredSigningKeys;
 use margaret_jwks_roller::stores_signing_keys::StoresSigningKeys;
 
+use crate::storage_backend_error::StorageBackendError;
+
+struct FixtureSigningKeysState {
+    accepted_writes: usize,
+    reachable: bool,
+    stored: StoredSigningKeys,
+}
+
+impl FixtureSigningKeysState {
+    fn reachable(&mut self) -> anyhow::Result<&mut Self> {
+        if self.reachable {
+            Ok(self)
+        } else {
+            Err(StorageBackendError::Unreachable.into())
+        }
+    }
+}
+
 pub struct FixtureSigningKeys {
-    documents: Mutex<Vec<String>>,
+    state: Mutex<FixtureSigningKeysState>,
 }
 
 impl FixtureSigningKeys {
     #[must_use]
     pub fn empty() -> Self {
-        Self {
-            documents: Mutex::new(Vec::new()),
-        }
+        Self::with_contents(StoredSigningKeys::Absent)
     }
 
     #[must_use]
-    pub fn holding(document: &str) -> Self {
-        Self {
-            documents: Mutex::new(vec![document.to_string()]),
-        }
+    pub fn holding(revision: SigningKeysRevision) -> Self {
+        Self::with_contents(StoredSigningKeys::Stored(revision))
     }
 
     /// # Panics
@@ -33,33 +48,75 @@ impl FixtureSigningKeys {
     #[must_use]
     pub fn storing(secret: &JwksSecret) -> Self {
         Self::holding(
-            &serde_json::to_string(&PersistedJwksSecret::from_secret(secret))
-                .expect("the fixture secret serializes"),
+            SigningKeysRevision::from_secret(secret).expect("the fixture secret serializes"),
         )
     }
 
-    pub async fn stored_documents(&self) -> usize {
-        self.documents.lock().await.len()
+    fn with_contents(stored: StoredSigningKeys) -> Self {
+        Self {
+            state: Mutex::new(FixtureSigningKeysState {
+                accepted_writes: 0,
+                reachable: true,
+                stored,
+            }),
+        }
+    }
+
+    pub async fn accepted_writes(&self) -> usize {
+        self.state.lock().await.accepted_writes
+    }
+
+    pub async fn break_down(&self) {
+        self.state.lock().await.reachable = false;
+    }
+
+    pub async fn overwrite(&self, contents: StoredSigningKeys) {
+        self.state.lock().await.stored = contents;
     }
 }
 
 #[async_trait]
 impl StoresSigningKeys for FixtureSigningKeys {
     async fn load_signing_keys(&self) -> anyhow::Result<StoredSigningKeys> {
-        Ok(match self.documents.lock().await.last() {
-            Some(document) => StoredSigningKeys::Stored(SigningKeysDocument::new(Zeroizing::new(
-                document.clone(),
-            ))),
-            None => StoredSigningKeys::Absent,
+        Ok(self.state.lock().await.reachable()?.stored.clone())
+    }
+
+    async fn create_signing_keys(
+        &self,
+        revision: &SigningKeysRevision,
+    ) -> anyhow::Result<SigningKeysCreation> {
+        let mut guard = self.state.lock().await;
+        let state = guard.reachable()?;
+
+        Ok(match state.stored {
+            StoredSigningKeys::Absent => {
+                state.stored = StoredSigningKeys::Stored(revision.clone());
+                state.accepted_writes += 1;
+
+                SigningKeysCreation::Created
+            }
+            StoredSigningKeys::Stored(_) => SigningKeysCreation::AlreadyCreated,
         })
     }
 
-    async fn store_signing_keys(&self, document: &SigningKeysDocument) -> anyhow::Result<()> {
-        self.documents
-            .lock()
-            .await
-            .push(document.json().to_string());
+    async fn replace_signing_keys(
+        &self,
+        expected: SigningKeysGeneration,
+        revision: &SigningKeysRevision,
+    ) -> anyhow::Result<SigningKeysReplacement> {
+        let mut guard = self.state.lock().await;
+        let state = guard.reachable()?;
 
-        Ok(())
+        Ok(match &state.stored {
+            StoredSigningKeys::Stored(stored) if stored.generation == expected => {
+                state.stored = StoredSigningKeys::Stored(revision.clone());
+                state.accepted_writes += 1;
+
+                SigningKeysReplacement::Replaced
+            }
+            StoredSigningKeys::Absent | StoredSigningKeys::Stored(_) => {
+                SigningKeysReplacement::Superseded
+            }
+        })
     }
 }

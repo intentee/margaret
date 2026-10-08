@@ -17,13 +17,13 @@ margaret_http = { workspace = true }
 margaret_http_tests = { path = "../margaret_http_tests" }
 margaret_issuer_key_set = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller_server = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
 margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
 margaret_oauth_client = { workspace = true }
 margaret_oidc_sign_in = { workspace = true }
 margaret_route_method = { workspace = true }
-margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 url = { workspace = true }

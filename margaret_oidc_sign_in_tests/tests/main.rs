@@ -1,5 +1,6 @@
 mod awaits_the_signing_keys_of_the_issuer;
 mod binds_the_transaction_to_its_authorization_request;
+mod completes_a_sign_in_on_a_peer_one_generation_apart;
 mod describes_every_sign_in_refusal;
 mod fetches_userinfo_of_the_signed_in_subject;
 mod redirects_to_the_authorization_endpoint;

@@ -18,7 +18,6 @@ use margaret_identity_session::refresh_token_claims_signed::RefreshTokenClaimsSi
 use margaret_identity_session::refresh_token_lifetime_secs::REFRESH_TOKEN_LIFETIME_SECS;
 use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
 use margaret_jose_parameters::jwt_type::JwtType;
-use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
@@ -176,8 +175,9 @@ impl JwksSecretStore {
         &self,
         token: &str,
         now: DateTime<Utc>,
-    ) -> JwksSecretVerificationResult<TClaims, AccessTokenProfile> {
-        self.roller.jwks_secret_holder().get().verify_jwt(
+    ) -> JwtVerification<TClaims, AccessTokenProfile> {
+        verify_serialized_jwt(
+            self.roller.jwks_secret_holder().get().token_key_set(),
             token,
             &self.issuance.expectation(),
             NumericDate::from(now),
@@ -203,7 +203,11 @@ impl JwksSecretStore {
         jwt: &AttributedJwt<'_>,
         now: NumericDate,
     ) -> JwtVerification<TClaims, TProfile> {
-        verify_attributed(jwt, self.roller.jwks_secret_holder().get().key_set(), now)
+        verify_attributed(
+            jwt,
+            self.roller.jwks_secret_holder().get().token_key_set(),
+            now,
+        )
     }
 
     #[must_use]
@@ -214,7 +218,7 @@ impl JwksSecretStore {
         now: DateTime<Utc>,
     ) -> JwtVerification<ResourceAccessTokenClaims, AccessTokenProfile> {
         verify_serialized_jwt(
-            self.roller.jwks_secret_holder().get().key_set(),
+            self.roller.jwks_secret_holder().get().token_key_set(),
             token,
             &JwtExpectation {
                 audience: ExpectedAudience::AnyOf(audiences),

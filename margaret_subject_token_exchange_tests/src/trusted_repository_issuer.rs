@@ -7,10 +7,11 @@ use serde_json::json;
 use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::signing_curve::SigningCurve;
+use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectTokens;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
 use margaret_subject_token_exchange::subject_token_profile::SubjectTokenProfile;
-use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_trust::token_trust::TokenTrust;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
@@ -28,7 +29,7 @@ impl TrustedRepositoryIssuer {
     pub fn named(issuer: &'static str) -> Self {
         Self {
             issuer,
-            secret: fresh_p256_secret(),
+            secret: fresh_secret(SigningCurve::P256),
         }
     }
 
@@ -89,7 +90,7 @@ impl TrustedRepositoryIssuer {
     ) -> Arc<SubjectTokenExchanger> {
         let key_set = Arc::new(IssuerKeySet::awaiting());
 
-        key_set.hold(Arc::new(self.secret.key_set().clone()));
+        key_set.hold(Arc::new(self.secret.published_key_set().clone()));
 
         Arc::new(SubjectTokenExchanger::create(
             Arc::new(self.trusted_issuer(key_set, audience)),

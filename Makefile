@@ -25,6 +25,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_construction \
 	-p margaret_container \
 	-p margaret_container_tests \
+	-p margaret_deadline \
 	-p margaret_declaration_anchor \
 	-p margaret_environment_variable \
 	-p margaret_environment_variable_codegen \
@@ -181,6 +182,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_console_codegen \
 	-p margaret_construction \
 	-p margaret_container \
+	-p margaret_deadline \
 	-p margaret_declaration_anchor \
 	-p margaret_environment_variable \
 	-p margaret_environment_variable_codegen \
@@ -344,6 +346,7 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_construction=100 \
 		--gated margaret_container=100 \
 		--gated margaret_container_tests=100 \
+		--gated margaret_deadline=100 \
 		--gated margaret_declaration_anchor=100 \
 		--gated margaret_environment_variable=100 \
 		--gated margaret_environment_variable_codegen=100 \

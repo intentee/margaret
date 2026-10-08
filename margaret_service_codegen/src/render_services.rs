@@ -17,7 +17,6 @@ use margaret_http_codegen::server_origin_source::ServerOriginSource;
 use margaret_http_codegen::server_uploads::ServerUploads;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
-use crate::first_tick::FirstTick;
 use crate::runner_outcome::RunnerOutcome;
 use crate::service_kind::ServiceKind;
 use crate::service_plan::ServicePlan;
@@ -278,25 +277,12 @@ fn missed_tick_behavior_method(behavior: Option<&CanonicalPath>) -> TokenStream 
     }
 }
 
-fn first_tick_timing_method(first_tick: FirstTick) -> TokenStream {
-    match first_tick {
-        FirstTick::AfterInterval => quote! {
-            fn first_tick_timing(&self) -> trzcina::FirstTickTiming {
-                trzcina::FirstTickTiming::AfterInterval
-            }
-        },
-        FirstTick::Immediate => quote! {},
-    }
-}
-
 fn adapter(unit: &ServiceUnit) -> TokenStream {
     match &unit.kind {
         ServiceKind::Service => service_adapter(unit),
-        ServiceKind::Ticker {
-            behavior,
-            first_tick,
-            interval,
-        } => ticker_adapter(unit, behavior.as_ref(), *first_tick, interval),
+        ServiceKind::Ticker { behavior, interval } => {
+            ticker_adapter(unit, behavior.as_ref(), interval)
+        }
     }
 }
 
@@ -327,14 +313,12 @@ fn runner_result(unit: &ServiceUnit, call: &TokenStream) -> TokenStream {
 fn ticker_adapter(
     unit: &ServiceUnit,
     behavior: Option<&CanonicalPath>,
-    first_tick: FirstTick,
     interval: &CanonicalPath,
 ) -> TokenStream {
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
     let interval = path_tokens(interval);
     let missed_tick_behavior_method = missed_tick_behavior_method(behavior);
-    let first_tick_timing_method = first_tick_timing_method(first_tick);
     let token_binding = token_binding(unit);
     let outcome = runner_outcome(unit);
 
@@ -349,7 +333,6 @@ fn ticker_adapter(
                 #interval
             }
 
-            #first_tick_timing_method
 
             #missed_tick_behavior_method
 

@@ -4,12 +4,18 @@ use p256::pkcs8;
 use thiserror::Error;
 
 use margaret_jws_verification::duplicate_key_id::DuplicateKeyId;
+use margaret_jws_verification::ignored_key_reason::IgnoredKeyReason;
 use margaret_jws_verification::key_material_rejection::KeyMaterialRejection;
+
+use crate::signing_keys_generation::SigningKeysGeneration;
 
 #[derive(Debug, Error)]
 pub enum JwksKeyError {
     #[error("the secret's keys do not form a key set: {duplicate}")]
     DuplicateKeyId { duplicate: DuplicateKeyId },
+
+    #[error("the signing keys reached their last generation {generation}")]
+    GenerationExhausted { generation: SigningKeysGeneration },
 
     #[error("the public key is missing its {coordinate} coordinate")]
     MissingPublicKeyCoordinate { coordinate: &'static str },
@@ -43,6 +49,12 @@ pub enum JwksKeyError {
         #[source]
         source: KeyRejected,
     },
+
+    #[error("a retired key of the stored signing keys does not verify signatures: {reason}")]
+    RetiredKeyRejected { reason: IgnoredKeyReason },
+
+    #[error("a retired key of the stored signing keys has no key id")]
+    RetiredKeyWithoutKid,
 
     #[error("the rsa signing key could not sign: {source}")]
     RsaSigning {

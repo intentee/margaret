@@ -16,8 +16,7 @@ use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
-use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
-use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
@@ -26,12 +25,12 @@ use margaret_route_method::route_method::RouteMethod;
 #[tokio::test(flavor = "multi_thread")]
 async fn admits_a_token_of_a_rolling_margaret_issuer() {
     let fixture = TlsFixture::generate();
-    let server_bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
-        rsa_keys: Arc::new(FixtureRsaSigningKeys::default()),
-        storage: Arc::new(FixtureSigningKeys::empty()),
-    })
+    let roller = JwksRoller::create(
+        Arc::new(FixtureSigningKeys::empty()),
+        Arc::new(FixtureRsaSigningKeys::default()),
+    )
     .await
-    .expect("the first secret is rolled and published");
+    .expect("the roller starts");
     let jwks_server = RunningFixtureServer::start(
         fixture.server_config.clone(),
         vec![RouteEntry::new(
@@ -39,7 +38,7 @@ async fn admits_a_token_of_a_rolling_margaret_issuer() {
             vec![MethodHandler::head(
                 RouteMethod::Get,
                 Arc::new(StaticHandler {
-                    body: server_bundle.jwks_document_holder().get().to_vec(),
+                    body: roller.jwks_document_holder().get().to_vec(),
                     content_type: "application/jwk-set+json",
                     status: 200,
                 }),
@@ -68,7 +67,7 @@ async fn admits_a_token_of_a_rolling_margaret_issuer() {
     let claims = TestClaims {
         sub: "subject".to_string(),
     };
-    let token = claims.signed_by(server_bundle.jwks_secret_holder().get().current());
+    let token = claims.signed_by(roller.jwks_secret_holder().get().current());
     let authorization = RequestAuthorization::parse(Some(&format!("Bearer {token}")));
     let BearerTokenRouting::Routed(routed) = route_bearer_token(&authorization, &[&trusted_issuer])
         .expect("the system clock reads as a numeric date")

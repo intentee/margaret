@@ -44,6 +44,7 @@ members = [
     "margaret_construction",
     "margaret_container",
     "margaret_container_tests",
+    "margaret_deadline",
     "margaret_declaration_anchor",
     "margaret_environment_variable",
     "margaret_environment_variable_codegen",
@@ -236,6 +237,7 @@ margaret_console_argument_codegen = { path = "margaret_console_argument_codegen"
 margaret_console_codegen = { path = "margaret_console_codegen", version = "0.4.0" }
 margaret_construction = { path = "margaret_construction", version = "0.1.0" }
 margaret_container = { path = "margaret_container", version = "0.4.0" }
+margaret_deadline = { path = "margaret_deadline", version = "0.1.0" }
 margaret_declaration_anchor = { path = "margaret_declaration_anchor", version = "0.1.0" }
 margaret_environment_variable = { path = "margaret_environment_variable", version = "0.1.0" }
 margaret_environment_variable_codegen = { path = "margaret_environment_variable_codegen", version = "0.4.0" }

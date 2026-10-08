@@ -1,15 +1,14 @@
 use anyhow::Result;
 use serde_json::to_value;
 
-use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
-use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
+use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jws_verification::ec_jwk::EcJwk;
 use margaret_jws_verification::jwk::Jwk;
 
 #[test]
 fn public_jwks_serializes_to_jwks_wire_format() -> Result<()> {
-    let secret = JwksSecret::fresh(SigningCurve::P256, &FixtureRsaSigningKeys::default())?;
+    let secret = fresh_secret(SigningCurve::P256);
     let Jwk::Ec(EcJwk { x, y, .. }) = secret.current().public_jwk().clone() else {
         panic!("the pair publishes an ec key");
     };

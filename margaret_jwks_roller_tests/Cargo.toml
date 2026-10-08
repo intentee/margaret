@@ -9,16 +9,19 @@ autotests = false
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
-zeroize = { workspace = true }
 
 [dev-dependencies]
-async-trait = { workspace = true }
-margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
+futures-util = { workspace = true }
+margaret_identity_session = { workspace = true }
+margaret_issuer_request = { workspace = true }
+margaret_registered_claims = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "sync"] }
+zeroize = { workspace = true }
 
 [[test]]
 name = "main"

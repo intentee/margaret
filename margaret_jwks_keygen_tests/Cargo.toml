@@ -8,6 +8,7 @@ autotests = false
 [dependencies]
 margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
+margaret_jwks_roller = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }

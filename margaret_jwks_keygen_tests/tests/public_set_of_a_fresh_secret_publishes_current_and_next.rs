@@ -1,12 +1,9 @@
-use anyhow::Result;
-
-use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
-use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
+use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 
 #[test]
-fn public_set_of_a_fresh_secret_publishes_current_and_next() -> Result<()> {
-    let secret = JwksSecret::fresh(SigningCurve::P256, &FixtureRsaSigningKeys::default())?;
+fn public_set_of_a_fresh_secret_publishes_current_and_next() {
+    let secret = fresh_secret(SigningCurve::P256);
 
     assert_eq!(
         secret.public_jwks().keys(),
@@ -17,6 +14,4 @@ fn public_set_of_a_fresh_secret_publishes_current_and_next() -> Result<()> {
             secret.rsa().next().public_jwk().clone()
         ]
     );
-
-    Ok(())
 }

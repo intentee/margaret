@@ -2074,6 +2074,7 @@ dependencies = [
  "chrono",
  "margaret_http",
  "margaret_jwks_keygen",
+ "margaret_jwks_keygen_tests",
  "margaret_jwks_secret_store",
  "margaret_jwks_secret_store_tests",
  "margaret_token_signer",
@@ -2190,6 +2191,8 @@ dependencies = [
  "margaret_issuer_metadata",
  "margaret_issuer_request",
  "margaret_jose_parameters",
+ "margaret_jwks_keygen",
+ "margaret_jwks_keygen_tests",
  "margaret_jwks_secret_store",
  "margaret_jwks_secret_store_tests",
  "margaret_jws_verification",
@@ -2647,6 +2650,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_deadline"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "margaret_declaration_anchor"
 version = "0.1.0"
 dependencies = [
@@ -2898,6 +2909,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "log",
+ "margaret_deadline",
  "margaret_https_url",
  "margaret_issuer_key_set",
  "margaret_issuer_metadata",
@@ -2946,6 +2958,8 @@ dependencies = [
 name = "margaret_issuer_key_set"
 version = "0.1.0"
 dependencies = [
+ "margaret_jwks_keygen",
+ "margaret_jwks_keygen_tests",
  "margaret_jws_verification",
  "margaret_jwt_verification",
  "margaret_registered_claims",
@@ -3033,7 +3047,6 @@ dependencies = [
  "base64ct",
  "margaret_jose_parameters",
  "margaret_jws_verification",
- "margaret_jwt_verification",
  "margaret_registered_claims",
  "margaret_sync_holder",
  "p256",
@@ -3054,6 +3067,7 @@ dependencies = [
  "jsonwebtoken",
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
+ "margaret_jwks_roller",
  "margaret_jws_verification",
  "margaret_jwt_verification",
  "margaret_jwt_verification_tests",
@@ -3071,7 +3085,10 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures-util",
+ "margaret_identity_session",
+ "margaret_issuer_request",
  "margaret_jwks_keygen",
+ "margaret_registered_claims",
  "serde_json",
  "thiserror 2.0.18",
  "zeroize",
@@ -3081,23 +3098,20 @@ dependencies = [
 name = "margaret_jwks_roller_server"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "async-trait",
  "bytes",
+ "chrono",
+ "margaret_deadline",
  "margaret_http",
- "margaret_identity_session",
- "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "margaret_jwks_keygen_tests",
  "margaret_jwks_roller",
  "margaret_jwks_roller_tests",
- "margaret_jws_verification",
+ "margaret_registered_claims",
  "margaret_sync_holder",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
- "trzcina",
 ]
 
 [[package]]
@@ -3106,9 +3120,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "futures-util",
+ "margaret_identity_session",
+ "margaret_issuer_request",
  "margaret_jwks_keygen",
  "margaret_jwks_keygen_tests",
  "margaret_jwks_roller",
+ "margaret_registered_claims",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
@@ -3145,6 +3163,7 @@ dependencies = [
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "margaret_jwks_keygen_tests",
+ "margaret_jwks_roller",
  "margaret_jwks_roller_server",
  "margaret_jwks_roller_tests",
  "margaret_jwks_secret_store",
@@ -3431,6 +3450,7 @@ dependencies = [
  "margaret_issuer_request",
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
+ "margaret_jwks_keygen_tests",
  "margaret_jwks_roller_server",
  "margaret_jwks_secret_store",
  "margaret_jwks_secret_store_tests",
@@ -3449,7 +3469,6 @@ dependencies = [
  "margaret_token_exchange_client",
  "margaret_token_introspection",
  "margaret_token_issuance",
- "margaret_token_signer_tests",
  "margaret_token_trust",
  "margaret_trusted_issuer",
  "margaret_validation",
@@ -3513,6 +3532,7 @@ dependencies = [
  "margaret_issuer_request",
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
+ "margaret_jwks_keygen_tests",
  "margaret_jwks_roller_server",
  "margaret_jwks_secret_store",
  "margaret_jwks_secret_store_tests",
@@ -3524,7 +3544,6 @@ dependencies = [
  "margaret_oidc_sign_in",
  "margaret_registered_claims",
  "margaret_route_method",
- "margaret_token_signer_tests",
  "margaret_trusted_issuer",
  "oauth2",
  "serde",
@@ -3945,6 +3964,7 @@ dependencies = [
  "margaret_issuer_metadata",
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
+ "margaret_jwks_keygen_tests",
  "margaret_jws_verification",
  "margaret_jwt_verification",
  "margaret_jwt_verification_tests",
@@ -3952,7 +3972,6 @@ dependencies = [
  "margaret_registered_claims",
  "margaret_subject_token_exchange",
  "margaret_token_exchange_client",
- "margaret_token_signer_tests",
  "margaret_token_trust",
  "margaret_trusted_issuer",
  "serde",
@@ -4133,6 +4152,7 @@ dependencies = [
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "margaret_jwks_keygen_tests",
+ "margaret_jwks_roller",
  "margaret_jws_verification",
  "margaret_jwt_verification",
  "margaret_jwt_verification_tests",

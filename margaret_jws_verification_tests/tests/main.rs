@@ -67,6 +67,7 @@ mod rejects_a_token_without_a_key_id_when_no_key_verifies_its_algorithm;
 mod rejects_an_hmac_token;
 mod rejects_an_rs256_signature_over_another_input;
 mod rejects_an_unsigned_token;
+mod restores_the_material_of_a_published_jwk;
 mod verifies_a_token_of_a_key_set_with_an_ignored_key;
 mod verifies_a_token_of_a_key_whose_operations_permit_verification;
 mod verifies_a_token_of_an_assembled_key;

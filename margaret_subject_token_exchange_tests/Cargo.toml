@@ -13,11 +13,11 @@ margaret_issuer_key_set = { workspace = true }
 margaret_issuer_metadata = { workspace = true }
 margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwt_verification = { workspace = true }
 margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_subject_token_exchange = { workspace = true }
-margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 margaret_token_trust = { workspace = true }
 margaret_trusted_issuer = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

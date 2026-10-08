@@ -1,31 +1,23 @@
 use tokio::time::Instant;
-use tokio::time::sleep_until;
 use tokio_util::sync::CancellationToken;
 
+use margaret_deadline::await_deadline::await_deadline;
+use margaret_deadline::deadline_wake::DeadlineWake;
 use margaret_issuer_key_set::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
 use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
-
-use crate::next_fetch::NextFetch;
-
-async fn spaced(started_at: Instant, cancellation_token: &CancellationToken) -> NextFetch {
-    tokio::select! {
-        biased;
-        () = cancellation_token.cancelled() => NextFetch::Cancelled,
-        () = sleep_until(started_at + ISSUER_FETCH_SPACING) => NextFetch::Due,
-    }
-}
 
 pub(crate) async fn await_next_fetch(
     key_set: &IssuerKeySet,
     started_at: Instant,
     due_at: Instant,
     cancellation_token: &CancellationToken,
-) -> NextFetch {
+) -> DeadlineWake {
     tokio::select! {
         biased;
-        () = cancellation_token.cancelled() => NextFetch::Cancelled,
-        () = sleep_until(due_at) => NextFetch::Due,
-        () = key_set.refresh_requested() => spaced(started_at, cancellation_token).await,
+        wake = await_deadline(due_at, cancellation_token) => wake,
+        () = key_set.refresh_requested() => {
+            await_deadline(started_at + ISSUER_FETCH_SPACING, cancellation_token).await
+        }
     }
 }
 
@@ -40,7 +32,7 @@ mod tests {
     use margaret_issuer_key_set::key_set_poll_interval_after_ready::KEY_SET_POLL_INTERVAL_AFTER_READY;
 
     use super::await_next_fetch;
-    use crate::next_fetch::NextFetch;
+    use margaret_deadline::deadline_wake::DeadlineWake;
 
     #[tokio::test(start_paused = true)]
     async fn waits_until_the_next_fetch_is_due() {
@@ -54,7 +46,7 @@ mod tests {
                 &CancellationToken::new()
             )
             .await,
-            NextFetch::Due
+            DeadlineWake::Reached
         );
         assert_eq!(started_at.elapsed(), KEY_SET_POLL_INTERVAL_AFTER_READY);
     }
@@ -79,7 +71,7 @@ mod tests {
             )
         );
 
-        assert_eq!(next_fetch, NextFetch::Due);
+        assert_eq!(next_fetch, DeadlineWake::Reached);
         assert!(refresh.is_err());
         assert_eq!(started_at.elapsed(), ISSUER_FETCH_SPACING);
     }
@@ -99,7 +91,7 @@ mod tests {
                 &cancellation_token
             )
             .await,
-            NextFetch::Cancelled
+            DeadlineWake::Cancelled
         );
     }
 
@@ -130,7 +122,7 @@ mod tests {
             }
         );
 
-        assert_eq!(next_fetch, NextFetch::Cancelled);
+        assert_eq!(next_fetch, DeadlineWake::Cancelled);
         assert_eq!(started_at.elapsed(), ISSUER_FETCH_SPACING / 2);
     }
 }

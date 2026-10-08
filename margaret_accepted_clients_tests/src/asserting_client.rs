@@ -84,7 +84,11 @@ impl AssertingClient {
         let key_set = IssuerKeySet::awaiting();
 
         key_set.hold(Arc::new(
-            roller.jwks_secret_holder().get().key_set().clone(),
+            roller
+                .jwks_secret_holder()
+                .get()
+                .published_key_set()
+                .clone(),
         ));
 
         Self {

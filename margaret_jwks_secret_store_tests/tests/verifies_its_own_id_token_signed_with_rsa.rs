@@ -2,6 +2,8 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use margaret_identity_session::id_token_claims::IdTokenClaims;
+use margaret_jwks_keygen::signing_curve::SigningCurve;
+use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_secret_store::id_token_signing::IdTokenSigning;
 use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
 use margaret_jwt_verification::attribute_serialized_jwt::attribute_serialized_jwt;
@@ -11,12 +13,11 @@ use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
-use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_signer_tests::unix_time::unix_time;
 
 #[tokio::test]
 async fn verifies_its_own_id_token_signed_with_rsa() {
-    let store = rolled_store(fresh_p256_secret()).await;
+    let store = rolled_store(fresh_secret(SigningCurve::P256)).await;
     let id_token = store
         .issue_id_token(
             &IdTokenClaims {

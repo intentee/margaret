@@ -32,7 +32,11 @@ async fn presents_a_client_assertion_signed_with_the_current_key() {
         Some(&HeaderType::Supported(JwtType::ClientAuthentication))
     );
     assert!(matches!(
-        roller.jwks_secret_holder().get().key_set().verify(&jws),
+        roller
+            .jwks_secret_holder()
+            .get()
+            .token_key_set()
+            .verify(&jws),
         JwsVerification::Verified(_)
     ));
 }

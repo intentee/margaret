@@ -1,49 +1,34 @@
-use anyhow::Result;
-
-use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
-use margaret_jwks_keygen::persisted_jwks_secret::PersistedJwksSecret;
-use margaret_jwks_keygen::previous_key::PreviousKey;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
-use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
+use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
+use margaret_jwks_keygen_tests::persisted_document::persisted_document;
+use margaret_jwks_keygen_tests::restored_document::restored_document;
+use margaret_jwks_keygen_tests::rolled_secret::rolled_secret;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
-use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
-use margaret_registered_claims::numeric_date::NumericDate;
+use margaret_jwks_keygen_tests::verified_token::verified_token;
+use margaret_jwt_verification::jwt_verification::JwtVerification;
 
 #[test]
-fn persisted_jwks_secret_restores_the_keys_it_persisted() -> Result<()> {
-    let trust = fixture_trust();
+fn persisted_jwks_secret_restores_the_keys_it_persisted() {
     let claims = TestClaims {
         sub: "subject".to_string(),
     };
-    let secret = JwksSecret::fresh(SigningCurve::P256, &FixtureRsaSigningKeys::default())?
-        .rotate(&FixtureRsaSigningKeys::default())?;
-    let current_token = claims.signed_by(secret.current());
-    let PreviousKey::Retired(retired) = secret.previous() else {
-        panic!("a rotated secret retires its previous key");
-    };
-    let retired_token = claims.signed_by(retired);
-    let document = serde_json::to_vec(&PersistedJwksSecret::from_secret(&secret))?;
-    let restored = serde_json::from_slice::<PersistedJwksSecret>(&document)?
-        .into_secret(&FixtureRsaSigningKeys::default())?;
+    let fresh = fresh_secret(SigningCurve::P256);
+    let retired_token = claims.signed_by(fresh.current());
+    let rolled = rolled_secret(&fresh);
+    let current_token = claims.signed_by(rolled.current());
+    let restored = restored_document(persisted_document(&rolled)).expect("the document restores");
 
+    assert_eq!(restored.rolled_at(), rolled.rolled_at());
+    assert_eq!(
+        restored.retired()[0].retired_at(),
+        rolled.retired()[0].retired_at()
+    );
     assert!(matches!(
-        restored.verify_jwt::<TestClaims, AccessTokenProfile>(
-            &current_token,
-            &trust.expectation(),
-            NumericDate::new(0)
-        ),
-        JwksSecretVerificationResult::SignedWithCurrent(_)
+        verified_token(restored.token_key_set(), &current_token),
+        JwtVerification::Verified(_)
     ));
     assert!(matches!(
-        restored.verify_jwt::<TestClaims, AccessTokenProfile>(
-            &retired_token,
-            &trust.expectation(),
-            NumericDate::new(0)
-        ),
-        JwksSecretVerificationResult::SignedWithPrevious(_)
+        verified_token(restored.token_key_set(), &retired_token),
+        JwtVerification::Verified(_)
     ));
-
-    Ok(())
 }

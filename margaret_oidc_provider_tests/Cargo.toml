@@ -26,6 +26,7 @@ margaret_issuer_metadata = { workspace = true }
 margaret_issuer_request = { workspace = true }
 margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller_server = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
 margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
@@ -42,7 +43,6 @@ margaret_route_method = { workspace = true }
 margaret_subject_token_exchange = { workspace = true }
 margaret_token_digest = { workspace = true }
 margaret_token_issuance = { workspace = true }
-margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 margaret_token_trust = { workspace = true }
 margaret_trusted_issuer = { workspace = true }
 margaret_validation = { workspace = true }

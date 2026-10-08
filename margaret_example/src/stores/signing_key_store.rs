@@ -1,7 +1,10 @@
 use async_trait::async_trait;
 use tokio::sync::Mutex;
 
-use margaret::framework::jwks_roller::signing_keys_document::SigningKeysDocument;
+use margaret::framework::jwks_keygen::signing_keys_generation::SigningKeysGeneration;
+use margaret::framework::jwks_roller::signing_keys_creation::SigningKeysCreation;
+use margaret::framework::jwks_roller::signing_keys_replacement::SigningKeysReplacement;
+use margaret::framework::jwks_roller::signing_keys_revision::SigningKeysRevision;
 use margaret::framework::jwks_roller::stored_signing_keys::StoredSigningKeys;
 use margaret::framework::jwks_roller::stores_signing_keys::StoresSigningKeys;
 use margaret::framework::macros::constructor;
@@ -32,9 +35,38 @@ impl StoresSigningKeys for SigningKeyStore {
         Ok(self.stored.lock().await.clone())
     }
 
-    async fn store_signing_keys(&self, document: &SigningKeysDocument) -> anyhow::Result<()> {
-        *self.stored.lock().await = StoredSigningKeys::Stored(document.clone());
+    async fn create_signing_keys(
+        &self,
+        revision: &SigningKeysRevision,
+    ) -> anyhow::Result<SigningKeysCreation> {
+        let mut stored = self.stored.lock().await;
 
-        Ok(())
+        Ok(match *stored {
+            StoredSigningKeys::Absent => {
+                *stored = StoredSigningKeys::Stored(revision.clone());
+
+                SigningKeysCreation::Created
+            }
+            StoredSigningKeys::Stored(_) => SigningKeysCreation::AlreadyCreated,
+        })
+    }
+
+    async fn replace_signing_keys(
+        &self,
+        expected: SigningKeysGeneration,
+        revision: &SigningKeysRevision,
+    ) -> anyhow::Result<SigningKeysReplacement> {
+        let mut stored = self.stored.lock().await;
+
+        Ok(match &*stored {
+            StoredSigningKeys::Stored(current) if current.generation == expected => {
+                *stored = StoredSigningKeys::Stored(revision.clone());
+
+                SigningKeysReplacement::Replaced
+            }
+            StoredSigningKeys::Absent | StoredSigningKeys::Stored(_) => {
+                SigningKeysReplacement::Superseded
+            }
+        })
     }
 }

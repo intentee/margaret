@@ -25,6 +25,8 @@ use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::echo_wrapping::EchoWrapping;
 use margaret_http_tests::form_echo_handler::FormEchoHandler;
 use margaret_jose_parameters::jwt_type::JwtType;
+use margaret_jwks_keygen::signing_curve::SigningCurve;
+use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_secret_store_tests::rolled_roller::rolled_roller;
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
@@ -34,7 +36,6 @@ use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_oauth_client::client_authentication::ClientAuthentication;
 use margaret_oauth_vocabulary::grant_type::GrantType;
 use margaret_route_method::content_method::ContentMethod;
-use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct EchoFields {
@@ -99,8 +100,8 @@ fn authenticated_claims(echoed: &Value, key_set: &VerificationKeySet) -> Value {
 
 #[tokio::test]
 async fn authenticates_with_private_key_jwt() {
-    let secret = fresh_p256_secret();
-    let key_set = secret.key_set().clone();
+    let secret = fresh_secret(SigningCurve::P256);
+    let key_set = secret.published_key_set().clone();
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
@@ -131,8 +132,8 @@ async fn authenticates_with_private_key_jwt() {
 
 #[tokio::test]
 async fn authenticates_a_grant_with_private_key_jwt() {
-    let secret = fresh_p256_secret();
-    let key_set = secret.key_set().clone();
+    let secret = fresh_secret(SigningCurve::P256);
+    let key_set = secret.published_key_set().clone();
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
@@ -163,8 +164,8 @@ async fn authenticates_a_grant_with_private_key_jwt() {
 
 #[tokio::test]
 async fn authenticates_a_code_exchange_with_private_key_jwt() {
-    let secret = fresh_p256_secret();
-    let key_set = secret.key_set().clone();
+    let secret = fresh_secret(SigningCurve::P256);
+    let key_set = secret.published_key_set().clone();
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
@@ -191,8 +192,8 @@ async fn authenticates_a_code_exchange_with_private_key_jwt() {
 
 #[tokio::test]
 async fn authenticates_an_introspection_with_private_key_jwt() {
-    let secret = fresh_p256_secret();
-    let key_set = secret.key_set().clone();
+    let secret = fresh_secret(SigningCurve::P256);
+    let key_set = secret.published_key_set().clone();
     let server = echo_server("/introspect", EchoWrapping::ActiveIntrospection).await;
 
     let outcome = server

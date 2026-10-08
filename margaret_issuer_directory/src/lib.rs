@@ -8,7 +8,6 @@ pub mod jwks_endpoint_issuer;
 mod key_set_poll;
 mod key_set_poll_failure;
 mod key_set_source;
-mod next_fetch;
 mod poll_key_set;
 pub mod polled_key_set;
 mod refresh_discovered_metadata;

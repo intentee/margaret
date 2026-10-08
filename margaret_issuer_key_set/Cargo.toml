@@ -18,6 +18,8 @@ serde = { workspace = true }
 tokio = { workspace = true, features = ["macros", "sync", "time"] }
 
 [dev-dependencies]
+margaret_jwks_keygen = { workspace = true }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 tokio = { workspace = true, features = ["macros", "rt", "sync", "test-util", "time"] }
 

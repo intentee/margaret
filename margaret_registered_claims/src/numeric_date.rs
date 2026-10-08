@@ -8,10 +8,11 @@ use std::time::UNIX_EPOCH;
 use chrono::DateTime;
 use chrono::Utc;
 use serde::Deserialize;
+use serde::Serialize;
 
 use crate::registered_claims_error::RegisteredClaimsError;
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
 pub struct NumericDate {
     seconds_since_epoch: i64,

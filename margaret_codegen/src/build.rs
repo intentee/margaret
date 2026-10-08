@@ -1321,10 +1321,13 @@ impl GetIdentity {
         ));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains("impltrzcina::TickerforMargaretJwksJwksRoller"));
-        assert!(serve.contains(
-            "margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL"
-        ));
+        assert!(serve.contains("impltrzcina::ServiceforMargaretJwksJwksRoller"));
+        assert!(
+            serve.contains(
+                "self.inner.run(cancellation_token).await?;::std::result::Result::Ok(())"
+            )
+        );
+        assert!(!serve.contains("impltrzcina::TickerforMargaretJwksJwksRoller"));
     }
 
     #[test]

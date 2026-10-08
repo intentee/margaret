@@ -4,9 +4,8 @@ use margaret_bearer_token_verification_tests::held_trusted_issuer::held_trusted_
 use margaret_bearer_token_verification_tests::refused_with_challenge::refused_with_challenge;
 use margaret_http::request_authorization::RequestAuthorization;
 use margaret_http::token_admission::TokenAdmission;
-use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
-use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
+use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwt_verification::id_token_profile::IdTokenProfile;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
@@ -14,9 +13,8 @@ use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 
 #[tokio::test]
 async fn refuses_an_access_token_under_the_id_token_profile() {
-    let secret = JwksSecret::fresh(SigningCurve::P256, &FixtureRsaSigningKeys::default())
-        .expect("a fresh secret");
-    let trusted_issuer = held_trusted_issuer(fixture_trust(), secret.key_set().clone());
+    let secret = fresh_secret(SigningCurve::P256);
+    let trusted_issuer = held_trusted_issuer(fixture_trust(), secret.published_key_set().clone());
     let token = TestClaims {
         sub: "subject".to_string(),
     }

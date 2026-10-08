@@ -1,6 +1,11 @@
 pub mod far_future_expiry;
 pub mod fixture_pair;
 pub mod fixture_rsa_signing_keys;
+pub mod fresh_secret;
 pub mod malformed_rsa_signing_keys;
+pub mod persisted_document;
 pub mod published_key_set;
+pub mod restored_document;
+pub mod rolled_secret;
 pub mod test_claims;
+pub mod verified_token;
