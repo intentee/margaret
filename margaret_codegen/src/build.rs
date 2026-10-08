@@ -361,7 +361,7 @@ fn render_role_modules(
 
     if features.contains(GeneratedFeature::Schema) {
         let models = models(index)?;
-        modules.push(render_schema(&models));
+        modules.push(render_schema(&models, &[]));
     }
 
     let console_roots = if features.contains(GeneratedFeature::Console) {

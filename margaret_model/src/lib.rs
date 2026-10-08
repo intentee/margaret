@@ -4,6 +4,7 @@ pub mod column_check;
 pub mod column_default;
 pub mod column_type;
 pub mod foreign_key;
+pub mod framework_namespace;
 pub mod index;
 pub mod on_delete;
 pub mod render_postgres;

@@ -4,6 +4,9 @@ use margaret_model_codegen::model::Model;
 use crate::render::render;
 
 #[must_use]
-pub fn render_schema(models: &[Model]) -> GeneratedModuleTokens {
-    GeneratedModuleTokens::new("schema", render(models))
+pub fn render_schema(
+    application_models: &[Model],
+    framework_models: &[Model],
+) -> GeneratedModuleTokens {
+    GeneratedModuleTokens::new("schema", render(application_models, framework_models))
 }

@@ -17,7 +17,6 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_attributes::select_framework_attributes::select_framework_attributes;
 use margaret_attributes::standard_library_item::StandardLibraryItem;
-use margaret_model::column_default::ColumnDefault;
 use margaret_schema_identifier_naming::primary_key_index_name::primary_key_index_name;
 use margaret_schema_identifier_naming::schema_identifier::schema_identifier;
 use margaret_schema_identifier_naming::unique_index_name::unique_index_name;
@@ -785,7 +784,6 @@ fn resolve_foreign_keys(
                 checks: Vec::new(),
                 inferred: InferredColumn {
                     column_type: referenced.column_type,
-                    default: ColumnDefault::NotSet,
                     nullable,
                 },
                 name: column_name.clone(),

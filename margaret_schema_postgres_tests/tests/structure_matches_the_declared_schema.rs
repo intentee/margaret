@@ -1,14 +1,12 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-use sqlx::PgPool;
-use sqlx::query_as;
-use sqlx::query_scalar;
+use tokio_postgres::Client;
 
 use margaret_model::table::Table;
+use margaret_schema_postgres_fixture::margaret::schema::schema;
 use margaret_schema_postgres_tests::apply_schema::apply_schema;
-use margaret_schema_postgres_tests::schema_fixture::schema_fixture;
-use margaret_schema_postgres_tests::start_database::start_database;
+use margaret_schema_postgres_tests::started_database::StartedDatabase;
 
 #[derive(Debug, Eq, PartialEq)]
 struct ForeignKeyDefinition {
@@ -17,23 +15,25 @@ struct ForeignKeyDefinition {
     references_table: String,
 }
 
-async fn unique_column_sets(pool: &PgPool, table: &str) -> Vec<Vec<String>> {
-    let rows: Vec<(String, String)> = query_as(
-        "SELECT tc.constraint_name, kcu.column_name \
+async fn unique_column_sets(client: &Client, table: &str) -> Vec<Vec<String>> {
+    let rows = client
+        .query(
+            "SELECT tc.constraint_name::text AS constraint_name, kcu.column_name::text AS column_name \
          FROM information_schema.table_constraints tc \
          JOIN information_schema.key_column_usage kcu \
            ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema \
          WHERE tc.constraint_type = 'UNIQUE' AND tc.table_schema = 'public' AND tc.table_name = $1",
-    )
-    .bind(table)
-    .fetch_all(pool)
-    .await
-    .expect("the unique constraints are introspected");
+            &[&table],
+        )
+        .await
+        .expect("the unique constraints are introspected");
 
     let mut sets: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
-    for (constraint_name, column_name) in rows {
-        sets.entry(constraint_name).or_default().push(column_name);
+    for row in rows {
+        sets.entry(row.get("constraint_name"))
+            .or_default()
+            .push(row.get("column_name"));
     }
 
     sets.into_values()
@@ -44,18 +44,18 @@ async fn unique_column_sets(pool: &PgPool, table: &str) -> Vec<Vec<String>> {
         .collect()
 }
 
-async fn assert_columns_match(pool: &PgPool, table: &Table) {
-    let observed: HashMap<String, bool> = query_as::<_, (String, String)>(
-        "SELECT column_name, is_nullable FROM information_schema.columns \
-         WHERE table_schema = 'public' AND table_name = $1",
-    )
-    .bind(&table.name)
-    .fetch_all(pool)
-    .await
-    .expect("the table columns are introspected")
-    .into_iter()
-    .map(|(name, is_nullable)| (name, is_nullable == "YES"))
-    .collect();
+async fn assert_columns_match(client: &Client, table: &Table) {
+    let observed: HashMap<String, bool> = client
+        .query(
+            "SELECT column_name::text, is_nullable::text = 'YES' AS nullable FROM information_schema.columns \
+             WHERE table_schema = 'public' AND table_name = $1",
+            &[&table.name],
+        )
+        .await
+        .expect("the table columns are introspected")
+        .into_iter()
+        .map(|row| (row.get("column_name"), row.get("nullable")))
+        .collect();
 
     for column in &table.columns {
         assert_eq!(
@@ -68,18 +68,21 @@ async fn assert_columns_match(pool: &PgPool, table: &Table) {
     }
 }
 
-async fn assert_primary_key_matches(pool: &PgPool, table: &Table) {
-    let mut observed: Vec<String> = query_scalar(
-        "SELECT kcu.column_name \
+async fn assert_primary_key_matches(client: &Client, table: &Table) {
+    let mut observed: Vec<String> = client
+        .query(
+            "SELECT kcu.column_name::text \
          FROM information_schema.table_constraints tc \
          JOIN information_schema.key_column_usage kcu \
            ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema \
          WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = 'public' AND tc.table_name = $1",
-    )
-    .bind(&table.name)
-    .fetch_all(pool)
-    .await
-    .expect("the primary key is introspected");
+            &[&table.name],
+        )
+        .await
+        .expect("the primary key is introspected")
+        .into_iter()
+        .map(|row| row.get(0))
+        .collect();
 
     observed.sort();
 
@@ -93,9 +96,10 @@ async fn assert_primary_key_matches(pool: &PgPool, table: &Table) {
     );
 }
 
-async fn foreign_key_definitions(pool: &PgPool, table: &str) -> Vec<ForeignKeyDefinition> {
-    let rows: Vec<(Vec<String>, String, Vec<String>)> = query_as(
-        "SELECT array_agg(local_attribute.attname::text ORDER BY local_key.ordinality), \
+async fn foreign_key_definitions(client: &Client, table: &str) -> Vec<ForeignKeyDefinition> {
+    client
+        .query(
+            "SELECT array_agg(local_attribute.attname::text ORDER BY local_key.ordinality), \
                 referenced.relname::text, \
                 array_agg(referenced_attribute.attname::text ORDER BY referenced_key.ordinality) \
          FROM pg_constraint constraint_entry \
@@ -115,25 +119,21 @@ async fn foreign_key_definitions(pool: &PgPool, table: &str) -> Vec<ForeignKeyDe
          WHERE constraint_entry.contype = 'f' AND namespace.nspname = 'public' \
            AND local.relname = $1 AND local_key.ordinality = referenced_key.ordinality \
          GROUP BY constraint_entry.oid, referenced.relname",
-    )
-    .bind(table)
-    .fetch_all(pool)
-    .await
-    .expect("the foreign keys are introspected");
-
-    rows.into_iter()
-        .map(
-            |(columns, references_table, references_columns)| ForeignKeyDefinition {
-                columns,
-                references_columns,
-                references_table,
-            },
+            &[&table],
         )
+        .await
+        .expect("the foreign keys are introspected")
+        .into_iter()
+        .map(|row| ForeignKeyDefinition {
+            columns: row.get(0),
+            references_columns: row.get(2),
+            references_table: row.get(1),
+        })
         .collect()
 }
 
-async fn assert_foreign_keys_match(pool: &PgPool, table: &Table) {
-    let observed = foreign_key_definitions(pool, &table.name).await;
+async fn assert_foreign_keys_match(client: &Client, table: &Table) {
+    let observed = foreign_key_definitions(client, &table.name).await;
 
     for foreign_key in &table.foreign_keys {
         let expected = ForeignKeyDefinition {
@@ -151,10 +151,11 @@ async fn assert_foreign_keys_match(pool: &PgPool, table: &Table) {
     }
 }
 
-async fn assert_indexes_match(pool: &PgPool, table: &Table) {
+async fn assert_indexes_match(client: &Client, table: &Table) {
     for index in &table.indexes {
-        let observed: Vec<String> = query_scalar(
-            "SELECT a.attname::text \
+        let observed: Vec<String> = client
+            .query(
+                "SELECT a.attname::text \
              FROM pg_index i \
              JOIN pg_class ic ON ic.oid = i.indexrelid \
              JOIN pg_class tc ON tc.oid = i.indrelid \
@@ -163,12 +164,13 @@ async fn assert_indexes_match(pool: &PgPool, table: &Table) {
              JOIN pg_attribute a ON a.attrelid = tc.oid AND a.attnum = k.attnum \
              WHERE n.nspname = 'public' AND tc.relname = $1 AND ic.relname = $2 \
              ORDER BY k.ord",
-        )
-        .bind(&table.name)
-        .bind(&index.name)
-        .fetch_all(pool)
-        .await
-        .expect("the index columns are introspected");
+                &[&table.name, &index.name],
+            )
+            .await
+            .expect("the index columns are introspected")
+            .into_iter()
+            .map(|row| row.get(0))
+            .collect();
 
         assert_eq!(
             observed, index.columns,
@@ -178,13 +180,13 @@ async fn assert_indexes_match(pool: &PgPool, table: &Table) {
     }
 }
 
-async fn assert_unique_constraints_exist(pool: &PgPool, table: &Table) {
+async fn assert_unique_constraints_exist(client: &Client, table: &Table) {
     for unique_constraint in &table.unique_constraints {
         let mut expected = unique_constraint.columns.clone();
         expected.sort();
 
         assert!(
-            unique_column_sets(pool, &table.name)
+            unique_column_sets(client, &table.name)
                 .await
                 .contains(&expected),
             "unique constraint over {:?} of table '{}' is missing",
@@ -196,18 +198,22 @@ async fn assert_unique_constraints_exist(pool: &PgPool, table: &Table) {
 
 #[tokio::test]
 async fn the_applied_schema_matches_the_declared_structure() {
-    let database = start_database().await;
-    let pool = database.pool();
+    let declared = schema();
+    let started = StartedDatabase::start().await;
 
-    apply_schema(pool).await;
+    apply_schema(&started.database, &declared).await;
 
-    let declared = schema_fixture();
+    let client = started
+        .database
+        .client()
+        .await
+        .expect("a connection is checked out");
 
     for table in &declared.tables {
-        assert_columns_match(pool, table).await;
-        assert_primary_key_matches(pool, table).await;
-        assert_foreign_keys_match(pool, table).await;
-        assert_indexes_match(pool, table).await;
-        assert_unique_constraints_exist(pool, table).await;
+        assert_columns_match(&client, table).await;
+        assert_primary_key_matches(&client, table).await;
+        assert_foreign_keys_match(&client, table).await;
+        assert_indexes_match(&client, table).await;
+        assert_unique_constraints_exist(&client, table).await;
     }
 }

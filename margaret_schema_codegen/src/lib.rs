@@ -38,7 +38,7 @@ struct Author {
         let indexed = IndexedSource::new(lib_source);
         let models = models(&indexed.index).expect("the models resolve");
 
-        render_schema(&models)
+        render_schema(&models, &[])
             .to_source()
             .split_whitespace()
             .collect()
@@ -46,6 +46,31 @@ struct Author {
 
     fn with_author(referencing: &str) -> String {
         format!("{AUTHOR_MODEL}\n{referencing}")
+    }
+
+    #[test]
+    fn renders_framework_models_as_framework_tables_beside_application_tables() {
+        let application = IndexedSource::new(ARTICLE);
+        let framework = IndexedSource::new(AUTHOR_MODEL);
+        let source: String = render_schema(
+            &models(&application.index).expect("the application models resolve"),
+            &models(&framework.index).expect("the framework models resolve"),
+        )
+        .to_source()
+        .split_whitespace()
+        .collect();
+        let framework_tables = source
+            .find("framework_tables:vec![")
+            .expect("the schema lists its framework tables");
+        let tables = source
+            .find(",tables:vec![")
+            .expect("the schema lists its application tables");
+
+        assert!(framework_tables < tables);
+        assert!(source[framework_tables..tables].contains("\"authors\""));
+        assert!(!source[framework_tables..tables].contains("\"articles\""));
+        assert!(source[tables..].contains("\"articles\""));
+        assert!(!source[tables..].contains("\"authors\""));
     }
 
     #[test]

@@ -1,6 +1,5 @@
 use quote::ToTokens;
 
-use margaret_model::column_default::ColumnDefault;
 use margaret_model::column_type::ColumnType;
 
 use crate::column_type_context::ColumnTypeContext;
@@ -14,7 +13,6 @@ use crate::numeric_digits::NumericDigits;
 fn numeric_column(precision: u32, scale: u32, nullable: bool) -> InferredColumn {
     InferredColumn {
         column_type: ColumnType::Numeric { precision, scale },
-        default: ColumnDefault::NotSet,
         nullable,
     }
 }

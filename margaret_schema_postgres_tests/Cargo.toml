@@ -7,13 +7,15 @@ autotests = false
 
 [dependencies]
 ephemeral-postgres = { workspace = true }
+margaret_database = { workspace = true }
 margaret_model = { workspace = true }
-sqlx = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true, features = ["clock"] }
-rust_decimal = { workspace = true }
+margaret_schema_postgres_fixture = { path = "fixture" }
+rust_decimal = { workspace = true, features = ["db-tokio-postgres"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio-postgres = { workspace = true, features = ["with-chrono-0_4", "with-uuid-1"] }
 uuid = { workspace = true, features = ["v4"] }
 
 [features]

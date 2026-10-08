@@ -873,13 +873,62 @@ struct Book {
             .column_type
     }
 
+    fn uuid_column_default(column_attribute: &str) -> ColumnDefault {
+        let indexed = IndexedSource::new(&format!(
+            "#[model(table = \"values\")]\nstruct Values {{\n    #[column(primary_key)]\n    key: String,\n    #[column{column_attribute}]\n    value: uuid::Uuid,\n}}\n"
+        ));
+
+        column_defaults(&indexed)
+            .into_iter()
+            .last()
+            .expect("the value column resolves")
+    }
+
+    fn column_defaults(indexed: &IndexedSource) -> Vec<ColumnDefault> {
+        models(&indexed.index)
+            .expect("the models resolve")
+            .iter()
+            .flat_map(|model| {
+                model
+                    .columns
+                    .iter()
+                    .map(|column| model.column_default(column))
+            })
+            .collect()
+    }
+
     #[test]
-    fn infers_a_uuid_column_with_a_v7_default() {
+    fn infers_a_uuid_column() {
         let inferred = inferred_value("", "uuid::Uuid").expect("a uuid is inferable");
 
         assert_eq!(inferred.column_type, ColumnType::Uuid);
-        assert_eq!(inferred.default, ColumnDefault::UuidV7);
         assert!(!inferred.nullable);
+    }
+
+    #[test]
+    fn defaults_a_uuid_primary_key_to_a_v7_identifier() {
+        let indexed = IndexedSource::new(
+            "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
+        );
+
+        assert_eq!(column_defaults(&indexed), [ColumnDefault::UuidV7]);
+    }
+
+    #[test]
+    fn leaves_a_uuid_column_outside_the_primary_key_without_a_default() {
+        assert_eq!(uuid_column_default(""), ColumnDefault::NotSet);
+    }
+
+    #[test]
+    fn leaves_a_uuid_column_of_a_composite_primary_key_without_a_default() {
+        let indexed = IndexedSource::new(
+            "#[model(table = \"values\")]\n#[primary_key(columns = [left, right])]\nstruct Values {\n    #[column]\n    left: uuid::Uuid,\n    #[column]\n    right: uuid::Uuid,\n}\n",
+        );
+
+        assert_eq!(
+            column_defaults(&indexed),
+            [ColumnDefault::NotSet, ColumnDefault::NotSet]
+        );
     }
 
     #[test]
@@ -928,7 +977,6 @@ struct Book {
             .expect("a datetime is inferable");
 
         assert_eq!(inferred.column_type, ColumnType::Timestamptz);
-        assert_eq!(inferred.default, ColumnDefault::NotSet);
         assert!(!inferred.nullable);
     }
 
@@ -939,7 +987,6 @@ struct Book {
 
         assert!(inferred.nullable);
         assert_eq!(inferred.column_type, ColumnType::Text);
-        assert_eq!(inferred.default, ColumnDefault::NotSet);
     }
 
     #[test]

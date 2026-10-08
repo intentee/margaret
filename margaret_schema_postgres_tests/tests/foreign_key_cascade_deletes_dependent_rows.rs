@@ -1,56 +1,66 @@
 use chrono::Utc;
-use sqlx::query;
-use sqlx::query_scalar;
 use uuid::Uuid;
 
+use margaret_schema_postgres_fixture::margaret::schema::schema;
 use margaret_schema_postgres_tests::apply_schema::apply_schema;
-use margaret_schema_postgres_tests::start_database::start_database;
+use margaret_schema_postgres_tests::started_database::StartedDatabase;
 
 #[tokio::test]
 async fn deleting_an_author_cascades_to_its_articles() {
-    let database = start_database().await;
-    let pool = database.pool();
+    let started = StartedDatabase::start().await;
 
-    apply_schema(pool).await;
+    apply_schema(&started.database, &schema()).await;
 
+    let client = started
+        .database
+        .client()
+        .await
+        .expect("a connection is checked out");
     let author_id = Uuid::new_v4();
 
-    query("INSERT INTO authors (id, name, is_active, joined_at, bio) VALUES ($1, $2, $3, $4, $5)")
-        .bind(author_id)
-        .bind("Edsger Dijkstra")
-        .bind(true)
-        .bind(Utc::now())
-        .bind(None::<String>)
-        .execute(pool)
+    client
+        .execute(
+            "INSERT INTO authors (id, name, is_active, joined_at, bio) VALUES ($1, $2, $3, $4, $5)",
+            &[
+                &author_id,
+                &"Edsger Dijkstra",
+                &true,
+                &Utc::now(),
+                &None::<String>,
+            ],
+        )
         .await
         .expect("the author is inserted");
-
-    query(
-        "INSERT INTO articles (id, title, body, cover, published, status, created_at, author_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-    )
-    .bind(Uuid::new_v4())
-    .bind("A Discipline of Programming")
-    .bind("the body text")
-    .bind(None::<Vec<u8>>)
-    .bind(true)
-    .bind("Published")
-    .bind(Utc::now())
-    .bind(author_id)
-    .execute(pool)
-    .await
-    .expect("the article is inserted");
-
-    query("DELETE FROM authors WHERE id = $1")
-        .bind(author_id)
-        .execute(pool)
+    client
+        .execute(
+            "INSERT INTO articles (id, title, body, cover, published, status, created_at, author_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            &[
+                &Uuid::new_v4(),
+                &"A Discipline of Programming",
+                &"the body text",
+                &None::<Vec<u8>>,
+                &true,
+                &"Published",
+                &Utc::now(),
+                &author_id,
+            ],
+        )
+        .await
+        .expect("the article is inserted");
+    client
+        .execute("DELETE FROM authors WHERE id = $1", &[&author_id])
         .await
         .expect("the author is deleted");
 
-    let remaining: i64 = query_scalar("SELECT COUNT(*) FROM articles WHERE author_id = $1")
-        .bind(author_id)
-        .fetch_one(pool)
-        .await
-        .expect("the remaining article count is read");
-
-    assert_eq!(remaining, 0);
+    assert_eq!(
+        client
+            .query_one(
+                "SELECT COUNT(*) FROM articles WHERE author_id = $1",
+                &[&author_id],
+            )
+            .await
+            .expect("the remaining article count is read")
+            .get::<_, i64>(0),
+        0
+    );
 }

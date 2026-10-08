@@ -25,6 +25,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_construction \
 	-p margaret_container \
 	-p margaret_container_tests \
+	-p margaret_database \
 	-p margaret_deadline \
 	-p margaret_declaration_anchor \
 	-p margaret_environment_variable \
@@ -143,6 +144,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_codegen_websocket_peer_identity_fixture \
 	--exclude-from-report margaret_composite_foreign_key_model_fixture \
 	--exclude-from-report margaret_example \
+	--exclude-from-report margaret_schema_postgres_fixture \
 	--exclude-from-report margaret_self_referential_model_fixture \
 	--exclude-from-report margaret_spiffe_http_client_fixture
 GENERATED_CODE_PACKAGES := \
@@ -162,6 +164,7 @@ GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_websocket_peer_identity_fixture \
 	-p margaret_composite_foreign_key_model_fixture \
 	-p margaret_example \
+	-p margaret_schema_postgres_fixture \
 	-p margaret_self_referential_model_fixture \
 	-p margaret_spiffe_http_client_fixture
 RUNTIME_PACKAGES := \
@@ -183,6 +186,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_console_codegen \
 	-p margaret_construction \
 	-p margaret_container \
+	-p margaret_database \
 	-p margaret_deadline \
 	-p margaret_declaration_anchor \
 	-p margaret_environment_variable \
@@ -347,6 +351,7 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_construction=100 \
 		--gated margaret_container=100 \
 		--gated margaret_container_tests=100 \
+		--gated margaret_database=100 \
 		--gated margaret_deadline=100 \
 		--gated margaret_declaration_anchor=100 \
 		--gated margaret_environment_variable=100 \

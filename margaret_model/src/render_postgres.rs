@@ -3,6 +3,7 @@ use crate::column::Column;
 use crate::column_check::ColumnCheck;
 use crate::column_default::ColumnDefault;
 use crate::foreign_key::ForeignKey;
+use crate::framework_namespace::FRAMEWORK_NAMESPACE;
 use crate::index::Index;
 use crate::on_delete::OnDelete;
 use crate::schema::Schema;
@@ -11,6 +12,17 @@ use crate::unique_constraint::UniqueConstraint;
 
 fn quote_identifier(identifier: &str) -> String {
     format!("\"{identifier}\"")
+}
+
+fn qualified_table(namespace: TableNamespace, table: &str) -> String {
+    match namespace {
+        TableNamespace::Application => quote_identifier(table),
+        TableNamespace::Framework => format!(
+            "{}.{}",
+            quote_identifier(FRAMEWORK_NAMESPACE),
+            quote_identifier(table)
+        ),
+    }
 }
 
 fn quote_identifier_list(identifiers: &[String]) -> String {
@@ -72,11 +84,11 @@ fn render_column(column: &Column) -> String {
     definition
 }
 
-fn render_foreign_key(foreign_key: &ForeignKey) -> String {
+fn render_foreign_key(namespace: TableNamespace, foreign_key: &ForeignKey) -> String {
     let mut definition = format!(
         "FOREIGN KEY ({}) REFERENCES {} ({})",
         quote_identifier_list(&foreign_key.columns),
-        quote_identifier(&foreign_key.references_table),
+        qualified_table(namespace, &foreign_key.references_table),
         quote_identifier_list(&foreign_key.references_columns)
     );
 
@@ -91,11 +103,11 @@ fn render_foreign_key(foreign_key: &ForeignKey) -> String {
     definition
 }
 
-fn render_index(table_name: &str, index: &Index) -> String {
+fn render_index(namespace: TableNamespace, table_name: &str, index: &Index) -> String {
     format!(
         "CREATE INDEX {} ON {} ({});",
         quote_identifier(&index.name),
-        quote_identifier(table_name),
+        qualified_table(namespace, table_name),
         quote_identifier_list(&index.columns)
     )
 }
@@ -107,8 +119,8 @@ fn render_unique_constraint(unique_constraint: &UniqueConstraint) -> String {
     )
 }
 
-fn render_table(table: &Table) -> String {
-    let name = quote_identifier(&table.name);
+fn render_table(namespace: TableNamespace, table: &Table) -> String {
+    let name = qualified_table(namespace, &table.name);
     let mut lines: Vec<String> = table.columns.iter().map(render_column).collect();
 
     if !table.primary_key.is_empty() {
@@ -127,8 +139,11 @@ fn render_table(table: &Table) -> String {
     unique_lines.sort();
     lines.extend(unique_lines);
 
-    let mut foreign_key_lines: Vec<String> =
-        table.foreign_keys.iter().map(render_foreign_key).collect();
+    let mut foreign_key_lines: Vec<String> = table
+        .foreign_keys
+        .iter()
+        .map(|foreign_key| render_foreign_key(namespace, foreign_key))
+        .collect();
 
     foreign_key_lines.sort();
     lines.extend(foreign_key_lines);
@@ -148,7 +163,7 @@ fn render_table(table: &Table) -> String {
     let mut index_statements: Vec<String> = table
         .indexes
         .iter()
-        .map(|index| render_index(&table.name, index))
+        .map(|index| render_index(namespace, &table.name, index))
         .collect();
 
     index_statements.sort();
@@ -163,12 +178,34 @@ fn render_table(table: &Table) -> String {
     statements.join("\n\n")
 }
 
+#[derive(Clone, Copy)]
+enum TableNamespace {
+    Application,
+    Framework,
+}
+
 #[must_use]
-pub fn render_postgres(schema: &Schema) -> String {
-    schema
-        .tables
-        .iter()
-        .map(render_table)
+pub fn render_postgres(
+    Schema {
+        framework_tables,
+        tables,
+    }: &Schema,
+) -> String {
+    let framework_namespace = (!framework_tables.is_empty())
+        .then(|| format!("CREATE SCHEMA {};", quote_identifier(FRAMEWORK_NAMESPACE)));
+
+    framework_namespace
+        .into_iter()
+        .chain(
+            framework_tables
+                .iter()
+                .map(|table| render_table(TableNamespace::Framework, table)),
+        )
+        .chain(
+            tables
+                .iter()
+                .map(|table| render_table(TableNamespace::Application, table)),
+        )
         .collect::<Vec<String>>()
         .join("\n\n")
 }
@@ -248,8 +285,46 @@ mod tests {
     }
 
     #[test]
+    fn renders_framework_tables_in_the_framework_namespace_before_application_tables() {
+        let schema = Schema {
+            framework_tables: vec![Table {
+                columns: vec![column(
+                    "family",
+                    ColumnType::Uuid,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key(
+                    &["family"],
+                    &["family"],
+                    "families",
+                    OnDelete::Cascade,
+                )],
+                indexes: vec![index(&["family"], "tokens_family")],
+                name: "tokens".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+            tables: vec![Table {
+                columns: vec![column("id", ColumnType::Uuid, false, ColumnDefault::NotSet)],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "things".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE SCHEMA \"margaret\";\n\nCREATE TABLE \"margaret\".\"tokens\" (\n    \"family\" UUID NOT NULL,\n    FOREIGN KEY (\"family\") REFERENCES \"margaret\".\"families\" (\"family\") ON DELETE CASCADE\n);\n\nCREATE INDEX \"tokens_family\" ON \"margaret\".\"tokens\" (\"family\");\n\nCREATE TABLE \"things\" (\n    \"id\" UUID NOT NULL\n);"
+        );
+    }
+
+    #[test]
     fn renders_columns_types_nullability_default_and_primary_key() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![
                     column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
@@ -276,6 +351,7 @@ mod tests {
     #[test]
     fn renders_a_timestamptz_column() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "created_at",
@@ -300,6 +376,7 @@ mod tests {
     #[test]
     fn renders_a_bytea_column() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "data",
@@ -324,6 +401,7 @@ mod tests {
     #[test]
     fn renders_a_real_column() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "reputation",
@@ -348,6 +426,7 @@ mod tests {
     #[test]
     fn renders_a_double_precision_column() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "reading_minutes",
@@ -372,6 +451,7 @@ mod tests {
     #[test]
     fn renders_a_numeric_column_with_its_precision_and_scale() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "price",
@@ -399,6 +479,7 @@ mod tests {
     #[test]
     fn renders_a_nullable_numeric_column() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "discount",
@@ -426,6 +507,7 @@ mod tests {
     #[test]
     fn renders_a_composite_primary_key() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![
                     column("left", ColumnType::Uuid, false, ColumnDefault::UuidV7),
@@ -448,6 +530,7 @@ mod tests {
     #[test]
     fn renders_a_single_column_unique_constraint() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![
                     column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
@@ -470,6 +553,7 @@ mod tests {
     #[test]
     fn renders_a_composite_unique_constraint_before_foreign_keys() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![
                     column("region", ColumnType::Text, false, ColumnDefault::NotSet),
@@ -498,6 +582,7 @@ mod tests {
     #[test]
     fn renders_multiple_tables_separated_by_a_blank_line() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![
                 Table {
                     columns: vec![column("id", ColumnType::Text, false, ColumnDefault::NotSet)],
@@ -527,6 +612,7 @@ mod tests {
     #[test]
     fn renders_a_table_without_columns() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: Vec::new(),
                 foreign_keys: Vec::new(),
@@ -543,6 +629,7 @@ mod tests {
     #[test]
     fn renders_a_single_column_foreign_key() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![
                     column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
@@ -571,6 +658,7 @@ mod tests {
     #[test]
     fn renders_a_nullable_foreign_key_column() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "author_id",
@@ -600,6 +688,7 @@ mod tests {
     #[test]
     fn renders_foreign_keys_in_a_deterministic_order() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![
                     column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
@@ -625,6 +714,7 @@ mod tests {
     #[test]
     fn renders_on_delete_cascade() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "author_id",
@@ -654,6 +744,7 @@ mod tests {
     #[test]
     fn renders_on_delete_restrict() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "author_id",
@@ -683,6 +774,7 @@ mod tests {
     #[test]
     fn renders_on_delete_set_null() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "author_id",
@@ -712,6 +804,7 @@ mod tests {
     #[test]
     fn renders_on_delete_set_default() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![column(
                     "author_id",
@@ -741,6 +834,7 @@ mod tests {
     #[test]
     fn renders_a_single_column_index() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![
                     column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
@@ -768,6 +862,7 @@ mod tests {
     #[test]
     fn renders_a_multi_column_index() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![
                     column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
@@ -801,6 +896,7 @@ mod tests {
     #[test]
     fn renders_indexes_in_a_deterministic_order() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![
                     column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
@@ -831,6 +927,7 @@ mod tests {
     #[test]
     fn renders_a_byte_length_check() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![checked_column(
                     "hash",
@@ -857,6 +954,7 @@ mod tests {
     #[test]
     fn renders_a_minimum_check() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![checked_column(
                     "size_payload",
@@ -883,6 +981,7 @@ mod tests {
     #[test]
     fn renders_checks_on_one_column_in_a_deterministic_order() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![checked_column(
                     "hash",
@@ -915,6 +1014,7 @@ mod tests {
     #[test]
     fn renders_a_composite_foreign_key() {
         let schema = Schema {
+            framework_tables: Vec::new(),
             tables: vec![Table {
                 columns: vec![
                     column("partition", ColumnType::Uuid, false, ColumnDefault::NotSet),

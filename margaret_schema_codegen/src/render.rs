@@ -23,10 +23,10 @@ fn string_vec(values: &[String]) -> TokenStream {
     quote! { vec![#(#items),*] }
 }
 
-fn render_column(column: &ResolvedColumn) -> TokenStream {
+fn render_column(model: &Model, column: &ResolvedColumn) -> TokenStream {
     let checks = column.checks.iter().map(column_check_tokens);
     let column_type = column_type_tokens(column.inferred.column_type);
-    let default = column_default_tokens(column.inferred.default);
+    let default = column_default_tokens(model.column_default(column));
     let nullable = column.inferred.nullable;
     let name = Literal::string(&column.name);
 
@@ -81,7 +81,10 @@ fn render_unique_constraint(columns: &[String]) -> TokenStream {
 
 fn render_table(model: &Model) -> TokenStream {
     let table = Literal::string(&model.table);
-    let columns = model.columns.iter().map(render_column);
+    let columns = model
+        .columns
+        .iter()
+        .map(|column| render_column(model, column));
     let foreign_keys = model.foreign_keys.iter().map(render_foreign_key);
     let indexes = model.indexes.iter().map(render_index);
     let primary_key = string_vec(&model.primary_key);
@@ -102,8 +105,9 @@ fn render_table(model: &Model) -> TokenStream {
     }
 }
 
-pub(crate) fn render(models: &[Model]) -> TokenStream {
-    let tables = models.iter().map(render_table);
+pub(crate) fn render(application_models: &[Model], framework_models: &[Model]) -> TokenStream {
+    let framework_tables = framework_models.iter().map(render_table);
+    let tables = application_models.iter().map(render_table);
     let too_many_lines = too_many_lines_allow();
 
     quote! {
@@ -111,6 +115,7 @@ pub(crate) fn render(models: &[Model]) -> TokenStream {
         #too_many_lines
         pub fn schema() -> margaret::framework::model::schema::Schema {
             margaret::framework::model::schema::Schema {
+                framework_tables: vec![#(#framework_tables),*],
                 tables: vec![#(#tables),*],
             }
         }

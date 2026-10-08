@@ -1,89 +1,95 @@
-use sqlx::Error;
-use sqlx::PgPool;
-use sqlx::query;
+use tokio_postgres::Client;
+use tokio_postgres::Error;
+use tokio_postgres::error::SqlState;
 use uuid::Uuid;
 
+use margaret_schema_postgres_fixture::margaret::schema::schema;
 use margaret_schema_postgres_tests::apply_schema::apply_schema;
-use margaret_schema_postgres_tests::start_database::start_database;
-
-const CHECK_VIOLATION: &str = "23514";
-
-const INSERT_FRAGMENT_METADATA: &str =
-    "INSERT INTO fragment_metadata (partition, hash, size_payload) VALUES ($1, $2, $3)";
+use margaret_schema_postgres_tests::started_database::StartedDatabase;
 
 async fn insert_fragment_metadata(
-    pool: &PgPool,
+    client: &Client,
     hash: Vec<u8>,
     size_payload: i64,
-) -> Result<(), Error> {
-    query(INSERT_FRAGMENT_METADATA)
-        .bind(Uuid::new_v4())
-        .bind(hash)
-        .bind(size_payload)
-        .execute(pool)
+) -> Result<u64, Error> {
+    client
+        .execute(
+            "INSERT INTO fragment_metadata (partition, hash, size_payload) VALUES ($1, $2, $3)",
+            &[&Uuid::new_v4(), &hash, &size_payload],
+        )
         .await
-        .map(|_| ())
-}
-
-fn sqlstate(error: &Error) -> String {
-    error
-        .as_database_error()
-        .expect("the rejection carries a database error")
-        .code()
-        .expect("the database error carries an SQLSTATE")
-        .to_string()
 }
 
 #[tokio::test]
 async fn a_hash_of_the_declared_byte_length_is_accepted() {
-    let database = start_database().await;
-    let pool = database.pool();
+    let started = StartedDatabase::start().await;
 
-    apply_schema(pool).await;
+    apply_schema(&started.database, &schema()).await;
 
-    insert_fragment_metadata(pool, vec![0u8; 32], 0)
+    let client = started
+        .database
+        .client()
+        .await
+        .expect("a connection is checked out");
+
+    insert_fragment_metadata(&client, vec![0u8; 32], 0)
         .await
         .expect("a thirty two byte hash is accepted");
 }
 
 #[tokio::test]
 async fn a_hash_shorter_than_the_declared_byte_length_is_rejected() {
-    let database = start_database().await;
-    let pool = database.pool();
+    let started = StartedDatabase::start().await;
 
-    apply_schema(pool).await;
+    apply_schema(&started.database, &schema()).await;
 
-    let rejection = insert_fragment_metadata(pool, vec![0u8; 16], 0)
+    let client = started
+        .database
+        .client()
+        .await
+        .expect("a connection is checked out");
+
+    let rejection = insert_fragment_metadata(&client, vec![0u8; 16], 0)
         .await
         .expect_err("a sixteen byte hash is rejected");
 
-    assert_eq!(sqlstate(&rejection), CHECK_VIOLATION);
+    assert_eq!(rejection.code(), Some(&SqlState::CHECK_VIOLATION));
 }
 
 #[tokio::test]
 async fn a_hash_longer_than_the_declared_byte_length_is_rejected() {
-    let database = start_database().await;
-    let pool = database.pool();
+    let started = StartedDatabase::start().await;
 
-    apply_schema(pool).await;
+    apply_schema(&started.database, &schema()).await;
 
-    let rejection = insert_fragment_metadata(pool, vec![0u8; 33], 0)
+    let client = started
+        .database
+        .client()
+        .await
+        .expect("a connection is checked out");
+
+    let rejection = insert_fragment_metadata(&client, vec![0u8; 33], 0)
         .await
         .expect_err("a thirty three byte hash is rejected");
 
-    assert_eq!(sqlstate(&rejection), CHECK_VIOLATION);
+    assert_eq!(rejection.code(), Some(&SqlState::CHECK_VIOLATION));
 }
 
 #[tokio::test]
 async fn a_size_below_the_declared_minimum_is_rejected() {
-    let database = start_database().await;
-    let pool = database.pool();
+    let started = StartedDatabase::start().await;
 
-    apply_schema(pool).await;
+    apply_schema(&started.database, &schema()).await;
 
-    let rejection = insert_fragment_metadata(pool, vec![0u8; 32], -1)
+    let client = started
+        .database
+        .client()
+        .await
+        .expect("a connection is checked out");
+
+    let rejection = insert_fragment_metadata(&client, vec![0u8; 32], -1)
         .await
         .expect_err("a negative size is rejected");
 
-    assert_eq!(sqlstate(&rejection), CHECK_VIOLATION);
+    assert_eq!(rejection.code(), Some(&SqlState::CHECK_VIOLATION));
 }

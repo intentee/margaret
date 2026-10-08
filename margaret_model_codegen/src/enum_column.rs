@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::struct_shape::StructShape;
-use margaret_model::column_default::ColumnDefault;
 use margaret_model::column_type::ColumnType;
 
 use crate::inferred_column::InferredColumn;
@@ -12,7 +11,6 @@ use crate::model_codegen_error::ModelCodegenError;
 fn text_column(nullable: bool) -> InferredColumn {
     InferredColumn {
         column_type: ColumnType::Text,
-        default: ColumnDefault::NotSet,
         nullable,
     }
 }
