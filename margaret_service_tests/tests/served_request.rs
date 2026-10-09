@@ -6,12 +6,12 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio_util::sync::CancellationToken;
 
+use margaret_handler_error::handler_error::HandlerError;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::body_reading::BodyReading;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::content_handler::ContentHandler;
 use margaret_http::forward_targets::ForwardTargets;
-use margaret_http::handler_error::HandlerError;
 use margaret_http::head_handler::HeadHandler;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::read_form_fields::read_form_fields;
@@ -26,35 +26,6 @@ use margaret_http::transport_config::TransportConfig;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 use margaret_route_method::content_method::ContentMethod;
 use margaret_route_method::route_method::RouteMethod;
-
-struct Accepts;
-
-#[async_trait]
-impl HeadHandler for Accepts {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
-        Ok(ResponseContinuation::Done(Response::text(200, "accepted")))
-    }
-}
-
-struct ReadsForm {
-    limit: BodyLimit,
-}
-
-#[async_trait]
-impl ContentHandler for ReadsForm {
-    async fn handle(
-        &self,
-        request: &Request,
-        body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
-        Ok(ResponseContinuation::Done(
-            match read_form_fields(request, body, self.limit).await {
-                BodyReading::Read(_) => Response::text(200, "accepted"),
-                BodyReading::Rejected(rejection) => rejection.into_response(),
-            },
-        ))
-    }
-}
 
 async fn exchange(request: &[u8], close_write: bool) -> String {
     let router = Router::build(vec![
@@ -123,6 +94,35 @@ async fn exchange(request: &[u8], close_write: bool) -> String {
     serving.await.expect("the server task finishes");
 
     String::from_utf8_lossy(&response).into_owned()
+}
+
+struct Accepts;
+
+#[async_trait]
+impl HeadHandler for Accepts {
+    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        Ok(ResponseContinuation::Done(Response::text(200, "accepted")))
+    }
+}
+
+struct ReadsForm {
+    limit: BodyLimit,
+}
+
+#[async_trait]
+impl ContentHandler for ReadsForm {
+    async fn handle(
+        &self,
+        request: &Request,
+        body: RequestBody,
+    ) -> Result<ResponseContinuation, HandlerError> {
+        Ok(ResponseContinuation::Done(
+            match read_form_fields(request, body, self.limit).await {
+                BodyReading::Read(_) => Response::text(200, "accepted"),
+                BodyReading::Rejected(rejection) => rejection.into_response(),
+            },
+        ))
+    }
 }
 
 #[tokio::test]

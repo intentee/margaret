@@ -22,16 +22,17 @@ use margaret_oidc_provider::authorization_endpoint::AuthorizationEndpoint;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::consent_endpoint::ConsentEndpoint;
 use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
+use margaret_sessions::issued_sessions::IssuedSessions;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::answer::Answer;
 use crate::client_credentials::ClientCredentials;
 use crate::fixture_clients::FixtureClients;
-use crate::fixture_endpoints::fixture_endpoints;
-use crate::provider_issuance::provider_issuance;
+use crate::fixture_issuer::FixtureIssuer;
+use crate::localhost_issuer::LOCALHOST_ISSUER;
 use crate::provider_parts::ProviderParts;
+use crate::provider_session_audience::PROVIDER_SESSION_AUDIENCE;
 use crate::provider_url::provider_url;
 use crate::published_endpoints::PublishedEndpoints;
 use crate::signed_in_end_user::signed_in_end_user;
@@ -41,35 +42,29 @@ use crate::validated_form::validated_form;
 const FORM_CONTENT_TYPE: &str = "application/x-www-form-urlencoded";
 
 struct ProviderPublication {
-    endpoints: PublishedEndpoints,
     ip: IpAddr,
-    issuance: TokenIssuance,
+    issuer: &'static FixtureIssuer,
     tls: TlsFixture,
 }
 
 impl ProviderPublication {
     fn on_localhost() -> Self {
         Self {
-            endpoints: fixture_endpoints(
-                &provider_issuance()
-                    .issuer
-                    .parse()
-                    .expect("the fixture issuer is an https url"),
-            ),
             ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
-            issuance: provider_issuance(),
+            issuer: &LOCALHOST_ISSUER,
             tls: TlsFixture::generate(),
         }
     }
 }
 
 pub struct ProviderFixture {
-    pub authorization: AuthorizationEndpoint,
+    pub authorization: Arc<AuthorizationEndpoint>,
     pub client: Client,
     pub clients: FixtureClients,
-    pub consent: ConsentEndpoint,
-    pub issuer: &'static str,
+    pub consent: Arc<ConsentEndpoint>,
+    pub issuer: &'static FixtureIssuer,
     pub server: RunningFixtureServer,
+    pub sessions: Arc<IssuedSessions>,
     pub storage: StartedDatabase,
     pub tls: TlsFixture,
 }
@@ -79,19 +74,22 @@ impl ProviderFixture {
         storage: StartedDatabase,
         clients: FixtureClients,
         exchangers: Vec<Arc<SubjectTokenExchanger>>,
-        ProviderPublication {
-            endpoints:
-                PublishedEndpoints {
-                    authorization,
-                    provider: endpoints,
-                },
-            ip,
-            issuance,
-            tls,
-        }: ProviderPublication,
+        ProviderPublication { ip, issuer, tls }: ProviderPublication,
     ) -> Self {
+        let PublishedEndpoints {
+            authorization,
+            provider: endpoints,
+        } = issuer.endpoints.published();
+        let issuance = TokenIssuance {
+            issuer: issuer.location.issuer.as_str(),
+        };
         let secrets = fixture_secrets();
         let secret_store = Arc::new(JwksSecretStore::create(Arc::clone(&secrets), issuance));
+        let sessions = Arc::new(IssuedSessions::host_only(
+            Arc::clone(&storage.database),
+            Arc::clone(&secret_store),
+            PROVIDER_SESSION_AUDIENCE,
+        ));
         let parts = ProviderParts {
             clients: Arc::new(AcceptedClients::create(clients.registered(), issuance)),
             database: Arc::clone(&storage.database),
@@ -109,16 +107,17 @@ impl ProviderFixture {
             .expect("the fixture client builds");
 
         Self {
-            authorization: AuthorizationEndpoint::create(
+            authorization: Arc::new(AuthorizationEndpoint::create(
                 parts.clients,
                 authorization,
                 parts.issuance,
-            ),
+            )),
             client,
-            consent: ConsentEndpoint::create(parts.database, parts.issuance),
+            consent: Arc::new(ConsentEndpoint::create(parts.database, parts.issuance)),
             clients,
-            issuer: parts.issuance.issuer,
+            issuer,
             server,
+            sessions,
             storage,
             tls,
         }
@@ -128,8 +127,15 @@ impl ProviderFixture {
     ///
     /// Panics when the issuer names no host, or the fixture clients, endpoints or tls client
     /// cannot be prepared.
-    pub async fn published(issuer: IssuerIdentifier, ip: IpAddr) -> Self {
-        let tls = TlsFixture::serving(issuer.url().host_str().expect("the issuer names a host"));
+    pub async fn published(issuer: &'static FixtureIssuer, ip: IpAddr) -> Self {
+        let tls = TlsFixture::serving(
+            issuer
+                .location
+                .issuer
+                .url()
+                .host_str()
+                .expect("the issuer names a host"),
+        );
         let storage = started_with_provider_state().await;
         let clients = FixtureClients::standard(&storage.database);
 
@@ -137,15 +143,7 @@ impl ProviderFixture {
             storage,
             clients,
             Vec::new(),
-            ProviderPublication {
-                endpoints: fixture_endpoints(&issuer),
-                ip,
-                issuance: TokenIssuance {
-                    issuer: String::leak(issuer.as_str().to_string()),
-                    ..provider_issuance()
-                },
-                tls,
-            },
+            ProviderPublication { ip, issuer, tls },
         )
         .await
     }
@@ -197,7 +195,10 @@ impl ProviderFixture {
     pub fn assertion(&self, client_id: &'static str) -> String {
         self.clients
             .asserting(client_id)
-            .assertion(&assertion_claims(client_id, self.issuer))
+            .assertion(&assertion_claims(
+                client_id,
+                self.issuer.location.issuer.as_str(),
+            ))
     }
 
     /// # Panics

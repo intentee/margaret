@@ -31,7 +31,10 @@ fn resolved(
             record: family.into_family(),
         }
     } else {
-        RefreshTokenLookup::Superseded { family: family.id }
+        RefreshTokenLookup::Superseded {
+            client_id: family.client_id,
+            family: family.id,
+        }
     }
 }
 

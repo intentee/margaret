@@ -16,7 +16,6 @@ pub struct JwkPair {
     encoded_access_token_header: String,
     encoded_client_authentication_header: String,
     encoded_jwt_header: String,
-    encoded_refresh_header: String,
     encoded_sign_in_transaction_header: String,
     kid: KeyId,
     public_jwk: Jwk,
@@ -48,7 +47,6 @@ impl JwkPair {
                         JwtType::ClientAuthentication,
                     ),
                     encoded_jwt_header: encoded_header(algorithm, &kid, JwtType::Jwt),
-                    encoded_refresh_header: encoded_header(algorithm, &kid, JwtType::Refresh),
                     encoded_sign_in_transaction_header: encoded_header(
                         algorithm,
                         &kid,
@@ -79,7 +77,6 @@ impl JwkPair {
             JwtType::AccessToken => &self.encoded_access_token_header,
             JwtType::ClientAuthentication => &self.encoded_client_authentication_header,
             JwtType::Jwt => &self.encoded_jwt_header,
-            JwtType::Refresh => &self.encoded_refresh_header,
             JwtType::SignInTransaction => &self.encoded_sign_in_transaction_header,
         };
         let signing_input = signing_input(encoded_header, claims);

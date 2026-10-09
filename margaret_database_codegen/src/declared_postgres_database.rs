@@ -64,15 +64,17 @@ mod tests {
     #[test]
     fn reads_the_environment_variable_of_the_database_url() {
         read(
-            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\")]\npub struct BlogDatabase;\n",
+            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
                     Ok(DeclaredPostgresDatabase::Declared(PostgresDatabaseDeclaration {
                         anchor,
+                        max_connections_from,
                         url_from,
                     })) if anchor.canonical_path().to_string() == "crate::BlogDatabase"
                         && url_from.as_str() == "BLOG_DATABASE_URL"
+                        && max_connections_from.as_str() == "BLOG_DATABASE_MAX_CONNECTIONS"
                 ));
             },
         );
@@ -102,9 +104,48 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_declaration_without_a_max_connections_source() {
+        read(
+            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\")]\npub struct BlogDatabase;\n",
+            |read| {
+                assert!(matches!(
+                    read,
+                    Err(DatabaseCodegenError::MissingMaxConnectionsSource { anchor }) if anchor == "crate::BlogDatabase"
+                ));
+            },
+        );
+    }
+
+    #[test]
+    fn rejects_a_max_connections_source_that_is_not_an_environment_variable_name() {
+        read(
+            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"blog pool\")]\npub struct BlogDatabase;\n",
+            |read| {
+                assert!(matches!(
+                    read,
+                    Err(DatabaseCodegenError::MalformedMaxConnectionsSource { name, .. }) if name == "blog pool"
+                ));
+            },
+        );
+    }
+
+    #[test]
+    fn rejects_a_url_and_a_pool_size_read_from_one_environment_variable() {
+        read(
+            "#[postgres_database(url_from = \"BLOG_DATABASE\", max_connections_from = \"BLOG_DATABASE\")]\npub struct BlogDatabase;\n",
+            |read| {
+                assert!(matches!(
+                    read,
+                    Err(DatabaseCodegenError::SharedEnvironmentVariable { name, .. }) if name == "BLOG_DATABASE"
+                ));
+            },
+        );
+    }
+
+    #[test]
     fn rejects_a_url_source_that_is_not_an_environment_variable_name() {
         read(
-            "#[postgres_database(url_from = \"blog database\")]\npub struct BlogDatabase;\n",
+            "#[postgres_database(url_from = \"blog database\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -130,9 +171,24 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_max_connections_source_that_is_not_a_string() {
+        read(
+            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = BLOG_DATABASE_MAX_CONNECTIONS)]\npub struct BlogDatabase;\n",
+            |read| {
+                assert!(matches!(
+                    read,
+                    Err(DatabaseCodegenError::AttributeArguments(
+                        AttributeArgumentsError::UnexpectedArgument { key, .. }
+                    )) if key == "max_connections_from"
+                ));
+            },
+        );
+    }
+
+    #[test]
     fn rejects_an_unknown_argument() {
         read(
-            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", pool = 4)]\npub struct BlogDatabase;\n",
+            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\", pool = 4)]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -162,7 +218,7 @@ mod tests {
     #[test]
     fn rejects_a_declaration_on_a_singleton() {
         read(
-            "#[singleton]\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\")]\npub struct BlogDatabase;\n",
+            "#[singleton]\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -177,7 +233,7 @@ mod tests {
     #[test]
     fn rejects_two_databases() {
         read(
-            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\")]\npub struct BlogDatabase;\n\n#[postgres_database(url_from = \"AUDIT_DATABASE_URL\")]\npub struct AuditDatabase;\n",
+            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n\n#[postgres_database(url_from = \"AUDIT_DATABASE_URL\", max_connections_from = \"AUDIT_DATABASE_MAX_CONNECTIONS\")]\npub struct AuditDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,

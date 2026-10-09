@@ -18,13 +18,6 @@ const DECLARED: Schema = Schema {
     ],
 };
 
-#[derive(Debug, Eq, PartialEq)]
-struct ForeignKeyDefinition {
-    columns: Vec<String>,
-    references_columns: Vec<String>,
-    references_table: String,
-}
-
 fn owned(names: &[&str]) -> Vec<String> {
     names.iter().map(ToString::to_string).collect()
 }
@@ -257,6 +250,13 @@ async fn assert_tables_match(client: &Client, namespace: &str, tables: &[&Table]
         assert_indexes_match(client, namespace, table).await;
         assert_unique_constraints_exist(client, namespace, table).await;
     }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct ForeignKeyDefinition {
+    columns: Vec<String>,
+    references_columns: Vec<String>,
+    references_table: String,
 }
 
 #[tokio::test]

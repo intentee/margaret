@@ -23,16 +23,8 @@ pub fn render_jwks(server: &JwksServerModule) -> GeneratedModuleTokens {
             pub use margaret::framework::jwks_secret_store::jwks_secret_store::JwksSecretStore;
         }
     });
-    let minter = server.contains(JwksServerPart::Minter).then(|| {
-        quote! {
-            pub use margaret::framework::access_token_minter::mint_access_token_handler::MintAccessTokenHandler;
-        }
-    });
 
-    GeneratedModuleTokens::new(
-        JWKS_MODULE_NAME,
-        quote! { #roller #handler #secret_store #minter },
-    )
+    GeneratedModuleTokens::new(JWKS_MODULE_NAME, quote! { #roller #handler #secret_store })
 }
 
 #[cfg(test)]
@@ -55,7 +47,6 @@ mod tests {
 
         for part in [
             JwksServerPart::Handler,
-            JwksServerPart::Minter,
             JwksServerPart::Roller,
             JwksServerPart::SecretStore,
         ] {
@@ -75,9 +66,6 @@ mod tests {
         assert!(source.contains(
             "pub use margaret::framework::jwks_secret_store::jwks_secret_store::JwksSecretStore;"
         ));
-        assert!(source.contains(
-            "pub use margaret::framework::access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
-        ));
     }
 
     #[test]
@@ -87,6 +75,5 @@ mod tests {
         assert!(!source.contains("JwksRoller"));
         assert!(!source.contains("PublicJwksHandler"));
         assert!(!source.contains("JwksSecretStore"));
-        assert!(!source.contains("MintAccessTokenHandler"));
     }
 }

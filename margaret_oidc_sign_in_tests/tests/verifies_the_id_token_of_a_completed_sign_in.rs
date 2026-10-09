@@ -126,7 +126,6 @@ async fn signs_in_with_a_verified_id_token() {
         access_token,
         claims,
         subject,
-        transaction_removal,
     }) = completed_with(|_claims| {}, JwtType::Jwt).await
     else {
         panic!("the user signs in");
@@ -135,13 +134,4 @@ async fn signs_in_with_a_verified_id_token() {
     assert_eq!(access_token.secret(), "2YotnFZFEjr1zCsicMWpAA");
     assert_eq!(claims.email, "user@example.test");
     assert_eq!(subject, "subject");
-    assert!(
-        transaction_removal
-            .name()
-            .starts_with("__Host-margaret-sign-in-")
-    );
-    assert_eq!(
-        transaction_removal.max_age(),
-        Some(cookie::time::Duration::ZERO)
-    );
 }

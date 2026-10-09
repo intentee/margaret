@@ -1,7 +1,8 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use crate::handler_error::HandlerError;
+use margaret_handler_error::handler_error::HandlerError;
+
 use crate::response_continuation::ResponseContinuation;
 
 pub type HandlerFuture<'request> =

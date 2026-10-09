@@ -15,17 +15,17 @@ use rustls::pki_types::PrivateKeyDer;
 use crate::issued_certificate::IssuedCertificate;
 use crate::issued_pem_certificate::IssuedPemCertificate;
 
-struct SignedLeaf {
-    certificate: Certificate,
-    key: KeyPair,
-}
-
 fn named(common_name: &str) -> DistinguishedName {
     let mut distinguished_name = DistinguishedName::new();
 
     distinguished_name.push(DnType::CommonName, common_name);
 
     distinguished_name
+}
+
+struct SignedLeaf {
+    certificate: Certificate,
+    key: KeyPair,
 }
 
 pub struct FixtureCertificateAuthority {

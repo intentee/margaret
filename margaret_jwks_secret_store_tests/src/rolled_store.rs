@@ -1,7 +1,7 @@
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
-use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
 
+use crate::fixture_issuance::fixture_issuance;
 use crate::rolled_secrets::rolled_secrets;
 
 #[must_use]

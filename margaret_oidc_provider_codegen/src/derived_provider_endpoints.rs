@@ -1,7 +1,8 @@
+use crate::derived_authorization::DerivedAuthorization;
 use crate::derived_endpoint::DerivedEndpoint;
 
 pub struct DerivedProviderEndpoints {
-    pub authorization: DerivedEndpoint,
+    pub authorization: DerivedAuthorization,
     pub introspection: DerivedEndpoint,
     pub issuer_origin: String,
     pub jwks: String,

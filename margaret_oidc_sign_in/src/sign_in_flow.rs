@@ -4,6 +4,7 @@ use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use chrono::Utc;
+use cookie::Cookie;
 use oauth2::CsrfToken;
 use oauth2::RedirectUrl;
 use oauth2::TokenResponse;
@@ -32,7 +33,8 @@ use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
 use margaret_oauth_vocabulary::code_challenge::CodeChallenge;
 use margaret_oauth_vocabulary::code_verifier::CodeVerifier;
-use margaret_oauth_vocabulary::openid_scope::OPENID_SCOPE;
+use margaret_oauth_vocabulary::declared_scope::DeclaredScope;
+use margaret_oauth_vocabulary::openid_scope::OpenidScope;
 use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::equal_in_constant_time::equal_in_constant_time;
@@ -56,7 +58,7 @@ fn rejected_id_token<TIdClaims>(rejection: JwtRejection) -> SignInCompletion<TId
 }
 
 fn requested_scopes(scopes: &[&str]) -> Vec<oauth2::Scope> {
-    iter::once(OPENID_SCOPE)
+    iter::once(OpenidScope::NAME)
         .chain(scopes.iter().copied())
         .collect::<BTreeSet<&str>>()
         .into_iter()
@@ -70,7 +72,6 @@ pub struct SignInFlow {
     secrets: Arc<JwksSecretHolder>,
     server: Arc<AuthorizationServerClient>,
     transaction_cookie: TransactionCookie,
-    transaction_issuance: TokenIssuance,
 }
 
 impl SignInFlow {
@@ -83,19 +84,16 @@ impl SignInFlow {
         callback: String,
         scopes: &[&str],
     ) -> Result<Self, SignInFlowError> {
-        let transaction_issuance = TokenIssuance {
-            audience: server.client_id,
-            issuer: server.trusted_issuer.trust.issuer,
-        };
-
         RedirectUrl::new(callback.clone())
             .map(|callback| Self {
                 callback,
                 requested_scopes: requested_scopes(scopes),
                 secrets,
-                transaction_cookie: TransactionCookie::of(&transaction_issuance),
+                transaction_cookie: TransactionCookie::of(
+                    server.trusted_issuer.trust.issuer,
+                    server.client_id,
+                ),
                 server,
-                transaction_issuance,
             })
             .map_err(|source| SignInFlowError::MalformedCallback { callback, source })
     }
@@ -216,10 +214,19 @@ impl SignInFlow {
         }
     }
 
+    pub(crate) fn transaction_removal(&self) -> Cookie<'static> {
+        self.transaction_cookie.removal()
+    }
+
     fn sealed_transaction(&self, transaction: &SignInTransactionClaims) -> String {
-        let registered = self
-            .transaction_issuance
-            .registered_claims(Utc::now(), SIGN_IN_TRANSACTION_LIFETIME_SECS);
+        let registered = TokenIssuance {
+            issuer: self.server.trusted_issuer.trust.issuer,
+        }
+        .registered_claims(
+            AudienceClaim::Single(self.server.client_id.to_string()),
+            Utc::now(),
+            SIGN_IN_TRANSACTION_LIFETIME_SECS,
+        );
 
         self.secrets.get().current().sign_json(
             &transaction.to_payload(&registered),
@@ -265,7 +272,6 @@ impl SignInFlow {
             access_token,
             claims,
             subject: sub,
-            transaction_removal: self.transaction_cookie.removal(),
         })
     }
 
@@ -277,7 +283,10 @@ impl SignInFlow {
         verify_serialized_jwt(
             self.secrets.get().token_key_set(),
             presented,
-            &self.transaction_issuance.expectation(),
+            &JwtExpectation {
+                audience: ExpectedAudience::One(self.server.client_id),
+                issuer: self.server.trusted_issuer.trust.issuer,
+            },
             now,
         )
     }

@@ -1,0 +1,29 @@
+use std::collections::HashMap;
+
+use async_trait::async_trait;
+use cookie::Cookie;
+
+use margaret_handler_error::handler_error::HandlerError;
+use margaret_http::cookie_changes::CookieChanges;
+use margaret_http::forward::Forward;
+use margaret_http::head_handler::HeadHandler;
+use margaret_http::request::Request;
+use margaret_http::response_continuation::ResponseContinuation;
+
+pub struct CookieChangingForwardHandler {
+    pub cookie: Cookie<'static>,
+    pub target: &'static str,
+}
+
+#[async_trait]
+impl HeadHandler for CookieChangingForwardHandler {
+    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        Ok(CookieChanges {
+            cookies: vec![self.cookie.clone()],
+        }
+        .apply(ResponseContinuation::from(Forward::new(
+            self.target,
+            HashMap::new(),
+        ))))
+    }
+}

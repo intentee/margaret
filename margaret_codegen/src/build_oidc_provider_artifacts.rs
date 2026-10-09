@@ -7,9 +7,12 @@ use margaret_oidc_provider_codegen::render_oidc_provider::render_oidc_provider;
 use margaret_oidc_provider_codegen::subject_token_exchanger_path::subject_token_exchanger_path;
 use margaret_tag_codegen::subject_token_exchanger_binding::SubjectTokenExchangerBinding;
 
+use crate::provided_endpoints::ProvidedEndpoints;
+
 pub(crate) fn build_oidc_provider_artifacts(
     bindings: &ContainerBindings,
     exchangers: &[SubjectTokenExchangerBinding],
+    provided: &ProvidedEndpoints,
 ) -> Vec<GeneratedModuleTokens> {
     let items: Vec<OidcProviderItem> = OidcProviderItem::ALL
         .into_iter()
@@ -24,6 +27,6 @@ pub(crate) fn build_oidc_provider_artifacts(
     if items.is_empty() {
         Vec::new()
     } else {
-        render_oidc_provider(&items, &exchanger_issuers)
+        render_oidc_provider(&items, &exchanger_issuers, provided.authorization())
     }
 }

@@ -75,7 +75,7 @@ impl ConsentEndpoint {
                 .map(|()| ConsentOutcome::Redirected(redirection.code(&code)))
             }
             ConsentDecision::Denied => Ok(ConsentOutcome::Redirected(
-                redirection.error(AuthorizationError::AccessDenied),
+                redirection.error(&AuthorizationError::AccessDenied),
             )),
         }
     }

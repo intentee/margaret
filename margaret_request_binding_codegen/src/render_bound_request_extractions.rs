@@ -12,12 +12,6 @@ use crate::head_extraction_context::HeadExtractionContext;
 use crate::request_binding::RequestBinding;
 use crate::route_parameter_lookup::RouteParameterLookup;
 
-struct BoundRouteParameter<'parameter> {
-    lookup: &'parameter RouteParameterLookup,
-    parameter: &'parameter BoundParameter,
-    path_key: &'parameter str,
-}
-
 fn joined_future(first: &TokenStream, remaining: &[TokenStream]) -> TokenStream {
     if let Some((second, tail)) = remaining.split_first() {
         let remaining = joined_future(second, tail);
@@ -46,6 +40,12 @@ fn joined_pattern(first: &Ident, remaining: &[&Ident]) -> TokenStream {
     } else {
         quote! { #first }
     }
+}
+
+struct BoundRouteParameter<'parameter> {
+    lookup: &'parameter RouteParameterLookup,
+    parameter: &'parameter BoundParameter,
+    path_key: &'parameter str,
 }
 
 pub(crate) fn render_bound_request_extractions(
@@ -177,6 +177,7 @@ mod tests {
             &captured,
             &HeadExtractionContext {
                 continuation_return: &quote! { return response },
+                cookie_changes: &format_ident!("changed_cookies"),
                 error_return: &quote! { return error },
                 owner: &TokenStream::new(),
                 request_local: &format_ident!("request"),

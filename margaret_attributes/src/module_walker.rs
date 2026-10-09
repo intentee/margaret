@@ -35,28 +35,6 @@ use crate::scanned_method::ScannedMethod;
 use crate::struct_shape::StructShape;
 use crate::walk_output::WalkOutput;
 
-struct Recordable<'item> {
-    attributes: &'item [Attribute],
-    fields: Vec<ScannedField>,
-    identifier: &'item Ident,
-    kind: ItemKind,
-    variants: Vec<IndexedVariant>,
-}
-
-enum PendingMemberKind {
-    Method(ScannedMethod),
-    TraitImpl {
-        associated_types: Vec<IndexedAssociatedType>,
-        trait_path: syn::Path,
-    },
-}
-
-struct PendingMember {
-    kind: PendingMemberKind,
-    module_path: Vec<String>,
-    self_type: Type,
-}
-
 fn has_path_attribute(attributes: &[Attribute]) -> bool {
     attributes
         .iter()
@@ -146,6 +124,28 @@ fn resolve_module_file(directory: &Path, identifier: &Ident) -> Result<PathBuf, 
             directory_module: directory_module.display().to_string(),
         })
     }
+}
+
+struct Recordable<'item> {
+    attributes: &'item [Attribute],
+    fields: Vec<ScannedField>,
+    identifier: &'item Ident,
+    kind: ItemKind,
+    variants: Vec<IndexedVariant>,
+}
+
+enum PendingMemberKind {
+    Method(ScannedMethod),
+    TraitImpl {
+        associated_types: Vec<IndexedAssociatedType>,
+        trait_path: syn::Path,
+    },
+}
+
+struct PendingMember {
+    kind: PendingMemberKind,
+    module_path: Vec<String>,
+    self_type: Type,
 }
 
 pub(crate) struct ModuleWalker {

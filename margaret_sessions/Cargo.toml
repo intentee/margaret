@@ -1,0 +1,45 @@
+[package]
+name = "margaret_sessions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "The first-party browser sessions a Margaret token issuer starts, refreshes and ends, and the services that consume them."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+cookie = { workspace = true }
+futures-util = { workspace = true }
+http = { workspace = true }
+margaret = { package = "margaret_model_facade", path = "../margaret_model_facade", version = "0.1.0" }
+margaret_handler_error = { workspace = true }
+margaret_http = { workspace = true }
+margaret_http_validation = { workspace = true }
+margaret_https_url = { workspace = true }
+margaret_identity_session = { workspace = true }
+margaret_issuer_key_set = { workspace = true }
+margaret_issuer_request = { workspace = true }
+margaret_jwks_secret_store = { workspace = true }
+margaret_jwt_verification = { workspace = true }
+margaret_registered_claims = { workspace = true }
+margaret_token_digest = { workspace = true }
+margaret_trusted_issuer = { workspace = true }
+margaret_validation = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true, features = ["v7"] }
+validator = { workspace = true, features = ["derive"] }
+
+[build-dependencies]
+margaret_codegen = { workspace = true }
+
+[lints]
+workspace = true

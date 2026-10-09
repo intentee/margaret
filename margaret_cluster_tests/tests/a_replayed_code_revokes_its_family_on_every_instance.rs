@@ -7,14 +7,22 @@ use margaret_cluster_tests::partner_code::partner_code;
 use margaret_cluster_tests::partner_token::partner_token;
 use margaret_cluster_tests::partner_tokens::partner_tokens;
 use margaret_cluster_tests::refresh_grant::refresh_grant;
+use margaret_cluster_tests::started_alice_session::started_alice_session;
 
 use crate::cluster_binary::cluster_binary;
 
 #[tokio::test]
 async fn a_replayed_code_revokes_its_family_on_every_instance() {
     let cluster = Cluster::start(cluster_binary(), 3).await;
+    let alice = started_alice_session(&cluster, &cluster.instance_routes(0)).await;
     let identity = |index| cluster.instance_url(index, ClusterServer::Identity);
-    let code = partner_code(&cluster, &identity(0), &cluster.instance_routes(0)).await;
+    let code = partner_code(
+        &cluster,
+        &identity(0),
+        &cluster.instance_routes(0),
+        &alice.cookies,
+    )
+    .await;
     let tokens = partner_tokens(&cluster, &identity(0), &code).await;
 
     assert_eq!(

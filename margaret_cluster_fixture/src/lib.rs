@@ -1,5 +1,4 @@
 pub mod alice;
-pub mod alice_session;
 pub mod auth;
 pub mod cluster_database;
 pub mod commands;

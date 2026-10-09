@@ -6,6 +6,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 use margaret_route_method::route_method::RouteMethod;
 
+use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::named_route::NamedRoute;
@@ -44,7 +45,7 @@ fn injects_forwarder(table: &HttpRouteTable, server: &HttpServer) -> bool {
     table
         .route_groups(server.name())
         .flat_map(RouteGroup::method_routes)
-        .flat_map(|route| &route.arguments)
+        .flat_map(HttpRoute::arguments)
         .any(|argument| matches!(argument.binding, RequestBinding::Forwarder))
 }
 

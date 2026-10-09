@@ -9,7 +9,6 @@ pub mod english_greeter;
 pub mod featured_article_id;
 pub mod forms;
 pub mod metrics;
-pub mod milo_session;
 pub mod models;
 pub mod routes;
 pub mod services;

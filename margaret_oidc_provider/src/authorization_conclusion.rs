@@ -57,7 +57,7 @@ impl AuthorizationConclusion {
 
         if prompt == Prompt::NoInteraction {
             return Ok(AuthorizationOutcome::Redirected(
-                redirection.error(AuthorizationError::ConsentRequired),
+                redirection.error(&AuthorizationError::ConsentRequired),
             ));
         }
 

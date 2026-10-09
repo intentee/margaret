@@ -1,8 +1,11 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use cookie::Cookie;
 use http::HeaderMap;
+use http::HeaderValue;
 use http::Method;
+use http::header::COOKIE;
 
 use margaret_http::request::Request;
 use margaret_http::request_outcome::RequestOutcome;
@@ -80,5 +83,27 @@ impl FixtureRequest {
             RequestOutcome::Parsed(request) => Ok(request),
             RequestOutcome::Rejected(rejection) => Err(rejection),
         }
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the cookies cannot be written as a cookie header.
+    #[must_use]
+    pub fn presenting_cookies(mut self, cookies: &[Cookie<'_>]) -> Self {
+        if !cookies.is_empty() {
+            self.headers.insert(
+                COOKIE,
+                HeaderValue::from_str(
+                    &cookies
+                        .iter()
+                        .map(|cookie| format!("{}={}", cookie.name(), cookie.value()))
+                        .collect::<Vec<String>>()
+                        .join("; "),
+                )
+                .expect("the cookies form a header value"),
+            );
+        }
+
+        self
     }
 }

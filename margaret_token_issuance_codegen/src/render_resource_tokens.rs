@@ -80,7 +80,7 @@ mod tests {
     fn renders_the_audience_of_each_resource() {
         assert_eq!(
             sources(rendered(
-                "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(r#async, audience = \"jobs\")]\npub struct Jobs;\n#[issues_resource_tokens(attachments, audience = \"files\")]\npub struct Attachments;\n"
+                "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(r#async, audience = \"jobs\")]\npub struct Jobs;\n#[issues_resource_tokens(attachments, audience = \"files\")]\npub struct Attachments;\n"
             )),
             vec![
                 "resource_tokens: pub mod attachments;\npub mod r#async;\n".to_string(),

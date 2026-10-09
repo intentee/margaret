@@ -56,6 +56,23 @@ pub enum TagError {
     )]
     MalformedBearerToken { site: String },
 
+    #[error("{site} must name the issuer of its session as `issuer = <tag>`")]
+    MalformedSessionMarker { site: String },
+
+    #[error(
+        "{site} reads the session of '{tag}', but no struct declares #[issues_sessions] or #[consumes_sessions]"
+    )]
+    SessionWithoutDeclaredSessions { site: String, tag: String },
+
+    #[error(
+        "{site} reads the session of '{tag}', but the sessions of this application belong to '{declared}'"
+    )]
+    ForeignSessionIssuer {
+        declared: String,
+        site: String,
+        tag: String,
+    },
+
     #[error(
         "the oauth clients '{first}' and '{second}' both identify as '{client_id}' at the issuer '{issuer}', so the issuer cannot tell them apart"
     )]
@@ -76,14 +93,14 @@ pub enum TagError {
     },
 
     #[error(
-        "{site} acts as the admitted client '{admitted}', which redirects to more than one route, so its sign-in cannot tell which route to return to"
-    )]
-    AmbiguousOwnRedirectRoute { admitted: String, site: String },
-
-    #[error(
         "{site} introspects its bearer token through the oauth client '{client}', which acts as a client of this application's own provider; verify the provider's resource tokens with #[bearer_token(resource = <tag>)] instead"
     )]
     IntrospectionThroughOwnClient { client: String, site: String },
+
+    #[error(
+        "{site} verifies bearer tokens issued by '{tag}', the issuance of this application; its session tokens travel only in cookies, so read them with #[session(issuer = {tag})] inside #[infer_from_request]"
+    )]
+    BearerTokenOfOwnIssuance { site: String, tag: String },
 
     #[error(
         "{site} acts as the admitted client '{admitted}', which does not verify its assertions with ClientKeys::Own"
@@ -96,7 +113,7 @@ pub enum TagError {
     UnconsumedResourceIssuance { anchor: String, tag: String },
 
     #[error(
-        "the admitted client '{tag}' declared by '{anchor}' verifies its assertions with ClientKeys::Own, but no #[acts_as_oauth_client(admitted_as = {tag})] signs them"
+        "the admitted client '{tag}' declared by '{anchor}' verifies its assertions with ClientKeys::Own, but no #[oauth_client(admitted_as = {tag})] signs them"
     )]
     UnconsumedOwnKeys { anchor: String, tag: String },
 

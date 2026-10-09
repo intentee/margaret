@@ -35,7 +35,12 @@ pub struct AuthorizationRequest {
 }
 
 impl AuthorizationRequest {
-    pub(crate) fn continued_at(&self, endpoint: &str, prompt: Option<&str>) -> String {
+    pub(crate) fn continued_at(
+        &self,
+        endpoint: &str,
+        max_age: Option<&str>,
+        prompt: Option<&str>,
+    ) -> String {
         let mut pairs = Serializer::new(String::new());
 
         {
@@ -54,7 +59,7 @@ impl AuthorizationRequest {
                 },
                 NamedParameter {
                     name: "max_age",
-                    value: self.max_age.as_deref(),
+                    value: max_age,
                 },
                 NamedParameter {
                     name: "nonce",

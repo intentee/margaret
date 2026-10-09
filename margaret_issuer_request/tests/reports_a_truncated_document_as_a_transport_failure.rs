@@ -16,7 +16,7 @@ async fn reports_a_truncated_document_as_a_transport_failure() {
 
     let fetched = client
         .fetch_document(
-            fixture.url(server.port(), "/document"),
+            fixture.url(server.address().port(), "/document"),
             &CancellationToken::new(),
         )
         .await;

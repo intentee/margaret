@@ -7,16 +7,14 @@ pub enum JwtType {
     AccessToken,
     ClientAuthentication,
     Jwt,
-    Refresh,
     SignInTransaction,
 }
 
 impl JwtType {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 4] = [
         Self::AccessToken,
         Self::ClientAuthentication,
         Self::Jwt,
-        Self::Refresh,
         Self::SignInTransaction,
     ];
 
@@ -26,7 +24,6 @@ impl JwtType {
             Self::AccessToken => "at+jwt",
             Self::ClientAuthentication => "client-authentication+jwt",
             Self::Jwt => "JWT",
-            Self::Refresh => "margaret-refresh+jwt",
             Self::SignInTransaction => "margaret-sign-in+jwt",
         }
     }

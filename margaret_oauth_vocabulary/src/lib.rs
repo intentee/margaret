@@ -12,6 +12,7 @@ pub mod code_challenge_rejection;
 pub mod code_verifier;
 pub mod code_verifier_parsing;
 pub mod code_verifier_rejection;
+pub mod declared_scope;
 pub mod grant_type;
 pub mod jwt_bearer_client_assertion_type;
 pub mod oauth_vocabulary_error;

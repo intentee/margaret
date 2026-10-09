@@ -11,12 +11,14 @@ use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
 pub fn fixture_sign_in_flow(
     server: Arc<AuthorizationServerClient>,
     secrets: Arc<JwksSecretHolder>,
-) -> SignInFlow {
-    SignInFlow::create(
-        server,
-        secrets,
-        "https://client.example/callback".to_string(),
-        &["profile"],
+) -> Arc<SignInFlow> {
+    Arc::new(
+        SignInFlow::create(
+            server,
+            secrets,
+            "https://client.example/callback".to_string(),
+            &["profile"],
+        )
+        .expect("the fixture callback is a url"),
     )
-    .expect("the fixture callback is a url")
 }

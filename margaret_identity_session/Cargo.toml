@@ -10,14 +10,11 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
-chrono = { workspace = true }
-cookie = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_registered_claims = { workspace = true }
-margaret_token_issuance = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }
 
 [lints]

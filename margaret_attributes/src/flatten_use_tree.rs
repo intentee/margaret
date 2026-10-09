@@ -3,11 +3,6 @@ use syn::UseTree;
 use crate::canonical_path::CanonicalPath;
 use crate::flattened_import::FlattenedImport;
 
-struct UseTreeAnchor<'tree> {
-    prefix: Vec<String>,
-    tree: &'tree UseTree,
-}
-
 fn resolve_anchor<'tree>(tree: &'tree UseTree, module_path: &[String]) -> UseTreeAnchor<'tree> {
     let mut base = module_path.to_vec();
     let mut current = tree;
@@ -73,6 +68,11 @@ fn flatten(tree: &UseTree, prefix: Vec<String>) -> Vec<FlattenedImport> {
             .collect(),
         UseTree::Glob(_) => Vec::new(),
     }
+}
+
+struct UseTreeAnchor<'tree> {
+    prefix: Vec<String>,
+    tree: &'tree UseTree,
 }
 
 pub(crate) fn flatten_use_tree(tree: &UseTree, module_path: &[String]) -> Vec<FlattenedImport> {

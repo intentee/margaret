@@ -1,4 +1,3 @@
-pub mod authorization_response;
 pub mod consent_required;
 pub mod get_authorize;
 pub mod get_discovery;

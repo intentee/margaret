@@ -6,8 +6,10 @@ use crate::captured_providers::CapturedProviders;
 use crate::extraction_context::ExtractionContext;
 use crate::extraction_phase::ExtractionPhase;
 use crate::head_extraction_context::HeadExtractionContext;
+use crate::render_authenticated_user_extraction::render_authenticated_user_extraction;
 use crate::render_bound_request_extractions::render_bound_request_extractions;
 use crate::render_request_extraction::render_request_extraction;
+use crate::request_binding::RequestBinding;
 
 fn phase_extractions(
     parameters: &[BoundParameter],
@@ -19,16 +21,30 @@ fn phase_extractions(
         .iter()
         .filter(|parameter| parameter.binding.extraction_phase() == phase)
         .map(|parameter| {
-            render_request_extraction(
-                &parameter.binding,
-                &parameter.holder,
-                &ExtractionContext {
-                    continuation_return: context.continuation_return,
-                    error_return: context.error_return,
-                    provider_access: &captured.access(&parameter.binding, context.owner),
-                    request_local: context.request_local,
-                },
-            )
+            let extraction_context = ExtractionContext {
+                continuation_return: context.continuation_return,
+                error_return: context.error_return,
+                provider_access: &captured.access(&parameter.binding, context.owner),
+                request_local: context.request_local,
+            };
+
+            match &parameter.binding {
+                RequestBinding::AuthenticatedUser {
+                    application,
+                    requirement,
+                } => render_authenticated_user_extraction(
+                    application,
+                    *requirement,
+                    &parameter.holder,
+                    context.cookie_changes,
+                    &extraction_context,
+                ),
+                _ => render_request_extraction(
+                    &parameter.binding,
+                    &parameter.holder,
+                    &extraction_context,
+                ),
+            }
         });
 
     quote! { #(#extractions)* }
@@ -99,6 +115,7 @@ mod tests {
             &captured,
             &HeadExtractionContext {
                 continuation_return: &quote! { return response },
+                cookie_changes: &format_ident!("changed_cookies"),
                 error_return: &quote! { return error },
                 owner: &TokenStream::new(),
                 request_local: &format_ident!("request"),

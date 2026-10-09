@@ -1,6 +1,8 @@
+mod answers_userinfo_for_an_unknown_subject_with_not_found;
 #[cfg(feature = "tests_that_use_postgres")]
 mod postgres;
 mod refuses_userinfo_claims_that_are_not_an_object;
 mod refuses_userinfo_claims_that_name_their_own_subject;
 mod refuses_userinfo_for_a_token_of_a_client_itself;
+mod reports_a_userinfo_claims_provider_that_fails;
 mod reports_userinfo_claims_that_cannot_be_serialized;

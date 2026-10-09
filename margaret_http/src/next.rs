@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use margaret_handler_error::handler_error::HandlerError;
+
 use crate::content_handler::ContentHandler;
-use crate::handler_error::HandlerError;
 use crate::head_handler::HeadHandler;
 use crate::one_shot_handler::OneShotHandler;
 use crate::request::Request;

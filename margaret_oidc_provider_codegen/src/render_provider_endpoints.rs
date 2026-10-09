@@ -5,10 +5,12 @@ use quote::quote;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::authorization_endpoint_url_module_name::AUTHORIZATION_ENDPOINT_URL_MODULE_NAME;
+use crate::derived_authorization::DerivedAuthorization;
 use crate::derived_endpoint::DerivedEndpoint;
 use crate::derived_provider_endpoints::DerivedProviderEndpoints;
 use crate::oidc_provider_module_name::OIDC_PROVIDER_MODULE_NAME;
 use crate::provider_endpoints_module_name::PROVIDER_ENDPOINTS_MODULE_NAME;
+use crate::served_authorization::ServedAuthorization;
 
 fn served(endpoint: &TokenStream) -> TokenStream {
     quote! { margaret::framework::oidc_discovery::served_endpoint::ServedEndpoint::Served(#endpoint) }
@@ -61,7 +63,7 @@ pub fn render_provider_endpoints(
     };
 
     match authorization {
-        DerivedEndpoint::Served(url) => {
+        DerivedAuthorization::Served(ServedAuthorization { url, .. }) => {
             let url_module = format_ident!("{AUTHORIZATION_ENDPOINT_URL_MODULE_NAME}");
 
             vec![
@@ -75,17 +77,25 @@ pub fn render_provider_endpoints(
                 ),
             ]
         }
-        DerivedEndpoint::Unserved => vec![endpoints(derived(authorization), TokenStream::new())],
+        DerivedAuthorization::Unserved => vec![endpoints(
+            derived(&DerivedEndpoint::Unserved),
+            TokenStream::new(),
+        )],
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+    use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
 
     use super::render_provider_endpoints;
+    use crate::consent_page::ConsentPage;
+    use crate::derived_authorization::DerivedAuthorization;
     use crate::derived_endpoint::DerivedEndpoint;
     use crate::derived_provider_endpoints::DerivedProviderEndpoints;
+    use crate::served_authorization::ServedAuthorization;
 
     fn sources(modules: Vec<GeneratedModuleTokens>) -> Vec<String> {
         modules
@@ -108,7 +118,23 @@ mod tests {
         };
 
         DerivedProviderEndpoints {
-            authorization: endpoint("https://issuer.example/authorize"),
+            authorization: if served {
+                DerivedAuthorization::Served(ServedAuthorization {
+                    consent: ConsentPage {
+                        decision: RouteUrlInput {
+                            path: "/authorize/consent".to_string(),
+                            server: "public".to_string(),
+                        },
+                        view: CanonicalPath::new(vec![
+                            "crate".to_string(),
+                            "ConsentView".to_string(),
+                        ]),
+                    },
+                    url: "https://issuer.example/authorize".to_string(),
+                })
+            } else {
+                DerivedAuthorization::Unserved
+            },
             introspection: endpoint("https://issuer.example/introspect"),
             issuer_origin: "https://issuer.example".to_string(),
             jwks: "https://issuer.example/jwks.json".to_string(),

@@ -1,9 +1,14 @@
 use std::collections::BTreeSet;
 
+use async_trait::async_trait;
 use bytes::Bytes;
 
 use margaret_accepted_clients::assertion_signing::AssertionSigning;
+use margaret_handler_error::handler_error::HandlerError;
+use margaret_http::head_handler::HeadHandler;
+use margaret_http::request::Request;
 use margaret_http::response::Response;
+use margaret_http::response_continuation::ResponseContinuation;
 use margaret_identity_session::id_token_members::ID_TOKEN_MEMBERS;
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 use margaret_jwks_roller_server::jwks_curve::JWKS_CURVE;
@@ -158,10 +163,16 @@ impl ProviderMetadataHandler {
             document: Bytes::from(document),
         })
     }
+}
 
-    #[must_use]
-    pub fn respond(&self) -> Response {
-        Response::bytes(200, "application/json", self.document.clone())
+#[async_trait]
+impl HeadHandler for ProviderMetadataHandler {
+    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        Ok(ResponseContinuation::from(Response::bytes(
+            200,
+            "application/json",
+            self.document.clone(),
+        )))
     }
 }
 
@@ -210,7 +221,6 @@ mod tests {
                 userinfo: ServedEndpoint::Unserved,
             },
             TokenIssuance {
-                audience: "session",
                 issuer: "https://localhost",
             },
         )

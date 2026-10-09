@@ -111,7 +111,7 @@ impl AuthorizationEndpoint {
             scopes,
         } = match AuthorizationParameters::of(policy, &request) {
             ControlFlow::Break(error) => {
-                return Ok(AuthorizationOutcome::Redirected(redirection.error(error)));
+                return Ok(AuthorizationOutcome::Redirected(redirection.error(&error)));
             }
             ControlFlow::Continue(parameters) => parameters,
         };
@@ -125,13 +125,17 @@ impl AuthorizationEndpoint {
             EndUserAuthentication::Anonymous | EndUserAuthentication::Authenticated(_) => {
                 return Ok(match prompt {
                     Prompt::NoInteraction => AuthorizationOutcome::Redirected(
-                        redirection.error(AuthorizationError::LoginRequired),
+                        redirection.error(&AuthorizationError::LoginRequired),
                     ),
                     Prompt::Consent
                     | Prompt::Interactive
                     | Prompt::Login
                     | Prompt::LoginAndConsent => AuthorizationOutcome::AuthenticationRequired {
-                        return_to: request.continued_at(self.authorization, prompt.after_login()),
+                        return_to: request.continued_at(
+                            self.authorization,
+                            authentication_age.after_login().as_deref(),
+                            prompt.after_login(),
+                        ),
                     },
                 });
             }

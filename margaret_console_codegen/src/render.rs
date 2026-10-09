@@ -70,7 +70,7 @@ fn serve_registration(
                 let url_argument = server.url_argument();
 
                 quote! {
-                    .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true).value_parser(clap::value_parser!(margaret::framework::http::server_origin::ServerOrigin)))
+                    .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true).value_parser(clap::value_parser!(margaret::framework::server_origin::server_origin::ServerOrigin)))
                 }
             }
             ServerOriginSource::Issuer { .. } => quote! {},
@@ -177,11 +177,6 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
     }
 }
 
-struct SchemaTokens {
-    arm: TokenStream,
-    registration: TokenStream,
-}
-
 fn schema_tokens(has_models: bool) -> SchemaTokens {
     let registration = if has_models {
         quote! {
@@ -207,6 +202,11 @@ fn schema_tokens(has_models: bool) -> SchemaTokens {
     };
 
     SchemaTokens { arm, registration }
+}
+
+struct SchemaTokens {
+    arm: TokenStream,
+    registration: TokenStream,
 }
 
 pub(crate) fn render(

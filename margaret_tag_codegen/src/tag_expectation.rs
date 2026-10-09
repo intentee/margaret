@@ -10,7 +10,7 @@ pub enum TagExpectation {
     Middleware,
     OAuthClient,
     ResourceTokens,
-    TokenIssuer,
+    TokenIssuance,
     TrustedIssuer,
 }
 
@@ -21,7 +21,7 @@ impl TagExpectation {
             Self::Middleware => matches!(kind, TagKind::Middleware),
             Self::OAuthClient => matches!(kind, TagKind::OAuthClient),
             Self::ResourceTokens => matches!(kind, TagKind::ResourceTokens),
-            Self::TokenIssuer => matches!(kind, TagKind::TokenIssuance | TagKind::TrustedIssuer(_)),
+            Self::TokenIssuance => matches!(kind, TagKind::TokenIssuance),
             Self::TrustedIssuer => matches!(kind, TagKind::TrustedIssuer(_)),
         }
     }
@@ -34,7 +34,7 @@ impl Display for TagExpectation {
             Self::Middleware => "middleware handler",
             Self::OAuthClient => "oauth client",
             Self::ResourceTokens => "resource",
-            Self::TokenIssuer => "token issuance or trusted issuer",
+            Self::TokenIssuance => "token issuance",
             Self::TrustedIssuer => "trusted issuer",
         };
 

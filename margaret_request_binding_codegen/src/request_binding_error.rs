@@ -356,6 +356,49 @@ pub enum RequestBindingError {
     MixedBearerTokenCarriers { subject: String },
 
     #[error(
+        "{subject} reads both a session and a bearer token; a provider infers its user either from the session cookies or from a bearer credential"
+    )]
+    SessionMixedWithBearerToken { subject: String },
+
+    #[error(
+        "{subject} reads the session more than once; exactly one argument may carry #[session]"
+    )]
+    DuplicateSession { subject: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[session], which is only available in an #[infer_from_request] method of an #[infers_authenticated_user] provider"
+    )]
+    SessionUnavailable { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[session] together with another argument marker; an argument may use at most one"
+    )]
+    ConflictingSessionMarkers { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[session] on '{written}'; it must be Option<margaret::framework::sessions::session::Session> taken by value"
+    )]
+    SessionTypeMismatch {
+        subject: String,
+        parameter: String,
+        written: String,
+    },
+
+    #[error(
+        "argument #{parameter} of {subject} reads a session, but the dependency container plans no '{sessions}'"
+    )]
+    UnplannedSessions {
+        subject: String,
+        parameter: String,
+        sessions: String,
+    },
+
+    #[error(
+        "{subject} infers more than one authenticated user from the session; a request resolves its session once, so exactly one #[infers_authenticated_user] provider reads it"
+    )]
+    MultipleSessionAuthenticatedUsers { subject: String },
+
+    #[error(
         "argument #{parameter} of {subject} addresses its bearer token in a way its type cannot verify: a VerifiedJwt names `issuer = <tag>` or `resource = <tag>`, an IntrospectedToken names `client = <tag>`"
     )]
     MismatchedBearerTokenAddressee { subject: String, parameter: String },

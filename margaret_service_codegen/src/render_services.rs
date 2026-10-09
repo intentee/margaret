@@ -5,6 +5,7 @@ use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::routes_ident::routes_ident;
 use margaret_codegen_tokens::server_origin_ident::server_origin_ident;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
@@ -164,7 +165,7 @@ fn served_routes(servers: &[HttpServer]) -> TokenStream {
         let serialization = match server.origin() {
             ServerOriginSource::Argument => {
                 let origin_read = required_flag_read(
-                    &quote! { margaret::framework::http::server_origin::ServerOrigin },
+                    &quote! { margaret::framework::server_origin::server_origin::ServerOrigin },
                     &server.url_argument(),
                     &quote! { value.origin.ascii_serialization() },
                     &failed_outcome(),
@@ -188,11 +189,12 @@ fn served_routes(servers: &[HttpServer]) -> TokenStream {
 
         quote! { ::std::sync::Arc::clone(&#origin) }
     });
+    let routes = routes_ident();
 
     quote! {
         #(#origins)*
 
-        let routes = ::std::sync::Arc::new(
+        let #routes = ::std::sync::Arc::new(
             super::routes::Routes::from_origins(#(#origin_arguments),*),
         );
     }
@@ -464,13 +466,14 @@ fn register_servers_invocation(
     let spiffe_client_argument = activation
         .client_active
         .then(|| quote! { &spiffe_client_readiness, });
+    let routes = routes_ident();
 
     quote! {
         if let Err(outcome) = register_servers(
             &mut manager,
             matches,
             container,
-            &routes,
+            &#routes,
             #spiffe_server_argument
             #spiffe_client_argument
         ) {

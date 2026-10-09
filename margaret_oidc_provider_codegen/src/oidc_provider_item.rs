@@ -6,6 +6,7 @@ pub enum OidcProviderItem {
     AcceptedClients,
     AuthorizationEndpoint,
     ConsentEndpoint,
+    ConsentHandler,
     IntrospectionEndpoint,
     IssuerMetadata,
     ProviderMetadataHandler,
@@ -16,10 +17,11 @@ pub enum OidcProviderItem {
 }
 
 impl OidcProviderItem {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::AcceptedClients,
         Self::AuthorizationEndpoint,
         Self::ConsentEndpoint,
+        Self::ConsentHandler,
         Self::IntrospectionEndpoint,
         Self::IssuerMetadata,
         Self::ProviderMetadataHandler,
@@ -40,6 +42,9 @@ impl OidcProviderItem {
             },
             Self::ConsentEndpoint => quote! {
                 margaret::framework::oidc_provider::consent_endpoint::ConsentEndpoint
+            },
+            Self::ConsentHandler => quote! {
+                margaret::framework::oidc_provider::consent_handler::ConsentHandler
             },
             Self::IntrospectionEndpoint => quote! {
                 margaret::framework::oidc_provider::introspection_endpoint::IntrospectionEndpoint
@@ -73,6 +78,7 @@ impl OidcProviderItem {
             }
             Self::AcceptedClients
             | Self::ConsentEndpoint
+            | Self::ConsentHandler
             | Self::IntrospectionEndpoint
             | Self::RevocationEndpoint
             | Self::SubjectTokenExchangers
@@ -87,6 +93,7 @@ impl OidcProviderItem {
             Self::AcceptedClients => "AcceptedClients",
             Self::AuthorizationEndpoint => "AuthorizationEndpoint",
             Self::ConsentEndpoint => "ConsentEndpoint",
+            Self::ConsentHandler => "ConsentHandler",
             Self::IntrospectionEndpoint => "IntrospectionEndpoint",
             Self::IssuerMetadata => "IssuerMetadata",
             Self::ProviderMetadataHandler => "ProviderMetadataHandler",

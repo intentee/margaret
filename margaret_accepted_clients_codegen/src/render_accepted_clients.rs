@@ -8,7 +8,6 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;
 use margaret_oauth_vocabulary::grant_type::GrantType;
 use margaret_oauth_vocabulary_codegen::client_authentication_methods::CLIENT_AUTHENTICATION_METHODS;
-use margaret_registered_claims::audience::Audience;
 
 use crate::accepted_client_constant::AcceptedClientConstant;
 use crate::accepted_client_declaration::AcceptedClientDeclaration;
@@ -100,7 +99,10 @@ fn code_grant_policy_module(
 fn accepted_client_module(client: &AcceptedClientDeclaration) -> GeneratedModuleTokens {
     let framework_path = AcceptedClientConstant::AcceptedClient.framework_path();
     let client_id = client.client_id.as_str();
-    let resources = client.resources.iter().map(Audience::as_str);
+    let resources = client
+        .resources
+        .iter()
+        .map(|resource| resource.audience.as_str());
     let token_exchange = match &client.token_exchange {
         DeclaredTokenExchange::Granted { scopes } => {
             let scopes = scopes
@@ -344,7 +346,12 @@ fn aggregate_module(
         ProviderAggregate::AcceptedResources => {
             let resources = clients
                 .iter()
-                .flat_map(|client| client.resources.iter().map(Audience::as_str))
+                .flat_map(|client| {
+                    client
+                        .resources
+                        .iter()
+                        .map(|resource| resource.audience.as_str())
+                })
                 .collect::<BTreeSet<&str>>()
                 .into_iter();
 
@@ -469,6 +476,7 @@ pub fn render_accepted_clients(
 mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+    use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
     use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -476,7 +484,7 @@ mod tests {
     use crate::declared_accepted_clients::DeclaredAcceptedClients;
     use crate::provider_aggregate::ProviderAggregate;
 
-    const CLIENTS: &str = "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ArtifactsResource;\n#[issues_resource_tokens(reports, audience = \"reports\")]\nstruct ReportsResource;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(client_credentials(scopes = [\"artifacts:read\"]), introspection, keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)), authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Implicit, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::Rsa, redirect_uris = [\"https://portal.example/callback\"], scopes = [\"openid\", \"profile\"], refresh_token), client_id = \"portal\", resources = [artifacts], token_exchange(scopes = [\"deploy\"]))]\npub struct Portal;\n#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Prompted, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::EllipticCurve, redirect_uris = [\"http://127.0.0.1:8080/callback\"], scopes = [\"openid\"]), client_id = \"spa\", resources = [reports, artifacts])]\npub struct Spa;\n";
+    const CLIENTS: &str = "#[oauth_scope(name = \"artifacts:read\")]\npub struct ArtifactsReadScope;\n#[oauth_scope(name = \"deploy\")]\npub struct DeployScope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ArtifactsResource;\n#[issues_resource_tokens(reports, audience = \"reports\")]\nstruct ReportsResource;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(client_credentials(scopes = [ArtifactsReadScope]), introspection, keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)), authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Implicit, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::Rsa, redirect_uris = [\"https://portal.example/callback\"], scopes = [margaret::framework::oauth_vocabulary::openid_scope::OpenidScope, ProfileScope], refresh_token), client_id = \"portal\", resources = [artifacts], token_exchange(scopes = [DeployScope]))]\npub struct Portal;\n#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Prompted, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::EllipticCurve, redirect_uris = [\"http://127.0.0.1:8080/callback\"], scopes = [margaret::framework::oauth_vocabulary::openid_scope::OpenidScope]), client_id = \"spa\", resources = [reports, artifacts])]\npub struct Spa;\n";
 
     fn modules(source: &str, aggregates: &[ProviderAggregate]) -> Vec<GeneratedModuleTokens> {
         let indexed = IndexedSource::new(source);
@@ -488,6 +496,7 @@ mod tests {
                 &issuance,
                 &DeclaredResourceIssuances::read(&indexed.index, &issuance)
                     .expect("the resources are read"),
+                &DeclaredScopes::read(&indexed.index).expect("the scopes are read"),
             )
             .expect("the clients are read"),
             aggregates,
@@ -618,7 +627,7 @@ mod tests {
         assert_eq!(
             named_source(
                 modules(
-                    "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ArtifactsResource;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), client_id = \"portal\", resources = [artifacts])]\npub struct Portal;\n",
+                    "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ArtifactsResource;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), client_id = \"portal\", resources = [artifacts])]\npub struct Portal;\n",
                     &[],
                 ),
                 "accepted_clients/clients/portal",
@@ -639,7 +648,7 @@ mod tests {
     fn renders_the_withheld_privileges_of_a_confidential_client() {
         let source = named_source(
             modules(
-                "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ArtifactsResource;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)), client_id = \"portal\", resources = [artifacts])]\npub struct Portal;\n",
+                "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ArtifactsResource;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)), client_id = \"portal\", resources = [artifacts])]\npub struct Portal;\n",
                 &[],
             ),
             "accepted_clients/clients/portal/confidential_privileges",
@@ -670,13 +679,18 @@ mod tests {
     #[test]
     fn renders_the_own_keys_a_client_signs_its_assertions_with() {
         let indexed = IndexedSource::new(
-            "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ArtifactsResource;\n#[admits_oauth_client(service_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), client_id = \"service\", resources = [artifacts])]\npub struct Service;\n",
+            "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ArtifactsResource;\n#[admits_oauth_client(service_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), client_id = \"service\", resources = [artifacts])]\npub struct Service;\n",
         );
         let issuance = DeclaredTokenIssuance::read(&indexed.index).expect("the issuance is read");
         let resources = DeclaredResourceIssuances::read(&indexed.index, &issuance)
             .expect("the resources are read");
-        let accepted = DeclaredAcceptedClients::read(&indexed.index, &issuance, &resources)
-            .expect("the clients are read");
+        let accepted = DeclaredAcceptedClients::read(
+            &indexed.index,
+            &issuance,
+            &resources,
+            &DeclaredScopes::read(&indexed.index).expect("the scopes are read"),
+        )
+        .expect("the clients are read");
         let source = render_accepted_clients(&accepted, &[ProviderAggregate::ProviderSupport])
             .into_iter()
             .find(|module| module.name() == "accepted_clients/provider_support")

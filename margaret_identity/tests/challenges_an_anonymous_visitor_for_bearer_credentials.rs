@@ -6,7 +6,7 @@ use reqwest::header::AUTHORIZATION;
 use reqwest::header::HeaderValue;
 use reqwest::header::WWW_AUTHENTICATE;
 
-use margaret_http::handler_error::HandlerError;
+use margaret_handler_error::handler_error::HandlerError;
 use margaret_http::head_handler::HeadHandler;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request::Request;

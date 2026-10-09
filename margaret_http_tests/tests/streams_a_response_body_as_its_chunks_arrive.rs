@@ -7,7 +7,7 @@ use futures_util::StreamExt;
 use futures_util::stream;
 use tokio_util::sync::CancellationToken;
 
-use margaret_http::handler_error::HandlerError;
+use margaret_handler_error::handler_error::HandlerError;
 use margaret_http::head_handler::HeadHandler;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request::Request;

@@ -1,15 +1,12 @@
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 use margaret_attributes::tag::Tag;
-use margaret_registered_claims::audience::Audience;
-use margaret_registered_claims::audience_parsing::AudienceParsing;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
 use crate::token_issuance_codegen_error::TokenIssuanceCodegenError;
 
 pub struct TokenIssuanceDeclaration<'index> {
     pub anchor: &'index IndexedItem,
-    pub audience: Audience,
     pub issuer: IssuerIdentifier,
     pub tag: Tag,
 }
@@ -32,17 +29,6 @@ impl<'index> TokenIssuanceDeclaration<'index> {
                         anchor: path.to_string(),
                     })
                 })?;
-            let AudienceParsing::Accepted(audience) =
-                Audience::parse(&reader.take_string("audience")?.ok_or_else(|| {
-                    TokenIssuanceCodegenError::MissingAudience {
-                        anchor: path.to_string(),
-                    }
-                })?)
-            else {
-                return Err(TokenIssuanceCodegenError::EmptyAudience {
-                    anchor: path.to_string(),
-                });
-            };
             let issuer = reader
                 .take_string("issuer")?
                 .ok_or_else(|| TokenIssuanceCodegenError::MissingIssuer {
@@ -54,16 +40,8 @@ impl<'index> TokenIssuanceDeclaration<'index> {
                     source,
                 })?;
 
-            if audience.as_str() == issuer.as_str() {
-                return Err(TokenIssuanceCodegenError::SessionAudienceNamesIssuer {
-                    anchor: path.to_string(),
-                    audience: audience.to_string(),
-                });
-            }
-
             Ok(Self {
                 anchor,
-                audience,
                 issuer,
                 tag,
             })

@@ -7,7 +7,6 @@ use margaret_jwks_codegen::render_jwks::render_jwks;
 use crate::framework_artifacts::FrameworkArtifacts;
 use crate::jwks_framework_services::jwks_framework_services;
 use crate::jwks_roller_canonical_path::jwks_roller_canonical_path;
-use crate::mint_access_token_handler_canonical_path::mint_access_token_handler_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
 
 pub(crate) fn build_jwks_artifacts(bindings: &ContainerBindings) -> FrameworkArtifacts {
@@ -16,10 +15,6 @@ pub(crate) fn build_jwks_artifacts(bindings: &ContainerBindings) -> FrameworkArt
     server.enable_if(
         JwksServerPart::Handler,
         bindings.provides(&public_jwks_handler_canonical_path()),
-    );
-    server.enable_if(
-        JwksServerPart::Minter,
-        bindings.provides(&mint_access_token_handler_canonical_path()),
     );
     server.enable_if(
         JwksServerPart::Roller,

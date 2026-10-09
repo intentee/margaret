@@ -66,6 +66,11 @@ impl TruncatedResponseServer {
         }
     }
 
+    #[must_use]
+    pub fn address(&self) -> SocketAddr {
+        self.address
+    }
+
     /// # Panics
     ///
     /// Panics when the fixture it builds cannot be prepared.
@@ -73,10 +78,5 @@ impl TruncatedResponseServer {
         self.join_handle
             .await
             .expect("the truncating server task finishes cleanly");
-    }
-
-    #[must_use]
-    pub fn port(&self) -> u16 {
-        self.address.port()
     }
 }

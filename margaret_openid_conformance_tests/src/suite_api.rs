@@ -14,8 +14,21 @@ use crate::module_status::ModuleStatus;
 use crate::plan_module::PlanModule;
 
 const CLIENT_TURN_STATUSES: &str = "WAITING,FINISHED,INTERRUPTED";
+
 const LONG_POLL_MILLISECONDS: u32 = 30_000;
+
 const RESULT_STATUSES: &str = "FINISHED,INTERRUPTED";
+
+async fn answered<TAnswer: DeserializeOwned>(
+    request: RequestBuilder,
+    expected: StatusCode,
+) -> TAnswer {
+    let response = request.send().await.expect("the suite answers");
+
+    assert_eq!(response.status(), expected, "the suite answers as expected");
+
+    response.json().await.expect("the suite answers with json")
+}
 
 #[derive(Deserialize)]
 struct CreatedModule {
@@ -46,17 +59,6 @@ struct StatusQuery<'status> {
 #[derive(Deserialize)]
 struct ReachedStatus {
     state: ModuleStatus,
-}
-
-async fn answered<TAnswer: DeserializeOwned>(
-    request: RequestBuilder,
-    expected: StatusCode,
-) -> TAnswer {
-    let response = request.send().await.expect("the suite answers");
-
-    assert_eq!(response.status(), expected, "the suite answers as expected");
-
-    response.json().await.expect("the suite answers with json")
 }
 
 pub struct SuiteApi {

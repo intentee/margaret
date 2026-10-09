@@ -4,7 +4,7 @@ use url::Url;
 
 use margaret_cluster_fixture::margaret::routes::Routes;
 
-use crate::alice_session_cookie::alice_session_cookie;
+use crate::alice_session::AliceSession;
 use crate::begun_sign_in::BegunSignIn;
 use crate::cluster::Cluster;
 use crate::consent_decision::consent_decision;
@@ -18,11 +18,12 @@ pub async fn authorized_sign_in(
     cluster: &Cluster,
     begun: &BegunSignIn,
     consent_at: &Routes,
+    alice: &AliceSession,
 ) -> Url {
     let response = cluster
         .client
         .get(begun.authorization.clone())
-        .header(COOKIE, alice_session_cookie())
+        .header(COOKIE, &alice.cookies)
         .send()
         .await
         .expect("the authorization request is answered");
@@ -34,5 +35,5 @@ pub async fn authorized_sign_in(
         .await
         .expect("the identity server asks for consent");
 
-    redirect_location(&consent_decision(cluster, consent_at, consent).await)
+    redirect_location(&consent_decision(cluster, consent_at, consent, &alice.cookies).await)
 }

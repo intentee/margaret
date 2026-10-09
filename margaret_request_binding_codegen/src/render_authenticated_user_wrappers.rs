@@ -6,7 +6,9 @@ use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_tag_codegen::session_source::SessionSource;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
 use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
@@ -63,6 +65,14 @@ fn wrapper_struct(
 
             quote! {
                 pub #field: std::sync::Arc<margaret::framework::authorization_server_client::authorization_server_client::AuthorizationServerClient>,
+            }
+        }
+        AuthenticatedUserChallenge::Session { sessions, .. } => {
+            let field = format_ident!("{}", sessions.field);
+            let sessions = path_tokens(&sessions.concrete);
+
+            quote! {
+                pub #field: std::sync::Arc<#sessions>,
             }
         }
         AuthenticatedUserChallenge::Unchallenged => TokenStream::new(),
@@ -171,6 +181,72 @@ fn introspected_token_extraction(
     }
 }
 
+fn session_resolution(
+    sessions: &InjectedDependency,
+    source: SessionSource,
+    cookie_changes: &Ident,
+    request_binding: &Ident,
+    session: &Ident,
+) -> TokenStream {
+    let field = format_ident!("{}", sessions.field);
+
+    match source {
+        SessionSource::Consumed => quote! {
+            let margaret::framework::sessions::resolved_session::ResolvedSession {
+                cookie_changes: #cookie_changes,
+                session: #session,
+            } = match self.#field.resolve(#request_binding).await {
+                margaret::framework::sessions::session_resolution::SessionResolution::Resolved(resolved) => resolved,
+                margaret::framework::sessions::session_resolution::SessionResolution::Unavailable(unavailability) => {
+                    return ::std::result::Result::Ok(
+                        margaret::framework::identity::session_user_inference::SessionUserInference {
+                            cookie_changes: margaret::framework::http::cookie_changes::CookieChanges {
+                                cookies: ::std::vec::Vec::new(),
+                            },
+                            outcome: margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
+                                margaret::framework::http::response_continuation::ResponseContinuation::from(unavailability),
+                            ),
+                        },
+                    );
+                }
+            };
+        },
+        SessionSource::Issued => quote! {
+            let margaret::framework::sessions::resolved_session::ResolvedSession {
+                cookie_changes: #cookie_changes,
+                session: #session,
+            } = self.#field.resolve(#request_binding).await?;
+        },
+    }
+}
+
+fn interruption_return(
+    challenge: &AuthenticatedUserChallenge,
+    cookie_changes: &Ident,
+) -> TokenStream {
+    match challenge {
+        AuthenticatedUserChallenge::Session { .. } => quote! {
+            return ::std::result::Result::Ok(
+                margaret::framework::identity::session_user_inference::SessionUserInference {
+                    cookie_changes: #cookie_changes,
+                    outcome: margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
+                        response,
+                    ),
+                },
+            )
+        },
+        AuthenticatedUserChallenge::Bearer { .. }
+        | AuthenticatedUserChallenge::Introspection { .. }
+        | AuthenticatedUserChallenge::Unchallenged => quote! {
+            return ::std::result::Result::Ok(
+                margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
+                    response,
+                ),
+            )
+        },
+    }
+}
+
 fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     let AuthenticatedUserProvider {
         application,
@@ -197,13 +273,8 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     };
 
     let routed = format_ident!("{}", allocator.allocate("bearer_token").field());
-    let continuation_return = quote! {
-        return ::std::result::Result::Ok(
-            margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
-                response,
-            ),
-        )
-    };
+    let cookie_changes = format_ident!("{}", allocator.allocate("changed_cookies").field());
+    let continuation_return = interruption_return(&application.challenge, &cookie_changes);
     let error_return = quote! { return ::std::result::Result::Err(error) };
     let provider_access = TokenStream::new();
     let context = ExtractionContext {
@@ -223,24 +294,61 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
         quote! { self.inner.#method_name(#(#call_arguments),*) }
     };
 
-    quote! {
-        #wrapper_struct
+    match &application.challenge {
+        AuthenticatedUserChallenge::Session {
+            holder,
+            sessions,
+            source,
+        } => {
+            let resolution =
+                session_resolution(sessions, *source, &cookie_changes, &request_binding, holder);
 
-        #[async_trait::async_trait]
-        impl margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser for #wrapper {
-            type User = #model;
+            quote! {
+                #wrapper_struct
 
-            async fn infer(
-                &self,
-                #request_binding: &margaret::framework::http::request::Request,
-            ) -> margaret::framework::anyhow::Result<
-                margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User>,
-            > {
-                #routing
-                #(#extractions)*
-                #infer_call
+                #[async_trait::async_trait]
+                impl margaret::framework::identity::infers_session_user::InfersSessionUser for #wrapper {
+                    type User = #model;
+
+                    async fn infer(
+                        &self,
+                        #request_binding: &margaret::framework::http::request::Request,
+                    ) -> margaret::framework::anyhow::Result<
+                        margaret::framework::identity::session_user_inference::SessionUserInference<Self::User>,
+                    > {
+                        #resolution
+                        #(#extractions)*
+                        #infer_call.map(|outcome| {
+                            margaret::framework::identity::session_user_inference::SessionUserInference {
+                                cookie_changes: #cookie_changes,
+                                outcome,
+                            }
+                        })
+                    }
+                }
             }
         }
+        AuthenticatedUserChallenge::Bearer { .. }
+        | AuthenticatedUserChallenge::Introspection { .. }
+        | AuthenticatedUserChallenge::Unchallenged => quote! {
+            #wrapper_struct
+
+            #[async_trait::async_trait]
+            impl margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser for #wrapper {
+                type User = #model;
+
+                async fn infer(
+                    &self,
+                    #request_binding: &margaret::framework::http::request::Request,
+                ) -> margaret::framework::anyhow::Result<
+                    margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User>,
+                > {
+                    #routing
+                    #(#extractions)*
+                    #infer_call
+                }
+            }
+        },
     }
 }
 

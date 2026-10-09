@@ -6,6 +6,7 @@ use crate::database_codegen_error::DatabaseCodegenError;
 
 pub struct PostgresDatabaseDeclaration<'index> {
     pub anchor: &'index IndexedItem,
+    pub max_connections_from: EnvironmentVariableName,
     pub url_from: EnvironmentVariableName,
 }
 
@@ -17,18 +18,41 @@ impl<'index> PostgresDatabaseDeclaration<'index> {
         let path = anchor.canonical_path();
 
         matched.args()?.interpret(|reader| {
-            let name = reader.take_string("url_from")?.ok_or_else(|| {
+            let url_name = reader.take_string("url_from")?.ok_or_else(|| {
                 DatabaseCodegenError::MissingUrlSource {
                     anchor: path.to_string(),
                 }
             })?;
-
-            EnvironmentVariableName::new(&name)
-                .map(|url_from| Self { anchor, url_from })
-                .ok_or_else(|| DatabaseCodegenError::MalformedUrlSource {
+            let url_from = EnvironmentVariableName::new(&url_name).ok_or_else(|| {
+                DatabaseCodegenError::MalformedUrlSource {
                     anchor: path.to_string(),
-                    name,
-                })
+                    name: url_name,
+                }
+            })?;
+            let max_connections_name =
+                reader.take_string("max_connections_from")?.ok_or_else(|| {
+                    DatabaseCodegenError::MissingMaxConnectionsSource {
+                        anchor: path.to_string(),
+                    }
+                })?;
+            let max_connections_from = EnvironmentVariableName::new(&max_connections_name)
+                .ok_or_else(|| DatabaseCodegenError::MalformedMaxConnectionsSource {
+                    anchor: path.to_string(),
+                    name: max_connections_name,
+                })?;
+
+            if max_connections_from == url_from {
+                return Err(DatabaseCodegenError::SharedEnvironmentVariable {
+                    anchor: path.to_string(),
+                    name: url_from.as_str().to_string(),
+                });
+            }
+
+            Ok(Self {
+                anchor,
+                max_connections_from,
+                url_from,
+            })
         })
     }
 }

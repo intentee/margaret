@@ -4,7 +4,7 @@ use std::sync::atomic::Ordering;
 use async_trait::async_trait;
 use serde_json::json;
 
-use margaret_http::handler_error::HandlerError;
+use margaret_handler_error::handler_error::HandlerError;
 use margaret_http::head_handler::HeadHandler;
 use margaret_http::request::Request;
 use margaret_http::response::Response;

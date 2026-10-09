@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use margaret_http::cookie_changes::CookieChanges;
 use margaret_http::request::Request;
+use margaret_websocket_session::created_web_socket_session::CreatedWebSocketSession;
 use margaret_websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError;
 use margaret_websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome;
 use margaret_websocket_session::web_socket_session_factory::WebSocketSessionFactory;
@@ -19,8 +21,13 @@ impl WebSocketSessionFactory for TestSessionFactory {
         &self,
         _handshake: &Request,
     ) -> Result<WebSocketSessionCreationOutcome<TestSession>, WebSocketSessionCreationError> {
-        Ok(WebSocketSessionCreationOutcome::Created(Arc::new(
-            TestSession::default(),
-        )))
+        Ok(WebSocketSessionCreationOutcome::Created(
+            CreatedWebSocketSession {
+                cookie_changes: CookieChanges {
+                    cookies: Vec::new(),
+                },
+                session: Arc::new(TestSession::default()),
+            },
+        ))
     }
 }

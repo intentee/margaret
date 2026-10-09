@@ -30,18 +30,12 @@ pub enum TokenIssuanceCodegenError {
     #[error(transparent)]
     Index(#[from] AttributeError),
 
-    #[error("#[issues_tokens] on '{anchor}' declares an empty audience")]
-    EmptyAudience { anchor: String },
-
     #[error("the issuer '#[issues_tokens]' declares on '{anchor}' is malformed: {source}")]
     MalformedIssuer {
         anchor: String,
         #[source]
         source: RegisteredClaimsError,
     },
-
-    #[error("#[issues_tokens] on '{anchor}' does not declare the audience of the tokens")]
-    MissingAudience { anchor: String },
 
     #[error("#[issues_resource_tokens] on '{anchor}' declares an empty audience")]
     EmptyResourceAudience { anchor: String },
@@ -65,19 +59,9 @@ pub enum TokenIssuanceCodegenError {
     MissingTag { anchor: String },
 
     #[error(
-        "#[issues_resource_tokens] on '{anchor}' declares the audience '{audience}', which addresses the tokens of the sessions instead"
-    )]
-    ResourceAudienceOfSessions { anchor: String, audience: String },
-
-    #[error(
         "#[issues_resource_tokens] on '{anchor}' declares the audience '{audience}', which names the issuer, so its tokens would pass where the issuer is addressed"
     )]
     ResourceAudienceNamesIssuer { anchor: String, audience: String },
-
-    #[error(
-        "#[issues_tokens] on '{anchor}' declares the session audience '{audience}', which names its own issuer, so the tokens the provider addresses to the issuer would pass as sessions"
-    )]
-    SessionAudienceNamesIssuer { anchor: String, audience: String },
 
     #[error(
         "#[issues_resource_tokens] on '{anchor}' declares resource tokens, but no #[issues_tokens] declares the issuer that signs them"

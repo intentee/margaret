@@ -38,12 +38,6 @@ fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream 
     }
 }
 
-#[derive(Clone, Copy)]
-enum ArcClone {
-    Inferred,
-    Typed,
-}
-
 fn field_expression(
     PlannedField {
         concrete_path,
@@ -194,12 +188,6 @@ fn statement(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver) ->
     quote! { let #binding = #constructed; }
 }
 
-struct RootBuilder {
-    arguments: Option<GeneratedModuleTokens>,
-    function: Ident,
-    tokens: TokenStream,
-}
-
 fn arguments_declaration(
     function: &Ident,
     inputs: &[SlottedServeInput],
@@ -304,6 +292,18 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
         function,
         tokens,
     }
+}
+
+#[derive(Clone, Copy)]
+enum ArcClone {
+    Inferred,
+    Typed,
+}
+
+struct RootBuilder {
+    arguments: Option<GeneratedModuleTokens>,
+    function: Ident,
+    tokens: TokenStream,
 }
 
 pub(crate) fn render_build(

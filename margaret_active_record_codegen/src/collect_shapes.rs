@@ -26,18 +26,6 @@ use crate::shape_declaration::ShapeDeclaration;
 use crate::shape_relation::ShapeRelation;
 use crate::shape_relation_kind::ShapeRelationKind;
 
-struct DeclaredShape<'index, 'model> {
-    item: &'index IndexedItem,
-    model: &'model Model,
-    module: String,
-}
-
-struct ExpectedRelation<'model> {
-    kind: ShapeRelationKind<'model>,
-    related: &'model CanonicalPath,
-    wrapper: LoadedWrapper,
-}
-
 fn declared_shape<'index, 'model>(
     index: &'index AttributeIndex,
     item: &'index IndexedItem,
@@ -272,6 +260,18 @@ fn shape_declaration<'model>(
             shape,
         }),
     }
+}
+
+struct DeclaredShape<'index, 'model> {
+    item: &'index IndexedItem,
+    model: &'model Model,
+    module: String,
+}
+
+struct ExpectedRelation<'model> {
+    kind: ShapeRelationKind<'model>,
+    related: &'model CanonicalPath,
+    wrapper: LoadedWrapper,
 }
 
 /// # Errors

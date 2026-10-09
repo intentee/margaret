@@ -1,9 +1,11 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_environment_variable_codegen::environment_variable::EnvironmentVariable;
 use margaret_input_weaving::weaving_kind::WeavingKind;
+use margaret_umbrella_path::routes_path::routes_path;
 
 use crate::route_url_input::RouteUrlInput;
 use crate::serve_input_key::ServeInputKey;
@@ -13,6 +15,7 @@ pub enum ServeInput {
     ConsoleArgument(ConsoleArgument),
     EnvironmentVariable(EnvironmentVariable),
     RouteUrl(RouteUrlInput),
+    Routes,
     SpiffeHttpClient,
 }
 
@@ -23,7 +26,12 @@ impl ServeInput {
             ServeInput::ConsoleArgument(argument) => argument.field_type(),
             ServeInput::EnvironmentVariable(variable) => variable.value.field_type(),
             ServeInput::RouteUrl(_) => quote! { ::std::string::String },
-            ServeInput::SpiffeHttpClient => quote! { reqwest::Client },
+            ServeInput::Routes => {
+                let routes = path_tokens(&routes_path());
+
+                quote! { ::std::sync::Arc<#routes> }
+            }
+            ServeInput::SpiffeHttpClient => quote! { margaret::framework::reqwest::Client },
         }
     }
 
@@ -33,6 +41,7 @@ impl ServeInput {
             ServeInput::ConsoleArgument(argument) => argument.is_shareable(),
             ServeInput::EnvironmentVariable(_)
             | ServeInput::RouteUrl(_)
+            | ServeInput::Routes
             | ServeInput::SpiffeHttpClient => true,
         }
     }
@@ -43,13 +52,14 @@ impl ServeInput {
             ServeInput::ConsoleArgument(argument) => argument.name(),
             ServeInput::EnvironmentVariable(variable) => variable.name.as_str(),
             ServeInput::RouteUrl(route) => &route.path,
+            ServeInput::Routes => "routes",
             ServeInput::SpiffeHttpClient => "spiffe_http_client",
         }
     }
 
     #[must_use]
     pub fn reads_server_origins(&self) -> bool {
-        matches!(self, ServeInput::RouteUrl(_))
+        matches!(self, ServeInput::RouteUrl(_) | ServeInput::Routes)
     }
 
     #[must_use]
@@ -58,6 +68,7 @@ impl ServeInput {
             ServeInput::ConsoleArgument(_) => true,
             ServeInput::EnvironmentVariable(_)
             | ServeInput::RouteUrl(_)
+            | ServeInput::Routes
             | ServeInput::SpiffeHttpClient => false,
         }
     }
@@ -72,6 +83,7 @@ impl ServeInput {
                 name: variable.name.as_str().to_string(),
             },
             ServeInput::RouteUrl(route) => ServeInputKey::RouteUrl(route.clone()),
+            ServeInput::Routes => ServeInputKey::Routes,
             ServeInput::SpiffeHttpClient => ServeInputKey::SpiffeHttpClient,
         }
     }
@@ -81,7 +93,9 @@ impl ServeInput {
         match self {
             ServeInput::ConsoleArgument(argument) => argument.weaving(),
             ServeInput::EnvironmentVariable(variable) => variable.value.weaving.clone(),
-            ServeInput::RouteUrl(_) | ServeInput::SpiffeHttpClient => WeavingKind::Cloned,
+            ServeInput::RouteUrl(_) | ServeInput::Routes | ServeInput::SpiffeHttpClient => {
+                WeavingKind::Cloned
+            }
         }
     }
 }
@@ -183,13 +197,32 @@ mod tests {
     fn a_spiffe_http_client_is_a_cloned_reqwest_client() {
         let input = ServeInput::SpiffeHttpClient;
 
-        assert_eq!(collapsed(&input.field_type()), "reqwest::Client");
+        assert_eq!(
+            collapsed(&input.field_type()),
+            "margaret::framework::reqwest::Client"
+        );
         assert_eq!(input.name(), "spiffe_http_client");
         assert_eq!(input.weaving(), WeavingKind::Cloned);
         assert!(input.is_shareable());
         assert!(!input.reads_clap_matches());
         assert!(!input.reads_server_origins());
         assert_eq!(input.slot_key(), ServeInputKey::SpiffeHttpClient);
+    }
+
+    #[test]
+    fn the_routes_are_a_shared_handle_composed_from_the_server_origins() {
+        let input = ServeInput::Routes;
+
+        assert_eq!(
+            collapsed(&input.field_type()),
+            "::std::sync::Arc<crate::margaret::routes::Routes>"
+        );
+        assert_eq!(input.name(), "routes");
+        assert_eq!(input.weaving(), WeavingKind::Cloned);
+        assert!(input.is_shareable());
+        assert!(!input.reads_clap_matches());
+        assert!(input.reads_server_origins());
+        assert_eq!(input.slot_key(), ServeInputKey::Routes);
     }
 
     fn callback() -> RouteUrlInput {

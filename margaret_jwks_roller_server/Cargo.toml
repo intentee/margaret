@@ -11,10 +11,12 @@ publish.workspace = true
 autotests = false
 
 [dependencies]
+async-trait = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 margaret_database = { workspace = true }
 margaret_deadline = { workspace = true }
+margaret_handler_error = { workspace = true }
 margaret_http = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwks_roller = { workspace = true }
@@ -26,7 +28,9 @@ tokio = { workspace = true, features = ["time"] }
 tokio-util = { workspace = true }
 
 [dev-dependencies]
+http = { workspace = true }
 margaret_database_tests = { path = "../margaret_database_tests" }
+margaret_http_tests = { path = "../margaret_http_tests" }
 margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller_tests = { path = "../margaret_jwks_roller_tests" }
 margaret_signing_keys = { workspace = true }

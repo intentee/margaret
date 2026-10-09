@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use cookie::Cookie;
 use oauth2::AccessToken;
 
 use margaret_authorization_server_client::server_unavailability::ServerUnavailability;
@@ -39,7 +38,6 @@ async fn reports_unavailable_userinfo() {
             access_token: AccessToken::new("2YotnFZFEjr1zCsicMWpAA".to_string()),
             claims: (),
             subject: "subject".to_string(),
-            transaction_removal: Cookie::new("transaction", ""),
         })
         .await;
 

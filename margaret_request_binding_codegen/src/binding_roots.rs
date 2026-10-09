@@ -35,6 +35,7 @@ pub fn binding_roots(binding: &RequestBinding) -> Vec<&CanonicalPath> {
         | RequestBinding::RequestBodyStream
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
+        | RequestBinding::Session { .. }
         | RequestBinding::UploadedFiles
         | RequestBinding::Views => Vec::new(),
     }

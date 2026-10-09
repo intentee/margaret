@@ -10,35 +10,28 @@ pub(crate) fn own_trusts<'declarations>(
     issuance: &'declarations DeclaredTokenIssuance,
     resources: &'declarations DeclaredResourceIssuances,
     tags: &TagPool,
-    oauth_client_bindings: &[OAuthClientBinding],
+    oauth_client_bindings: &'declarations [OAuthClientBinding],
 ) -> Vec<OwnTrust<'declarations>> {
-    let DeclaredTokenIssuance::Declared(TokenIssuanceDeclaration {
-        audience,
-        issuer,
-        tag,
-        ..
-    }) = issuance
-    else {
+    let DeclaredTokenIssuance::Declared(TokenIssuanceDeclaration { issuer, .. }) = issuance else {
         return Vec::new();
     };
-    let own_clients_verify_the_issuance = oauth_client_bindings
-        .iter()
-        .any(|binding| matches!(binding.server, BoundAuthorizationServer::Own { .. }));
-    let issuance_trust = (own_clients_verify_the_issuance || tags.verifies_bearer_tokens_for(tag))
-        .then_some(OwnTrust {
-            audience,
-            issuer,
-            tag,
-        });
 
-    issuance_trust
-        .into_iter()
+    oauth_client_bindings
+        .iter()
+        .filter_map(|binding| match &binding.server {
+            BoundAuthorizationServer::Own { admitted, .. } => Some(OwnTrust {
+                audience: admitted.client_id.as_str(),
+                issuer,
+                tag: &binding.client.tag,
+            }),
+            BoundAuthorizationServer::External { .. } => None,
+        })
         .chain(
             resources
                 .resources()
-                .filter(|resource| tags.verifies_bearer_tokens_for(&resource.tag))
+                .filter(|resource| tags.verifies_resource_tokens_for(&resource.tag))
                 .map(|resource| OwnTrust {
-                    audience: &resource.audience,
+                    audience: resource.audience.as_str(),
                     issuer,
                     tag: &resource.tag,
                 }),

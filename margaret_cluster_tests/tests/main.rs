@@ -9,8 +9,6 @@ mod a_decided_consent_is_unknown_on_another_instance;
 #[cfg(feature = "tests_that_use_cluster")]
 mod a_forward_renders_a_note_written_on_another_instance;
 #[cfg(feature = "tests_that_use_cluster")]
-mod a_refresh_token_signed_after_a_roll_mints_on_an_instance_started_before_it;
-#[cfg(feature = "tests_that_use_cluster")]
 mod a_replayed_client_assertion_is_refused_on_another_instance;
 #[cfg(feature = "tests_that_use_cluster")]
 mod a_replayed_code_revokes_its_family_on_every_instance;
@@ -27,7 +25,9 @@ mod a_rotation_on_one_instance_supersedes_the_token_on_another;
 #[cfg(feature = "tests_that_use_cluster")]
 mod a_service_acquires_a_token_through_a_peer;
 #[cfg(feature = "tests_that_use_cluster")]
-mod a_session_refresh_token_from_one_instance_mints_on_another;
+mod a_session_signed_after_a_roll_is_admitted_on_an_instance_started_before_it;
+#[cfg(feature = "tests_that_use_cluster")]
+mod a_session_started_on_one_instance_refreshes_on_another;
 #[cfg(feature = "tests_that_use_cluster")]
 mod a_sign_in_begun_on_one_instance_completes_on_another;
 #[cfg(feature = "tests_that_use_cluster")]

@@ -25,13 +25,14 @@ use margaret_oauth_vocabulary::grant_type::GrantType;
 use margaret_oauth_vocabulary::resource_scope::ResourceScope;
 use margaret_oauth_vocabulary::resource_scope_parsing::ResourceScopeParsing;
 use margaret_oauth_vocabulary::scope::Scope;
-use margaret_oauth_vocabulary::scope_parsing::ScopeParsing;
 use margaret_oauth_vocabulary_codegen::client_authentication_methods::CLIENT_AUTHENTICATION_METHODS;
-use margaret_registered_claims::audience::Audience;
+use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
+use margaret_oauth_vocabulary_codegen::scope_resolution::ScopeResolution;
 use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
 use margaret_token_issuance_codegen::token_issuance_declaration::TokenIssuanceDeclaration;
 
 use crate::accepted_clients_codegen_error::AcceptedClientsCodegenError;
+use crate::admitted_resource::AdmittedResource;
 use crate::client_key_sources::CLIENT_KEY_SOURCES;
 use crate::client_signing_algorithms::CLIENT_SIGNING_ALGORITHMS;
 use crate::consent_policies::CONSENT_POLICIES;
@@ -50,21 +51,49 @@ fn written(path: &Path) -> String {
     path.to_token_stream().to_string()
 }
 
+fn scope_list(
+    context: &ScopeContext,
+    reader: &mut AttributeArgumentsReader,
+) -> Result<Option<Vec<Scope>>, AcceptedClientsCodegenError> {
+    reader
+        .take_path_array("scopes")?
+        .map(|written_scopes| {
+            written_scopes
+                .iter()
+                .map(|written_scope| {
+                    match context
+                        .scopes
+                        .resolve(context.index, context.item, written_scope)
+                    {
+                        ScopeResolution::Declared(scope) => Ok(scope),
+                        ScopeResolution::Unknown => {
+                            Err(AcceptedClientsCodegenError::UnknownScope {
+                                anchor: context.item.canonical_path().to_string(),
+                                written: written(written_scope),
+                            })
+                        }
+                    }
+                })
+                .collect()
+        })
+        .transpose()
+}
+
 fn client_credentials(
+    context: &ScopeContext,
     reader: &mut AttributeArgumentsReader,
     anchor: &str,
 ) -> Result<DeclaredClientCredentials, AcceptedClientsCodegenError> {
     Ok(reader
         .take_group("client_credentials", |group| {
-            group
-                .take_string_array("scopes")?
+            scope_list(context, group)?
                 .ok_or_else(
                     || AcceptedClientsCodegenError::MissingClientCredentialsScopes {
                         anchor: anchor.to_string(),
                     },
                 )?
                 .iter()
-                .map(|scope| match ResourceScope::parse(scope) {
+                .map(|scope| match ResourceScope::parse(scope.as_str()) {
                     ResourceScopeParsing::Accepted(scope) => Ok(scope),
                     ResourceScopeParsing::Rejected(rejection) => Err(
                         AcceptedClientsCodegenError::MalformedClientCredentialsScope {
@@ -146,11 +175,11 @@ fn client_keys(
 }
 
 fn declared_authentication(
-    index: &AttributeIndex,
-    item: &IndexedItem,
+    context: &ScopeContext,
     variant: &Path,
     reader: &mut AttributeArgumentsReader,
 ) -> Result<DeclaredAcceptedAuthentication, AcceptedClientsCodegenError> {
+    let ScopeContext { index, item, .. } = *context;
     let anchor = item.canonical_path().to_string();
     let method = index
         .resolve_item_path(item, variant)
@@ -171,7 +200,7 @@ fn declared_authentication(
         ClientAuthenticationMethod::None => Ok(DeclaredAcceptedAuthentication::Public),
         ClientAuthenticationMethod::PrivateKeyJwt => Ok(
             DeclaredAcceptedAuthentication::PrivateKeyJwt(DeclaredConfidentialClient {
-                client_credentials: client_credentials(reader, &anchor)?,
+                client_credentials: client_credentials(context, reader, &anchor)?,
                 introspection: reader.take_flag("introspection"),
                 keys: reader
                     .take_variant(ItemNamingArgument::Keys.key(), |keys, arguments| {
@@ -245,10 +274,10 @@ fn redirect_routes(
 }
 
 fn code_policy(
-    index: &AttributeIndex,
-    item: &IndexedItem,
+    context: &ScopeContext,
     reader: &mut AttributeArgumentsReader,
 ) -> Result<DeclaredCodePolicy, AcceptedClientsCodegenError> {
+    let ScopeContext { index, item, .. } = *context;
     let anchor = item.canonical_path().to_string();
     let anchor = anchor.as_str();
     let declared_consent = reader
@@ -292,22 +321,11 @@ fn code_policy(
         redirect_routes,
         redirect_uris,
         refresh_token: reader.take_flag("refresh_token"),
-        scopes: reader
-            .take_string_array("scopes")?
-            .ok_or_else(|| AcceptedClientsCodegenError::MissingCodeScopes {
+        scopes: scope_list(context, reader)?.ok_or_else(|| {
+            AcceptedClientsCodegenError::MissingCodeScopes {
                 anchor: anchor.to_string(),
-            })?
-            .iter()
-            .map(|scope| match Scope::parse(scope) {
-                ScopeParsing::Accepted(scope) => Ok(scope),
-                ScopeParsing::Rejected(rejection) => {
-                    Err(AcceptedClientsCodegenError::MalformedCodeScope {
-                        anchor: anchor.to_string(),
-                        rejection,
-                    })
-                }
-            })
-            .collect::<Result<_, _>>()?,
+            }
+        })?,
     })
 }
 
@@ -343,7 +361,7 @@ fn resources(
     reader: &mut AttributeArgumentsReader,
     resources: &DeclaredResourceIssuances,
     anchor: &str,
-) -> Result<Vec<Audience>, AcceptedClientsCodegenError> {
+) -> Result<Vec<AdmittedResource>, AcceptedClientsCodegenError> {
     let declared = reader.take_path_array("resources")?.ok_or_else(|| {
         AcceptedClientsCodegenError::MissingResources {
             anchor: anchor.to_string(),
@@ -356,7 +374,7 @@ fn resources(
         });
     }
 
-    let mut audiences: Vec<Audience> = Vec::with_capacity(declared.len());
+    let mut admitted: Vec<AdmittedResource> = Vec::with_capacity(declared.len());
 
     for path in &declared {
         let tag = Tag::from_path(path).ok_or_else(|| {
@@ -372,45 +390,45 @@ fn resources(
                     tag: tag.to_string(),
                 })?;
 
-        if audiences.contains(&resource.audience) {
+        if admitted.iter().any(|resource| resource.tag == tag) {
             return Err(AcceptedClientsCodegenError::DuplicateResource {
                 anchor: anchor.to_string(),
                 tag: tag.to_string(),
             });
         }
 
-        audiences.push(resource.audience.clone());
+        admitted.push(AdmittedResource {
+            audience: resource.audience.clone(),
+            tag,
+        });
     }
 
-    Ok(audiences)
+    Ok(admitted)
 }
 
 fn token_exchange(
+    context: &ScopeContext,
     reader: &mut AttributeArgumentsReader,
     anchor: &str,
 ) -> Result<DeclaredTokenExchange, AcceptedClientsCodegenError> {
     Ok(reader
         .take_group("token_exchange", |group| {
-            group
-                .take_string_array("scopes")?
-                .ok_or_else(|| AcceptedClientsCodegenError::MissingTokenExchangeScopes {
+            scope_list(context, group)?.ok_or_else(|| {
+                AcceptedClientsCodegenError::MissingTokenExchangeScopes {
                     anchor: anchor.to_string(),
-                })?
-                .iter()
-                .map(|scope| match Scope::parse(scope) {
-                    ScopeParsing::Accepted(scope) => Ok(scope),
-                    ScopeParsing::Rejected(rejection) => {
-                        Err(AcceptedClientsCodegenError::MalformedTokenExchangeScope {
-                            anchor: anchor.to_string(),
-                            rejection,
-                        })
-                    }
-                })
-                .collect::<Result<Vec<Scope>, AcceptedClientsCodegenError>>()
+                }
+            })
         })?
         .map_or(DeclaredTokenExchange::Withheld, |scopes| {
             DeclaredTokenExchange::Granted { scopes }
         }))
+}
+
+#[derive(Clone, Copy)]
+struct ScopeContext<'context> {
+    index: &'context AttributeIndex,
+    item: &'context IndexedItem,
+    scopes: &'context DeclaredScopes<'context>,
 }
 
 pub struct AcceptedClientDeclaration<'index> {
@@ -418,7 +436,7 @@ pub struct AcceptedClientDeclaration<'index> {
     pub authentication: DeclaredAcceptedAuthentication,
     pub authorization_code: DeclaredCodeGrant,
     pub client_id: ClientId,
-    pub resources: Vec<Audience>,
+    pub resources: Vec<AdmittedResource>,
     pub tag: Tag,
     pub token_exchange: DeclaredTokenExchange,
 }
@@ -497,10 +515,16 @@ impl<'index> AcceptedClientDeclaration<'index> {
         index: &'index AttributeIndex,
         matched: &MatchedAttribute<'index>,
         declared_resources: &DeclaredResourceIssuances,
+        scopes: &DeclaredScopes,
     ) -> Result<Self, AcceptedClientsCodegenError> {
         let anchor = declaration_anchor(index, matched, FrameworkAttribute::AdmitsOAuthClient)?;
         let item = anchor.item;
         let path = item.canonical_path().to_string();
+        let context = ScopeContext {
+            index,
+            item,
+            scopes,
+        };
 
         matched.args()?.interpret(|reader| {
             Ok(Self {
@@ -519,21 +543,17 @@ impl<'index> AcceptedClientDeclaration<'index> {
                 authentication: reader
                     .take_variant(
                         ItemNamingArgument::ClientAuthentication.key(),
-                        |variant, arguments| {
-                            declared_authentication(index, item, variant, arguments)
-                        },
+                        |variant, arguments| declared_authentication(&context, variant, arguments),
                     )?
                     .ok_or_else(|| AcceptedClientsCodegenError::MissingAuthentication {
                         anchor: path.clone(),
                     })?,
                 authorization_code: reader
-                    .take_group("authorization_code", |group| {
-                        code_policy(index, item, group)
-                    })?
+                    .take_group("authorization_code", |group| code_policy(&context, group))?
                     .map_or(DeclaredCodeGrant::Withheld, DeclaredCodeGrant::Granted),
                 client_id: client_id(reader, &path)?,
                 resources: resources(reader, declared_resources, &path)?,
-                token_exchange: token_exchange(reader, &path)?,
+                token_exchange: token_exchange(&context, reader, &path)?,
                 anchor,
             })
         })
@@ -550,6 +570,7 @@ mod tests {
     use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
     use margaret_oauth_vocabulary::grant_type::GrantType;
     use margaret_oauth_vocabulary::scope::Scope;
+    use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
     use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -564,9 +585,9 @@ mod tests {
     use crate::declared_token_exchange::DeclaredTokenExchange;
 
     const ANCHOR: &str = "crate::Client";
-    const ISSUANCE: &str = "use margaret::framework::accepted_clients::client_keys::ClientKeys;\nuse margaret::framework::accepted_clients::consent_policy::ConsentPolicy;\nuse margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm;\nuse margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning;\nuse margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;\nuse crate::routes::Callback;\n\nmod routes {\n    pub struct Callback;\n    pub struct Other;\n}\n\n#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n#[issues_resource_tokens(reports, audience = \"reports\")]\npub struct Reports;\n";
-    const PRIVATE_KEY_JWT: &str = "authentication = ClientAuthenticationMethod::PrivateKeyJwt(client_credentials(scopes = [\"artifacts:read\"]), introspection, keys = ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = JwsAlgorithm::Es256))";
-    const AUTHORIZATION_CODE: &str = "authorization_code(consent = ConsentPolicy::Prompted, id_token_signing = IdTokenSigning::Rsa, redirect_uris = [\"https://portal.example/callback\"], scopes = [\"openid\", \"profile\"], refresh_token)";
+    const ISSUANCE: &str = "use margaret::framework::accepted_clients::client_keys::ClientKeys;\nuse margaret::framework::accepted_clients::consent_policy::ConsentPolicy;\nuse margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm;\nuse margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning;\nuse margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;\nuse margaret::framework::oauth_vocabulary::openid_scope::OpenidScope;\nuse crate::routes::Callback;\n\n#[oauth_scope(name = \"artifacts:read\")]\npub struct ArtifactsReadScope;\n#[oauth_scope(name = \"deploy\")]\npub struct DeployScope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n\nmod routes {\n    pub struct Callback;\n    pub struct Other;\n}\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n#[issues_resource_tokens(reports, audience = \"reports\")]\npub struct Reports;\n";
+    const PRIVATE_KEY_JWT: &str = "authentication = ClientAuthenticationMethod::PrivateKeyJwt(client_credentials(scopes = [ArtifactsReadScope]), introspection, keys = ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = JwsAlgorithm::Es256))";
+    const AUTHORIZATION_CODE: &str = "authorization_code(consent = ConsentPolicy::Prompted, id_token_signing = IdTokenSigning::Rsa, redirect_uris = [\"https://portal.example/callback\"], scopes = [OpenidScope, ProfileScope], refresh_token)";
 
     fn read<TOutcome>(
         arguments: &str,
@@ -582,6 +603,7 @@ mod tests {
             &issuance,
             &DeclaredResourceIssuances::read(&indexed.index, &issuance)
                 .expect("the resources are read"),
+            &DeclaredScopes::read(&indexed.index).expect("the scopes are read"),
         ))
     }
 
@@ -596,6 +618,7 @@ mod tests {
             &issuance,
             &DeclaredResourceIssuances::read(&indexed.index, &issuance)
                 .expect("the resources are read"),
+            &DeclaredScopes::read(&indexed.index).expect("the scopes are read"),
         )
         .err()
         .expect("the declaration is rejected")
@@ -611,7 +634,7 @@ mod tests {
     fn reads_a_confidential_client() {
         read(
             &format!(
-                "{PRIVATE_KEY_JWT}, {AUTHORIZATION_CODE}, client_id = \"portal\", resources = [artifacts, reports], token_exchange(scopes = [\"deploy\"])"
+                "{PRIVATE_KEY_JWT}, {AUTHORIZATION_CODE}, client_id = \"portal\", resources = [artifacts, reports], token_exchange(scopes = [DeployScope])"
             ),
             |read| {
                 let accepted = read.expect("the client is accepted");
@@ -684,7 +707,7 @@ mod tests {
     fn grants_the_types_and_scopes_it_declares() {
         read(
             &format!(
-                "{PRIVATE_KEY_JWT}, {AUTHORIZATION_CODE}, client_id = \"portal\", resources = [artifacts], token_exchange(scopes = [\"deploy\"])"
+                "{PRIVATE_KEY_JWT}, {AUTHORIZATION_CODE}, client_id = \"portal\", resources = [artifacts], token_exchange(scopes = [DeployScope])"
             ),
             |read| {
                 let accepted = read.expect("the client is accepted");
@@ -860,13 +883,13 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_malformed_token_exchange_scope() {
+    fn rejects_a_token_exchange_scope_that_no_declaration_declares() {
         assert!(matches!(
             rejection(
-                "authentication = ClientAuthenticationMethod::None, client_id = \"ci\", resources = [artifacts], token_exchange(scopes = [\"two words\"])"
+                "authentication = ClientAuthenticationMethod::None, client_id = \"ci\", resources = [artifacts], token_exchange(scopes = [UndeclaredScope])"
             ),
-            AcceptedClientsCodegenError::MalformedTokenExchangeScope { anchor, .. }
-                if anchor == ANCHOR
+            AcceptedClientsCodegenError::UnknownScope { anchor, written }
+                if anchor == ANCHOR && written == "UndeclaredScope"
         ));
     }
 
@@ -1001,7 +1024,7 @@ mod tests {
     fn rejects_openid_as_a_client_credentials_scope() {
         assert!(matches!(
             rejection(
-                "authentication = ClientAuthenticationMethod::PrivateKeyJwt(client_credentials(scopes = [\"openid\"]), keys = ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = JwsAlgorithm::Es256)), client_id = \"portal\", resources = [artifacts]"
+                "authentication = ClientAuthenticationMethod::PrivateKeyJwt(client_credentials(scopes = [OpenidScope]), keys = ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = JwsAlgorithm::Es256)), client_id = \"portal\", resources = [artifacts]"
             ),
             AcceptedClientsCodegenError::MalformedClientCredentialsScope { anchor, .. }
                 if anchor == ANCHOR
@@ -1054,7 +1077,7 @@ mod tests {
 
     fn code_grant_redirecting(redirects: &str) -> String {
         format!(
-            "authentication = ClientAuthenticationMethod::None, authorization_code(consent = ConsentPolicy::Implicit, id_token_signing = IdTokenSigning::Rsa, {redirects}, scopes = [\"openid\"]), client_id = \"spa\", resources = [artifacts]"
+            "authentication = ClientAuthenticationMethod::None, authorization_code(consent = ConsentPolicy::Implicit, id_token_signing = IdTokenSigning::Rsa, {redirects}, scopes = [OpenidScope]), client_id = \"spa\", resources = [artifacts]"
         )
     }
 
@@ -1172,13 +1195,14 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_malformed_authorization_code_scope() {
+    fn rejects_an_authorization_code_scope_written_as_a_string() {
         assert!(matches!(
             rejection(
-                "authentication = ClientAuthenticationMethod::None, authorization_code(consent = ConsentPolicy::Implicit, id_token_signing = IdTokenSigning::EllipticCurve, redirect_uris = [\"https://spa.example/callback\"], scopes = [\"a\\\"b\"]), client_id = \"spa\", resources = [artifacts]"
+                "authentication = ClientAuthenticationMethod::None, authorization_code(consent = ConsentPolicy::Implicit, id_token_signing = IdTokenSigning::EllipticCurve, redirect_uris = [\"https://spa.example/callback\"], scopes = [\"profile\"]), client_id = \"spa\", resources = [artifacts]"
             ),
-            AcceptedClientsCodegenError::MalformedCodeScope { anchor, .. }
-                if anchor == ANCHOR
+            AcceptedClientsCodegenError::AttributeArguments(
+                AttributeArgumentsError::UnexpectedArgument { key, .. }
+            ) if key == "scopes"
         ));
     }
 

@@ -37,13 +37,6 @@ use margaret_oauth_client::client_authentication::ClientAuthentication;
 use margaret_oauth_vocabulary::grant_type::GrantType;
 use margaret_route_method::content_method::ContentMethod;
 
-#[derive(Debug, Deserialize, Serialize)]
-struct EchoFields {
-    echo: Value,
-}
-
-impl ExtraTokenFields for EchoFields {}
-
 async fn echo_server(path: &'static str, wrapping: EchoWrapping) -> FixtureAuthorizationServer {
     FixtureAuthorizationServer::start(
         path,
@@ -97,6 +90,13 @@ fn authenticated_claims(echoed: &Value, key_set: &VerificationKeySet) -> Value {
 
     claims
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+struct EchoFields {
+    echo: Value,
+}
+
+impl ExtraTokenFields for EchoFields {}
 
 #[tokio::test]
 async fn authenticates_with_private_key_jwt() {

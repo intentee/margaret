@@ -245,88 +245,6 @@ fn implements_trait(index: &AttributeIndex, item: &IndexedItem, required: &Canon
     })
 }
 
-struct DependencyResolver<'resolver> {
-    framework_providers: &'resolver [FrameworkProvider],
-    provided_keys: &'resolver HashMap<CanonicalPath, CanonicalPath>,
-    serve_inputs: &'resolver DeclaredServeInputs,
-}
-
-impl DependencyResolver<'_> {
-    fn resolve_dependencies(
-        &self,
-        concrete_path: &CanonicalPath,
-        constructor: &IndexedMethod,
-        parameters: &[DraftParameter],
-    ) -> Result<Vec<DependencyKind>, ContainerError> {
-        let mut dependencies = Vec::new();
-
-        if constructor.has_receiver() {
-            return Err(ContainerError::UnsupportedParameterShape {
-                singleton: concrete_path.to_string(),
-                parameter: "self".to_string(),
-                written: "self".to_string(),
-            });
-        }
-
-        for DraftParameter { indexed, target } in parameters {
-            let parameter = indexed.name().to_string();
-
-            dependencies.push(
-                match self.serve_inputs.input(concrete_path, indexed.position()) {
-                    Some(input) => DependencyKind::ServeInput {
-                        input: Box::new(input.clone()),
-                    },
-                    None => match target {
-                        ParameterTarget::Resolved { resolved, written } => resolve_target(
-                            resolved,
-                            written,
-                            concrete_path,
-                            &parameter,
-                            self.provided_keys,
-                            self.framework_providers,
-                        )?,
-                        ParameterTarget::Unresolved { written } => {
-                            return Err(missing_provider(concrete_path, &parameter, written));
-                        }
-                        ParameterTarget::UnsupportedShape => {
-                            return Err(ContainerError::UnsupportedParameterShape {
-                                singleton: concrete_path.to_string(),
-                                parameter,
-                                written: type_text(indexed.declared()),
-                            });
-                        }
-                    },
-                },
-            );
-        }
-
-        Ok(dependencies)
-    }
-
-    fn resolve_direct(
-        &self,
-        source: &ConstructionSource,
-        parameters: &[DraftParameter],
-        concrete_path: &CanonicalPath,
-    ) -> Result<DirectConstruction, ContainerError> {
-        match source {
-            ConstructionSource::Constructor(constructor) => {
-                let dependencies =
-                    self.resolve_dependencies(concrete_path, constructor, parameters)?;
-
-                Ok(DirectConstruction::Constructor {
-                    dependencies,
-                    is_async: constructor.signature().asyncness.is_some(),
-                    method: constructor.identifier().to_string(),
-                })
-            }
-            ConstructionSource::Fieldless(shape) => {
-                Ok(DirectConstruction::Fieldless { shape: *shape })
-            }
-        }
-    }
-}
-
 fn resolve_target(
     resolved: &CanonicalPath,
     written: &Path,
@@ -373,20 +291,6 @@ fn missing_provider(
         parameter: parameter.to_string(),
         written: path_text(written),
     }
-}
-
-struct Draft<'index> {
-    concrete_path: CanonicalPath,
-    construction: ConstructionSource<'index>,
-    field_name: String,
-    parameters: Vec<DraftParameter<'index>>,
-    type_name: String,
-}
-
-struct DraftedContainer<'index> {
-    construction_drafts: Vec<Draft<'index>>,
-    provided_keys: HashMap<CanonicalPath, CanonicalPath>,
-    provider_drafts: Vec<Draft<'index>>,
 }
 
 fn resolve_framework_providers(
@@ -510,6 +414,12 @@ fn framework_dependency_kind(
         FrameworkDependency::RouteUrl(route) => Ok(DependencyKind::ServeInput {
             input: Box::new(ServeInput::RouteUrl(route.clone())),
         }),
+        FrameworkDependency::Routes => Ok(DependencyKind::ServeInput {
+            input: Box::new(ServeInput::Routes),
+        }),
+        FrameworkDependency::SpiffeHttpClient => Ok(DependencyKind::ServeInput {
+            input: Box::new(ServeInput::SpiffeHttpClient),
+        }),
         FrameworkDependency::Urls(sources) => Ok(DependencyKind::Urls {
             sources: sources.clone(),
         }),
@@ -592,6 +502,8 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
                 | FrameworkDependency::EnvironmentVariable { .. }
                 | FrameworkDependency::RouteUrl(_)
                 | FrameworkDependency::SingletonView(_)
+                | FrameworkDependency::Routes
+                | FrameworkDependency::SpiffeHttpClient
                 | FrameworkDependency::TokenIssuance
                 | FrameworkDependency::Urls(_) => &[],
             })
@@ -662,6 +574,102 @@ fn draft_references_path(draft: &Draft, path: &CanonicalPath) -> bool {
         .parameters
         .iter()
         .any(|parameter| parameter.target.resolves_to(path))
+}
+
+struct DependencyResolver<'resolver> {
+    framework_providers: &'resolver [FrameworkProvider],
+    provided_keys: &'resolver HashMap<CanonicalPath, CanonicalPath>,
+    serve_inputs: &'resolver DeclaredServeInputs,
+}
+
+impl DependencyResolver<'_> {
+    fn resolve_dependencies(
+        &self,
+        concrete_path: &CanonicalPath,
+        constructor: &IndexedMethod,
+        parameters: &[DraftParameter],
+    ) -> Result<Vec<DependencyKind>, ContainerError> {
+        let mut dependencies = Vec::new();
+
+        if constructor.has_receiver() {
+            return Err(ContainerError::UnsupportedParameterShape {
+                singleton: concrete_path.to_string(),
+                parameter: "self".to_string(),
+                written: "self".to_string(),
+            });
+        }
+
+        for DraftParameter { indexed, target } in parameters {
+            let parameter = indexed.name().to_string();
+
+            dependencies.push(
+                match self.serve_inputs.input(concrete_path, indexed.position()) {
+                    Some(input) => DependencyKind::ServeInput {
+                        input: Box::new(input.clone()),
+                    },
+                    None => match target {
+                        ParameterTarget::Resolved { resolved, written } => resolve_target(
+                            resolved,
+                            written,
+                            concrete_path,
+                            &parameter,
+                            self.provided_keys,
+                            self.framework_providers,
+                        )?,
+                        ParameterTarget::Unresolved { written } => {
+                            return Err(missing_provider(concrete_path, &parameter, written));
+                        }
+                        ParameterTarget::UnsupportedShape => {
+                            return Err(ContainerError::UnsupportedParameterShape {
+                                singleton: concrete_path.to_string(),
+                                parameter,
+                                written: type_text(indexed.declared()),
+                            });
+                        }
+                    },
+                },
+            );
+        }
+
+        Ok(dependencies)
+    }
+
+    fn resolve_direct(
+        &self,
+        source: &ConstructionSource,
+        parameters: &[DraftParameter],
+        concrete_path: &CanonicalPath,
+    ) -> Result<DirectConstruction, ContainerError> {
+        match source {
+            ConstructionSource::Constructor(constructor) => {
+                let dependencies =
+                    self.resolve_dependencies(concrete_path, constructor, parameters)?;
+
+                Ok(DirectConstruction::Constructor {
+                    dependencies,
+                    is_async: constructor.signature().asyncness.is_some(),
+                    method: constructor.identifier().to_string(),
+                })
+            }
+            ConstructionSource::Fieldless(shape) => {
+                Ok(DirectConstruction::Fieldless { shape: *shape })
+            }
+        }
+    }
+}
+
+struct Draft<'index> {
+    concrete_path: CanonicalPath,
+    construction: ConstructionSource<'index>,
+    field_name: String,
+    parameters: Vec<DraftParameter<'index>>,
+    type_name: String,
+}
+
+struct DraftedContainer<'index> {
+    construction_drafts: Vec<Draft<'index>>,
+    provided_keys: HashMap<CanonicalPath, CanonicalPath>,
+    provider_drafts: Vec<Draft<'index>>,
 }
 
 pub(crate) fn build_plan(

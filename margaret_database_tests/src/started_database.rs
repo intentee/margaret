@@ -1,23 +1,34 @@
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use url::Url;
 use uuid::Uuid;
 
 use margaret_database::database::Database;
+use margaret_database::max_connections::MaxConnections;
 use margaret_model::render_postgres::render_postgres;
 use margaret_model::schema::Schema;
 use margaret_sql_identifier::quote_identifier::quote_identifier;
 
 use crate::connected_client::connected_client;
 use crate::database_administration::DatabaseAdministration;
+use crate::racing_instances::RACING_INSTANCES;
 use crate::test_postgres_url::test_postgres_url;
 
-async fn connected_pool(database_url: &Url) -> Database {
+fn racing_pool_size() -> MaxConnections {
+    MaxConnections {
+        connections: NonZeroUsize::new(RACING_INSTANCES)
+            .expect("the racing instances of a test are at least one"),
+    }
+}
+
+async fn connected_pool(database_url: &Url, max_connections: MaxConnections) -> Database {
     Database::connect(
         database_url
             .as_str()
             .parse()
             .expect("the test database url is a postgres url"),
+        max_connections,
     )
     .await
     .expect("the test database accepts connections")
@@ -61,7 +72,7 @@ impl StartedDatabase {
             .expect("the shared test cluster url carries a username");
         database_url.set_path(&name);
 
-        let database = connected_pool(&database_url).await;
+        let database = connected_pool(&database_url, racing_pool_size()).await;
 
         Self {
             administration: DatabaseAdministration {
@@ -97,6 +108,13 @@ impl StartedDatabase {
     ///
     /// Panics when the test database refuses another pool of connections.
     pub async fn separate_pool(&self) -> Arc<Database> {
-        Arc::new(connected_pool(&self.database_url).await)
+        self.separate_pool_of(racing_pool_size()).await
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the test database refuses another pool of connections.
+    pub async fn separate_pool_of(&self, max_connections: MaxConnections) -> Arc<Database> {
+        Arc::new(connected_pool(&self.database_url, max_connections).await)
     }
 }

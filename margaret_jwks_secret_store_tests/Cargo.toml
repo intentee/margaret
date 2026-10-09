@@ -7,11 +7,13 @@ autotests = false
 
 [dependencies]
 bytes = { workspace = true }
+chrono = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller_server = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
-margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
+margaret_token_issuance = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
@@ -21,7 +23,6 @@ margaret_jose_parameters = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_registered_claims = { workspace = true }
-margaret_token_signer = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
 uuid = { workspace = true }

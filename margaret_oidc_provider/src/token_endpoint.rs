@@ -1,6 +1,7 @@
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use oauth2::basic::BasicErrorResponseType;
@@ -28,12 +29,19 @@ use margaret_authorization_grants::refresh_rotation::RefreshRotation;
 use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
 use margaret_authorization_grants::refresh_token_record::RefreshTokenRecord;
 use margaret_database::database::Database;
+use margaret_handler_error::handler_error::HandlerError;
+use margaret_http::body_limit::BodyLimit;
+use margaret_http::handles_limited_content::HandlesLimitedContent;
 use margaret_http::request::Request;
+use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
+use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http_validation::responded_to_form::responded_to_form;
 use margaret_identity_session::id_token_claims::IdTokenClaims;
 use margaret_identity_session::issued_access_token_claims::IssuedAccessTokenClaims;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
-use margaret_oauth_vocabulary::openid_scope::OPENID_SCOPE;
+use margaret_oauth_vocabulary::declared_scope::DeclaredScope;
+use margaret_oauth_vocabulary::openid_scope::OpenidScope;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_oauth_vocabulary::subject_token_type_parsing::SubjectTokenTypeParsing;
@@ -182,7 +190,7 @@ impl TokenEndpoint {
     /// remembered, `ProviderError::AuthorizationGrants` when the application cannot keep its grants,
     /// `ProviderError::Signing` when an id token cannot be signed, and
     /// `ProviderError::SubjectTokenExchange` when a subject token exchanger fails.
-    pub async fn respond(
+    async fn respond(
         &self,
         request: &Request,
         token_request: ValidationResult<TokenRequest>,
@@ -427,7 +435,7 @@ impl TokenEndpoint {
         }: TokenIssue,
         now: DateTime<Utc>,
     ) -> PreparedTokens {
-        let audience = if scopes.contains(OPENID_SCOPE) {
+        let audience = if scopes.contains(OpenidScope::NAME) {
             AudienceClaim::Multiple(vec![resource.to_string(), self.issuance.issuer.to_string()])
         } else {
             AudienceClaim::Single(resource.to_string())
@@ -537,11 +545,15 @@ impl TokenEndpoint {
             {
                 record
             }
-            RefreshTokenLookup::Current { .. } | RefreshTokenLookup::Unknown => {
-                return Ok(unknown_refresh_token());
-            }
-            RefreshTokenLookup::Superseded { family } => {
+            RefreshTokenLookup::Superseded { client_id, family }
+                if client_id == client.client_id =>
+            {
                 return revoked_family(database, family).await;
+            }
+            RefreshTokenLookup::Current { .. }
+            | RefreshTokenLookup::Superseded { .. }
+            | RefreshTokenLookup::Unknown => {
+                return Ok(unknown_refresh_token());
             }
         };
         let scopes = match requested.within(&granted.iter().map(Scope::as_str).collect()) {
@@ -668,5 +680,20 @@ impl TokenEndpoint {
                 ),
             },
         )
+    }
+}
+
+#[async_trait]
+impl HandlesLimitedContent for TokenEndpoint {
+    async fn handle(
+        &self,
+        request: &Request,
+        body: RequestBody,
+        limit: BodyLimit,
+    ) -> Result<ResponseContinuation, HandlerError> {
+        responded_to_form(request, body, limit, |token_request| {
+            self.respond(request, token_request)
+        })
+        .await
     }
 }

@@ -1,4 +1,5 @@
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_umbrella_path::routes_path::routes_path;
 
 pub enum RequestInjectable {
     AssetBag,
@@ -8,6 +9,7 @@ pub enum RequestInjectable {
     PeerSpiffeId,
     RequestBodyStream,
     Routes,
+    Session,
     UploadedFiles,
     ValidationResult,
     VerifiedJwt,
@@ -25,6 +27,7 @@ impl RequestInjectable {
             Self::PeerSpiffeId,
             Self::RequestBodyStream,
             Self::Routes,
+            Self::Session,
             Self::UploadedFiles,
             Self::ValidationResult,
             Self::VerifiedJwt,
@@ -81,11 +84,13 @@ impl RequestInjectable {
                 "request_body_stream".to_string(),
                 "RequestBodyStream".to_string(),
             ]),
-            Self::Routes => CanonicalPath::new(vec![
-                "crate".to_string(),
+            Self::Routes => routes_path(),
+            Self::Session => CanonicalPath::new(vec![
                 "margaret".to_string(),
-                "routes".to_string(),
-                "Routes".to_string(),
+                "framework".to_string(),
+                "sessions".to_string(),
+                "session".to_string(),
+                "Session".to_string(),
             ]),
             Self::UploadedFiles => CanonicalPath::new(vec![
                 "margaret".to_string(),
@@ -124,6 +129,7 @@ impl RequestInjectable {
             | Self::IntrospectedToken
             | Self::Next
             | Self::RequestBodyStream
+            | Self::Session
             | Self::UploadedFiles
             | Self::ValidationResult
             | Self::VerifiedJwt => false,

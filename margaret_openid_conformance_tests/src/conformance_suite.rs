@@ -6,47 +6,24 @@ use rcgen::SanType;
 use rcgen::string::Ia5String;
 use reqwest::ClientBuilder;
 use serde::Deserialize;
-use url::Url;
 
 use margaret_http_tests::fixture_certificate_authority::FixtureCertificateAuthority;
 use margaret_http_tests::fixture_client_builder::fixture_client_builder;
 use margaret_http_tests::issued_pem_certificate::IssuedPemCertificate;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
 use crate::compose_project::ComposeProject;
 use crate::docker_output::docker_output;
 use crate::provider_host::PROVIDER_HOST;
 use crate::suite_api::SuiteApi;
+use crate::suite_base_url::SUITE_BASE_URL;
 use crate::suite_host::SUITE_HOST;
+use crate::suite_port::SUITE_PORT;
 
 const PROVIDER_RELAY_COMPOSE: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/compose/provider_relay.yml");
+
 const SUITE_COMPOSE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/compose/conformance_suite.yml");
-const SUITE_PORT: u16 = 8443;
-
-struct ComposeVariable {
-    name: &'static str,
-    value: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct AttachedNetwork {
-    #[serde(rename = "IPAddress")]
-    ip_address: IpAddr,
-}
-
-#[derive(Debug, Deserialize)]
-struct InspectedContainer {
-    #[serde(rename = "NetworkSettings")]
-    network_settings: NetworkSettings,
-}
-
-#[derive(Debug, Deserialize)]
-struct NetworkSettings {
-    #[serde(rename = "Networks")]
-    networks: HashMap<String, AttachedNetwork>,
-}
 
 async fn proxy_address(project: &ComposeProject) -> SocketAddr {
     let container = docker_output(
@@ -75,6 +52,29 @@ async fn proxy_address(project: &ComposeProject) -> SocketAddr {
         .expect("the suite proxy is attached to exactly one network");
 
     SocketAddr::new(network.ip_address, SUITE_PORT)
+}
+
+struct ComposeVariable {
+    name: &'static str,
+    value: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct AttachedNetwork {
+    #[serde(rename = "IPAddress")]
+    ip_address: IpAddr,
+}
+
+#[derive(Debug, Deserialize)]
+struct InspectedContainer {
+    #[serde(rename = "NetworkSettings")]
+    network_settings: NetworkSettings,
+}
+
+#[derive(Debug, Deserialize)]
+struct NetworkSettings {
+    #[serde(rename = "Networks")]
+    networks: HashMap<String, AttachedNetwork>,
 }
 
 pub struct ConformanceSuite {
@@ -123,8 +123,7 @@ impl ConformanceSuite {
 
         Self {
             api: SuiteApi {
-                base_url: Url::parse(&format!("https://{SUITE_HOST}:{SUITE_PORT}/"))
-                    .expect("the suite base url parses"),
+                base_url: SUITE_BASE_URL.clone(),
                 client: fixture_client_builder(&certificate_authority)
                     .resolve(SUITE_HOST, proxy)
                     .build()
@@ -169,20 +168,6 @@ impl ConformanceSuite {
     #[must_use]
     pub fn issuer_request_client(&self) -> IssuerRequestClient {
         IssuerRequestClient::build(self.client_builder()).expect("the issuer request client builds")
-    }
-
-    /// # Panics
-    ///
-    /// Panics when the alias does not form an issuer of the suite.
-    #[must_use]
-    pub fn relying_party_issuer(&self, alias: &str) -> IssuerIdentifier {
-        self.api
-            .base_url
-            .join(&format!("test/a/{alias}/"))
-            .expect("the alias joins the suite base url")
-            .as_str()
-            .parse()
-            .expect("the suite issuer is an https url")
     }
 
     pub fn stop(self) {

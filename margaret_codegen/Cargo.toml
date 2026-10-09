@@ -26,11 +26,15 @@ margaret_middleware_codegen = { workspace = true }
 margaret_model_codegen = { workspace = true }
 margaret_oauth_client_codegen = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
+margaret_oauth_vocabulary_codegen = { workspace = true }
 margaret_oidc_provider_codegen = { workspace = true }
 margaret_request_binding_codegen = { workspace = true }
 margaret_schema_codegen = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
 margaret_service_codegen = { workspace = true }
+margaret_session_endpoints_codegen = { workspace = true }
+margaret_sessions_codegen = { workspace = true }
+margaret_sign_in_endpoints_codegen = { workspace = true }
 margaret_sql_identifier = { workspace = true }
 margaret_tag_codegen = { workspace = true }
 margaret_token_issuance_codegen = { workspace = true }

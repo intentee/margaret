@@ -17,8 +17,8 @@ impl<'index> DeclaredResourceIssuances<'index> {
     /// # Errors
     ///
     /// Returns `TokenIssuanceCodegenError` when a declaration is malformed, when resource tokens
-    /// are declared without the token issuance that signs them, or when an audience is not
-    /// distinct from the session audience or from another resource.
+    /// are declared without the token issuance that signs them, or when an audience names the
+    /// issuer or another resource.
     pub fn read(
         index: &'index AttributeIndex,
         issuance: &DeclaredTokenIssuance,
@@ -36,16 +36,8 @@ impl<'index> DeclaredResourceIssuances<'index> {
                         anchor: declared.anchor.canonical_path().to_string(),
                     });
                 }
-                DeclaredTokenIssuance::Declared(session)
-                    if session.audience == declared.audience =>
-                {
-                    return Err(TokenIssuanceCodegenError::ResourceAudienceOfSessions {
-                        anchor: declared.anchor.canonical_path().to_string(),
-                        audience: declared.audience.to_string(),
-                    });
-                }
-                DeclaredTokenIssuance::Declared(session)
-                    if session.issuer.as_str() == declared.audience.as_str() =>
+                DeclaredTokenIssuance::Declared(issuance)
+                    if issuance.issuer.as_str() == declared.audience.as_str() =>
                 {
                     return Err(TokenIssuanceCodegenError::ResourceAudienceNamesIssuer {
                         anchor: declared.anchor.canonical_path().to_string(),
@@ -95,7 +87,8 @@ mod tests {
     use crate::declared_token_issuance::DeclaredTokenIssuance;
     use crate::token_issuance_codegen_error::TokenIssuanceCodegenError;
 
-    const ISSUANCE: &str = "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n";
+    const ISSUANCE: &str =
+        "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n";
 
     fn read<TOutcome>(
         source: &str,
@@ -211,15 +204,6 @@ mod tests {
                 ));
             },
         );
-    }
-
-    #[test]
-    fn rejects_a_resource_addressed_like_the_sessions() {
-        assert!(matches!(
-            rejection("#[issues_resource_tokens(attachments, audience = \"session\")]\npub struct Attachments;\n"),
-            TokenIssuanceCodegenError::ResourceAudienceOfSessions { anchor, audience }
-                if anchor == "crate::Attachments" && audience == "session"
-        ));
     }
 
     #[test]

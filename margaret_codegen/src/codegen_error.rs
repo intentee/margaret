@@ -16,10 +16,14 @@ use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_model_codegen::model_codegen_error::ModelCodegenError;
 use margaret_oauth_client_codegen::oauth_client_codegen_error::OAuthClientCodegenError;
+use margaret_oauth_vocabulary_codegen::oauth_vocabulary_codegen_error::OAuthVocabularyCodegenError;
 use margaret_oidc_provider_codegen::oidc_provider_codegen_error::OidcProviderCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 use margaret_serve_input_codegen::serve_input_codegen_error::ServeInputCodegenError;
 use margaret_service_codegen::service_codegen_error::ServiceCodegenError;
+use margaret_session_endpoints_codegen::session_endpoints_codegen_error::SessionEndpointsCodegenError;
+use margaret_sessions_codegen::sessions_codegen_error::SessionsCodegenError;
+use margaret_sign_in_endpoints_codegen::sign_in_endpoints_codegen_error::SignInEndpointsCodegenError;
 use margaret_tag_codegen::tag_error::TagError;
 use margaret_token_issuance_codegen::token_issuance_codegen_error::TokenIssuanceCodegenError;
 use margaret_trusted_issuer_codegen::trusted_issuer_codegen_error::TrustedIssuerCodegenError;
@@ -58,6 +62,12 @@ pub enum CodegenError {
         source: AcceptedClientsCodegenError,
     },
 
+    #[error("failed to read the oauth vocabulary: {source}")]
+    OAuthVocabulary {
+        #[from]
+        source: OAuthVocabularyCodegenError,
+    },
+
     #[error("failed to read the oauth clients: {source}")]
     OAuthClient {
         #[from]
@@ -91,6 +101,29 @@ pub enum CodegenError {
         #[from]
         source: OidcProviderCodegenError,
     },
+
+    #[error("failed to read the sessions: {source}")]
+    Sessions {
+        #[from]
+        source: SessionsCodegenError,
+    },
+
+    #[error("failed to read the session endpoints: {source}")]
+    SessionEndpoints {
+        #[from]
+        source: SessionEndpointsCodegenError,
+    },
+
+    #[error("failed to read the sign-in endpoints: {source}")]
+    SignInEndpoints {
+        #[from]
+        source: SignInEndpointsCodegenError,
+    },
+
+    #[error(
+        "the framework handler '{handler}' serving the route '{route}' is not planned in the dependency container"
+    )]
+    UnplannedFrameworkResponder { handler: String, route: String },
 
     #[error("failed to collect the tags: {source}")]
     Tag {

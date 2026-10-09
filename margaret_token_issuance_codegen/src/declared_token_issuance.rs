@@ -69,19 +69,17 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_declared_tag_audience_and_issuer() {
+    fn reads_the_declared_tag_and_issuer() {
         read(
-            "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n",
+            "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n",
             |read| {
                 assert!(matches!(
                     read,
                     Ok(DeclaredTokenIssuance::Declared(TokenIssuanceDeclaration {
                         anchor,
-                        audience,
                         issuer,
                         tag,
                     })) if anchor.canonical_path().to_string() == "crate::Issuer"
-                        && audience.as_str() == "session"
                         && issuer.as_str() == "https://issuer.example"
                         && tag.to_string() == "provider"
                 ));
@@ -102,7 +100,7 @@ mod tests {
     #[test]
     fn rejects_a_declaration_without_a_tag() {
         assert!(matches!(
-            rejection("audience = \"session\", issuer = \"https://issuer.example\""),
+            rejection("issuer = \"https://issuer.example\""),
             TokenIssuanceCodegenError::MissingTag { anchor } if anchor == "crate::Issuer"
         ));
     }
@@ -110,7 +108,7 @@ mod tests {
     #[test]
     fn rejects_a_tag_that_is_not_a_plain_name() {
         assert!(matches!(
-            rejection("own::provider, audience = \"session\", issuer = \"https://issuer.example\""),
+            rejection("own::provider, issuer = \"https://issuer.example\""),
             TokenIssuanceCodegenError::MalformedTag { anchor } if anchor == "crate::Issuer"
         ));
     }
@@ -118,7 +116,7 @@ mod tests {
     #[test]
     fn rejects_two_declarations_of_the_token_issuance() {
         read(
-            "#[issues_tokens(provider, audience = \"a\", issuer = \"https://a.example\")]\npub struct First;\n#[issues_tokens(provider, audience = \"b\", issuer = \"https://b.example\")]\npub struct Second;\n",
+            "#[issues_tokens(provider, issuer = \"https://a.example\")]\npub struct First;\n#[issues_tokens(provider, issuer = \"https://b.example\")]\npub struct Second;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -130,44 +128,9 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_declaration_without_an_audience() {
-        assert!(matches!(
-            rejection("provider, issuer = \"https://issuer.example\""),
-            TokenIssuanceCodegenError::MissingAudience { anchor } if anchor == "crate::Issuer"
-        ));
-    }
-
-    #[test]
-    fn rejects_an_audience_that_is_not_a_string() {
-        assert!(matches!(
-            rejection("provider, audience = 5, issuer = \"https://issuer.example\""),
-            TokenIssuanceCodegenError::AttributeArguments(
-                AttributeArgumentsError::UnexpectedArgument { key, .. }
-            ) if key == "audience"
-        ));
-    }
-
-    #[test]
-    fn rejects_an_empty_audience() {
-        assert!(matches!(
-            rejection("provider, audience = \"\", issuer = \"https://issuer.example\""),
-            TokenIssuanceCodegenError::EmptyAudience { anchor } if anchor == "crate::Issuer"
-        ));
-    }
-
-    #[test]
-    fn rejects_a_session_audience_naming_the_issuer() {
-        assert_eq!(
-            rejection("provider, audience = \"https://issuer.example\", issuer = \"https://issuer.example\"")
-                .to_string(),
-            "#[issues_tokens] on 'crate::Issuer' declares the session audience 'https://issuer.example', which names its own issuer, so the tokens the provider addresses to the issuer would pass as sessions"
-        );
-    }
-
-    #[test]
     fn rejects_a_declaration_without_an_issuer() {
         assert!(matches!(
-            rejection("provider, audience = \"session\""),
+            rejection("provider"),
             TokenIssuanceCodegenError::MissingIssuer { anchor } if anchor == "crate::Issuer"
         ));
     }
@@ -175,7 +138,7 @@ mod tests {
     #[test]
     fn rejects_an_issuer_that_is_not_a_string() {
         assert!(matches!(
-            rejection("provider, audience = \"session\", issuer = issuer"),
+            rejection("provider, issuer = issuer"),
             TokenIssuanceCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnexpectedArgument { key, .. }
             ) if key == "issuer"
@@ -185,7 +148,7 @@ mod tests {
     #[test]
     fn rejects_an_issuer_over_plain_http() {
         assert!(matches!(
-            rejection("provider, audience = \"session\", issuer = \"http://issuer.example\""),
+            rejection("provider, issuer = \"http://issuer.example\""),
             TokenIssuanceCodegenError::MalformedIssuer { anchor, .. } if anchor == "crate::Issuer"
         ));
     }
@@ -193,7 +156,7 @@ mod tests {
     #[test]
     fn rejects_an_unrecognized_argument() {
         assert!(matches!(
-            rejection("provider, audience = \"session\", issuer = \"https://issuer.example\", lifetime = 5"),
+            rejection("provider, issuer = \"https://issuer.example\", lifetime = 5"),
             TokenIssuanceCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnrecognizedArgument { argument, .. }
             ) if argument == "lifetime"
@@ -213,7 +176,7 @@ mod tests {
     #[test]
     fn rejects_a_declaration_that_is_not_anchored_by_a_struct() {
         read(
-            "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub enum Issuer { Only }\n",
+            "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub enum Issuer { Only }\n",
             |read| {
                 assert!(matches!(
                     read,

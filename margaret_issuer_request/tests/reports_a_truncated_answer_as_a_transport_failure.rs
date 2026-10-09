@@ -13,7 +13,7 @@ async fn reports_a_truncated_answer_as_a_transport_failure() {
     let server = TruncatedResponseServer::start(fixture.server_config.clone()).await;
     let client = IssuerRequestClient::build(fixture_client_builder(&fixture.certificate_authority))
         .expect("the issuer request client builds");
-    let request = Request::new(Method::POST, fixture.url(server.port(), "/token"));
+    let request = Request::new(Method::POST, fixture.url(server.address().port(), "/token"));
 
     assert!(matches!(
         client.exchange(request).await,

@@ -1,3 +1,4 @@
+use margaret_oauth_client_codegen::oauth_client_credentials::OAuthClientCredentials;
 use margaret_oauth_client_codegen::oauth_client_declaration::OAuthClientDeclaration;
 use margaret_oauth_vocabulary::client_id::ClientId;
 
@@ -6,6 +7,7 @@ use crate::bound_sign_in::BoundSignIn;
 
 pub struct OAuthClientBinding<'declarations, 'index> {
     pub client: &'declarations OAuthClientDeclaration<'index>,
+    pub credentials: OAuthClientCredentials<'declarations>,
     pub server: BoundAuthorizationServer<'declarations, 'index>,
     pub sign_in: BoundSignIn<'declarations>,
 }

@@ -71,7 +71,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     let continuation_return = quote! { return ::std::result::Result::Ok(response) };
     let error_return = quote! {
         return ::std::result::Result::Err(
-            margaret::framework::http::handler_error::HandlerError::consumer(error),
+            margaret::framework::handler_error::handler_error::HandlerError::consumer(error),
         )
     };
     let provider_access = TokenStream::new();
@@ -111,11 +111,11 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
                 #next_binding: margaret::framework::http::next::Next,
             ) -> ::std::result::Result<
                 margaret::framework::http::response_continuation::ResponseContinuation,
-                margaret::framework::http::handler_error::HandlerError,
+                margaret::framework::handler_error::handler_error::HandlerError,
             > {
                 #(#extractions)*
                 #process_call
-                    .map_err(margaret::framework::http::handler_error::HandlerError::consumer)
+                    .map_err(margaret::framework::handler_error::handler_error::HandlerError::consumer)
             }
         }
     }

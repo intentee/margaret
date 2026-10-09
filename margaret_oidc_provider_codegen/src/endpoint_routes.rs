@@ -2,17 +2,22 @@ use std::collections::BTreeSet;
 
 use url::Url;
 
-use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_container::container_bindings::ContainerBindings;
-use margaret_http_codegen::route_location::RouteLocation;
 use margaret_oidc_discovery::oidc_discovery_url::oidc_discovery_url;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
+use margaret_route_parameter_codegen::literal_route_path::LiteralRoutePath;
+use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
+use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
 
+use crate::consent_page::ConsentPage;
+use crate::declared_consent::DeclaredConsent;
+use crate::declared_consent_route::DeclaredConsentRoute;
+use crate::declared_endpoint_routes::DeclaredEndpointRoutes;
+use crate::derived_authorization::DerivedAuthorization;
 use crate::derived_endpoint::DerivedEndpoint;
+use crate::located_route::LocatedRoute;
 use crate::oidc_provider_codegen_error::OidcProviderCodegenError;
-use crate::oidc_provider_item::OidcProviderItem;
-use crate::oidc_provider_item_path::oidc_provider_item_path;
 use crate::provider_endpoint::ProviderEndpoint;
+use crate::served_authorization::ServedAuthorization;
 
 fn located_at_issuer(issuer: &IssuerIdentifier, path: &str) -> Url {
     let mut located = issuer.url().clone();
@@ -23,70 +28,42 @@ fn located_at_issuer(issuer: &IssuerIdentifier, path: &str) -> Url {
 }
 
 pub(crate) struct EndpointRoutes<'plan> {
-    pub(crate) bindings: &'plan ContainerBindings,
-    pub(crate) locations: &'plan [RouteLocation<'plan>],
+    pub(crate) marked: &'plan DeclaredEndpointRoutes,
 }
 
 impl<'plan> EndpointRoutes<'plan> {
-    pub(crate) fn path(
-        &self,
-        endpoint: ProviderEndpoint,
-        server: &str,
-    ) -> Result<String, OidcProviderCodegenError> {
-        let mut paths = BTreeSet::new();
-
-        for location in self
-            .serving(endpoint)
-            .into_iter()
-            .filter(|location| location.server == server)
-        {
-            let path = location.path.pattern();
-
-            if !endpoint.admits(location.method) {
-                return Err(OidcProviderCodegenError::EndpointRouteMethod {
-                    endpoint,
-                    method: location.method,
-                    path: path.to_string(),
-                });
-            }
-
-            if location.path.parameters().next().is_some() {
-                return Err(OidcProviderCodegenError::ParameterizedEndpointRoute {
-                    endpoint,
-                    path: path.to_string(),
-                });
-            }
-
-            paths.insert(path.to_string());
-        }
-
-        match paths.first() {
-            Some(path) if paths.len() == 1 => Ok(path.clone()),
-            Some(_) => Err(OidcProviderCodegenError::AmbiguousEndpointRoute {
-                endpoint,
-                paths: paths.into_iter().collect(),
-                server: server.to_string(),
-            }),
-            None => Err(OidcProviderCodegenError::MissingEndpointRoute {
-                endpoint,
-                server: server.to_string(),
-            }),
-        }
-    }
-
-    pub(crate) fn consent(
+    pub(crate) fn authorization(
         &self,
         capable: &[ProviderEndpoint],
-    ) -> Result<(), OidcProviderCodegenError> {
-        let served = self.serves(&oidc_provider_item_path(OidcProviderItem::ConsentEndpoint));
-        let authorization = capable.contains(&ProviderEndpoint::Authorization);
+        server: &str,
+        issuer: &IssuerIdentifier,
+        sessions: &DeclaredSessions,
+    ) -> Result<DerivedAuthorization, OidcProviderCodegenError> {
+        match self.optional(ProviderEndpoint::Authorization, capable, server, issuer)? {
+            DerivedEndpoint::Served(url) => {
+                let consent = self.consent_page(server)?;
 
-        if authorization == served {
-            Ok(())
-        } else if authorization {
-            Err(OidcProviderCodegenError::MissingConsentRoute)
-        } else {
-            Err(OidcProviderCodegenError::UnconsumedConsentRoute)
+                match sessions {
+                    DeclaredSessions::Issued(_) => {
+                        Ok(DerivedAuthorization::Served(ServedAuthorization {
+                            consent,
+                            url,
+                        }))
+                    }
+                    DeclaredSessions::Absent | DeclaredSessions::Consumed(_) => {
+                        Err(OidcProviderCodegenError::AuthorizationWithoutSessions)
+                    }
+                }
+            }
+            DerivedEndpoint::Unserved => match self.marked.consent {
+                DeclaredConsent::Declared(_) => {
+                    Err(OidcProviderCodegenError::UnconsumedEndpointRoute {
+                        capability: ProviderEndpoint::Consent.capability(),
+                        endpoint: ProviderEndpoint::Consent,
+                    })
+                }
+                DeclaredConsent::Undeclared => Ok(DerivedAuthorization::Unserved),
+            },
         }
     }
 
@@ -106,16 +83,6 @@ impl<'plan> EndpointRoutes<'plan> {
                 path,
             })
         }
-    }
-
-    pub(crate) fn url(
-        &self,
-        endpoint: ProviderEndpoint,
-        server: &str,
-        issuer: &IssuerIdentifier,
-    ) -> Result<String, OidcProviderCodegenError> {
-        self.path(endpoint, server)
-            .map(|path| located_at_issuer(issuer, &path).to_string())
     }
 
     pub(crate) fn optional(
@@ -153,22 +120,102 @@ impl<'plan> EndpointRoutes<'plan> {
         }
     }
 
-    pub(crate) fn serves(&self, handler: &CanonicalPath) -> bool {
-        self.locations.iter().any(|location| {
-            self.bindings
-                .depends_directly_on(location.responder_path, handler)
-        })
-    }
-
-    pub(crate) fn serving(&self, endpoint: ProviderEndpoint) -> Vec<&'plan RouteLocation<'plan>> {
-        let handler = endpoint.handler_path();
-
-        self.locations
+    pub(crate) fn serving(&self, endpoint: ProviderEndpoint) -> Vec<LocatedRoute<'plan>> {
+        self.marked
+            .routes
             .iter()
-            .filter(|location| {
-                self.bindings
-                    .depends_directly_on(location.responder_path, &handler)
+            .filter(|marked| marked.endpoint == endpoint)
+            .map(|marked| LocatedRoute {
+                path: &marked.path,
+                server: &marked.server,
             })
             .collect()
+    }
+
+    pub(crate) fn url(
+        &self,
+        endpoint: ProviderEndpoint,
+        server: &str,
+        issuer: &IssuerIdentifier,
+    ) -> Result<String, OidcProviderCodegenError> {
+        self.path(endpoint, server)
+            .map(|path| located_at_issuer(issuer, &path).to_string())
+    }
+
+    fn consent_page(&self, server: &str) -> Result<ConsentPage, OidcProviderCodegenError> {
+        let DeclaredConsent::Declared(DeclaredConsentRoute {
+            path,
+            route,
+            server: consent_server,
+            view,
+            ..
+        }) = &self.marked.consent
+        else {
+            return Err(OidcProviderCodegenError::MissingEndpointRoute {
+                endpoint: ProviderEndpoint::Consent,
+                server: server.to_string(),
+            });
+        };
+
+        if consent_server != server {
+            return Err(OidcProviderCodegenError::ConsentRouteOnForeignServer {
+                provider_server: server.to_string(),
+                route: route.to_string(),
+                server: consent_server.clone(),
+            });
+        }
+
+        match path.literal() {
+            LiteralRoutePath::Literal(path) => Ok(ConsentPage {
+                decision: RouteUrlInput {
+                    path,
+                    server: consent_server.clone(),
+                },
+                view: view.clone(),
+            }),
+            LiteralRoutePath::Parameterized => {
+                Err(OidcProviderCodegenError::ParameterizedEndpointRoute {
+                    endpoint: ProviderEndpoint::Consent,
+                    path: path.pattern().to_string(),
+                })
+            }
+        }
+    }
+
+    fn path(
+        &self,
+        endpoint: ProviderEndpoint,
+        server: &str,
+    ) -> Result<String, OidcProviderCodegenError> {
+        let mut paths = BTreeSet::new();
+
+        for location in self
+            .serving(endpoint)
+            .into_iter()
+            .filter(|location| location.server == server)
+        {
+            match location.path.literal() {
+                LiteralRoutePath::Literal(literal) => paths.insert(literal),
+                LiteralRoutePath::Parameterized => {
+                    return Err(OidcProviderCodegenError::ParameterizedEndpointRoute {
+                        endpoint,
+                        path: location.path.pattern().to_string(),
+                    });
+                }
+            };
+        }
+
+        match paths.first() {
+            Some(path) if paths.len() == 1 => Ok(path.clone()),
+            Some(_) => Err(OidcProviderCodegenError::AmbiguousEndpointRoute {
+                endpoint,
+                paths: paths.into_iter().collect(),
+                server: server.to_string(),
+            }),
+            None => Err(OidcProviderCodegenError::MissingEndpointRoute {
+                endpoint,
+                server: server.to_string(),
+            }),
+        }
     }
 }

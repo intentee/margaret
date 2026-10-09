@@ -68,7 +68,6 @@ pub struct JwksSecret {
     next: JwkPair,
     public_jwks: PublicJwks,
     published_key_set: VerificationKeySet,
-    refresh_key_set: VerificationKeySet,
     retention: KeyRetention,
     retired: Vec<RetiredKey>,
     rolled_at: NumericDate,
@@ -88,16 +87,11 @@ impl JwksSecret {
             rsa,
         }: JwksSecretParts,
     ) -> Result<Self, JwksKeyError> {
-        let token_entries: Vec<KeyEntry> = [pair_entry(&current), pair_entry(&next)]
+        let retired: Vec<RetiredKey> = retired
             .into_iter()
-            .chain(
-                retired
-                    .iter()
-                    .filter(|retired| retired.outlives(retention.token, rolled_at))
-                    .map(retired_entry),
-            )
+            .filter(|retired| retired.outlives(retention.token, rolled_at))
             .collect();
-        let refresh_entries: Vec<KeyEntry> = [pair_entry(&current), pair_entry(&next)]
+        let token_entries: Vec<KeyEntry> = [pair_entry(&current), pair_entry(&next)]
             .into_iter()
             .chain(retired.iter().map(retired_entry))
             .collect();
@@ -108,7 +102,6 @@ impl JwksSecret {
             .chain(rsa.retired().iter().map(retired_entry))
             .collect();
         let token_key_set = assembled(&token_entries)?;
-        let refresh_key_set = assembled(&refresh_entries)?;
         let published_key_set = assembled(&published_entries)?;
         let public_jwks = PublicJwks::new(
             published_entries
@@ -123,7 +116,6 @@ impl JwksSecret {
             next,
             public_jwks,
             published_key_set,
-            refresh_key_set,
             retention,
             retired,
             rolled_at,
@@ -184,11 +176,6 @@ impl JwksSecret {
     }
 
     #[must_use]
-    pub fn refresh_key_set(&self) -> &VerificationKeySet {
-        &self.refresh_key_set
-    }
-
-    #[must_use]
     pub fn retired(&self) -> &[RetiredKey] {
         &self.retired
     }
@@ -218,12 +205,7 @@ impl JwksSecret {
                             self.current.verification_key().clone(),
                             now,
                         ))
-                        .chain(
-                            self.retired
-                                .iter()
-                                .filter(|retired| retired.outlives(self.retention.refresh, now))
-                                .cloned(),
-                        )
+                        .chain(self.retired.iter().cloned())
                         .collect(),
                         rolled_at: now,
                         rsa,

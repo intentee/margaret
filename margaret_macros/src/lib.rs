@@ -11,12 +11,14 @@ use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 use margaret_item_naming_argument::render_item_references::render_item_references;
+use margaret_item_naming_argument::render_positional_variant_references::render_positional_variant_references;
 
-const REQUEST_BINDING_MARKERS: [&str; 4] = [
+const REQUEST_BINDING_MARKERS: [&str; 5] = [
     "authenticated_user",
     "route_parameter",
     "form_request",
     "bearer_token",
+    "session",
 ];
 
 fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str]) {
@@ -89,6 +91,24 @@ fn referencing_named_items_or_compile_error(
                 let references = render_item_references(&arguments, item_naming_arguments);
 
                 quote!(#item #references)
+            })
+            .map_err(|error| argument_error(&error)),
+    )
+}
+
+fn referencing_positional_variant_or_compile_error(
+    attribute_path: &str,
+    attributes: proc_macro2::TokenStream,
+    item: &proc_macro2::TokenStream,
+    item_naming_arguments: &[ItemNamingArgument],
+) -> proc_macro2::TokenStream {
+    or_compile_error(
+        AttributeArgs::from_argument_tokens(attribute_path.to_string(), attributes)
+            .map(|arguments| {
+                let variants = render_positional_variant_references(&arguments);
+                let items = render_item_references(&arguments, item_naming_arguments);
+
+                quote!(#item #variants #items)
             })
             .map_err(|error| argument_error(&error)),
     )
@@ -262,14 +282,14 @@ pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn acts_as_oauth_client(attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn oauth_client(attributes: TokenStream, item: TokenStream) -> TokenStream {
     referencing_named_items(
-        "acts_as_oauth_client",
+        "oauth_client",
         attributes,
         item,
         &[
             ItemNamingArgument::ClientAuthentication,
-            ItemNamingArgument::RedirectRoute,
+            ItemNamingArgument::Scopes,
         ],
     )
 }
@@ -287,8 +307,19 @@ pub fn admits_oauth_client(attributes: TokenStream, item: TokenStream) -> TokenS
             ItemNamingArgument::Consent,
             ItemNamingArgument::IdTokenSigning,
             ItemNamingArgument::RedirectRoutes,
+            ItemNamingArgument::Scopes,
         ],
     )
+}
+
+#[proc_macro_attribute]
+pub fn consumes_sessions(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn admits_sign_in(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
 }
 
 #[proc_macro_attribute]
@@ -302,7 +333,22 @@ pub fn issues_resource_tokens(_attributes: TokenStream, item: TokenStream) -> To
 }
 
 #[proc_macro_attribute]
+pub fn issues_sessions(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "issues_sessions",
+        attributes,
+        item,
+        &[ItemNamingArgument::Cookies],
+    )
+}
+
+#[proc_macro_attribute]
 pub fn issues_tokens(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn oauth_scope(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
@@ -312,8 +358,46 @@ pub fn postgres_database(_attributes: TokenStream, item: TokenStream) -> TokenSt
 }
 
 #[proc_macro_attribute]
+pub fn provides_userinfo_claims(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
 pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
+}
+
+#[proc_macro_attribute]
+pub fn serves_oidc_endpoint(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_positional_variant_or_compile_error(
+        "serves_oidc_endpoint",
+        attributes.into(),
+        &item.into(),
+        &[ItemNamingArgument::View],
+    )
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn serves_session_endpoint(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_positional_variant_or_compile_error(
+        "serves_session_endpoint",
+        attributes.into(),
+        &item.into(),
+        &[ItemNamingArgument::LandingRoute],
+    )
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn serves_sign_in(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_positional_variant_or_compile_error(
+        "serves_sign_in",
+        attributes.into(),
+        &item.into(),
+        &[ItemNamingArgument::LandingRoute],
+    )
+    .into()
 }
 
 #[proc_macro_attribute]
@@ -389,6 +473,7 @@ mod tests {
 
     use super::eager_load_or_compile_error;
     use super::referencing_named_items_or_compile_error;
+    use super::referencing_positional_variant_or_compile_error;
     use super::strip_or_compile_error;
     use super::strip_struct_or_compile_error;
 
@@ -760,6 +845,40 @@ mod tests {
 
         assert!(output.starts_with("structAccountProvider;"));
         assert!(output.contains("::core::marker::PhantomData<Account>"));
+    }
+
+    #[test]
+    fn references_the_positional_variant_and_the_items_it_names() {
+        let output: String = referencing_positional_variant_or_compile_error(
+            "serves_session_endpoint",
+            quote!(SessionEndpoint::SignOut(landing_route = GetWelcome)),
+            &quote!(
+                struct PostSignOut;
+            ),
+            &[ItemNamingArgument::LandingRoute],
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
+
+        assert!(output.starts_with("structPostSignOut;"));
+        assert!(output.contains("let_=&SessionEndpoint::SignOut;"));
+        assert!(output.contains("::core::marker::PhantomData<GetWelcome>"));
+    }
+
+    #[test]
+    fn turns_malformed_endpoint_arguments_into_a_compile_error() {
+        let output = referencing_positional_variant_or_compile_error(
+            "serves_oidc_endpoint",
+            quote!(= 5),
+            &quote!(
+                struct PostToken;
+            ),
+            &[ItemNamingArgument::View],
+        )
+        .to_string();
+
+        assert!(output.contains("compile_error"));
     }
 
     #[test]

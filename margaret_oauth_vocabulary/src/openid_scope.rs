@@ -1,1 +1,7 @@
-pub const OPENID_SCOPE: &str = "openid";
+use crate::declared_scope::DeclaredScope;
+
+pub struct OpenidScope;
+
+impl DeclaredScope for OpenidScope {
+    const NAME: &'static str = "openid";
+}

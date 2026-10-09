@@ -5,7 +5,6 @@ members = [
     "margaret_accepted_clients",
     "margaret_accepted_clients_codegen",
     "margaret_accepted_clients_tests",
-    "margaret_access_token_minter",
     "margaret_active_record",
     "margaret_active_record_codegen",
     "margaret_active_record_tests",
@@ -20,6 +19,7 @@ members = [
     "margaret_authorization_server_client_tests",
     "margaret_bearer_token_verification",
     "margaret_bearer_token_verification_tests",
+    "margaret_claims_merge",
     "margaret_client_assertions",
     "margaret_client_assertions_tests",
     "margaret_client_credentials",
@@ -30,6 +30,7 @@ members = [
     "margaret_codegen_tests",
     "margaret_codegen_tests/tests/fixtures/collisions_and_diamonds",
     "margaret_codegen_tests/tests/fixtures/composite_foreign_key_model",
+    "margaret_codegen_tests/tests/fixtures/consumed_sessions",
     "margaret_codegen_tests/tests/fixtures/copy_console_arguments",
     "margaret_codegen_tests/tests/fixtures/environment_variable_inputs",
     "margaret_codegen_tests/tests/fixtures/fallible_roles",
@@ -42,6 +43,7 @@ members = [
     "margaret_codegen_tests/tests/fixtures/oidc_provider",
     "margaret_codegen_tests/tests/fixtures/route_parameter_values",
     "margaret_codegen_tests/tests/fixtures/self_referential_model",
+    "margaret_codegen_tests/tests/fixtures/sessions",
     "margaret_codegen_tests/tests/fixtures/spiffe_http_client",
     "margaret_codegen_tests/tests/fixtures/websocket_console_argument_provider",
     "margaret_codegen_tests/tests/fixtures/websocket_peer_identity",
@@ -62,6 +64,7 @@ members = [
     "margaret_example",
     "margaret_example_tests",
     "margaret_generated_module",
+    "margaret_handler_error",
     "margaret_http",
     "margaret_http_codegen",
     "margaret_http_tests",
@@ -121,9 +124,15 @@ members = [
     "margaret_schema_postgres_fixture",
     "margaret_schema_postgres_tests",
     "margaret_serve_input_codegen",
+    "margaret_server_origin",
     "margaret_service",
     "margaret_service_codegen",
     "margaret_service_tests",
+    "margaret_session_endpoints_codegen",
+    "margaret_sessions",
+    "margaret_sessions_codegen",
+    "margaret_sessions_tests",
+    "margaret_sign_in_endpoints_codegen",
     "margaret_signing_keys",
     "margaret_signing_keys_tests",
     "margaret_spiffe_svid",
@@ -150,8 +159,6 @@ members = [
     "margaret_token_introspection_tests",
     "margaret_token_issuance",
     "margaret_token_issuance_codegen",
-    "margaret_token_signer",
-    "margaret_token_signer_tests",
     "margaret_token_trust",
     "margaret_toposort",
     "margaret_trusted_issuer",
@@ -241,7 +248,6 @@ zeroize = "1.9"
 margaret = { path = "margaret", version = "0.4.0", default-features = false }
 margaret_accepted_clients = { path = "margaret_accepted_clients", version = "0.1.0" }
 margaret_accepted_clients_codegen = { path = "margaret_accepted_clients_codegen", version = "0.1.0" }
-margaret_access_token_minter = { path = "margaret_access_token_minter", version = "0.1.0" }
 margaret_active_record = { path = "margaret_active_record", version = "0.1.0" }
 margaret_active_record_codegen = { path = "margaret_active_record_codegen", version = "0.1.0" }
 margaret_asset_bag = { path = "margaret_asset_bag", version = "0.1.0" }
@@ -251,6 +257,7 @@ margaret_attributes = { path = "margaret_attributes", version = "0.4.0" }
 margaret_authorization_grants = { path = "margaret_authorization_grants", version = "0.1.0" }
 margaret_authorization_server_client = { path = "margaret_authorization_server_client", version = "0.1.0" }
 margaret_bearer_token_verification = { path = "margaret_bearer_token_verification", version = "0.1.0" }
+margaret_claims_merge = { path = "margaret_claims_merge", version = "0.1.0" }
 margaret_client_assertions = { path = "margaret_client_assertions", version = "0.1.0" }
 margaret_client_credentials = { path = "margaret_client_credentials", version = "0.1.0" }
 margaret_codegen = { path = "margaret_codegen", version = "0.4.0" }
@@ -267,6 +274,7 @@ margaret_declaration_anchor = { path = "margaret_declaration_anchor", version = 
 margaret_environment_variable = { path = "margaret_environment_variable", version = "0.1.0" }
 margaret_environment_variable_codegen = { path = "margaret_environment_variable_codegen", version = "0.4.0" }
 margaret_generated_module = { path = "margaret_generated_module", version = "0.1.0" }
+margaret_handler_error = { path = "margaret_handler_error", version = "0.1.0" }
 margaret_http = { path = "margaret_http", version = "0.1.0" }
 margaret_http_codegen = { path = "margaret_http_codegen", version = "0.4.0" }
 margaret_http_uploaded_file = { path = "margaret_http_uploaded_file", version = "0.1.0" }
@@ -311,8 +319,13 @@ margaret_route_parameter_codegen = { path = "margaret_route_parameter_codegen", 
 margaret_schema_codegen = { path = "margaret_schema_codegen", version = "0.4.0" }
 margaret_schema_identifier_naming = { path = "margaret_schema_identifier_naming", version = "0.4.0" }
 margaret_serve_input_codegen = { path = "margaret_serve_input_codegen", version = "0.4.0" }
+margaret_server_origin = { path = "margaret_server_origin", version = "0.1.0" }
 margaret_service = { path = "margaret_service", version = "0.1.0" }
 margaret_service_codegen = { path = "margaret_service_codegen", version = "0.4.0" }
+margaret_session_endpoints_codegen = { path = "margaret_session_endpoints_codegen", version = "0.1.0" }
+margaret_sessions = { path = "margaret_sessions", version = "0.1.0" }
+margaret_sessions_codegen = { path = "margaret_sessions_codegen", version = "0.1.0" }
+margaret_sign_in_endpoints_codegen = { path = "margaret_sign_in_endpoints_codegen", version = "0.1.0" }
 margaret_signing_keys = { path = "margaret_signing_keys", version = "0.1.0" }
 margaret_spiffe_svid = { path = "margaret_spiffe_svid", version = "0.1.0" }
 margaret_spiffe_svid_bundle = { path = "margaret_spiffe_svid_bundle", version = "0.1.0" }
@@ -329,7 +342,6 @@ margaret_token_exchange_client = { path = "margaret_token_exchange_client", vers
 margaret_token_introspection = { path = "margaret_token_introspection", version = "0.1.0" }
 margaret_token_issuance = { path = "margaret_token_issuance", version = "0.1.0" }
 margaret_token_issuance_codegen = { path = "margaret_token_issuance_codegen", version = "0.1.0" }
-margaret_token_signer = { path = "margaret_token_signer", version = "0.1.0" }
 margaret_token_trust = { path = "margaret_token_trust", version = "0.1.0" }
 margaret_toposort = { path = "margaret_toposort", version = "0.1.0" }
 margaret_trusted_issuer = { path = "margaret_trusted_issuer", version = "0.1.0" }

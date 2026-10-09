@@ -4,6 +4,7 @@ use serde_json::json;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
+use margaret_jwks_secret_store_tests::fixture_issuance::fixture_issuance;
 use margaret_jwks_secret_store_tests::peer_secrets::PeerSecrets;
 use margaret_jwt_verification::attribute_serialized_jwt::attribute_serialized_jwt;
 use margaret_jwt_verification::client_assertion_profile::ClientAssertionProfile;
@@ -11,7 +12,6 @@ use margaret_jwt_verification::expected_audience::ExpectedAudience;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_registered_claims::numeric_date::NumericDate;
-use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
 
 const CLIENT: &str = "portal";
 const TOKEN_ENDPOINT: &str = "https://issuer.example/token";

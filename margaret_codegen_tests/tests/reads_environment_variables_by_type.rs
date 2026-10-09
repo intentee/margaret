@@ -1,12 +1,6 @@
 use margaret_codegen_tests::generate_fixture::generate_fixture;
 use margaret_codegen_tests::generated_module_source::generated_module_source;
 
-struct ModuleSources {
-    construction: String,
-    run: String,
-    serve: String,
-}
-
 fn without_formatting(source: &str) -> String {
     source
         .split_whitespace()
@@ -29,6 +23,12 @@ fn fixture() -> ModuleSources {
             generated_module_source(&generated, "serve").expect("the serve module is generated"),
         ),
     }
+}
+
+struct ModuleSources {
+    construction: String,
+    run: String,
+    serve: String,
 }
 
 #[test]

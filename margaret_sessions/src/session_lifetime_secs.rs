@@ -1,0 +1,1 @@
+pub const SESSION_LIFETIME_SECS: u32 = 259_200;

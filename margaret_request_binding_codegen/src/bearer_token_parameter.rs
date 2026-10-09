@@ -12,7 +12,7 @@ use margaret_syn_type_peeling::paired_generic_arguments::paired_generic_argument
 use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
 use margaret_tag_codegen::bearer_token_addressee::BearerTokenAddressee;
 
-use crate::bound_bearer_tokens::BoundBearerTokens;
+use crate::bound_credentials::BoundCredentials;
 use crate::plain_type_resolution::PlainTypeResolution;
 use crate::request_binding::RequestBinding;
 use crate::request_binding_error::RequestBindingError;
@@ -31,7 +31,7 @@ impl BearerTokenParameter<'_> {
     pub(crate) fn classify(
         &self,
         declared: &Type,
-        bound_bearer_tokens: &mut BoundBearerTokens,
+        bound_credentials: &mut BoundCredentials,
     ) -> Result<RequestBinding, RequestBindingError> {
         let OptionalParameter {
             required,
@@ -46,14 +46,14 @@ impl BearerTokenParameter<'_> {
         match carrier_segment {
             Some(segment) if RequestInjectable::VerifiedJwt.matches(carrier.as_ref(), false) => {
                 if let Some(pair) = paired_generic_arguments(segment) {
-                    return self.verified_jwt(pair, bound_bearer_tokens);
+                    return self.verified_jwt(pair, bound_credentials);
                 }
             }
             Some(segment)
                 if RequestInjectable::IntrospectedToken.matches(carrier.as_ref(), false) =>
             {
                 if let Some(claims) = single_generic_argument(segment) {
-                    return self.introspected_token(claims, bound_bearer_tokens);
+                    return self.introspected_token(claims, bound_credentials);
                 }
             }
             Some(_) | None => {}
@@ -87,14 +87,14 @@ impl BearerTokenParameter<'_> {
     fn introspected_token(
         &self,
         claims: &Type,
-        bound_bearer_tokens: &mut BoundBearerTokens,
+        bound_credentials: &mut BoundCredentials,
     ) -> Result<RequestBinding, RequestBindingError> {
         let BearerTokenAddressee::Client(client) = self.addressee else {
             return Err(self.mismatched_addressee());
         };
         let claims = self.claims(claims)?;
 
-        bound_bearer_tokens.bind_introspected(self.subject)?;
+        bound_credentials.bind_introspected(self.subject)?;
 
         let authorization_server =
             self.container_bindings
@@ -142,7 +142,7 @@ impl BearerTokenParameter<'_> {
             first: claims,
             second: profile,
         }: GenericArgumentPair,
-        bound_bearer_tokens: &mut BoundBearerTokens,
+        bound_credentials: &mut BoundCredentials,
     ) -> Result<RequestBinding, RequestBindingError> {
         let addressee: &Tag = match self.addressee {
             BearerTokenAddressee::Client(_) => return Err(self.mismatched_addressee()),
@@ -151,7 +151,7 @@ impl BearerTokenParameter<'_> {
         let claims = self.claims(claims)?;
         let profile = self.profile(profile)?;
 
-        bound_bearer_tokens.bind_verified_jwt(addressee, self.subject)?;
+        bound_credentials.bind_verified_jwt(addressee, self.subject)?;
 
         let trusted_issuer = self
             .container_bindings

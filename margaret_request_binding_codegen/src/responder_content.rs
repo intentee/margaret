@@ -26,6 +26,7 @@ fn demanded_content(BoundParameter { binding, holder }: &BoundParameter) -> Opti
         | RequestBinding::PeerSpiffeId
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
+        | RequestBinding::Session { .. }
         | RequestBinding::Views => None,
     }
 }

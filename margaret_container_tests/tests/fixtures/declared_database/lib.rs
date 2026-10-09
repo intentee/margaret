@@ -8,7 +8,7 @@ impl Consumer {
     fn create(roller: std::sync::Arc<crate::KeyRoller>) -> anyhow::Result<Self> {}
 }
 
-#[postgres_database(url_from = "KEY_DATABASE_URL")]
+#[postgres_database(url_from = "KEY_DATABASE_URL", max_connections_from = "KEY_DATABASE_MAX_CONNECTIONS")]
 struct KeyDatabase;
 
 pub struct KeyRoller;

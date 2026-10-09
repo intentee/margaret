@@ -1,13 +1,10 @@
 mod adds_a_lifetime_to_a_numeric_date;
+mod includes_a_present_not_before;
 mod keeps_the_issuer_exactly_as_written;
-mod merges_application_claims_into_the_registered_members;
 mod omits_an_absent_issued_at;
 mod rejects_an_empty_audience;
 mod rejects_an_issuer_over_plain_http;
 mod rejects_an_issuer_that_is_not_a_url;
 mod rejects_an_issuer_with_a_fragment;
 mod rejects_an_issuer_with_a_query;
-mod reports_application_claims_colliding_with_a_registered_member;
-mod reports_application_claims_that_are_not_an_object;
-mod reports_application_claims_that_cannot_be_serialized;
 mod saturates_a_lifetime_beyond_the_numeric_date_range;

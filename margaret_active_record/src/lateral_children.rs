@@ -40,12 +40,8 @@ use crate::statement_kind::StatementKind;
 use crate::table_source::table_source;
 
 const PARENTS: TableAlias = TableAlias { position: 0 };
-const CHILDREN: TableAlias = TableAlias { position: 1 };
 
-struct ParentKeys {
-    arrays: Vec<Vec<RawColumn>>,
-    indexes: Vec<i64>,
-}
+const CHILDREN: TableAlias = TableAlias { position: 1 };
 
 fn parent_keys<Child: Loadable>(
     rows: &[Row],
@@ -76,11 +72,6 @@ fn parent_keys<Child: Loadable>(
             })
         },
     )
-}
-
-struct ChildQuery {
-    lateral: TableAlias,
-    select: Select,
 }
 
 fn child_query<Child: Loadable>(
@@ -211,6 +202,16 @@ fn lateral_select<Child: Loadable>(
             })
             .collect(),
     }
+}
+
+struct ParentKeys {
+    arrays: Vec<Vec<RawColumn>>,
+    indexes: Vec<i64>,
+}
+
+struct ChildQuery {
+    lateral: TableAlias,
+    select: Select,
 }
 
 pub(crate) struct LateralChildren<'relation> {

@@ -6,6 +6,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
+use margaret_codegen_tokens::grouped_integer_literal::grouped_integer_literal;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
@@ -14,6 +15,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::fold_layers::fold_layers;
 use margaret_request_binding_codegen::authenticated_user_application::AuthenticatedUserApplication;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
+use margaret_request_binding_codegen::binds_session_user::binds_session_user;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
@@ -28,24 +30,28 @@ use margaret_request_binding_codegen::render_head_extractions::render_head_extra
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 use margaret_route_method::route_method::RouteMethod;
 
+use crate::application_responder::ApplicationResponder;
 use crate::content_method_tokens::content_method_tokens;
+use crate::framework_route::FrameworkRoute;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::route_content::RouteContent;
 use crate::route_group::RouteGroup;
+use crate::route_handling::RouteHandling;
 use crate::route_methods::ROUTE_METHODS;
+use crate::route_responder::RouteResponder;
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
-    injects_routes(&route.arguments)
+    injects_routes(route.arguments())
 }
 
 fn responder_injects_views(route: &HttpRoute) -> bool {
-    injects_views(&route.arguments)
+    injects_views(route.arguments())
 }
 
 fn route_applications(route: &HttpRoute) -> impl Iterator<Item = &AuthenticatedUserApplication> {
-    route.arguments.iter().filter_map(|argument| {
+    route.arguments().iter().filter_map(|argument| {
         let RequestBinding::AuthenticatedUser { application, .. } = &argument.binding else {
             return None;
         };
@@ -74,24 +80,14 @@ fn route_references_views(route: &HttpRoute) -> bool {
         || route.layers.iter().any(|layer| layer.injects_views)
 }
 
-struct HandlerNames {
-    body_binding: Ident,
-    captured: CapturedProviders,
-    content_local: Ident,
-    request_binding: Ident,
-    responder_binding: Ident,
-    routes_local: Ident,
-    views_local: Ident,
-}
-
-fn allocate_handler_names(route: &HttpRoute) -> HandlerNames {
+fn allocate_handler_names(responder: &ApplicationResponder) -> HandlerNames {
     let mut allocator = NameAllocator::new();
 
-    for argument in &route.arguments {
+    for argument in &responder.arguments {
         allocator.reserve(&argument.holder.to_string());
     }
 
-    let request_binding = if route
+    let request_binding = if responder
         .arguments
         .iter()
         .any(|argument| binding_reads_request(&argument.binding))
@@ -100,21 +96,23 @@ fn allocate_handler_names(route: &HttpRoute) -> HandlerNames {
     } else {
         format_ident!("_request")
     };
-    let body_binding = match route.content {
+    let body_binding = match responder.content {
         RouteContent::Read { .. } => format_ident!("{}", allocator.allocate("body").field()),
         RouteContent::Unread { .. } => format_ident!("_body"),
     };
     let content_local = format_ident!("{}", allocator.allocate("content").field());
+    let cookie_changes = format_ident!("{}", allocator.allocate("changed_cookies").field());
 
     let responder_binding = format_ident!("{}", allocator.allocate("responder").field());
     let routes_local = format_ident!("{}", allocator.allocate("routes").field());
     let views_local = format_ident!("{}", allocator.allocate("views").field());
-    let captured = CapturedProviders::capture(&route.arguments, &mut allocator);
+    let captured = CapturedProviders::capture(&responder.arguments, &mut allocator);
 
     HandlerNames {
         body_binding,
         captured,
         content_local,
+        cookie_changes,
         request_binding,
         responder_binding,
         routes_local,
@@ -123,15 +121,15 @@ fn allocate_handler_names(route: &HttpRoute) -> HandlerNames {
 }
 
 fn content_bindings(
-    route: &HttpRoute,
+    responder: &ApplicationResponder,
     body_binding: &Ident,
     content_local: &Ident,
     request_binding: &Ident,
 ) -> TokenStream {
-    match &route.content {
+    match &responder.content {
         RouteContent::Read { binding, limit, .. } => render_content_extraction(
             binding,
-            &route.arguments,
+            &responder.arguments,
             &ContentExtractionContext {
                 body_local: body_binding,
                 content_local,
@@ -142,7 +140,7 @@ fn content_bindings(
                 request_local: request_binding,
                 system_error_return: &quote! {
                     return ::std::result::Result::Err(
-                        margaret::framework::http::handler_error::HandlerError::from(error),
+                        margaret::framework::handler_error::handler_error::HandlerError::from(error),
                     )
                 },
             },
@@ -152,11 +150,13 @@ fn content_bindings(
 }
 
 fn responder_body(
-    route: &HttpRoute,
+    responder: &ApplicationResponder,
+    server: &str,
     HandlerNames {
         body_binding,
         captured,
         content_local,
+        cookie_changes,
         request_binding,
         responder_binding,
         routes_local,
@@ -164,49 +164,92 @@ fn responder_body(
     }: &HandlerNames,
 ) -> TokenStream {
     let head_extractions = render_head_extractions(
-        &route.arguments,
+        &responder.arguments,
         captured,
         &HeadExtractionContext {
             continuation_return: &quote! {
                 return ::std::result::Result::Ok(response)
             },
+            cookie_changes,
             error_return: &quote! {
                 return ::std::result::Result::Err(
-                    margaret::framework::http::handler_error::HandlerError::consumer(error),
+                    margaret::framework::handler_error::handler_error::HandlerError::consumer(error),
                 )
             },
             owner: &TokenStream::new(),
             request_local: request_binding,
         },
     );
-    let server = format_ident!("{}", route.server);
-    let argument_values = route
+    let server = format_ident!("{server}");
+    let argument_values = responder
         .arguments
         .iter()
         .map(|argument| argument_value(argument, routes_local, views_local, &server));
-    let method_name = &route.method_name;
-    let respond_call = if route.is_async {
+    let method_name = &responder.method_name;
+    let respond_call = if responder.is_async {
         quote! { #responder_binding.#method_name(#(#argument_values),*).await }
     } else {
         quote! { #responder_binding.#method_name(#(#argument_values),*) }
     };
-    let content_tokens = content_bindings(route, body_binding, content_local, request_binding);
-    let body = quote! {
+    let content_tokens = content_bindings(responder, body_binding, content_local, request_binding);
+    let changed_cookies = binds_session_user(&responder.arguments)
+        .then(|| quote! { .map(|continuation| #cookie_changes.apply(continuation)) });
+
+    quote! {
         #head_extractions
         #content_tokens
-        margaret::framework::http::responded::responded(#respond_call)
-    };
+        margaret::framework::http::responded::responded(#respond_call)#changed_cookies
+    }
+}
 
-    body
+fn framework_handler(
+    FrameworkRoute { content, handler }: &FrameworkRoute,
+    bindings: &ContainerBindings,
+) -> TokenStream {
+    let handler_access = bindings.accessor_invocation(&format_ident!("container"), &handler.field);
+
+    match content {
+        RouteContent::Read { limit, .. } => {
+            let limit = grouped_integer_literal(limit.get());
+
+            quote! {
+                margaret::framework::http::limited_content_handler::limited_content_handler(
+                    #handler_access,
+                    margaret::framework::http::body_limit::BodyLimit::new(#limit),
+                )
+            }
+        }
+        RouteContent::Unread { .. } => quote! {
+            #handler_access as ::std::sync::Arc<dyn margaret::framework::http::head_handler::HeadHandler>
+        },
+    }
 }
 
 fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
+    let handler = match &route.responder {
+        RouteResponder::Application(responder) => application_handler(route, responder, bindings),
+        RouteResponder::Framework(framework) => framework_handler(framework, bindings),
+    };
+
+    fold_layers(
+        &route.layers,
+        handler,
+        &quote! { super::super::middleware },
+        bindings,
+    )
+}
+
+fn application_handler(
+    route: &HttpRoute,
+    responder: &ApplicationResponder,
+    bindings: &ContainerBindings,
+) -> TokenStream {
     let responder_type = path_tokens(&route.responder_path);
     let responder_access = bindings.accessor_invocation(
         &format_ident!("container"),
-        &route.responder_field.to_string(),
+        &responder.responder_field.to_string(),
     );
-    let names = allocate_handler_names(route);
+    let names = allocate_handler_names(responder);
     let HandlerNames {
         body_binding,
         captured,
@@ -217,14 +260,14 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         ..
     } = &names;
 
-    let body = responder_body(route, &names);
+    let body = responder_body(responder, &route.server, &names);
 
     let captures_routes = responder_injects_routes(route);
     let captures_views = responder_injects_views(route);
     let outcome_future = quote! {
         margaret::framework::http::handler_future::HandlerFuture<'_>
     };
-    let responder_function = match &route.content {
+    let responder_function = match &responder.content {
         RouteContent::Read { .. } => {
             quote! { margaret::framework::http::content_responder::content_responder }
         }
@@ -232,14 +275,14 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
             quote! { margaret::framework::http::head_responder::head_responder }
         }
     };
-    let body_parameter = match &route.content {
+    let body_parameter = match &responder.content {
         RouteContent::Read { .. } => quote! {
             , #body_binding: margaret::framework::http::request_body::RequestBody
         },
         RouteContent::Unread { .. } => TokenStream::new(),
     };
 
-    let handler = if captured.is_empty() && !captures_routes && !captures_views {
+    if captured.is_empty() && !captures_routes && !captures_views {
         quote! {
             #responder_function(
                 #responder_access,
@@ -288,14 +331,7 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
                 )
             }
         }
-    };
-
-    fold_layers(
-        &route.layers,
-        handler,
-        &quote! { super::super::middleware },
-        bindings,
-    )
+    }
 }
 
 fn argument_value(
@@ -343,11 +379,6 @@ fn capture_binding(
     }
 }
 
-struct RenderedHandler {
-    function: Ident,
-    tokens: TokenStream,
-}
-
 fn render_handler(
     route: &HttpRoute,
     position: usize,
@@ -371,11 +402,11 @@ fn render_handler(
         }
     });
     let handler = onion(route, bindings);
-    let handler_kind = match &route.content {
-        RouteContent::Read { .. } => {
+    let handler_kind = match route.handling() {
+        RouteHandling::Content(_) => {
             quote! { margaret::framework::http::content_handler::ContentHandler }
         }
-        RouteContent::Unread { .. } => {
+        RouteHandling::Head(_) => {
             quote! { margaret::framework::http::head_handler::HeadHandler }
         }
     };
@@ -439,9 +470,9 @@ fn route_entries<'handler>(
                         #function(container, #routes_param, #views_argument)
                     };
 
-                    match &route.content {
-                        RouteContent::Read { method, .. } => {
-                            let method = content_method_tokens(*method);
+                    match route.handling() {
+                        RouteHandling::Content(method) => {
+                            let method = content_method_tokens(method);
 
                             quote! {
                                 margaret::framework::http::method_handler::MethodHandler::content(
@@ -450,7 +481,7 @@ fn route_entries<'handler>(
                                 )
                             }
                         }
-                        RouteContent::Unread { method } => match &route.name {
+                        RouteHandling::Head(method) => match &route.name {
                             Some(name) if matches!(method, RouteMethod::Get) => quote! {
                                 margaret::framework::http::method_handler::MethodHandler::forwardable(
                                     #name,
@@ -458,7 +489,7 @@ fn route_entries<'handler>(
                                 )
                             },
                             Some(_) | None => {
-                                let method = ROUTE_METHODS.tokens(*method);
+                                let method = ROUTE_METHODS.tokens(method);
 
                                 quote! {
                                     margaret::framework::http::method_handler::MethodHandler::head(
@@ -544,6 +575,22 @@ fn server_module(
             #body
         }
     }
+}
+
+struct HandlerNames {
+    body_binding: Ident,
+    captured: CapturedProviders,
+    content_local: Ident,
+    cookie_changes: Ident,
+    request_binding: Ident,
+    responder_binding: Ident,
+    routes_local: Ident,
+    views_local: Ident,
+}
+
+struct RenderedHandler {
+    function: Ident,
+    tokens: TokenStream,
 }
 
 pub(crate) fn render(

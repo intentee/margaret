@@ -2,7 +2,6 @@ use reqwest::Client;
 use reqwest::tls::Version;
 
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
-use margaret_issuer_request::issuer_request_error::IssuerRequestError;
 
 #[test]
 fn reports_a_builder_that_openssl_cannot_satisfy() {
@@ -10,6 +9,6 @@ fn reports_a_builder_that_openssl_cannot_satisfy() {
 
     assert!(matches!(
         IssuerRequestClient::build(requires_tls_1_3),
-        Err(IssuerRequestError::ClientBuild { .. })
+        Err(error) if error.is_builder()
     ));
 }

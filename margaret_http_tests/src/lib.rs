@@ -1,4 +1,5 @@
 pub mod content_type_request;
+pub mod cookie_changing_forward_handler;
 pub mod delegating_middleware;
 pub mod echo_bearer_route;
 pub mod echo_peer_route;
@@ -15,6 +16,7 @@ pub mod hanging_handler;
 pub mod issued_certificate;
 pub mod issued_pem_certificate;
 pub mod json_reading_handler;
+pub mod limit_reporting_handler;
 pub mod mtls_client_request;
 pub mod mtls_connect;
 pub mod mtls_fixture;

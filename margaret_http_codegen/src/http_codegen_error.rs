@@ -147,22 +147,18 @@ pub enum HttpCodegenError {
     )]
     InvalidServerName { responder: String, server: String },
 
-    #[error(
-        "the oauth client '{client}' redirects to '{route}', which responds to no HTTP request"
-    )]
-    RedirectRouteNotRouted { client: String, route: String },
+    #[error("'{referrer}' redirects to '{route}', which responds to no HTTP request")]
+    RedirectRouteNotRouted { referrer: String, route: String },
+
+    #[error("'{referrer}' redirects to '{route}', which does not respond to RouteMethod::Get")]
+    RedirectRouteNotGet { referrer: String, route: String },
 
     #[error(
-        "the oauth client '{client}' redirects to '{route}', which does not respond to RouteMethod::Get"
-    )]
-    RedirectRouteNotGet { client: String, route: String },
-
-    #[error(
-        "the oauth client '{client}' redirects to '{route}', whose path '{path}' has parameters a redirect cannot fill"
+        "'{referrer}' redirects to '{route}', whose path '{path}' has parameters a redirect cannot fill"
     )]
     ParameterizedRedirectRoute {
-        client: String,
         path: String,
+        referrer: String,
         route: String,
     },
 }

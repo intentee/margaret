@@ -4,7 +4,8 @@ use serde::Serialize;
 use serde::Serializer;
 use serde::de::Error;
 
-use crate::openid_scope::OPENID_SCOPE;
+use crate::declared_scope::DeclaredScope;
+use crate::openid_scope::OpenidScope;
 use crate::scope_parsing::ScopeParsing;
 use crate::scope_rejection::ScopeRejection;
 
@@ -28,7 +29,7 @@ impl Scope {
     #[must_use]
     pub fn openid() -> Self {
         Self {
-            value: OPENID_SCOPE.to_string(),
+            value: OpenidScope::NAME.to_string(),
         }
     }
 
@@ -52,7 +53,7 @@ impl Scope {
 
     #[must_use]
     pub fn is_openid(&self) -> bool {
-        self.value == OPENID_SCOPE
+        self.value == OpenidScope::NAME
     }
 }
 

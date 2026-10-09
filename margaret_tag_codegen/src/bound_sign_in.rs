@@ -1,10 +1,11 @@
-use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_oauth_vocabulary::scope::Scope;
+
+use crate::sign_in_callback_routes::SignInCallbackRoutes;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum BoundSignIn<'declarations> {
     Available {
-        redirect_route: &'declarations CanonicalPath,
+        callback_routes: SignInCallbackRoutes<'declarations>,
         scopes: &'declarations [Scope],
     },
     Unavailable,

@@ -5,6 +5,7 @@ pub mod accepted_client_item;
 pub mod accepted_client_item_path;
 pub mod accepted_clients_codegen_error;
 pub mod accepted_clients_module_name;
+pub mod admitted_resource;
 mod client_key_sources;
 mod client_signing_algorithms;
 mod clients_module_name;

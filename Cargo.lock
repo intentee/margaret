@@ -1521,7 +1521,6 @@ version = "0.4.0"
 dependencies = [
  "anyhow",
  "margaret_accepted_clients",
- "margaret_access_token_minter",
  "margaret_active_record",
  "margaret_asset_bag",
  "margaret_authorization_grants",
@@ -1534,6 +1533,7 @@ dependencies = [
  "margaret_construction",
  "margaret_database",
  "margaret_environment_variable",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_http_uploaded_file",
  "margaret_http_validation",
@@ -1561,7 +1561,9 @@ dependencies = [
  "margaret_registered_claims",
  "margaret_route_method",
  "margaret_route_parameter_binding",
+ "margaret_server_origin",
  "margaret_service",
+ "margaret_sessions",
  "margaret_signing_keys",
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_bundle",
@@ -1574,7 +1576,6 @@ dependencies = [
  "margaret_token_exchange_client",
  "margaret_token_introspection",
  "margaret_token_issuance",
- "margaret_token_signer",
  "margaret_token_trust",
  "margaret_trusted_issuer",
  "margaret_validation",
@@ -1582,6 +1583,7 @@ dependencies = [
  "margaret_websocket",
  "margaret_websocket_session",
  "oauth2",
+ "reqwest",
 ]
 
 [[package]]
@@ -1649,26 +1651,9 @@ dependencies = [
  "margaret_oauth_vocabulary",
  "margaret_registered_claims",
  "margaret_sql_identifier",
- "margaret_token_signer_tests",
  "serde_json",
  "tokio",
  "uuid",
-]
-
-[[package]]
-name = "margaret_access_token_minter"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "margaret_http",
- "margaret_jwks_keygen",
- "margaret_jwks_keygen_tests",
- "margaret_jwks_secret_store",
- "margaret_jwks_secret_store_tests",
- "margaret_token_signer",
- "margaret_token_signer_tests",
- "serde",
- "validator",
 ]
 
 [[package]]
@@ -1855,6 +1840,7 @@ dependencies = [
  "headers",
  "http",
  "margaret_authorization_server_client",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_http_tests",
  "margaret_issuer_key_set",
@@ -1871,7 +1857,6 @@ dependencies = [
  "margaret_oauth_vocabulary",
  "margaret_oidc_discovery",
  "margaret_route_method",
- "margaret_token_signer_tests",
  "margaret_token_trust",
  "margaret_trusted_issuer",
  "oauth2",
@@ -1913,12 +1898,20 @@ dependencies = [
  "margaret_jwt_verification",
  "margaret_jwt_verification_tests",
  "margaret_registered_claims",
- "margaret_token_signer_tests",
  "margaret_token_trust",
  "margaret_trusted_issuer",
  "serde_json",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "margaret_claims_merge"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1952,8 +1945,10 @@ name = "margaret_client_credentials"
 version = "0.1.0"
 dependencies = [
  "margaret_authorization_server_client",
+ "margaret_oauth_vocabulary",
  "moka",
  "oauth2",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2015,6 +2010,7 @@ dependencies = [
  "margaret_accepted_clients_tests",
  "margaret_cluster_fixture",
  "margaret_database_tests",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_http_tests",
  "margaret_http_uploaded_file",
@@ -2061,12 +2057,16 @@ dependencies = [
  "margaret_model_codegen",
  "margaret_oauth_client_codegen",
  "margaret_oauth_vocabulary",
+ "margaret_oauth_vocabulary_codegen",
  "margaret_oidc_provider_codegen",
  "margaret_process_tests",
  "margaret_request_binding_codegen",
  "margaret_schema_codegen",
  "margaret_serve_input_codegen",
  "margaret_service_codegen",
+ "margaret_session_endpoints_codegen",
+ "margaret_sessions_codegen",
+ "margaret_sign_in_endpoints_codegen",
  "margaret_sql_identifier",
  "margaret_tag_codegen",
  "margaret_token_issuance_codegen",
@@ -2091,6 +2091,26 @@ dependencies = [
  "tokio",
  "tokio-util",
  "trzcina",
+]
+
+[[package]]
+name = "margaret_codegen_consumed_sessions_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "margaret",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "url",
+ "uuid",
+ "validator",
+ "zeroize",
 ]
 
 [[package]]
@@ -2139,10 +2159,10 @@ dependencies = [
  "clap",
  "margaret",
  "serde",
- "serde_json",
  "tokio",
  "tokio-util",
  "trzcina",
+ "uuid",
 ]
 
 [[package]]
@@ -2210,6 +2230,7 @@ dependencies = [
  "async-trait",
  "clap",
  "margaret",
+ "serde",
  "tokio",
  "tokio-util",
  "trzcina",
@@ -2224,6 +2245,7 @@ dependencies = [
  "chrono",
  "clap",
  "margaret",
+ "maud",
  "serde",
  "serde_json",
  "tokio",
@@ -2251,6 +2273,26 @@ dependencies = [
  "tokio-util",
  "trzcina",
  "validator",
+]
+
+[[package]]
+name = "margaret_codegen_sessions_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "margaret",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "url",
+ "uuid",
+ "validator",
+ "zeroize",
 ]
 
 [[package]]
@@ -2403,6 +2445,7 @@ version = "0.1.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
+ "margaret_attributes_tests",
  "margaret_container",
  "margaret_database_codegen",
  "margaret_environment_variable_codegen",
@@ -2529,6 +2572,7 @@ dependencies = [
  "margaret",
  "margaret_database_tests",
  "margaret_example",
+ "margaret_sessions_tests",
  "tokio",
  "uuid",
 ]
@@ -2542,6 +2586,16 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "margaret_handler_error"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "margaret_http_uploaded_file",
+ "margaret_route_parameter_binding",
  "thiserror 2.0.18",
 ]
 
@@ -2560,6 +2614,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "margaret_handler_error",
  "margaret_http_uploaded_file",
  "margaret_peer_identity",
  "margaret_route_method",
@@ -2578,7 +2633,6 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util",
- "url",
 ]
 
 [[package]]
@@ -2601,6 +2655,7 @@ dependencies = [
  "margaret_route_method",
  "margaret_route_parameter_codegen",
  "margaret_serve_input_codegen",
+ "margaret_sessions_codegen",
  "margaret_tag_codegen",
  "margaret_tag_codegen_tests",
  "margaret_token_issuance_codegen",
@@ -2619,10 +2674,12 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bytes",
+ "cookie",
  "futures-util",
  "http",
  "http-body",
  "http-body-util",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_http_uploaded_file",
  "margaret_peer_identity",
@@ -2654,9 +2711,14 @@ dependencies = [
 name = "margaret_http_validation"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "http",
+ "margaret_handler_error",
  "margaret_http",
+ "margaret_http_tests",
  "margaret_validation",
  "serde",
+ "tokio",
  "validator",
 ]
 
@@ -2673,6 +2735,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_http_tests",
  "margaret_route_method",
@@ -2685,13 +2748,10 @@ name = "margaret_identity_session"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "cookie",
  "margaret_oauth_vocabulary",
  "margaret_registered_claims",
- "margaret_token_issuance",
  "serde",
  "serde_json",
- "thiserror 2.0.18",
  "uuid",
 ]
 
@@ -2748,6 +2808,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "margaret_bearer_token_verification",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_http_tests",
  "margaret_issuer_directory",
@@ -2781,7 +2842,6 @@ dependencies = [
  "margaret_jws_verification",
  "margaret_jwt_verification",
  "margaret_registered_claims",
- "margaret_token_signer_tests",
  "serde",
  "tokio",
 ]
@@ -2915,12 +2975,16 @@ dependencies = [
 name = "margaret_jwks_roller_server"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bytes",
  "chrono",
+ "http",
  "margaret_database",
  "margaret_database_tests",
  "margaret_deadline",
+ "margaret_handler_error",
  "margaret_http",
+ "margaret_http_tests",
  "margaret_jwks_keygen",
  "margaret_jwks_keygen_tests",
  "margaret_jwks_roller",
@@ -2970,11 +3034,8 @@ dependencies = [
  "margaret_jwt_verification",
  "margaret_registered_claims",
  "margaret_token_issuance",
- "margaret_token_signer",
  "serde",
- "serde_json",
  "thiserror 2.0.18",
- "uuid",
 ]
 
 [[package]]
@@ -2983,6 +3044,7 @@ version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
  "bytes",
+ "chrono",
  "margaret_identity_session",
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
@@ -2991,9 +3053,9 @@ dependencies = [
  "margaret_jwks_secret_store",
  "margaret_jws_verification",
  "margaret_jwt_verification",
+ "margaret_jwt_verification_tests",
  "margaret_registered_claims",
- "margaret_token_signer",
- "margaret_token_signer_tests",
+ "margaret_token_issuance",
  "serde",
  "serde_json",
  "tokio",
@@ -3147,12 +3209,14 @@ dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
  "margaret_attributes_tests",
+ "margaret_codegen_tokens",
  "margaret_declaration_anchor",
  "margaret_environment_variable_codegen",
  "margaret_generated_module",
  "margaret_item_naming_argument",
  "margaret_oauth_vocabulary",
  "margaret_oauth_vocabulary_codegen",
+ "margaret_token_issuance_codegen",
  "margaret_umbrella_path",
  "proc-macro2",
  "quote",
@@ -3182,8 +3246,16 @@ dependencies = [
 name = "margaret_oauth_vocabulary_codegen"
 version = "0.1.0"
 dependencies = [
+ "margaret_attribute_arguments",
  "margaret_attributes",
+ "margaret_attributes_tests",
+ "margaret_codegen_tokens",
+ "margaret_declaration_anchor",
+ "margaret_generated_module",
  "margaret_oauth_vocabulary",
+ "quote",
+ "syn 2.0.119",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3201,14 +3273,19 @@ dependencies = [
 name = "margaret_oidc_provider"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "bytes",
  "chrono",
  "futures-util",
  "http",
  "margaret_accepted_clients",
  "margaret_authorization_grants",
+ "margaret_claims_merge",
  "margaret_database",
+ "margaret_handler_error",
  "margaret_http",
+ "margaret_http_validation",
  "margaret_identity_session",
  "margaret_jose_parameters",
  "margaret_jwks_roller_server",
@@ -3217,11 +3294,13 @@ dependencies = [
  "margaret_oauth_vocabulary",
  "margaret_oidc_discovery",
  "margaret_registered_claims",
+ "margaret_sessions",
  "margaret_subject_token_exchange",
  "margaret_token_digest",
  "margaret_token_exchange_client",
  "margaret_token_issuance",
  "margaret_validation",
+ "margaret_views",
  "oauth2",
  "serde",
  "serde_json",
@@ -3235,10 +3314,13 @@ dependencies = [
 name = "margaret_oidc_provider_codegen"
 version = "0.1.0"
 dependencies = [
+ "margaret_attribute_arguments",
  "margaret_attributes",
  "margaret_attributes_tests",
+ "margaret_codegen_tokens",
  "margaret_container",
  "margaret_database_codegen",
+ "margaret_declaration_anchor",
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_jwks_codegen",
@@ -3248,7 +3330,9 @@ dependencies = [
  "margaret_registered_claims",
  "margaret_request_binding_codegen",
  "margaret_route_method",
+ "margaret_route_parameter_codegen",
  "margaret_serve_input_codegen",
+ "margaret_sessions_codegen",
  "margaret_tag_codegen",
  "margaret_tag_codegen_tests",
  "margaret_token_issuance_codegen",
@@ -3267,10 +3351,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bytes",
  "chrono",
+ "cookie",
  "form_urlencoded",
  "headers",
  "http",
+ "http-body-util",
  "margaret",
  "margaret_accepted_clients",
  "margaret_accepted_clients_tests",
@@ -3278,12 +3365,15 @@ dependencies = [
  "margaret_authorization_grants_tests",
  "margaret_authorization_server_client",
  "margaret_bearer_token_verification",
+ "margaret_claims_merge",
  "margaret_client_assertions",
  "margaret_client_credentials",
  "margaret_database",
  "margaret_database_tests",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_http_tests",
+ "margaret_http_uploaded_file",
  "margaret_identity_session",
  "margaret_issuer_directory",
  "margaret_issuer_directory_tests",
@@ -3306,6 +3396,7 @@ dependencies = [
  "margaret_oidc_sign_in_tests",
  "margaret_registered_claims",
  "margaret_route_method",
+ "margaret_sessions",
  "margaret_sql_identifier",
  "margaret_subject_token_exchange",
  "margaret_token_digest",
@@ -3315,6 +3406,8 @@ dependencies = [
  "margaret_token_trust",
  "margaret_trusted_issuer",
  "margaret_validation",
+ "margaret_views",
+ "maud",
  "oauth2",
  "reqwest",
  "serde",
@@ -3331,12 +3424,15 @@ dependencies = [
 name = "margaret_oidc_sign_in"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "aws-lc-rs",
  "base64ct",
  "chrono",
  "cookie",
  "http",
  "margaret_authorization_server_client",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_identity_session",
  "margaret_issuer_key_set",
@@ -3347,6 +3443,7 @@ dependencies = [
  "margaret_oauth_vocabulary",
  "margaret_oidc_discovery",
  "margaret_registered_claims",
+ "margaret_sessions",
  "margaret_token_digest",
  "margaret_token_issuance",
  "margaret_trusted_issuer",
@@ -3354,12 +3451,14 @@ dependencies = [
  "serde",
  "thiserror 2.0.18",
  "url",
+ "uuid",
 ]
 
 [[package]]
 name = "margaret_oidc_sign_in_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "base64ct",
  "chrono",
@@ -3368,6 +3467,8 @@ dependencies = [
  "http",
  "margaret_authorization_server_client",
  "margaret_authorization_server_client_tests",
+ "margaret_database",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_http_tests",
  "margaret_issuer_key_set",
@@ -3386,12 +3487,15 @@ dependencies = [
  "margaret_oidc_sign_in",
  "margaret_registered_claims",
  "margaret_route_method",
+ "margaret_sessions",
+ "margaret_sessions_tests",
  "margaret_trusted_issuer",
  "oauth2",
  "serde",
  "serde_json",
  "tokio",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -3472,11 +3576,13 @@ dependencies = [
  "margaret_oauth_client_codegen",
  "margaret_route_parameter_codegen",
  "margaret_serve_input_codegen",
+ "margaret_sessions_codegen",
  "margaret_syn_type_peeling",
  "margaret_tag_codegen",
  "margaret_tag_codegen_tests",
  "margaret_token_issuance_codegen",
  "margaret_trusted_issuer_codegen",
+ "margaret_umbrella_path",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -3574,10 +3680,19 @@ dependencies = [
  "margaret_environment_variable_codegen",
  "margaret_injection_codegen",
  "margaret_input_weaving",
+ "margaret_umbrella_path",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "margaret_server_origin"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.18",
+ "url",
 ]
 
 [[package]]
@@ -3629,6 +3744,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "margaret_console",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_http_uploaded_file",
  "margaret_process_tests",
@@ -3637,6 +3753,131 @@ dependencies = [
  "tokio",
  "tokio-util",
  "trzcina",
+]
+
+[[package]]
+name = "margaret_session_endpoints_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attribute_arguments",
+ "margaret_attributes",
+ "margaret_attributes_tests",
+ "margaret_declaration_anchor",
+ "margaret_http_codegen",
+ "margaret_route_method",
+ "margaret_serve_input_codegen",
+ "margaret_sessions_codegen",
+ "margaret_token_issuance_codegen",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "margaret_sessions"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "cookie",
+ "futures-util",
+ "http",
+ "margaret_codegen",
+ "margaret_handler_error",
+ "margaret_http",
+ "margaret_http_validation",
+ "margaret_https_url",
+ "margaret_identity_session",
+ "margaret_issuer_key_set",
+ "margaret_issuer_request",
+ "margaret_jwks_secret_store",
+ "margaret_jwt_verification",
+ "margaret_model_facade",
+ "margaret_registered_claims",
+ "margaret_token_digest",
+ "margaret_trusted_issuer",
+ "margaret_validation",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "url",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "margaret_sessions_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attribute_arguments",
+ "margaret_attributes",
+ "margaret_attributes_tests",
+ "margaret_declaration_anchor",
+ "margaret_environment_variable_codegen",
+ "margaret_generated_module",
+ "margaret_registered_claims",
+ "margaret_token_issuance_codegen",
+ "margaret_umbrella_path",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "margaret_sessions_tests"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "cookie",
+ "http",
+ "margaret",
+ "margaret_database_tests",
+ "margaret_handler_error",
+ "margaret_http",
+ "margaret_http_tests",
+ "margaret_identity_session",
+ "margaret_issuer_key_set",
+ "margaret_issuer_request",
+ "margaret_jwks_keygen",
+ "margaret_jwks_keygen_tests",
+ "margaret_jwks_secret_store",
+ "margaret_jwks_secret_store_tests",
+ "margaret_jwt_verification_tests",
+ "margaret_model",
+ "margaret_peer_identity",
+ "margaret_route_method",
+ "margaret_sessions",
+ "margaret_sql_identifier",
+ "margaret_token_digest",
+ "margaret_trusted_issuer",
+ "reqwest",
+ "serde_json",
+ "spiffe",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "margaret_sign_in_endpoints_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_accepted_clients_codegen",
+ "margaret_attribute_arguments",
+ "margaret_attributes",
+ "margaret_attributes_tests",
+ "margaret_declaration_anchor",
+ "margaret_http_codegen",
+ "margaret_oauth_client_codegen",
+ "margaret_oauth_vocabulary",
+ "margaret_oauth_vocabulary_codegen",
+ "margaret_route_method",
+ "margaret_serve_input_codegen",
+ "margaret_sessions_codegen",
+ "margaret_tag_codegen",
+ "margaret_token_issuance_codegen",
+ "margaret_trusted_issuer_codegen",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3917,6 +4158,8 @@ dependencies = [
  "margaret_attributes_tests",
  "margaret_oauth_client_codegen",
  "margaret_oauth_vocabulary",
+ "margaret_oauth_vocabulary_codegen",
+ "margaret_sessions_codegen",
  "margaret_token_issuance_codegen",
  "margaret_trusted_issuer_codegen",
  "syn 2.0.119",
@@ -3930,6 +4173,8 @@ dependencies = [
  "margaret_accepted_clients_codegen",
  "margaret_attributes",
  "margaret_oauth_client_codegen",
+ "margaret_oauth_vocabulary_codegen",
+ "margaret_sessions_codegen",
  "margaret_tag_codegen",
  "margaret_token_issuance_codegen",
  "margaret_trusted_issuer_codegen",
@@ -4017,7 +4262,6 @@ name = "margaret_token_issuance"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "margaret_jwt_verification",
  "margaret_registered_claims",
  "uuid",
 ]
@@ -4036,42 +4280,6 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "margaret_token_signer"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "margaret_identity_session",
- "margaret_jose_parameters",
- "margaret_jwks_keygen",
- "margaret_jwt_verification",
- "margaret_registered_claims",
- "margaret_token_issuance",
- "serde",
-]
-
-[[package]]
-name = "margaret_token_signer_tests"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "margaret_identity_session",
- "margaret_jose_parameters",
- "margaret_jwks_keygen",
- "margaret_jwks_keygen_tests",
- "margaret_jwks_roller",
- "margaret_jws_verification",
- "margaret_jwt_verification",
- "margaret_jwt_verification_tests",
- "margaret_registered_claims",
- "margaret_token_issuance",
- "margaret_token_signer",
- "margaret_token_trust",
- "serde",
- "serde_json",
- "uuid",
 ]
 
 [[package]]
@@ -4203,6 +4411,7 @@ dependencies = [
  "margaret_request_binding_codegen",
  "margaret_route_parameter_codegen",
  "margaret_serve_input_codegen",
+ "margaret_sessions_codegen",
  "margaret_tag_codegen",
  "margaret_tag_codegen_tests",
  "margaret_token_issuance_codegen",
@@ -4230,7 +4439,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "cookie",
  "futures-util",
+ "margaret_handler_error",
  "margaret_http",
  "margaret_http_tests",
  "margaret_http_uploaded_file",

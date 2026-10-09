@@ -71,7 +71,7 @@ fn own_modules(
             &[TrustedIssuerItem::TrustedIssuer],
             &[TrustedIssuerConstant::TokenTrust],
         ),
-        token_trust_module(tag, audience.as_str(), issuer.as_str()),
+        token_trust_module(tag, audience, issuer.as_str()),
     ]
 }
 
@@ -188,8 +188,6 @@ mod tests {
     use margaret_attributes::tag::Tag;
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-    use margaret_registered_claims::audience::Audience;
-    use margaret_registered_claims::audience_parsing::AudienceParsing;
     use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
     use super::render_trusted_issuers;
@@ -285,7 +283,7 @@ mod tests {
         );
     }
 
-    fn own_source(audience: &Audience, name: &str) -> String {
+    fn own_source(audience: &str, name: &str) -> String {
         let issuer: IssuerIdentifier = "https://issuer.example"
             .parse()
             .expect("the issuer is an https url");
@@ -304,28 +302,25 @@ mod tests {
 
     #[test]
     fn declares_an_own_trust_beside_the_declared_trusts() {
-        assert!(matches!(
-            Audience::parse("attachments"),
-            AudienceParsing::Accepted(audience)
-                if own_source(&audience, "trusted_issuers") == "pub mod attachments;\npub mod ci;\n"
-        ));
+        assert_eq!(
+            own_source("attachments", "trusted_issuers"),
+            "pub mod attachments;\npub mod ci;\n"
+        );
     }
 
     #[test]
     fn exports_only_the_trusted_issuer_of_an_own_trust() {
-        assert!(matches!(
-            Audience::parse("attachments"),
-            AudienceParsing::Accepted(audience)
-                if own_source(&audience, "trusted_issuers/attachments") == "pub mod token_trust;\npub use margaret::framework::trusted_issuer::trusted_issuer::TrustedIssuer;\n"
-        ));
+        assert_eq!(
+            own_source("attachments", "trusted_issuers/attachments"),
+            "pub mod token_trust;\npub use margaret::framework::trusted_issuer::trusted_issuer::TrustedIssuer;\n"
+        );
     }
 
     #[test]
     fn renders_the_token_trust_of_an_own_trust() {
-        assert!(matches!(
-            Audience::parse("attachments"),
-            AudienceParsing::Accepted(audience)
-                if own_source(&audience, "trusted_issuers/attachments/token_trust") == "pub const TOKEN_TRUST: margaret::framework::token_trust::token_trust::TokenTrust = margaret::framework::token_trust::token_trust::TokenTrust {\n    audience: \"attachments\",\n    issuer: \"https://issuer.example\",\n};\n"
-        ));
+        assert_eq!(
+            own_source("attachments", "trusted_issuers/attachments/token_trust"),
+            "pub const TOKEN_TRUST: margaret::framework::token_trust::token_trust::TokenTrust = margaret::framework::token_trust::token_trust::TokenTrust {\n    audience: \"attachments\",\n    issuer: \"https://issuer.example\",\n};\n"
+        );
     }
 }

@@ -18,7 +18,6 @@ pub mod jwt_routing;
 pub mod jwt_verification;
 pub mod presented_jwt;
 pub mod profiled_jwt;
-pub mod refresh_token_profile;
 pub mod sign_in_transaction_profile;
 pub mod type_header_expectation;
 pub mod type_rejection;

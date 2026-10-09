@@ -145,7 +145,9 @@ mod tests {
                 requiredness(variable.value.required),
                 variable.value.value_type
             ),
-            ServeInput::RouteUrl(_) | ServeInput::SpiffeHttpClient => input.name().to_string(),
+            ServeInput::RouteUrl(_) | ServeInput::Routes | ServeInput::SpiffeHttpClient => {
+                input.name().to_string()
+            }
         }
     }
 

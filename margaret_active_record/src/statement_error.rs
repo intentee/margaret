@@ -10,6 +10,7 @@ fn state_of(source: &DatabaseError) -> Option<&SqlState> {
         DatabaseError::StatementExecution(error) => error.code(),
         DatabaseError::Begin { .. }
         | DatabaseError::Commit(_)
+        | DatabaseError::MalformedMaxConnections(_)
         | DatabaseError::MalformedUrl(_)
         | DatabaseError::PoolBuild(_)
         | DatabaseError::Rollback(_)

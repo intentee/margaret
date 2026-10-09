@@ -12,10 +12,14 @@ use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::injectable_resolution::InjectableResolution;
+use margaret_container::injected_dependency::InjectedDependency;
 use margaret_container::resolve_injectable::resolve_injectable;
 use margaret_injection_codegen::optional_parameter::OptionalParameter;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
+use margaret_sessions_codegen::sessions_item::SessionsItem;
+use margaret_sessions_codegen::sessions_item_path::sessions_item_path;
+use margaret_tag_codegen::session_source::SessionSource;
 
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
@@ -23,7 +27,8 @@ use crate::bearer_token_marker::BearerTokenMarker;
 use crate::bearer_token_parameter::BearerTokenParameter;
 use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
-use crate::bound_bearer_tokens::BoundBearerTokens;
+use crate::bound_arguments::BoundArguments;
+use crate::bound_credentials::BoundCredentials;
 use crate::bound_parameter::BoundParameter;
 use crate::exclusive_bindings::ExclusiveBindings;
 use crate::form_request_arguments::FormRequestArguments;
@@ -38,6 +43,7 @@ use crate::route_model_resolution::RouteModelResolution;
 use crate::route_parameter_arguments::RouteParameterArguments;
 use crate::route_parameter_lookup::RouteParameterLookup;
 use crate::route_parameter_resolution::RouteParameterResolution;
+use crate::session_marker::SessionMarker;
 use crate::views_availability::ViewsAvailability;
 
 fn forwarder_path(server: &str) -> CanonicalPath {
@@ -377,7 +383,7 @@ fn classify_bearer_token(
     declared: &Type,
     context: &BindingContext,
     position: usize,
-    bound_bearer_tokens: &mut BoundBearerTokens,
+    bound_credentials: &mut BoundCredentials,
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
     let BearerTokenMarker::Scanned {
@@ -399,7 +405,7 @@ fn classify_bearer_token(
         position,
         subject,
     }
-    .classify(declared, bound_bearer_tokens)
+    .classify(declared, bound_credentials)
 }
 
 fn bearer_token_marker<'marker>(
@@ -428,9 +434,95 @@ fn bearer_token_marker<'marker>(
     }
 }
 
+fn session_marker<'marker>(
+    attributes: &'marker [IndexedAttribute],
+    context: &'marker BindingContext,
+) -> Option<SessionMarker<'marker>> {
+    match context {
+        BindingContext::AuthenticatedUserProvider {
+            container_bindings,
+            tags,
+            ..
+        } => tags
+            .session(attributes)
+            .map(|source| SessionMarker::Scanned {
+                container_bindings,
+                source,
+            }),
+        BindingContext::Handshake { .. }
+        | BindingContext::Middleware { .. }
+        | BindingContext::Responder { .. } => attributes
+            .iter()
+            .any(|attribute| attribute.framework_attribute() == Some(FrameworkAttribute::Session))
+            .then_some(SessionMarker::Unavailable),
+    }
+}
+
+fn classify_session(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    marker: SessionMarker,
+    declared: &Type,
+    context: &BindingContext,
+    position: usize,
+    bound_credentials: &mut BoundCredentials,
+) -> Result<RequestBinding, RequestBindingError> {
+    let subject = context.subject();
+    let SessionMarker::Scanned {
+        container_bindings,
+        source,
+    } = marker
+    else {
+        return Err(RequestBindingError::SessionUnavailable {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    };
+    let OptionalParameter {
+        required,
+        value_type,
+    } = OptionalParameter::from_type(index, item, declared);
+
+    if required
+        || !RequestInjectable::Session.matches(
+            index.resolve_item_type(item, &value_type).as_ref(),
+            matches!(value_type, Type::Reference(_)),
+        )
+    {
+        return Err(RequestBindingError::SessionTypeMismatch {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+            written: declared.to_token_stream().to_string(),
+        });
+    }
+
+    bound_credentials.bind_session(subject)?;
+
+    let sessions = sessions_item_path(match source {
+        SessionSource::Consumed => SessionsItem::ConsumedSessions,
+        SessionSource::Issued => SessionsItem::IssuedSessions,
+    });
+    let binding = container_bindings.provider(&sessions).ok_or_else(|| {
+        RequestBindingError::UnplannedSessions {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+            sessions: sessions.to_string(),
+        }
+    })?;
+
+    Ok(RequestBinding::Session {
+        sessions: InjectedDependency {
+            field: binding.field_name.clone(),
+            concrete: sessions,
+        },
+        source,
+    })
+}
+
 fn parameter_marker<'marker>(
     attributes: &'marker [IndexedAttribute],
     bearer_token: Option<BearerTokenMarker<'marker>>,
+    session: Option<SessionMarker<'marker>>,
     subject: &str,
     position: usize,
     is_peer_spiffe_id: bool,
@@ -467,11 +559,24 @@ fn parameter_marker<'marker>(
         });
     }
 
-    if is_peer_spiffe_id
+    if session.is_some()
         && (authenticated_user.is_some()
             || route_parameter.is_some()
             || form_request.is_some()
             || bearer_token.is_some())
+    {
+        return Err(RequestBindingError::ConflictingSessionMarkers {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if is_peer_spiffe_id
+        && (authenticated_user.is_some()
+            || route_parameter.is_some()
+            || form_request.is_some()
+            || bearer_token.is_some()
+            || session.is_some())
     {
         return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
             subject: subject.to_string(),
@@ -487,6 +592,8 @@ fn parameter_marker<'marker>(
         ParameterMarker::BearerToken(bearer_token)
     } else if let Some(attribute) = route_parameter {
         ParameterMarker::RouteParameter(attribute)
+    } else if let Some(session) = session {
+        ParameterMarker::Session(session)
     } else {
         ParameterMarker::Unmarked
     })
@@ -507,44 +614,30 @@ fn classify_next(
     }
 }
 
-enum ParameterMarker<'marker> {
-    AuthenticatedUser,
-    BearerToken(BearerTokenMarker<'marker>),
-    FormRequest(&'marker IndexedAttribute),
-    RouteParameter(&'marker IndexedAttribute),
-    Unmarked,
-}
-
-/// # Errors
-///
-/// Returns `RequestBindingError` propagated from the work it performs.
-pub fn classify_parameters(
+fn classify_parameter(
     index: &AttributeIndex,
     item: &IndexedItem,
-    method: &IndexedMethod,
-    context: &BindingContext,
-    registries: &BindingRegistries,
-) -> Result<Vec<BoundParameter>, RequestBindingError> {
-    let subject = context.subject();
-    let mut bound = Vec::new();
-    let mut exclusive = ExclusiveBindings::default();
-    let mut bound_bearer_tokens = BoundBearerTokens::Unbound;
-    let mut bound_route_parameters = HashSet::new();
-
-    for ParameterView {
+    ParameterView {
         attributes,
         declared,
         position,
         ..
-    } in parameters(method)
-    {
-        let resolved = index.resolve_item_type(item, declared);
-        let is_reference = matches!(declared, Type::Reference(_));
-        let injectable = RequestInjectable::resolve(resolved.as_ref(), is_reference);
-        let is_peer_spiffe_id = matches!(injectable, Some(RequestInjectable::PeerSpiffeId));
-        let binding = match parameter_marker(
+    }: &ParameterView,
+    context: &BindingContext,
+    registries: &BindingRegistries,
+    bound: &mut BoundArguments,
+) -> Result<RequestBinding, RequestBindingError> {
+    let subject = context.subject();
+    let position = *position;
+    let resolved = index.resolve_item_type(item, declared);
+    let is_reference = matches!(declared, Type::Reference(_));
+    let injectable = RequestInjectable::resolve(resolved.as_ref(), is_reference);
+    let is_peer_spiffe_id = matches!(injectable, Some(RequestInjectable::PeerSpiffeId));
+    Ok(
+        match parameter_marker(
             attributes,
             bearer_token_marker(attributes, context),
+            session_marker(attributes, context),
             subject,
             position,
             is_peer_spiffe_id,
@@ -564,11 +657,20 @@ pub fn classify_parameters(
                 declared,
                 context,
                 position,
-                &mut bound_bearer_tokens,
+                &mut bound.credentials,
             )?,
             ParameterMarker::FormRequest(attribute) => {
                 classify_form_request(index, item, attribute, declared, context, position)?
             }
+            ParameterMarker::Session(marker) => classify_session(
+                index,
+                item,
+                marker,
+                declared,
+                context,
+                position,
+                &mut bound.credentials,
+            )?,
             ParameterMarker::RouteParameter(attribute) => classify_route_parameter(
                 context,
                 attribute,
@@ -576,49 +678,83 @@ pub fn classify_parameters(
                 resolved.as_ref(),
                 position,
                 &registries.route_parameters,
-                &mut bound_route_parameters,
+                &mut bound.route_parameters,
             )?,
-            ParameterMarker::Unmarked => {
-                if matches!(injectable, Some(RequestInjectable::Next)) {
-                    classify_next(context, position)?
-                } else if is_peer_spiffe_id {
-                    RequestBinding::PeerSpiffeId
-                } else if matches!(injectable, Some(RequestInjectable::Routes)) {
-                    RequestBinding::Routes
-                } else if matches!(injectable, Some(RequestInjectable::Views)) {
-                    classify_views(context, position, registries.views)?
-                } else if matches!(injectable, Some(RequestInjectable::AssetBag)) {
-                    RequestBinding::AssetBag
-                } else if matches!(injectable, Some(RequestInjectable::CurrentRequest)) {
-                    RequestBinding::CurrentRequest
-                } else if matches!(injectable, Some(RequestInjectable::UploadedFiles)) {
-                    require_responder_context(context, position)?;
-
-                    RequestBinding::UploadedFiles
-                } else if matches!(injectable, Some(RequestInjectable::RequestBodyStream)) {
+            ParameterMarker::Unmarked => match injectable {
+                Some(RequestInjectable::AssetBag) => RequestBinding::AssetBag,
+                Some(RequestInjectable::CurrentRequest) => RequestBinding::CurrentRequest,
+                Some(RequestInjectable::Next) => classify_next(context, position)?,
+                Some(RequestInjectable::PeerSpiffeId) => RequestBinding::PeerSpiffeId,
+                Some(RequestInjectable::RequestBodyStream) => {
                     require_responder_context(context, position)?;
 
                     RequestBinding::RequestBodyStream
-                } else {
-                    classify_context_specific(
-                        index,
-                        item,
-                        declared,
-                        resolved.as_ref(),
-                        is_reference,
-                        context,
-                        position,
-                    )?
                 }
-            }
-        };
+                Some(RequestInjectable::Routes) => RequestBinding::Routes,
+                Some(RequestInjectable::UploadedFiles) => {
+                    require_responder_context(context, position)?;
+
+                    RequestBinding::UploadedFiles
+                }
+                Some(RequestInjectable::Views) => {
+                    classify_views(context, position, registries.views)?
+                }
+                Some(
+                    RequestInjectable::IntrospectedToken
+                    | RequestInjectable::Session
+                    | RequestInjectable::ValidationResult
+                    | RequestInjectable::VerifiedJwt,
+                )
+                | None => classify_context_specific(
+                    index,
+                    item,
+                    declared,
+                    resolved.as_ref(),
+                    is_reference,
+                    context,
+                    position,
+                )?,
+            },
+        },
+    )
+}
+
+enum ParameterMarker<'marker> {
+    AuthenticatedUser,
+    BearerToken(BearerTokenMarker<'marker>),
+    FormRequest(&'marker IndexedAttribute),
+    RouteParameter(&'marker IndexedAttribute),
+    Session(SessionMarker<'marker>),
+    Unmarked,
+}
+
+/// # Errors
+///
+/// Returns `RequestBindingError` propagated from the work it performs.
+pub fn classify_parameters(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    method: &IndexedMethod,
+    context: &BindingContext,
+    registries: &BindingRegistries,
+) -> Result<Vec<BoundParameter>, RequestBindingError> {
+    let subject = context.subject();
+    let mut classified = Vec::new();
+    let mut exclusive = ExclusiveBindings::default();
+    let mut bound = BoundArguments {
+        credentials: BoundCredentials::Unbound,
+        route_parameters: HashSet::new(),
+    };
+
+    for view in parameters(method) {
+        let binding = classify_parameter(index, item, &view, context, registries, &mut bound)?;
 
         exclusive.admit(&binding, subject)?;
-        bound.push(BoundParameter {
+        classified.push(BoundParameter {
             binding,
-            holder: format_ident!("argument_{position}"),
+            holder: format_ident!("argument_{}", view.position),
         });
     }
 
-    Ok(bound)
+    Ok(classified)
 }

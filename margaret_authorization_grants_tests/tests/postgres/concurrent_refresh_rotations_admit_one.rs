@@ -57,13 +57,19 @@ async fn concurrent_refresh_rotations_admit_one() {
         RefreshTokenRecord::lookup(database, rotated[0])
             .await
             .expect("the database finds refresh tokens"),
-        RefreshTokenLookup::Current { family, record }
+        RefreshTokenLookup::Current {
+            family,
+            record: record.clone()
+        }
     );
     assert_eq!(
         RefreshTokenRecord::lookup(database, presented)
             .await
             .expect("the database finds refresh tokens"),
-        RefreshTokenLookup::Superseded { family }
+        RefreshTokenLookup::Superseded {
+            client_id: record.client_id,
+            family
+        }
     );
 
     for raced in raced

@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 use deadpool_postgres::BuildError;
 use deadpool_postgres::PoolError;
 use thiserror::Error;
@@ -15,6 +17,9 @@ pub enum DatabaseError {
 
     #[error("the database does not commit the transaction: {0}")]
     Commit(#[source] tokio_postgres::Error),
+
+    #[error("the maximum number of database connections is malformed: {0}")]
+    MalformedMaxConnections(#[source] ParseIntError),
 
     #[error("the database url is malformed: {0}")]
     MalformedUrl(#[source] tokio_postgres::Error),

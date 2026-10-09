@@ -1,8 +1,12 @@
+mod answers_a_sign_in_start_of_an_undiscovered_provider_as_unavailable;
 mod awaits_the_signing_keys_of_the_issuer;
 mod binds_the_transaction_to_its_authorization_request;
 mod completes_a_sign_in_on_a_peer_one_generation_apart;
 mod describes_every_sign_in_refusal;
 mod fetches_userinfo_of_the_signed_in_subject;
+#[cfg(feature = "tests_that_use_postgres")]
+mod postgres;
+mod redirects_a_sign_in_start_to_the_authorization_endpoint;
 mod redirects_to_the_authorization_endpoint;
 mod refuses_a_callback_with_another_state;
 mod refuses_a_callback_without_a_code;

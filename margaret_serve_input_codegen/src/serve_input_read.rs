@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use margaret_codegen_tokens::routes_ident::routes_ident;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
 use margaret_console_argument_codegen::console_argument_read::console_argument_read;
 use margaret_environment_variable_codegen::environment_variable_read::environment_variable_read;
@@ -14,6 +15,11 @@ pub fn serve_input_read(input: &ServeInput) -> TokenStream {
         ServeInput::ConsoleArgument(argument) => console_argument_read(argument),
         ServeInput::EnvironmentVariable(variable) => environment_variable_read(variable),
         ServeInput::RouteUrl(route) => route_url_read(route),
+        ServeInput::Routes => {
+            let routes = routes_ident();
+
+            quote! { ::std::sync::Arc::clone(&#routes) }
+        }
         ServeInput::SpiffeHttpClient => {
             let spiffe_http_client = spiffe_http_client_ident();
 
@@ -84,6 +90,14 @@ mod tests {
                 server: "public".to_string(),
             }))
             .starts_with("margaret::framework::http::build_url::build_url(&origin_public")
+        );
+    }
+
+    #[test]
+    fn the_routes_share_the_serve_local() {
+        assert_eq!(
+            collapsed(&ServeInput::Routes),
+            "::std::sync::Arc::clone(&routes)"
         );
     }
 

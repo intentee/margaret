@@ -1,6 +1,7 @@
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use oauth2::ClientId;
@@ -14,8 +15,15 @@ use margaret_accepted_clients::confidential_privileges::ConfidentialPrivileges;
 use margaret_accepted_clients::introspection_permission::IntrospectionPermission;
 use margaret_accepted_clients::registered_authentication::RegisteredAuthentication;
 use margaret_accepted_clients::registered_client::RegisteredClient;
+use margaret_handler_error::handler_error::HandlerError;
+use margaret_http::body_limit::BodyLimit;
+use margaret_http::handles_limited_content::HandlesLimitedContent;
+use margaret_http::no_store::no_store;
 use margaret_http::request::Request;
+use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
+use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http_validation::responded_to_form::responded_to_form;
 use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
@@ -25,7 +33,6 @@ use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_validation::validation_result::ValidationResult;
 
 use crate::authenticated_client::authenticated_client;
-use crate::no_store::no_store;
 use crate::oauth_error::oauth_error;
 use crate::provider_error::ProviderError;
 use crate::token_submission::TokenSubmission;
@@ -84,7 +91,7 @@ impl IntrospectionEndpoint {
     ///
     /// Returns `ProviderError::ClientAuthentication` when the client assertion cannot be
     /// remembered.
-    pub async fn respond(
+    async fn respond(
         &self,
         request: &Request,
         submission: ValidationResult<TokenSubmission>,
@@ -148,5 +155,20 @@ impl IntrospectionEndpoint {
                 JwtVerification::Verified(verified) => active_introspection(verified),
             },
         )))
+    }
+}
+
+#[async_trait]
+impl HandlesLimitedContent for IntrospectionEndpoint {
+    async fn handle(
+        &self,
+        request: &Request,
+        body: RequestBody,
+        limit: BodyLimit,
+    ) -> Result<ResponseContinuation, HandlerError> {
+        responded_to_form(request, body, limit, |submission| {
+            self.respond(request, submission)
+        })
+        .await
     }
 }

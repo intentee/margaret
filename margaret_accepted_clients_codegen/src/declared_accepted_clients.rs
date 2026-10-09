@@ -3,6 +3,7 @@ use std::collections::btree_map::Entry;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
+use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
 use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
 use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -51,6 +52,7 @@ impl<'index> DeclaredAcceptedClients<'index> {
         index: &'index AttributeIndex,
         token_issuance: &DeclaredTokenIssuance,
         resources: &DeclaredResourceIssuances,
+        scopes: &DeclaredScopes,
     ) -> Result<Self, AcceptedClientsCodegenError> {
         let mut admitted: BTreeMap<String, AcceptedClientDeclaration<'index>> = BTreeMap::new();
         let mut published: BTreeMap<String, String> = BTreeMap::new();
@@ -61,7 +63,7 @@ impl<'index> DeclaredAcceptedClients<'index> {
                     anchor: matched.item().canonical_path().to_string(),
                 });
             };
-            let client = AcceptedClientDeclaration::read(index, &matched, resources)?;
+            let client = AcceptedClientDeclaration::read(index, &matched, resources, scopes)?;
 
             client.admitted_by(issuance)?;
             publish_keys(&mut published, &client)?;
@@ -97,13 +99,14 @@ impl<'index> DeclaredAcceptedClients<'index> {
 mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_declaration_anchor::declaration_anchor_error::DeclarationAnchorError;
+    use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
     use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use super::DeclaredAcceptedClients;
     use crate::accepted_clients_codegen_error::AcceptedClientsCodegenError;
 
-    const ISSUANCE: &str = "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n#[issues_resource_tokens(reports, audience = \"reports\")]\npub struct Reports;\n";
+    const ISSUANCE: &str = "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n#[issues_resource_tokens(reports, audience = \"reports\")]\npub struct Reports;\n";
 
     fn rejection(source: &str) -> AcceptedClientsCodegenError {
         let indexed = IndexedSource::new(source);
@@ -114,6 +117,7 @@ mod tests {
             &issuance,
             &DeclaredResourceIssuances::read(&indexed.index, &issuance)
                 .expect("the resources are read"),
+            &DeclaredScopes::read(&indexed.index).expect("the scopes are read"),
         )
         .err()
         .expect("the clients are rejected")
@@ -130,6 +134,7 @@ mod tests {
             &issuance,
             &DeclaredResourceIssuances::read(&indexed.index, &issuance)
                 .expect("the resources are read"),
+            &DeclaredScopes::read(&indexed.index).expect("the scopes are read"),
         )
         .expect("the clients are read");
 

@@ -1,5 +1,6 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::injected_dependency::InjectedDependency;
+use margaret_tag_codegen::session_source::SessionSource;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
 use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
@@ -51,6 +52,10 @@ pub enum RequestBinding {
         path_key: String,
     },
     Routes,
+    Session {
+        sessions: InjectedDependency,
+        source: SessionSource,
+    },
     UploadedFiles,
     Views,
 }
@@ -73,6 +78,7 @@ impl RequestBinding {
             | Self::RequestBodyStream
             | Self::RouteParameterValue { .. }
             | Self::Routes
+            | Self::Session { .. }
             | Self::UploadedFiles
             | Self::Views => ExtractionPhase::RequestInput,
         }

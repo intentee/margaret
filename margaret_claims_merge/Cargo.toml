@@ -1,0 +1,23 @@
+[package]
+name = "margaret_claims_merge"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Merging of application claims into the registered JSON web token members of the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+autotests = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

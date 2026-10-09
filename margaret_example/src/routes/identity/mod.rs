@@ -1,4 +1,3 @@
-pub mod authorization_page;
 pub mod get_authorize;
 pub mod get_discovery;
 pub mod get_jwks;

@@ -1,7 +1,10 @@
+use std::num::NonZeroUsize;
+
 use futures_util::future::join_all;
 
 use margaret_database::executor::Executor;
 use margaret_database::isolation::Isolation;
+use margaret_database::max_connections::MaxConnections;
 use margaret_database_tests::started_database::StartedDatabase;
 use margaret_sql::conflict_action::ConflictAction;
 
@@ -15,16 +18,22 @@ const WAITERS: i64 = 3;
 #[tokio::test]
 async fn releases_lock_waiters_together() {
     let started = StartedDatabase::start().await;
+    let database = started
+        .separate_pool_of(MaxConnections {
+            connections: NonZeroUsize::new(
+                usize::try_from(WAITERS + 1).expect("the waiters and the holder fit a pool size"),
+            )
+            .expect("the waiters and the holder need at least one connection"),
+        })
+        .await;
 
     create_probes(&started).await;
-    started
-        .database
+    database
         .affected(&insert_probe(1, 0, ConflictAction::Raise))
         .await
         .expect("the probe is inserted");
 
-    let mut connection = started
-        .database
+    let mut connection = database
         .connection()
         .await
         .expect("a connection is checked out");
@@ -38,9 +47,9 @@ async fn releases_lock_waiters_together() {
         .await
         .expect("the holder locks the probe");
 
-    let database = started.database.as_ref();
+    let waiting = database.as_ref();
     let waiters = join_all((0..WAITERS).map(|amount| async move {
-        database
+        waiting
             .affected(&update_probe_amount(1, 100 + amount))
             .await
     }));
@@ -55,5 +64,5 @@ async fn releases_lock_waiters_together() {
             .into_iter()
             .all(|outcome| outcome.expect("every waiter updates the probe") == 1)
     );
-    assert_eq!(probe_amounts(started.database.as_ref()).await.len(), 1);
+    assert_eq!(probe_amounts(database.as_ref()).await.len(), 1);
 }

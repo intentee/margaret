@@ -5,5 +5,6 @@ pub enum ServeInputKey {
     ConsoleArgument { name: String },
     EnvironmentVariable { name: String },
     RouteUrl(RouteUrlInput),
+    Routes,
     SpiffeHttpClient,
 }

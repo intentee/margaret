@@ -21,12 +21,27 @@ pub enum DatabaseCodegenError {
     Index(#[from] AttributeError),
 
     #[error(
+        "#[postgres_database] on '{anchor}' reads its maximum number of connections from '{name}', which is not an environment variable name"
+    )]
+    MalformedMaxConnectionsSource { anchor: String, name: String },
+
+    #[error(
         "#[postgres_database] on '{anchor}' reads its url from '{name}', which is not an environment variable name"
     )]
     MalformedUrlSource { anchor: String, name: String },
 
     #[error(
+        "#[postgres_database] on '{anchor}' declares no max_connections_from environment variable to read its maximum number of connections from"
+    )]
+    MissingMaxConnectionsSource { anchor: String },
+
+    #[error(
         "#[postgres_database] on '{anchor}' declares no url_from environment variable to read its url from"
     )]
     MissingUrlSource { anchor: String },
+
+    #[error(
+        "#[postgres_database] on '{anchor}' reads both its url and its maximum number of connections from '{name}'; each comes from its own environment variable"
+    )]
+    SharedEnvironmentVariable { anchor: String, name: String },
 }

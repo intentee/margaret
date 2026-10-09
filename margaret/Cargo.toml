@@ -14,7 +14,6 @@ categories = ["web-programming"]
 [dependencies]
 anyhow = { workspace = true, optional = true }
 margaret_accepted_clients = { workspace = true, optional = true }
-margaret_access_token_minter = { workspace = true, optional = true }
 margaret_active_record = { workspace = true, optional = true }
 margaret_asset_bag = { workspace = true, optional = true }
 margaret_authorization_grants = { workspace = true, optional = true }
@@ -27,6 +26,7 @@ margaret_console = { workspace = true, optional = true }
 margaret_construction = { workspace = true, optional = true }
 margaret_database = { workspace = true, optional = true }
 margaret_environment_variable = { workspace = true, optional = true }
+margaret_handler_error = { workspace = true, optional = true }
 margaret_http = { workspace = true, optional = true }
 margaret_http_uploaded_file = { workspace = true, optional = true }
 margaret_http_validation = { workspace = true, optional = true }
@@ -54,7 +54,9 @@ margaret_peer_identity = { workspace = true, optional = true }
 margaret_registered_claims = { workspace = true, optional = true }
 margaret_route_method = { workspace = true, optional = true }
 margaret_route_parameter_binding = { workspace = true, optional = true }
+margaret_server_origin = { workspace = true, optional = true }
 margaret_service = { workspace = true, optional = true }
+margaret_sessions = { workspace = true, optional = true }
 margaret_signing_keys = { workspace = true, optional = true }
 margaret_spiffe_svid = { workspace = true, optional = true }
 margaret_spiffe_svid_bundle = { workspace = true, optional = true }
@@ -67,13 +69,13 @@ margaret_token_digest = { workspace = true, optional = true }
 margaret_token_exchange_client = { workspace = true, optional = true }
 margaret_token_introspection = { workspace = true, optional = true }
 margaret_token_issuance = { workspace = true, optional = true }
-margaret_token_signer = { workspace = true, optional = true }
 margaret_token_trust = { workspace = true, optional = true }
 margaret_trusted_issuer = { workspace = true, optional = true }
 margaret_validation = { workspace = true, optional = true }
 margaret_views = { workspace = true, optional = true }
 margaret_websocket = { workspace = true, optional = true }
 margaret_websocket_session = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
 oauth2 = { workspace = true, optional = true }
 
 [features]
@@ -82,7 +84,6 @@ codegen = ["dep:margaret_codegen"]
 runtime = [
     "dep:anyhow",
     "dep:margaret_accepted_clients",
-    "dep:margaret_access_token_minter",
     "dep:margaret_active_record",
     "dep:margaret_asset_bag",
     "dep:margaret_authorization_grants",
@@ -94,6 +95,7 @@ runtime = [
     "dep:margaret_construction",
     "dep:margaret_database",
     "dep:margaret_environment_variable",
+    "dep:margaret_handler_error",
     "dep:margaret_http",
     "dep:margaret_http_uploaded_file",
     "dep:margaret_http_validation",
@@ -121,7 +123,9 @@ runtime = [
     "dep:margaret_registered_claims",
     "dep:margaret_route_method",
     "dep:margaret_route_parameter_binding",
+    "dep:margaret_server_origin",
     "dep:margaret_service",
+    "dep:margaret_sessions",
     "dep:margaret_signing_keys",
     "dep:margaret_spiffe_svid",
     "dep:margaret_spiffe_svid_bundle",
@@ -134,7 +138,6 @@ runtime = [
     "dep:margaret_token_exchange_client",
     "dep:margaret_token_introspection",
     "dep:margaret_token_issuance",
-    "dep:margaret_token_signer",
     "dep:margaret_token_trust",
     "dep:margaret_trusted_issuer",
     "dep:margaret_validation",
@@ -142,6 +145,7 @@ runtime = [
     "dep:margaret_websocket",
     "dep:margaret_websocket_session",
     "dep:oauth2",
+    "dep:reqwest",
 ]
 
 [lints]

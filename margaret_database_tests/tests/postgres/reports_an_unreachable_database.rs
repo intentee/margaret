@@ -1,6 +1,9 @@
+use std::num::NonZeroUsize;
+
 use margaret_database::database::Database;
 use margaret_database::database_error::DatabaseError;
 use margaret_database::executor::Executor;
+use margaret_database::max_connections::MaxConnections;
 use margaret_database_tests::started_database::StartedDatabase;
 
 use crate::postgres::select_probe_amounts::select_probe_amounts;
@@ -42,7 +45,10 @@ async fn reports_an_unreachable_database() {
                 .database_url
                 .as_str()
                 .parse()
-                .expect("the test database url is a postgres url")
+                .expect("the test database url is a postgres url"),
+            MaxConnections {
+                connections: NonZeroUsize::MIN,
+            },
         )
         .await,
         Err(DatabaseError::Unavailable(_))

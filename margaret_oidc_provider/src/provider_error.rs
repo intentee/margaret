@@ -2,8 +2,8 @@ use thiserror::Error;
 
 use margaret_accepted_clients::accepted_clients_error::AcceptedClientsError;
 use margaret_authorization_grants::authorization_grants_error::AuthorizationGrantsError;
+use margaret_claims_merge::claims_merge_error::ClaimsMergeError;
 use margaret_jwks_secret_store::jwks_secret_store_error::JwksSecretStoreError;
-use margaret_registered_claims::claims_merge_error::ClaimsMergeError;
 use margaret_subject_token_exchange::subject_token_exchange_error::SubjectTokenExchangeError;
 
 #[derive(Debug, Error)]
@@ -30,4 +30,7 @@ pub enum ProviderError {
 
     #[error("the userinfo claims could not be merged: {0}")]
     UserinfoClaims(#[source] ClaimsMergeError),
+
+    #[error("the userinfo claims provider failed: {0:#}")]
+    UserinfoClaimsProvider(#[source] anyhow::Error),
 }

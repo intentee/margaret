@@ -4,6 +4,7 @@ use std::ptr;
 use margaret_accepted_clients_codegen::accepted_client_declaration::AcceptedClientDeclaration;
 use margaret_accepted_clients_codegen::declared_accepted_authentication::DeclaredAcceptedAuthentication;
 use margaret_accepted_clients_codegen::declared_accepted_clients::DeclaredAcceptedClients;
+use margaret_accepted_clients_codegen::declared_client_credentials::DeclaredClientCredentials;
 use margaret_accepted_clients_codegen::declared_client_keys::DeclaredClientKeys;
 use margaret_accepted_clients_codegen::declared_code_grant::DeclaredCodeGrant;
 use margaret_accepted_clients_codegen::declared_confidential_client::DeclaredConfidentialClient;
@@ -16,8 +17,12 @@ use margaret_attributes::tag::Tag;
 use margaret_oauth_client_codegen::declared_client_registration::DeclaredClientRegistration;
 use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
 use margaret_oauth_client_codegen::declared_sign_in::DeclaredSignIn;
+use margaret_oauth_client_codegen::oauth_client_credentials::OAuthClientCredentials;
 use margaret_oauth_client_codegen::oauth_client_declaration::OAuthClientDeclaration;
 use margaret_oauth_vocabulary::client_id::ClientId;
+use margaret_sessions_codegen::consumed_sessions_declaration::ConsumedSessionsDeclaration;
+use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
+use margaret_sessions_codegen::issued_sessions_declaration::IssuedSessionsDeclaration;
 use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
 use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
@@ -31,22 +36,16 @@ use crate::oauth_client_binding::OAuthClientBinding;
 use crate::read_bearer_token_addressee::read_bearer_token_addressee;
 use crate::read_middleware_attribute::read_middleware_attribute;
 use crate::scanned_bearer_token::ScannedBearerToken;
+use crate::scanned_session::ScannedSession;
+use crate::session_issuance::SessionIssuance;
+use crate::session_source::SessionSource;
+use crate::sign_in_callback_routes::SignInCallbackRoutes;
 use crate::subject_token_exchanger_binding::SubjectTokenExchangerBinding;
 use crate::tag_error::TagError;
 use crate::tag_expectation::TagExpectation;
 use crate::tag_kind::TagKind;
 use crate::tagged_item::TaggedItem;
 use crate::trusted_issuer_kind::TrustedIssuerKind;
-
-struct TagEntry<'index> {
-    item: &'index IndexedItem,
-    kind: TagKind,
-}
-
-struct SortedEntry<'pool, 'index> {
-    entry: &'pool TagEntry<'index>,
-    tag: &'pool Tag,
-}
 
 fn unknown_tag(tag: &Tag, expected: TagExpectation, site: String) -> TagError {
     TagError::UnknownTag {
@@ -119,7 +118,17 @@ fn scan_bearer_tokens<'index>(
                         }
                     }
                     BearerTokenAddressee::Issuer(tag) => {
-                        resolve_entry(entries, tag, TagExpectation::TokenIssuer, &site)?;
+                        if entries
+                            .get(tag)
+                            .is_some_and(|entry| matches!(entry.kind, TagKind::TokenIssuance))
+                        {
+                            return Err(TagError::BearerTokenOfOwnIssuance {
+                                site,
+                                tag: tag.to_string(),
+                            });
+                        }
+
+                        resolve_entry(entries, tag, TagExpectation::TrustedIssuer, &site)?;
                     }
                     BearerTokenAddressee::Resource(tag) => {
                         resolve_entry(entries, tag, TagExpectation::ResourceTokens, &site)?;
@@ -130,6 +139,95 @@ fn scan_bearer_tokens<'index>(
                     addressee,
                     attribute,
                 });
+            }
+        }
+    }
+
+    Ok(scanned)
+}
+
+fn session_issuance<'declarations>(
+    entries: &HashMap<Tag, TagEntry>,
+    sessions: &'declarations DeclaredSessions,
+) -> Result<SessionIssuance<'declarations>, TagError> {
+    match sessions {
+        DeclaredSessions::Absent => Ok(SessionIssuance::Undeclared),
+        DeclaredSessions::Consumed(ConsumedSessionsDeclaration { anchor, issuer, .. }) => {
+            resolve_entry(
+                entries,
+                issuer,
+                TagExpectation::TrustedIssuer,
+                &format!("#[consumes_sessions] on '{}'", anchor.canonical_path()),
+            )
+            .map(|_| SessionIssuance::Declared {
+                source: SessionSource::Consumed,
+                tag: issuer,
+            })
+        }
+        DeclaredSessions::Issued(IssuedSessionsDeclaration { anchor, issuer, .. }) => {
+            resolve_entry(
+                entries,
+                issuer,
+                TagExpectation::TokenIssuance,
+                &format!("#[issues_sessions] on '{}'", anchor.canonical_path()),
+            )
+            .map(|_| SessionIssuance::Declared {
+                source: SessionSource::Issued,
+                tag: issuer,
+            })
+        }
+    }
+}
+
+fn scan_sessions<'index>(
+    index: &'index AttributeIndex,
+    issuance: &SessionIssuance,
+) -> Result<Vec<ScannedSession<'index>>, TagError> {
+    let mut scanned = Vec::new();
+
+    for item in index.items() {
+        for method in item.methods() {
+            for parameter in method.parameters() {
+                let Some(attribute) = parameter.framework_attribute(FrameworkAttribute::Session)
+                else {
+                    continue;
+                };
+                let site = format!(
+                    "argument #{} of '{}::{}'",
+                    parameter.position(),
+                    item.canonical_path(),
+                    method.identifier()
+                );
+                let tag = attribute.args()?.interpret(|reader| {
+                    reader
+                        .take_path("issuer")?
+                        .as_ref()
+                        .and_then(Tag::from_path)
+                        .ok_or_else(|| TagError::MalformedSessionMarker { site: site.clone() })
+                })?;
+
+                match issuance {
+                    SessionIssuance::Declared {
+                        source,
+                        tag: declared,
+                    } if **declared == tag => scanned.push(ScannedSession {
+                        attribute,
+                        source: *source,
+                    }),
+                    SessionIssuance::Declared { tag: declared, .. } => {
+                        return Err(TagError::ForeignSessionIssuer {
+                            declared: declared.to_string(),
+                            site,
+                            tag: tag.to_string(),
+                        });
+                    }
+                    SessionIssuance::Undeclared => {
+                        return Err(TagError::SessionWithoutDeclaredSessions {
+                            site,
+                            tag: tag.to_string(),
+                        });
+                    }
+                }
             }
         }
     }
@@ -192,11 +290,8 @@ fn collect_middleware_handlers<'index>(
 
 fn external_sign_in(sign_in: &DeclaredSignIn) -> BoundSignIn<'_> {
     match sign_in {
-        DeclaredSignIn::Declared {
-            redirect_route,
-            scopes,
-        } => BoundSignIn::Available {
-            redirect_route,
+        DeclaredSignIn::Declared { scopes } => BoundSignIn::Available {
+            callback_routes: SignInCallbackRoutes::RegisteredWithIssuer,
             scopes,
         },
         DeclaredSignIn::Undeclared => BoundSignIn::Unavailable,
@@ -204,29 +299,33 @@ fn external_sign_in(sign_in: &DeclaredSignIn) -> BoundSignIn<'_> {
 }
 
 fn own_sign_in<'declarations>(
-    admitted: &'declarations AcceptedClientDeclaration,
-    site: String,
-) -> Result<BoundSignIn<'declarations>, TagError> {
-    let DeclaredCodeGrant::Granted(policy) = &admitted.authorization_code else {
-        return Ok(BoundSignIn::Unavailable);
-    };
-
-    match policy.redirect_routes.as_slice() {
-        [] => Ok(BoundSignIn::Unavailable),
-        [redirect_route] => Ok(BoundSignIn::Available {
-            redirect_route,
-            scopes: &policy.scopes,
-        }),
-        [..] => Err(TagError::AmbiguousOwnRedirectRoute {
-            admitted: admitted.tag.to_string(),
-            site,
-        }),
+    admitted: &'declarations AcceptedClientDeclaration<'_>,
+) -> BoundSignIn<'declarations> {
+    match &admitted.authorization_code {
+        DeclaredCodeGrant::Granted(policy) if !policy.redirect_routes.is_empty() => {
+            BoundSignIn::Available {
+                callback_routes: SignInCallbackRoutes::Admitted(&policy.redirect_routes),
+                scopes: &policy.scopes,
+            }
+        }
+        DeclaredCodeGrant::Granted(_) | DeclaredCodeGrant::Withheld => BoundSignIn::Unavailable,
     }
+}
+
+struct TagEntry<'index> {
+    item: &'index IndexedItem,
+    kind: TagKind,
+}
+
+struct SortedEntry<'pool, 'index> {
+    entry: &'pool TagEntry<'index>,
+    tag: &'pool Tag,
 }
 
 pub struct TagPool<'index> {
     bearer_tokens: Vec<ScannedBearerToken<'index>>,
     entries: HashMap<Tag, TagEntry<'index>>,
+    sessions: Vec<ScannedSession<'index>>,
 }
 
 impl<'index> TagPool<'index> {
@@ -240,6 +339,7 @@ impl<'index> TagPool<'index> {
         issuance: &DeclaredTokenIssuance<'index>,
         resources: &DeclaredResourceIssuances<'index>,
         admitted: &DeclaredAcceptedClients<'index>,
+        sessions: &DeclaredSessions<'index>,
     ) -> Result<Self, TagError> {
         let mut entries: HashMap<Tag, TagEntry<'index>> = HashMap::new();
 
@@ -301,12 +401,18 @@ impl<'index> TagPool<'index> {
         }
 
         let bearer_tokens = scan_bearer_tokens(index, &entries, clients)?;
+        let sessions = scan_sessions(index, &session_issuance(&entries, sessions)?)?;
 
         if let Some(unconsumed) = resources.resources().find(|resource| {
             !admitted
                 .clients
                 .iter()
-                .any(|client| client.resources.contains(&resource.audience))
+                .any(|client| {
+                    client
+                        .resources
+                        .iter()
+                        .any(|admitted| admitted.tag == resource.tag)
+                })
                 && !bearer_tokens.iter().any(|scanned| {
                     matches!(&scanned.addressee, BearerTokenAddressee::Resource(tag) if *tag == resource.tag)
                 })
@@ -320,6 +426,7 @@ impl<'index> TagPool<'index> {
         Ok(Self {
             bearer_tokens,
             entries,
+            sessions,
         })
     }
 
@@ -336,13 +443,21 @@ impl<'index> TagPool<'index> {
     }
 
     #[must_use]
-    pub fn verifies_bearer_tokens_for(&self, tag: &Tag) -> bool {
+    pub fn session(&self, attributes: &[IndexedAttribute]) -> Option<SessionSource> {
+        self.sessions
+            .iter()
+            .find(|scanned| {
+                attributes
+                    .iter()
+                    .any(|attribute| ptr::eq(attribute, scanned.attribute))
+            })
+            .map(|scanned| scanned.source)
+    }
+
+    #[must_use]
+    pub fn verifies_resource_tokens_for(&self, tag: &Tag) -> bool {
         self.bearer_tokens.iter().any(|scanned| {
-            matches!(
-                &scanned.addressee,
-                BearerTokenAddressee::Issuer(verified) | BearerTokenAddressee::Resource(verified)
-                    if verified == tag
-            )
+            matches!(&scanned.addressee, BearerTokenAddressee::Resource(verified) if verified == tag)
         })
     }
 
@@ -393,6 +508,7 @@ impl<'index> TagPool<'index> {
                     sign_in,
                 } => OAuthClientBinding {
                     client,
+                    credentials: OAuthClientCredentials::Targeted,
                     server: BoundAuthorizationServer::External {
                         authentication,
                         client_id,
@@ -571,18 +687,17 @@ impl<'index> TagPool<'index> {
             return Err(self.unresolved(tag, TagExpectation::AdmittedClient, site));
         };
 
-        if !matches!(
-            found.authentication,
-            DeclaredAcceptedAuthentication::PrivateKeyJwt(DeclaredConfidentialClient {
-                keys: DeclaredClientKeys::Own,
-                ..
-            })
-        ) {
+        let DeclaredAcceptedAuthentication::PrivateKeyJwt(DeclaredConfidentialClient {
+            client_credentials,
+            keys: DeclaredClientKeys::Own,
+            ..
+        }) = &found.authentication
+        else {
             return Err(TagError::OwnClientOfPublishedKeys {
                 admitted: tag.to_string(),
                 site,
             });
-        }
+        };
 
         match bindings.iter().find(|existing| {
             matches!(
@@ -598,11 +713,24 @@ impl<'index> TagPool<'index> {
             }),
             None => Ok(OAuthClientBinding {
                 client,
+                credentials: match client_credentials {
+                    DeclaredClientCredentials::Granted { scopes } => {
+                        OAuthClientCredentials::PerResource {
+                            resources: found
+                                .resources
+                                .iter()
+                                .map(|resource| &resource.tag)
+                                .collect(),
+                            scopes,
+                        }
+                    }
+                    DeclaredClientCredentials::Withheld => OAuthClientCredentials::Withheld,
+                },
                 server: BoundAuthorizationServer::Own {
                     admitted: found,
                     issuance,
                 },
-                sign_in: own_sign_in(found, site)?,
+                sign_in: own_sign_in(found),
             }),
         }
     }
@@ -641,6 +769,8 @@ mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
     use margaret_oauth_vocabulary::scope::Scope;
+    use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
+    use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
     use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
     use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
@@ -649,6 +779,8 @@ mod tests {
     use crate::bound_authorization_server::BoundAuthorizationServer;
     use crate::bound_sign_in::BoundSignIn;
     use crate::oauth_client_binding::OAuthClientBinding;
+    use crate::session_source::SessionSource;
+    use crate::sign_in_callback_routes::SignInCallbackRoutes;
     use crate::tag_error::TagError;
     use crate::tag_expectation::TagExpectation;
     use crate::tag_kind::TagKind;
@@ -669,8 +801,13 @@ mod tests {
         DeclaredTrusts::read(&indexed.index).expect("the trusts are read")
     }
 
+    fn scopes(indexed: &IndexedSource) -> DeclaredScopes<'_> {
+        DeclaredScopes::read(&indexed.index).expect("the scopes are read")
+    }
+
     fn clients(indexed: &IndexedSource) -> DeclaredOAuthClients<'_> {
-        DeclaredOAuthClients::read(&indexed.index).expect("the oauth clients are read")
+        DeclaredOAuthClients::read(&indexed.index, &scopes(indexed))
+            .expect("the oauth clients are read")
     }
 
     fn collected(indexed: &IndexedSource) -> Result<TagPool<'_>, TagError> {
@@ -685,8 +822,10 @@ mod tests {
             &clients(indexed),
             &issuance,
             &resources,
-            &DeclaredAcceptedClients::read(&indexed.index, &issuance, &resources)
+            &DeclaredAcceptedClients::read(&indexed.index, &issuance, &resources, &scopes(indexed))
                 .expect("the admitted clients are read"),
+            &DeclaredSessions::read(&indexed.index, &issuance, &resources)
+                .expect("the sessions are read"),
         )
     }
 
@@ -706,7 +845,7 @@ mod tests {
 
     fn oauth_client(tag: &str, client_id: &str, issuer: &str, anchor: &str) -> String {
         format!(
-            "#[acts_as_oauth_client({tag}, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"{client_id}\", issuer = {issuer})]\nstruct {anchor};\n"
+            "#[oauth_client({tag}, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"{client_id}\", issuer = {issuer})]\nstruct {anchor};\n"
         )
     }
 
@@ -726,8 +865,9 @@ mod tests {
             DeclaredTokenIssuance::read(&indexed.index).expect("the token issuance is read");
         let resources = DeclaredResourceIssuances::read(&indexed.index, &issuance)
             .expect("the resources are read");
-        let admitted = DeclaredAcceptedClients::read(&indexed.index, &issuance, &resources)
-            .expect("the admitted clients are read");
+        let admitted =
+            DeclaredAcceptedClients::read(&indexed.index, &issuance, &resources, &scopes(&indexed))
+                .expect("the admitted clients are read");
         let trusts = trusts(&indexed);
         let clients = clients(&indexed);
         let pool = pool(&indexed);
@@ -743,19 +883,19 @@ mod tests {
 
     fn own_provider_admitting(keys: &str) -> String {
         format!(
-            "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::{keys}), client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n"
+            "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::{keys}), client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n"
         )
     }
 
     fn own_provider_granting(redirects: &str) -> String {
         format!(
-            "mod routes {{\n    pub struct Callback;\n    pub struct Landing;\n}}\n#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Implicit, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::Rsa, {redirects}, scopes = [\"openid\", \"profile\"]), client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n{}",
+            "#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\nmod routes {{\n    pub struct Callback;\n    pub struct Landing;\n}}\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Implicit, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::Rsa, {redirects}, scopes = [margaret::framework::oauth_vocabulary::openid_scope::OpenidScope, ProfileScope]), client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n{}",
             own_client("portal", "portal_app", "PortalClient")
         )
     }
 
     fn own_client(tag: &str, admitted: &str, anchor: &str) -> String {
-        format!("#[acts_as_oauth_client({tag}, admitted_as = {admitted})]\nstruct {anchor};\n")
+        format!("#[oauth_client({tag}, admitted_as = {admitted})]\nstruct {anchor};\n")
     }
 
     #[test]
@@ -796,15 +936,16 @@ mod tests {
     fn binds_the_sign_in_an_external_client_declares() {
         assert!(with_bindings(
             &format!(
-                "{PARTNER_TRUST}struct Callback;\n#[acts_as_oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner, sign_in(redirect_route = Callback, scopes = [\"profile\"]))]\nstruct PartnerClient;\n"
+                "#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n{PARTNER_TRUST}#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner, sign_in(scopes = [ProfileScope]))]\nstruct PartnerClient;\n"
             ),
             |bindings| matches!(
                 bindings.as_deref(),
                 Ok([binding]) if matches!(
                     binding.sign_in,
-                    BoundSignIn::Available { redirect_route, scopes }
-                        if redirect_route.to_string() == "crate::Callback"
-                            && scopes.iter().map(Scope::as_str).eq(["profile"])
+                    BoundSignIn::Available {
+                        callback_routes: SignInCallbackRoutes::RegisteredWithIssuer,
+                        scopes,
+                    } if scopes.iter().map(Scope::as_str).eq(["profile"])
                 )
             )
         ));
@@ -829,9 +970,11 @@ mod tests {
                 bindings.as_deref(),
                 Ok([binding]) if matches!(
                     binding.sign_in,
-                    BoundSignIn::Available { redirect_route, scopes }
-                        if redirect_route.to_string() == "crate::routes::Callback"
-                            && scopes.iter().map(Scope::as_str).eq(["openid", "profile"])
+                    BoundSignIn::Available {
+                        callback_routes: SignInCallbackRoutes::Admitted(routes),
+                        scopes,
+                    } if routes.iter().map(ToString::to_string).eq(["crate::routes::Callback"])
+                        && scopes.iter().map(Scope::as_str).eq(["openid", "profile"])
                 )
             )
         ));
@@ -870,21 +1013,27 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_own_client_whose_admitted_client_redirects_to_two_routes() {
-        assert_eq!(
-            oauth_client_rejection(&own_provider_granting(
-                "redirect_routes = [routes::Callback, routes::Landing]"
-            ))
-            .to_string(),
-            "the oauth client 'crate::PortalClient' acts as the admitted client 'portal_app', which redirects to more than one route, so its sign-in cannot tell which route to return to"
-        );
+    fn signs_an_own_client_in_through_any_redirect_route_of_its_admitted_client() {
+        assert!(with_bindings(
+            &own_provider_granting("redirect_routes = [routes::Callback, routes::Landing]"),
+            |bindings| matches!(
+                bindings.as_deref(),
+                Ok([binding]) if matches!(
+                    binding.sign_in,
+                    BoundSignIn::Available {
+                        callback_routes: SignInCallbackRoutes::Admitted(routes),
+                        ..
+                    } if routes.iter().map(ToString::to_string).eq(["crate::routes::Callback", "crate::routes::Landing"])
+                )
+            )
+        ));
     }
 
     #[test]
     fn rejects_own_keys_no_oauth_client_signs_with() {
         assert_eq!(
             oauth_client_rejection(&own_provider_admitting("Own")).to_string(),
-            "the admitted client 'portal_app' declared by 'crate::Portal' verifies its assertions with ClientKeys::Own, but no #[acts_as_oauth_client(admitted_as = portal_app)] signs them"
+            "the admitted client 'portal_app' declared by 'crate::Portal' verifies its assertions with ClientKeys::Own, but no #[oauth_client(admitted_as = portal_app)] signs them"
         );
     }
 
@@ -1211,7 +1360,7 @@ mod tests {
         );
     }
 
-    const EXCHANGING_PROVIDER: &str = "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\nstruct ExchangeIssuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ExchangedArtifacts;\n#[admits_oauth_client(deployer_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"deployer\", resources = [artifacts], token_exchange(scopes = [\"deploy\"]))]\nstruct Deployer;\n";
+    const EXCHANGING_PROVIDER: &str = "#[oauth_scope(name = \"deploy\")]\npub struct DeployScope;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct ExchangeIssuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ExchangedArtifacts;\n#[admits_oauth_client(deployer_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"deployer\", resources = [artifacts], token_exchange(scopes = [DeployScope]))]\nstruct Deployer;\n";
 
     fn bindings_of_exchangers(lib_source: &str) -> Result<Vec<String>, TagError> {
         let indexed = IndexedSource::new(lib_source);
@@ -1219,8 +1368,9 @@ mod tests {
             DeclaredTokenIssuance::read(&indexed.index).expect("the token issuance is read");
         let resources = DeclaredResourceIssuances::read(&indexed.index, &issuance)
             .expect("the resources are read");
-        let admitted = DeclaredAcceptedClients::read(&indexed.index, &issuance, &resources)
-            .expect("the admitted clients are read");
+        let admitted =
+            DeclaredAcceptedClients::read(&indexed.index, &issuance, &resources, &scopes(&indexed))
+                .expect("the admitted clients are read");
         let trusts = trusts(&indexed);
         let pool = pool(&indexed);
 
@@ -1342,23 +1492,169 @@ mod tests {
         )
     }
 
-    const OWN_TOKENS: &str = "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(attachments, audience = \"attachments\")]\nstruct Attachments;\n";
+    const OWN_TOKENS: &str = "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(attachments, audience = \"attachments\")]\nstruct Attachments;\n";
 
     #[test]
-    fn verifies_bearer_tokens_for_the_own_issuance_and_resources_they_name() {
+    fn verifies_resource_tokens_only_for_the_resources_bearer_tokens_name() {
         let indexed = IndexedSource::new(&format!(
-            "{}{}",
-            bearer_source(
-                OWN_TOKENS,
-                "#[bearer_token(issuer = provider)] session: Option<Session>"
-            ),
-            "struct Uploader;\n\nimpl Uploader {\n    fn upload(&self, #[bearer_token(resource = attachments)] token: Option<Upload>) {}\n}\n"
+            "{OWN_TOKENS}struct Uploader;\n\nimpl Uploader {{\n    fn upload(&self, #[bearer_token(resource = attachments)] token: Option<Upload>) {{}}\n}}\n"
         ));
         let pool = pool(&indexed);
 
-        assert!(pool.verifies_bearer_tokens_for(&tag("provider")));
-        assert!(pool.verifies_bearer_tokens_for(&tag("attachments")));
-        assert!(!pool.verifies_bearer_tokens_for(&tag("partner")));
+        assert!(pool.verifies_resource_tokens_for(&tag("attachments")));
+        assert!(!pool.verifies_resource_tokens_for(&tag("provider")));
+    }
+
+    #[test]
+    fn rejects_a_bearer_token_issued_by_the_own_issuance() {
+        assert!(matches!(
+            rejection_for(&bearer_source(
+                OWN_TOKENS,
+                "#[bearer_token(issuer = provider)] session: Option<Session>"
+            )),
+            TagError::BearerTokenOfOwnIssuance { site, tag }
+                if site == "argument #1 of 'crate::RunnerProvider::infer'" && tag == "provider"
+        ));
+    }
+
+    const OWN_ISSUANCE: &str = "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct ProviderIssuance;\n";
+
+    const OWN_SESSIONS: &str = "#[issues_sessions(issuer = provider, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n";
+
+    const PARTNER_SESSIONS: &str = "#[consumes_sessions(issuer = partner, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]\nstruct PartnerSessions;\n";
+
+    fn session_source_of(declarations: &str) -> Option<SessionSource> {
+        let indexed = IndexedSource::new(&bearer_source(
+            declarations,
+            "#[session(issuer = provider)] session: Option<Session>",
+        ));
+        let pool = pool(&indexed);
+        let parameter_attributes = indexed
+            .item("RunnerProvider")
+            .methods()
+            .iter()
+            .flat_map(IndexedMethod::parameters)
+            .map(IndexedParameter::attributes)
+            .find(|attributes| !attributes.is_empty())
+            .expect("the session parameter is indexed");
+
+        pool.session(parameter_attributes)
+    }
+
+    #[test]
+    fn finds_the_issued_sessions_of_a_session_marker() {
+        assert_eq!(
+            session_source_of(&format!("{OWN_ISSUANCE}{OWN_SESSIONS}")),
+            Some(SessionSource::Issued)
+        );
+    }
+
+    #[test]
+    fn finds_the_consumed_sessions_of_a_session_marker() {
+        let indexed = IndexedSource::new(&bearer_source(
+            &format!("{PARTNER_TRUST}{PARTNER_SESSIONS}"),
+            "#[session(issuer = partner)] session: Option<Session>",
+        ));
+
+        assert_eq!(
+            pool(&indexed).session(
+                indexed
+                    .item("RunnerProvider")
+                    .methods()
+                    .iter()
+                    .flat_map(IndexedMethod::parameters)
+                    .map(IndexedParameter::attributes)
+                    .find(|attributes| !attributes.is_empty())
+                    .expect("the session parameter is indexed")
+            ),
+            Some(SessionSource::Consumed)
+        );
+    }
+
+    #[test]
+    fn finds_no_session_for_unmarked_attributes() {
+        assert_eq!(
+            pool(&IndexedSource::new(&format!(
+                "{OWN_ISSUANCE}{OWN_SESSIONS}"
+            )))
+            .session(&[]),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_marker_without_declared_sessions() {
+        assert_eq!(
+            error_for(&bearer_source(
+                OWN_ISSUANCE,
+                "#[session(issuer = provider)] session: Option<Session>"
+            )),
+            "argument #1 of 'crate::RunnerProvider::infer' reads the session of 'provider', but no struct declares #[issues_sessions] or #[consumes_sessions]"
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_marker_of_another_issuer() {
+        assert_eq!(
+            error_for(&bearer_source(
+                &format!("{OWN_ISSUANCE}{OWN_SESSIONS}{PARTNER_TRUST}"),
+                "#[session(issuer = partner)] session: Option<Session>"
+            )),
+            "argument #1 of 'crate::RunnerProvider::infer' reads the session of 'partner', but the sessions of this application belong to 'provider'"
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_marker_without_a_plain_issuer() {
+        assert_eq!(
+            error_for(&bearer_source(
+                &format!("{OWN_ISSUANCE}{OWN_SESSIONS}"),
+                "#[session(issuer = sessions::provider)] session: Option<Session>"
+            )),
+            "argument #1 of 'crate::RunnerProvider::infer' must name the issuer of its session as `issuer = <tag>`"
+        );
+    }
+
+    #[test]
+    fn reports_session_marker_arguments_that_do_not_parse() {
+        assert_eq!(
+            error_for(&bearer_source(
+                &format!("{OWN_ISSUANCE}{OWN_SESSIONS}"),
+                "#[session(= 5)] session: Option<Session>"
+            )),
+            "failed to index the crate: arguments of attribute 'session' could not be parsed: expected an expression"
+        );
+    }
+
+    #[test]
+    fn reports_a_session_issuer_that_is_not_a_path() {
+        assert_eq!(
+            error_for(&bearer_source(
+                &format!("{OWN_ISSUANCE}{OWN_SESSIONS}"),
+                "#[session(issuer = \"provider\")] session: Option<Session>"
+            )),
+            "failed to read the attribute arguments: argument 'issuer' of attribute 'session' is not a path"
+        );
+    }
+
+    #[test]
+    fn rejects_issued_sessions_of_a_trusted_issuer() {
+        assert_eq!(
+            error_for(&format!(
+                "{OWN_ISSUANCE}{PARTNER_TRUST}#[issues_sessions(issuer = partner, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n"
+            )),
+            "#[issues_sessions] on 'crate::BrowserSessions' references the tag 'partner', which is a trusted issuer with discovered keys, not a token issuance"
+        );
+    }
+
+    #[test]
+    fn rejects_consumed_sessions_of_the_own_issuance() {
+        assert_eq!(
+            error_for(&format!(
+                "{OWN_ISSUANCE}#[consumes_sessions(issuer = provider, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]\nstruct ProviderSessions;\n"
+            )),
+            "#[consumes_sessions] on 'crate::ProviderSessions' references the tag 'provider', which is a token issuance, not a trusted issuer"
+        );
     }
 
     #[test]
@@ -1419,9 +1715,13 @@ mod tests {
 
     #[test]
     fn rejects_a_bearer_token_of_an_undeclared_issuer() {
-        assert!(error_for(&bearer_source(PARTNER_TRUST, "#[bearer_token(issuer = undeclared)] token: Option<Token>")).ends_with(
-            "references the tag 'undeclared', which no token issuance or trusted issuer declares"
-        ));
+        assert!(
+            error_for(&bearer_source(
+                PARTNER_TRUST,
+                "#[bearer_token(issuer = undeclared)] token: Option<Token>"
+            ))
+            .ends_with("references the tag 'undeclared', which no trusted issuer declares")
+        );
     }
 
     #[test]
@@ -1431,7 +1731,7 @@ mod tests {
             "#[bearer_token(issuer = logged)] token: Option<Token>",
         ))
         .ends_with(
-            "references the tag 'logged', which is a middleware handler, not a token issuance or trusted issuer"
+            "references the tag 'logged', which is a middleware handler, not a trusted issuer"
         ));
     }
 
@@ -1491,7 +1791,7 @@ mod tests {
     #[test]
     fn reports_a_token_issuance_tag_where_a_trusted_issuer_is_expected() {
         let indexed = IndexedSource::new(
-            "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\nstruct Issuer;\n",
+            "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n",
         );
 
         assert_eq!(
@@ -1508,7 +1808,7 @@ mod tests {
     fn rejects_a_token_issuance_that_shares_the_tag_of_a_trusted_issuer() {
         assert_eq!(
             error_for(&format!(
-                "{PARTNER_TRUST}#[issues_tokens(partner, audience = \"session\", issuer = \"https://issuer.example\")]\nstruct OwnIssuer;\n"
+                "{PARTNER_TRUST}#[issues_tokens(partner, issuer = \"https://issuer.example\")]\nstruct OwnIssuer;\n"
             )),
             "the tag 'partner' is declared more than once: by 'crate::Issuer' and by 'crate::OwnIssuer'"
         );
@@ -1518,7 +1818,7 @@ mod tests {
     fn rejects_a_resource_that_shares_the_tag_of_the_token_issuance() {
         assert_eq!(
             error_for(
-                "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(provider, audience = \"artifacts\")]\nstruct Artifacts;\n"
+                "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(provider, audience = \"artifacts\")]\nstruct Artifacts;\n"
             ),
             "the tag 'provider' is declared more than once: by 'crate::Issuer' and by 'crate::Artifacts'"
         );
@@ -1528,7 +1828,7 @@ mod tests {
     fn rejects_an_admitted_client_that_shares_the_tag_of_a_resource() {
         assert_eq!(
             error_for(
-                "#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(artifacts, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n"
+                "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(artifacts, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n"
             ),
             "the tag 'artifacts' is declared more than once: by 'crate::Artifacts' and by 'crate::Portal'"
         );

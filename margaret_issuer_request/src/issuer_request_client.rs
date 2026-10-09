@@ -10,7 +10,6 @@ use tokio_util::sync::CancellationToken;
 use crate::issuer_answer::IssuerAnswer;
 use crate::issuer_document::IssuerDocument;
 use crate::issuer_exchange_error::IssuerExchangeError;
-use crate::issuer_request_error::IssuerRequestError;
 use crate::issuer_request_timeout::ISSUER_REQUEST_TIMEOUT;
 use crate::read_response_body::read_response_body;
 use crate::response_body::ResponseBody;
@@ -42,24 +41,26 @@ pub struct IssuerRequestClient {
 impl IssuerRequestClient {
     /// # Errors
     ///
-    /// Returns `IssuerRequestError::ClientBuild` when the builder cannot produce a client.
-    pub fn build(client_builder: ClientBuilder) -> Result<Self, IssuerRequestError> {
-        let http_client = client_builder
+    /// Returns `reqwest::Error` when the builder cannot produce a client.
+    pub fn build(client_builder: ClientBuilder) -> Result<Self, reqwest::Error> {
+        client_builder
             .use_native_tls()
             .https_only(true)
             .redirect(Policy::none())
             .build()
-            .map_err(|source| IssuerRequestError::ClientBuild { source })?;
-
-        Ok(Self { http_client })
+            .map(|http_client| Self { http_client })
     }
 
     /// # Errors
     ///
-    /// Returns `IssuerRequestError::ClientBuild` when the system TLS configuration cannot produce a
-    /// client.
-    pub fn create() -> Result<Self, IssuerRequestError> {
+    /// Returns `reqwest::Error` when the system TLS configuration cannot produce a client.
+    pub fn create() -> Result<Self, reqwest::Error> {
         Self::build(Client::builder())
+    }
+
+    #[must_use]
+    pub fn preconfigured(http_client: Client) -> Self {
+        Self { http_client }
     }
 
     /// # Errors

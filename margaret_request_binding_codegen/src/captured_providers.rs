@@ -39,6 +39,7 @@ fn provider_kind(binding: &RequestBinding) -> Option<CapturedProviderKind> {
         | RequestBinding::RequestBodyStream
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
+        | RequestBinding::Session { .. }
         | RequestBinding::UploadedFiles
         | RequestBinding::Views => None,
     }

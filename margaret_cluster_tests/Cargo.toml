@@ -23,6 +23,7 @@ margaret = { workspace = true, features = ["runtime"] }
 margaret_accepted_clients_tests = { path = "../margaret_accepted_clients_tests" }
 margaret_cluster_fixture = { path = "../margaret_cluster_fixture" }
 margaret_database_tests = { path = "../margaret_database_tests" }
+margaret_handler_error = { workspace = true }
 margaret_http = { workspace = true }
 margaret_http_tests = { path = "../margaret_http_tests" }
 margaret_http_uploaded_file = { workspace = true }

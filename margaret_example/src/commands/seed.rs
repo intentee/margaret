@@ -14,14 +14,14 @@ use margaret::framework::macros::console_command;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::singleton;
+use margaret::framework::sessions::started_session::StartedSession;
 
 use crate::featured_article_id::FEATURED_ARTICLE_ID;
-use crate::milo_session::MILO_SESSION;
+use crate::margaret::sessions::IssuedSessions;
 use crate::models::article::Article;
 use crate::models::article_status::ArticleStatus;
 use crate::models::author::Author;
 use crate::models::user_account::UserAccount;
-use crate::models::user_session::UserSession;
 use crate::system_clock::SystemClock;
 
 fn at_epoch_seconds(seconds: i64) -> DateTime<Utc> {
@@ -94,11 +94,12 @@ fn articles(milo: &Author, mona: &Author) -> Vec<Article> {
 #[singleton]
 #[console_command(
     name = "seed",
-    description = "Seeds the blog database with its sample authors, articles, and reader session"
+    description = "Seeds the blog database with its sample authors, articles, and reader, and prints the session cookies of the reader"
 )]
 pub struct Seed {
     clock: Arc<SystemClock>,
     database: Arc<Database>,
+    sessions: Arc<IssuedSessions>,
 }
 
 impl Seed {
@@ -106,15 +107,36 @@ impl Seed {
     ///
     /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub fn create(clock: Arc<SystemClock>, database: Arc<Database>) -> anyhow::Result<Self> {
-        Ok(Self { clock, database })
+    pub fn create(
+        clock: Arc<SystemClock>,
+        database: Arc<Database>,
+        sessions: Arc<IssuedSessions>,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
+            clock,
+            database,
+            sessions,
+        })
     }
 
     /// # Errors
     ///
-    /// Returns an error when the sample data cannot be stored.
+    /// Returns an error when the sample data cannot be stored or the session of the reader cannot
+    /// start.
     #[process]
     pub async fn run(&self) -> anyhow::Result<CommandOutcome> {
+        let reader = self.stored_sample_data().await?;
+        let StartedSession { cookie_changes, .. } =
+            self.sessions.start(reader.id, self.clock.now()).await?;
+
+        for cookie in &cookie_changes.cookies {
+            println!("{}={}", cookie.name(), cookie.value());
+        }
+
+        Ok(CommandOutcome::Succeeded)
+    }
+
+    async fn stored_sample_data(&self) -> anyhow::Result<UserAccount> {
         let milo = milo();
         let mona = mona();
         let reader = UserAccount {
@@ -133,16 +155,8 @@ impl Seed {
         }
 
         reader.insert().or_ignore(&transaction).await?;
-        UserSession {
-            id: MILO_SESSION,
-            authenticated_at: self.clock.now(),
-            user: Key::of(&reader),
-        }
-        .insert()
-        .or_ignore(&transaction)
-        .await?;
         transaction.commit().await?;
 
-        Ok(CommandOutcome::Succeeded)
+        Ok(reader)
     }
 }

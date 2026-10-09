@@ -55,10 +55,11 @@ fn authentication_age(
 ) -> ControlFlow<AuthorizationError, AuthenticationAge> {
     match &request.max_age {
         Some(max_age) => match max_age.parse::<u32>() {
+            Ok(0) => ControlFlow::Continue(AuthenticationAge::NewLogin),
             Ok(seconds) => ControlFlow::Continue(AuthenticationAge::AtMost(TimeDelta::seconds(
                 i64::from(seconds),
             ))),
-            Err(_) => ControlFlow::Break(AuthorizationError::MalformedMaxAge),
+            Err(source) => ControlFlow::Break(AuthorizationError::MalformedMaxAge(source)),
         },
         None => ControlFlow::Continue(AuthenticationAge::Unbounded),
     }

@@ -14,6 +14,7 @@ use crate::database_error::DatabaseError;
 use crate::database_url::DatabaseUrl;
 use crate::executor::Executor;
 use crate::executor_seal::ExecutorSeal;
+use crate::max_connections::MaxConnections;
 use crate::pooled_connection::PooledConnection;
 use crate::statement_affected::statement_affected;
 use crate::statement_optional_row::statement_optional_row;
@@ -29,13 +30,17 @@ impl Database {
     ///
     /// Returns `DatabaseError::PoolBuild` when the pool cannot be built, and
     /// `DatabaseError::Unavailable` when no connection to the database can be established.
-    pub async fn connect(DatabaseUrl { config }: DatabaseUrl) -> Result<Self, DatabaseError> {
+    pub async fn connect(
+        DatabaseUrl { config }: DatabaseUrl,
+        MaxConnections { connections }: MaxConnections,
+    ) -> Result<Self, DatabaseError> {
         ready(
             Pool::builder(Manager::from_config(
                 config,
                 NoTls,
                 ManagerConfig::default(),
             ))
+            .max_size(connections.get())
             .build()
             .map_err(DatabaseError::PoolBuild),
         )
@@ -107,6 +112,7 @@ mod tests {
                 format!("postgresql://margaret@127.0.0.1:{port}/blog")
                     .parse()
                     .expect("the url is a postgres url"),
+                "1".parse().expect("one connection is a pool size"),
             )
             .await,
             Err(DatabaseError::Unavailable(PoolError::Backend(source))) if source.as_db_error().is_none()

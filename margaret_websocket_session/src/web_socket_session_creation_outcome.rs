@@ -1,8 +1,8 @@
-use std::sync::Arc;
-
 use margaret_http::response_continuation::ResponseContinuation;
 
+use crate::created_web_socket_session::CreatedWebSocketSession;
+
 pub enum WebSocketSessionCreationOutcome<Session> {
-    Created(Arc<Session>),
+    Created(CreatedWebSocketSession<Session>),
     Interrupted(ResponseContinuation),
 }

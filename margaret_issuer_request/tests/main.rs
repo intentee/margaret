@@ -2,6 +2,7 @@ mod answers_with_the_body_of_an_error_status;
 mod describes_every_exchange_error;
 mod does_not_follow_a_redirect;
 mod exchanges_a_request_with_an_issuer;
+mod exchanges_through_a_preconfigured_client;
 mod fetches_a_document_over_tls_without_client_authentication;
 mod refuses_a_document_over_the_size_limit;
 mod refuses_a_plaintext_url;

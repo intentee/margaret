@@ -21,7 +21,7 @@ impl Redirection {
         })
     }
 
-    pub(crate) fn error(self, error: AuthorizationError) -> Response {
+    pub(crate) fn error(self, error: &AuthorizationError) -> Response {
         self.redirected(|query| {
             query.append_pair("error", error.wire_name());
             query.append_pair("error_description", error.description());

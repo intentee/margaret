@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
-use margaret_issuer_directory::discovered_issuer::DiscoveredIssuer;
 use margaret_issuer_directory_tests::polled_directory::PolledDirectory;
 use margaret_issuer_directory_tests::polled_fixture::PolledFixture;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
@@ -9,11 +8,11 @@ use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_secret_store_tests::fixture_secrets::fixture_secrets;
 use margaret_oauth_vocabulary::client_secret::ClientSecret;
-use margaret_oidc_discovery::oidc_discovery_url::oidc_discovery_url;
 use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
 use margaret_token_trust::token_trust::TokenTrust;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
+use crate::issuer_location::IssuerLocation;
 use crate::provider_fixture::ProviderFixture;
 
 const PORTAL_CLIENT_ID: &str = "portal";
@@ -30,10 +29,8 @@ impl MargaretClient {
 
         Self::discovering(
             || fixture.issuer_request_client(),
-            TokenTrust {
-                audience: "artifacts",
-                issuer: fixture.issuer,
-            },
+            &fixture.issuer.location,
+            "artifacts",
             Arc::clone(&secrets),
             |request_client, metadata, trusted_issuer| {
                 AuthorizationServerClient::with_private_key_jwt(
@@ -50,13 +47,14 @@ impl MargaretClient {
 
     pub async fn signing_in(
         request_client: impl Fn() -> IssuerRequestClient,
-        trust: TokenTrust,
+        issuer: &'static IssuerLocation,
         client_id: &'static str,
         client_secret: ClientSecret,
     ) -> Self {
         Self::discovering(
             request_client,
-            trust,
+            issuer,
+            client_id,
             fixture_secrets(),
             |request_client, metadata, trusted_issuer| {
                 AuthorizationServerClient::with_client_secret_basic(
@@ -91,7 +89,8 @@ impl MargaretClient {
 
     async fn discovering(
         request_client: impl Fn() -> IssuerRequestClient,
-        trust: TokenTrust,
+        issuer: &'static IssuerLocation,
+        audience: &'static str,
         secrets: Arc<JwksSecretHolder>,
         server: impl FnOnce(
             Arc<IssuerRequestClient>,
@@ -100,21 +99,7 @@ impl MargaretClient {
         ) -> AuthorizationServerClient,
     ) -> Self {
         let metadata = Arc::new(IssuerMetadata::awaiting());
-        let polled = PolledFixture::discovered(
-            DiscoveredIssuer {
-                discovery_url: String::leak(
-                    oidc_discovery_url(
-                        &trust
-                            .issuer
-                            .parse()
-                            .expect("the trusted issuer is an https url"),
-                    )
-                    .to_string(),
-                ),
-                issuer: trust.issuer,
-            },
-            Arc::clone(&metadata),
-        );
+        let polled = PolledFixture::discovered(issuer.discovered(), Arc::clone(&metadata));
         let snapshot = polled.key_set.snapshot();
         let directory = PolledDirectory::start(vec![Arc::clone(&polled.polled)], request_client());
 
@@ -126,7 +111,10 @@ impl MargaretClient {
             server: Arc::new(server(
                 Arc::new(request_client()),
                 metadata,
-                Arc::new(polled.trusted(trust)),
+                Arc::new(polled.trusted(TokenTrust {
+                    audience,
+                    issuer: issuer.issuer.as_str(),
+                })),
             )),
         }
     }

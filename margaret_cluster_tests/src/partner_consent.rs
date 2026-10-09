@@ -8,7 +8,6 @@ use margaret_cluster_fixture::margaret::accepted_clients::clients::auth_accepted
 use margaret_cluster_fixture::margaret::oidc_provider::provider_endpoints::authorization_endpoint_url::AUTHORIZATION_ENDPOINT_URL;
 use margaret_oidc_provider_tests::pkce_challenge::pkce_challenge;
 
-use crate::alice_session_cookie::alice_session_cookie;
 use crate::cluster::Cluster;
 use crate::consent_required::ConsentRequired;
 use crate::endpoint_url::endpoint_url;
@@ -17,11 +16,11 @@ use crate::partner_redirect_uri::PARTNER_REDIRECT_URI;
 /// # Panics
 ///
 /// Panics when the identity server does not ask Alice for her consent.
-pub async fn partner_consent(cluster: &Cluster, identity: &Url) -> Uuid {
+pub async fn partner_consent(cluster: &Cluster, identity: &Url, session_cookies: &str) -> Uuid {
     let response = cluster
         .client
         .get(endpoint_url(identity, AUTHORIZATION_ENDPOINT_URL))
-        .header(COOKIE, alice_session_cookie())
+        .header(COOKIE, session_cookies)
         .query(&[
             ["client_id", ACCEPTED_CLIENT.client_id],
             ["code_challenge", &pkce_challenge()],

@@ -16,12 +16,6 @@ use crate::service_unit::ServiceUnit;
 use crate::service_unit_origin::ServiceUnitOrigin;
 use crate::tick_timer_arguments::TickTimerArguments;
 
-#[derive(Clone, Copy)]
-enum Role {
-    Service,
-    Ticker,
-}
-
 fn canonical_attribute_path(
     index: &AttributeIndex,
     item: &IndexedItem,
@@ -128,6 +122,12 @@ fn has_conflicting_roles(item: &IndexedItem, role: Role) -> bool {
     others
         .iter()
         .any(|other| item.has_framework_attribute(*other))
+}
+
+#[derive(Clone, Copy)]
+enum Role {
+    Service,
+    Ticker,
 }
 
 pub(crate) fn service_units(

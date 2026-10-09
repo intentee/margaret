@@ -37,27 +37,6 @@ fn missing_path() -> CanonicalPath {
     CanonicalPath::new(vec!["crate".to_string(), "Missing".to_string()])
 }
 
-#[test]
-fn reports_an_unplanned_served_root() {
-    let planned = planned_container();
-    let Err(error) = planned.render(&[missing_path()], &[]) else {
-        panic!("an unplanned served root must not be rendered");
-    };
-
-    assert!(error.to_string().contains("crate::Missing"));
-}
-
-#[test]
-fn reports_an_unplanned_builder_root() {
-    let planned = planned_container();
-    let roots = planned.roots();
-    let Err(error) = planned.render(&roots, &[missing_path()]) else {
-        panic!("an unplanned builder root must not be rendered");
-    };
-
-    assert!(error.to_string().contains("crate::Missing"));
-}
-
 fn planned_with(fixture: &str, framework_provider: FrameworkProvider) -> PlannedContainer {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures")
@@ -97,6 +76,27 @@ fn user_roots(planned: &PlannedContainer) -> Vec<CanonicalPath> {
         .into_iter()
         .filter(|root| root != &unit_provider(FrameworkEnablement::Dependency).provided)
         .collect()
+}
+
+#[test]
+fn reports_an_unplanned_served_root() {
+    let planned = planned_container();
+    let Err(error) = planned.render(&[missing_path()], &[]) else {
+        panic!("an unplanned served root must not be rendered");
+    };
+
+    assert!(error.to_string().contains("crate::Missing"));
+}
+
+#[test]
+fn reports_an_unplanned_builder_root() {
+    let planned = planned_container();
+    let roots = planned.roots();
+    let Err(error) = planned.render(&roots, &[missing_path()]) else {
+        panic!("an unplanned builder root must not be rendered");
+    };
+
+    assert!(error.to_string().contains("crate::Missing"));
 }
 
 #[test]

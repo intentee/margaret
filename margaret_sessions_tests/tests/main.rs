@@ -1,0 +1,14 @@
+mod clears_a_consumed_access_token_signed_by_another_key;
+mod clears_a_stale_consumed_access_token_presented_without_its_secret;
+mod clears_the_cookies_of_a_secret_its_issuer_refuses;
+mod finds_no_consumed_session_without_session_cookies;
+#[cfg(feature = "tests_that_use_postgres")]
+mod postgres;
+mod reports_a_malformed_refresh_answer;
+mod reports_an_issuer_answering_the_refresh_with_an_unexpected_status;
+mod reports_an_oversized_refresh_answer;
+mod reports_an_unreachable_issuer;
+mod reports_an_unverifiable_refreshed_token;
+mod reports_the_awaited_keys_of_a_refreshed_session_token;
+mod reports_the_awaited_keys_of_a_session_issuer;
+mod resolves_a_consumed_session_from_its_access_token;

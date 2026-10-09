@@ -36,12 +36,8 @@ use crate::statement_kind::StatementKind;
 use crate::table_source::table_source;
 
 const KEYS: TableAlias = TableAlias { position: 0 };
-const ROOTS: TableAlias = TableAlias { position: 1 };
 
-struct KeyArrays {
-    indexes: Vec<i64>,
-    keys: Vec<Vec<DynParameter>>,
-}
+const ROOTS: TableAlias = TableAlias { position: 1 };
 
 fn key_arrays<Loaded: Loadable>(
     records: &[Loaded::Root],
@@ -142,6 +138,11 @@ fn keyed_select<Loaded: Loadable>(KeyArrays { indexes, keys }: KeyArrays) -> Sta
             },
         }],
     })
+}
+
+struct KeyArrays {
+    indexes: Vec<i64>,
+    keys: Vec<Vec<DynParameter>>,
 }
 
 pub(crate) async fn attach_shapes<Loaded: Loadable, Executing: Executor>(

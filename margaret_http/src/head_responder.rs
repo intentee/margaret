@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::handler_error::HandlerError;
+use margaret_handler_error::handler_error::HandlerError;
+
 use crate::handler_future::HandlerFuture;
 use crate::head_handler::HeadHandler;
 use crate::request::Request;

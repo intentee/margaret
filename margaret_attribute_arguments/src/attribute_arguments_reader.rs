@@ -10,13 +10,36 @@ use syn::Path;
 
 use crate::attribute_args::AttributeArgs;
 use crate::attribute_arguments_error::AttributeArgumentsError;
+use crate::format_path::format_path;
 use crate::named_argument::NamedArgument;
+
+fn positional_variant(expression: &Expr) -> Option<PositionalVariant> {
+    match expression {
+        Expr::Path(expression) => Some(PositionalVariant {
+            arguments: Vec::new(),
+            path: expression.path.clone(),
+        }),
+        Expr::Call(call) => match call.func.as_ref() {
+            Expr::Path(function) => Some(PositionalVariant {
+                arguments: call.args.iter().cloned().collect(),
+                path: function.path.clone(),
+            }),
+            _ => None,
+        },
+        _ => None,
+    }
+}
 
 fn call_name(call: &ExprCall) -> Option<&Ident> {
     match call.func.as_ref() {
         Expr::Path(function) => function.path.get_ident(),
         _ => None,
     }
+}
+
+struct PositionalVariant {
+    arguments: Vec<Expr>,
+    path: Path,
 }
 
 pub struct AttributeArgumentsReader {
@@ -144,6 +167,26 @@ impl AttributeArgumentsReader {
             }
             _ => None,
         }
+    }
+
+    /// # Errors
+    ///
+    /// Returns the errors of reading the variant or of its leftover arguments.
+    pub fn take_positional_variant<Interpreted, InterpretError>(
+        &mut self,
+        read: impl FnOnce(&Path, &mut Self) -> Result<Interpreted, InterpretError>,
+    ) -> Result<Option<Interpreted>, InterpretError>
+    where
+        InterpretError: From<AttributeArgumentsError>,
+    {
+        let Some(PositionalVariant { arguments, path }) =
+            self.positional.first().and_then(positional_variant)
+        else {
+            return Ok(None);
+        };
+
+        self.positional.remove(0);
+        self.read_variant(&format_path(&path), &path, arguments, read)
     }
 
     /// # Errors

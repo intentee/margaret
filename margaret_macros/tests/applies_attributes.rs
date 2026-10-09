@@ -5,10 +5,6 @@ mod catalog {
 
     pub struct Account;
 
-    pub struct PartnerCallback {
-        _flow: (),
-    }
-
     pub struct PortalCallback {
         _flow: (),
     }
@@ -57,28 +53,54 @@ mod catalog {
     pub enum JwsAlgorithm {
         Es256,
     }
+
+    pub enum OidcEndpoint {
+        Token,
+    }
+
+    pub enum SessionCookies {
+        SharedWithDomain,
+    }
+
+    pub enum SessionEndpoint {
+        SignOut,
+    }
+
+    pub enum SignInEndpoint {
+        Callback,
+    }
+
+    pub struct Welcome;
 }
 
-use margaret_macros::acts_as_oauth_client;
 use margaret_macros::admits_oauth_client;
+use margaret_macros::admits_sign_in;
 use margaret_macros::build_for_session;
 use margaret_macros::console_command;
 use margaret_macros::constructor;
+use margaret_macros::consumes_sessions;
 use margaret_macros::exchanges_tokens_from;
 use margaret_macros::handles_middleware_attribute;
 use margaret_macros::infer_from_request;
 use margaret_macros::infers_authenticated_user;
 use margaret_macros::issues_resource_tokens;
+use margaret_macros::issues_sessions;
 use margaret_macros::issues_tokens;
 use margaret_macros::middleware;
 use margaret_macros::model;
+use margaret_macros::oauth_client;
+use margaret_macros::oauth_scope;
 use margaret_macros::postgres_database;
 use margaret_macros::process;
 use margaret_macros::provides_route_parameter;
+use margaret_macros::provides_userinfo_claims;
 use margaret_macros::renders_view;
 use margaret_macros::responds_to_http;
 use margaret_macros::route_parameter_value;
 use margaret_macros::scheduled_with_tick_timer;
+use margaret_macros::serves_oidc_endpoint;
+use margaret_macros::serves_session_endpoint;
+use margaret_macros::serves_sign_in;
 use margaret_macros::service;
 use margaret_macros::singleton;
 use margaret_macros::verifies_tokens_from_issuer;
@@ -92,14 +114,18 @@ use crate::catalog::ConsentPolicy;
 use crate::catalog::IdTokenSigning;
 use crate::catalog::IssuerKeys;
 use crate::catalog::JwsAlgorithm;
+use crate::catalog::OidcEndpoint;
 use crate::catalog::OnDelete;
-use crate::catalog::PartnerCallback;
 use crate::catalog::PortalCallback;
 use crate::catalog::RequestInput;
 use crate::catalog::RouteMethod;
+use crate::catalog::SessionCookies;
+use crate::catalog::SessionEndpoint;
+use crate::catalog::SignInEndpoint;
 use crate::catalog::TICK_INTERVAL;
 use crate::catalog::TickBehavior;
 use crate::catalog::WebSocketResponse;
+use crate::catalog::Welcome;
 
 #[singleton]
 #[responds_to_http(method = RouteMethod::Get, path = "/subject", server = "public")]
@@ -146,7 +172,7 @@ struct Binder {
 )]
 struct JwksEndpoint;
 
-#[issues_tokens(provider, audience = "session", issuer = "https://issuer.example")]
+#[issues_tokens(provider, issuer = "https://issuer.example")]
 struct TokenIssuer;
 
 #[issues_resource_tokens(attachments, audience = "attachments")]
@@ -160,14 +186,20 @@ struct AttachmentsResource;
 )]
 struct PartnerIssuer;
 
-#[acts_as_oauth_client(
+#[oauth_client(
     partner_client,
     authentication = ClientAuthenticationMethod::PrivateKeyJwt,
     client_id = "partner",
     issuer = partner,
-    sign_in(redirect_route = PartnerCallback, scopes = ["profile"])
+    sign_in(scopes = [ProfileScope])
 )]
 struct PartnerClient;
+
+#[serves_sign_in(SignInEndpoint::Callback(landing_route = Welcome), client = partner_client)]
+struct GetPartnerCallback;
+
+#[admits_sign_in(client = partner_client)]
+struct PartnerReaders;
 
 #[admits_oauth_client(
     portal,
@@ -181,7 +213,7 @@ struct PartnerClient;
         consent = ConsentPolicy::Prompted,
         id_token_signing = IdTokenSigning::Rsa,
         redirect_routes = [PortalCallback],
-        scopes = ["openid"]
+        scopes = [ProfileScope]
     ),
     client_id = "portal",
     resources = ["attachments"]
@@ -191,11 +223,40 @@ struct PortalClient;
 #[exchanges_tokens_from(issuer = partner)]
 struct PartnerExchanger;
 
-#[postgres_database(url_from = "PORTAL_DATABASE_URL")]
+#[postgres_database(
+    url_from = "PORTAL_DATABASE_URL",
+    max_connections_from = "PORTAL_DATABASE_MAX_CONNECTIONS"
+)]
 struct PortalDatabase;
 
 #[route_parameter_value]
 struct SubjectId(String);
+
+#[oauth_scope(name = "profile")]
+struct ProfileScope;
+
+#[provides_userinfo_claims]
+struct ProfileClaims;
+
+#[serves_oidc_endpoint(OidcEndpoint::Token)]
+struct PostToken;
+
+#[issues_sessions(
+    issuer = provider,
+    audience = "browser",
+    cookies = SessionCookies::SharedWithDomain(domain_from = "SESSION_COOKIE_DOMAIN")
+)]
+struct BrowserSessions;
+
+#[consumes_sessions(
+    issuer = partner,
+    cookie_domain_from = "SESSION_COOKIE_DOMAIN",
+    refresh_url_from = "SESSION_REFRESH_URL"
+)]
+struct PartnerSessions;
+
+#[serves_session_endpoint(SessionEndpoint::SignOut(landing_route = Welcome))]
+struct PostSignOut;
 
 impl Binder {
     fn bind(&self, value: &str) -> String {
@@ -212,8 +273,12 @@ struct AccountProvider;
 
 impl AccountProvider {
     #[infer_from_request]
-    fn infer(&self, #[bearer_token(issuer = partner)] token: &str) -> String {
-        format!("verified {token}")
+    fn infer(
+        &self,
+        #[bearer_token(issuer = partner)] token: &str,
+        #[session(issuer = provider)] session: &str,
+    ) -> String {
+        format!("verified {token} in {session}")
     }
 }
 
@@ -273,9 +338,20 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(size_of::<AttachmentsResource>(), 0);
     assert_eq!(size_of::<PartnerExchanger>(), 0);
     assert_eq!(size_of::<PortalDatabase>(), 0);
+    assert_eq!(size_of_val(&ProfileScope), 0);
+    assert_eq!(size_of_val(&ProfileClaims), 0);
+    assert_eq!(size_of_val(&PostToken), 0);
+    assert_eq!(size_of_val(&BrowserSessions), 0);
+    assert_eq!(size_of_val(&PartnerSessions), 0);
+    assert_eq!(size_of_val(&PostSignOut), 0);
+    assert_eq!(size_of_val(&GetPartnerCallback), 0);
+    assert_eq!(size_of_val(&PartnerReaders), 0);
     assert_eq!(size_of::<Worker>(), 0);
     assert_eq!(size_of_val(&AccountProvider), 0);
-    assert_eq!(AccountProvider.infer("bearer"), "verified bearer");
+    assert_eq!(
+        AccountProvider.infer("bearer", "session"),
+        "verified bearer in session"
+    );
     assert_eq!(size_of_val(&Account), 0);
 
     let record = Record {

@@ -48,26 +48,6 @@ use crate::web_socket_driver_channel::WebSocketDriverChannel;
 use crate::web_socket_driver_sender::WebSocketDriverSender;
 use crate::web_socket_upgrade_terminal::WebSocketUpgradeTerminal;
 
-#[derive(Clone)]
-enum BoundTransport {
-    Plain,
-    MutualTls { acceptor: TlsAcceptor },
-}
-
-#[derive(Clone)]
-struct ConnectionContext {
-    cancellation_token: CancellationToken,
-    forward_targets: Arc<ForwardTargets>,
-    peer_identity: Arc<PeerIdentity>,
-    remote_addr: SocketAddr,
-    server: Arc<Server>,
-}
-
-struct AcceptedConnection {
-    remote_addr: SocketAddr,
-    stream: TcpStream,
-}
-
 fn accepted_connection(
     (stream, remote_addr): (TcpStream, SocketAddr),
 ) -> Result<AcceptedConnection, io::Error> {
@@ -238,6 +218,26 @@ async fn dispatch(
     }
 }
 
+#[derive(Clone)]
+enum BoundTransport {
+    Plain,
+    MutualTls { acceptor: TlsAcceptor },
+}
+
+#[derive(Clone)]
+struct ConnectionContext {
+    cancellation_token: CancellationToken,
+    forward_targets: Arc<ForwardTargets>,
+    peer_identity: Arc<PeerIdentity>,
+    remote_addr: SocketAddr,
+    server: Arc<Server>,
+}
+
+struct AcceptedConnection {
+    remote_addr: SocketAddr,
+    stream: TcpStream,
+}
+
 pub struct BoundServer {
     forward_targets: Arc<ForwardTargets>,
     listener: TcpListener,
@@ -398,6 +398,7 @@ mod tests {
     use tokio::time::Instant;
     use tokio_util::sync::CancellationToken;
 
+    use margaret_handler_error::handler_error::HandlerError;
     use margaret_http_uploaded_file::upload_config::UploadConfig;
     use margaret_route_method::route_method::RouteMethod;
 
@@ -408,7 +409,6 @@ mod tests {
     use crate::client_head_timeout::CLIENT_HEAD_TIMEOUT;
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
-    use crate::handler_error::HandlerError;
     use crate::head_handler::HeadHandler;
     use crate::http_middleware::HttpMiddleware;
     use crate::method_handler::MethodHandler;

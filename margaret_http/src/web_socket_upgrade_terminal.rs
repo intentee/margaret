@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use hyper::upgrade::OnUpgrade;
 use tokio_util::sync::CancellationToken;
 
-use crate::handler_error::HandlerError;
+use margaret_handler_error::handler_error::HandlerError;
+
 use crate::one_shot_handler::OneShotHandler;
 use crate::request::Request;
 use crate::response_continuation::ResponseContinuation;

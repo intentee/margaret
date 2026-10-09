@@ -23,13 +23,13 @@ use crate::refresh_family_record::RefreshFamilyRecord;
 use crate::sweep_refresh_families::sweep_refresh_families;
 
 async fn earlier_redemption<Decided>(
-    database: &Database,
+    transaction: &Transaction<'_>,
     code: Vec<u8>,
 ) -> Result<CodeRedemption<Decided>, AuthorizationGrantsError> {
     AuthorizationCodeRecord::query()
         .code
         .eq(code)
-        .find(database)
+        .find(transaction)
         .map_err(AuthorizationGrantsError::FindRedeemedCode)
         .await
         .map(|lookup| match lookup {
@@ -43,7 +43,6 @@ async fn earlier_redemption<Decided>(
 
 async fn redeemed_within<Decided>(
     transaction: Transaction<'_>,
-    database: &Database,
     code: Vec<u8>,
     family: Uuid,
     now: NumericDate,
@@ -71,13 +70,15 @@ async fn redeemed_within<Decided>(
                     .map(|()| CodeRedemption::Unknown)
                     .map_err(AuthorizationGrantsError::CommitExpiredCodeRedemption),
                 Change::Unmatched => {
-                    let rolled_back = transaction
-                        .rollback()
-                        .await
-                        .map_err(AuthorizationGrantsError::RollbackUnmatchedCodeRedemption);
+                    let earlier = earlier_redemption(&transaction, code).await;
 
-                    ready(rolled_back)
-                        .and_then(|()| earlier_redemption(database, code))
+                    ready(earlier)
+                        .and_then(|redemption| {
+                            transaction
+                                .rollback()
+                                .map_ok(|()| redemption)
+                                .map_err(AuthorizationGrantsError::RollbackUnmatchedCodeRedemption)
+                        })
                         .await
                 }
             }
@@ -191,9 +192,7 @@ impl AuthorizationCodeRecord {
                     .map_err(AuthorizationGrantsError::BeginCodeRedemption);
 
                 ready(began)
-                    .and_then(|transaction| {
-                        redeemed_within(transaction, database, code, family, now, decide)
-                    })
+                    .and_then(|transaction| redeemed_within(transaction, code, family, now, decide))
                     .await
             })
             .await

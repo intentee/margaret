@@ -2,20 +2,23 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::module_sign_in::ModuleSignIn;
+use crate::oauth_client_credentials::OAuthClientCredentials;
 
 #[derive(Clone, Copy)]
 pub enum OAuthClientItem {
     AuthorizationServerClient,
     ClientCredentials,
     SignInFlow,
+    SignInStartHandler,
     TokenExchange,
 }
 
 impl OAuthClientItem {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::AuthorizationServerClient,
         Self::ClientCredentials,
         Self::SignInFlow,
+        Self::SignInStartHandler,
         Self::TokenExchange,
     ];
 
@@ -31,6 +34,9 @@ impl OAuthClientItem {
             Self::SignInFlow => quote! {
                 margaret::framework::oidc_sign_in::sign_in_flow::SignInFlow
             },
+            Self::SignInStartHandler => quote! {
+                margaret::framework::oidc_sign_in::sign_in_start_handler::SignInStartHandler
+            },
             Self::TokenExchange => quote! {
                 margaret::framework::token_exchange_client::token_exchange::TokenExchange
             },
@@ -38,10 +44,17 @@ impl OAuthClientItem {
     }
 
     #[must_use]
-    pub fn is_available_to(self, sign_in: &ModuleSignIn) -> bool {
+    pub fn is_available_to(
+        self,
+        sign_in: &ModuleSignIn,
+        credentials: &OAuthClientCredentials,
+    ) -> bool {
         match self {
-            Self::SignInFlow => matches!(sign_in, ModuleSignIn::Available { .. }),
-            Self::AuthorizationServerClient | Self::ClientCredentials | Self::TokenExchange => true,
+            Self::ClientCredentials => matches!(credentials, OAuthClientCredentials::Targeted),
+            Self::SignInFlow | Self::SignInStartHandler => {
+                matches!(sign_in, ModuleSignIn::Available { .. })
+            }
+            Self::AuthorizationServerClient | Self::TokenExchange => true,
         }
     }
 
@@ -51,6 +64,7 @@ impl OAuthClientItem {
             Self::AuthorizationServerClient => "AuthorizationServerClient",
             Self::ClientCredentials => "ClientCredentials",
             Self::SignInFlow => "SignInFlow",
+            Self::SignInStartHandler => "SignInStartHandler",
             Self::TokenExchange => "TokenExchange",
         }
     }

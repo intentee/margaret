@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use cookie::Cookie;
 use oauth2::AccessToken;
 
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
@@ -38,7 +37,6 @@ async fn fetches_userinfo_of_the_signed_in_subject() {
             access_token: AccessToken::new("2YotnFZFEjr1zCsicMWpAA".to_string()),
             claims: (),
             subject: "subject".to_string(),
-            transaction_removal: Cookie::new("transaction", ""),
         })
         .await;
 

@@ -45,6 +45,8 @@ mod tests {
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_sessions_codegen::sessions_item::SessionsItem;
+    use margaret_sessions_codegen::sessions_item_path::sessions_item_path;
     use margaret_tag_codegen_tests::collected_tags::collected_tags;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -146,18 +148,25 @@ impl RespondsToWebSocketNotification for Typist {
 }
 "#;
 
-    fn bindings(index: &AttributeIndex) -> ContainerBindings {
+    fn bindings_providing(
+        index: &AttributeIndex,
+        framework_providers: &[FrameworkProvider],
+    ) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
         render_container(
             index,
             &registry,
-            &[],
+            framework_providers,
             &DeclaredPostgresDatabase::Absent,
             &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")
         .bindings
+    }
+
+    fn bindings(index: &AttributeIndex) -> ContainerBindings {
+        bindings_providing(index, &[])
     }
 
     fn collect_registries(
@@ -1010,6 +1019,81 @@ impl RespondsToWebSocketMessage for Chatter {
     type Message = Chat;
 }
 "#;
+
+    const SESSION_HANDSHAKE: &str = r#"
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::sessions::session::Session;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[issues_tokens(provider, issuer = "https://issuer.example")]
+struct ProviderIssuance;
+
+#[issues_sessions(issuer = provider, audience = "browser", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]
+struct BrowserSessions;
+
+struct User;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[infer_from_request]
+    fn infer(&self, #[session(issuer = provider)] session: Option<Session>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn assemble(#[authenticated_user] viewer: Option<User>) -> anyhow::Result<Self> {}
+}
+
+#[websocket_message(request, method = "chat", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+"#;
+
+    #[test]
+    fn sets_the_session_cookie_changes_on_the_upgrade() {
+        let index = IndexedSource::new(SESSION_HANDSHAKE).index;
+        let bindings = bindings_providing(
+            &index,
+            &[FrameworkProvider {
+                construction: FrameworkConstruction::Unit,
+                enablement: FrameworkEnablement::Declared,
+                injection: FrameworkInjectionRole::Unmarked,
+                provided: sessions_item_path(SessionsItem::IssuedSessions),
+            }],
+        );
+        let tags = collected_tags(&index);
+        let registries =
+            BindingRegistries::collect(&index, ViewsAvailability::Available, &tags, &bindings, &[])
+                .expect("the binding registries are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
+        let source: String = render_websocket(&index, &bindings, &plans, &registries)
+            .expect("the websocket module is generated")
+            .modules
+            .into_iter()
+            .map(|module| module.to_source())
+            .collect::<String>()
+            .split_whitespace()
+            .collect();
+
+        assert!(
+            source
+                .contains("cookie_changes:changed_cookies,session:::std::sync::Arc::new(created),")
+        );
+    }
 
     #[test]
     fn holds_the_authenticated_user_provider_on_the_session_factory() {

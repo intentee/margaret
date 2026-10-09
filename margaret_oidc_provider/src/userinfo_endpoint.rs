@@ -1,69 +1,53 @@
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use chrono::Utc;
-use serde::Serialize;
-use serde_json::Map;
-use serde_json::Value;
 use uuid::Uuid;
 
+use margaret_handler_error::handler_error::HandlerError;
 use margaret_http::bearer_challenge::BearerChallenge;
+use margaret_http::head_handler::HeadHandler;
 use margaret_http::request::Request;
-use margaret_http::response::Response;
+use margaret_http::response_continuation::ResponseContinuation;
 use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 use margaret_oauth_vocabulary::scope_list::ScopeList;
-use margaret_registered_claims::merge_claims::merge_claims;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
-use crate::no_store::no_store;
-use crate::provider_error::ProviderError;
+use crate::answers_userinfo_grants::AnswersUserinfoGrants;
+use crate::provides_userinfo_claims::ProvidesUserinfoClaims;
+use crate::typed_userinfo_answer::TypedUserinfoAnswer;
 use crate::userinfo_authentication::UserinfoAuthentication;
 use crate::userinfo_grant::UserinfoGrant;
-
-const SUBJECT_MEMBER: &str = "sub";
 
 fn refused(challenge: BearerChallenge) -> UserinfoAuthentication {
     UserinfoAuthentication::Refused(challenge.response())
 }
 
 pub struct UserinfoEndpoint {
+    answer: Box<dyn AnswersUserinfoGrants>,
     issuance: TokenIssuance,
     secret_store: Arc<JwksSecretStore>,
 }
 
 impl UserinfoEndpoint {
     #[must_use]
-    pub fn create(secret_store: Arc<JwksSecretStore>, issuance: TokenIssuance) -> Self {
+    pub fn create<TProvider: ProvidesUserinfoClaims>(
+        secret_store: Arc<JwksSecretStore>,
+        issuance: TokenIssuance,
+        claims: Arc<TProvider>,
+    ) -> Self {
         Self {
+            answer: Box::new(TypedUserinfoAnswer { provider: claims }),
             issuance,
             secret_store,
         }
     }
 
-    /// # Errors
-    ///
-    /// Returns `ProviderError::UserinfoClaims` when the claims cannot be merged with the subject.
-    pub fn answer<TClaims: Serialize>(
-        &self,
-        grant: &UserinfoGrant,
-        claims: &TClaims,
-    ) -> Result<Response, ProviderError> {
-        merge_claims(
-            Map::from_iter([(
-                SUBJECT_MEMBER.to_string(),
-                Value::String(grant.subject.to_string()),
-            )]),
-            claims,
-        )
-        .map_err(ProviderError::UserinfoClaims)
-        .map(|members| no_store(Response::json(200, &Value::Object(members))))
-    }
-
-    #[must_use]
-    pub fn authenticate(&self, request: &Request) -> UserinfoAuthentication {
+    fn authenticate(&self, request: &Request) -> UserinfoAuthentication {
         let token = match request.inputs.server.authorization().bearer() {
             ControlFlow::Continue(token) => token,
             ControlFlow::Break(challenge) => return refused(challenge),
@@ -89,6 +73,21 @@ impl UserinfoEndpoint {
                 }
                 Err(_) => refused(BearerChallenge::InvalidToken),
             },
+        }
+    }
+}
+
+#[async_trait]
+impl HeadHandler for UserinfoEndpoint {
+    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        match self.authenticate(request) {
+            UserinfoAuthentication::Authenticated(grant) => self
+                .answer
+                .answered(&grant)
+                .await
+                .map(ResponseContinuation::from)
+                .map_err(|error| HandlerError::consumer(anyhow::Error::from(error))),
+            UserinfoAuthentication::Refused(refusal) => Ok(ResponseContinuation::from(refusal)),
         }
     }
 }

@@ -13,8 +13,8 @@ use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
+use margaret_jwks_secret_store_tests::fixture_issuance::fixture_issuance;
 use margaret_jwks_secret_store_tests::fixture_secrets::fixture_secrets;
-use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
 
 fn held(secrets: &JwksSecretHolder) -> Arc<ClientKeySet> {
     let key_set = IssuerKeySet::awaiting();

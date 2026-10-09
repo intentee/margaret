@@ -1,7 +1,7 @@
-use margaret_container::container_bindings::ContainerBindings;
-use margaret_http_codegen::route_location::RouteLocation;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
+use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
 
+use crate::declared_endpoint_routes::DeclaredEndpointRoutes;
 use crate::derived_provider_endpoints::DerivedProviderEndpoints;
 use crate::endpoint_routes::EndpointRoutes;
 use crate::oidc_provider_codegen_error::OidcProviderCodegenError;
@@ -10,26 +10,23 @@ use crate::provider_endpoint::ProviderEndpoint;
 /// # Errors
 ///
 /// Returns `OidcProviderCodegenError` when the discovery document is not served by exactly one
-/// server at the discovery location of the issuer, when no route uses the consent endpoint, or
-/// when an endpoint is not served at exactly one parameterless path of that server by routes of a
-/// method it admits.
+/// server at the discovery location of the issuer, when an endpoint is not served at exactly one
+/// parameterless path of that server, when an endpoint is served that no admitted client uses,
+/// or when the authorization endpoint is served without a consent page of that server or without
+/// sessions that authenticate its end users.
 pub fn derive_provider_endpoints(
-    locations: &[RouteLocation<'_>],
-    bindings: &ContainerBindings,
+    marked: &DeclaredEndpointRoutes,
     issuer: &IssuerIdentifier,
     capable: &[ProviderEndpoint],
+    sessions: &DeclaredSessions,
 ) -> Result<DerivedProviderEndpoints, OidcProviderCodegenError> {
-    let routes = EndpointRoutes {
-        bindings,
-        locations,
-    };
+    let routes = EndpointRoutes { marked };
     let server = routes.provider_server()?;
 
-    routes.consent(capable)?;
     routes.discovery_served(server, issuer)?;
 
     Ok(DerivedProviderEndpoints {
-        authorization: routes.optional(ProviderEndpoint::Authorization, capable, server, issuer)?,
+        authorization: routes.authorization(capable, server, issuer, sessions)?,
         introspection: routes.optional(ProviderEndpoint::Introspection, capable, server, issuer)?,
         issuer_origin: issuer.url().origin().ascii_serialization(),
         jwks: routes.url(ProviderEndpoint::Jwks, server, issuer)?,
@@ -42,34 +39,30 @@ pub fn derive_provider_endpoints(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use margaret_attributes_tests::indexed_source::IndexedSource;
-    use margaret_container::framework_construction::FrameworkConstruction;
-    use margaret_container::framework_enablement::FrameworkEnablement;
-    use margaret_container::framework_injection_role::FrameworkInjectionRole;
-    use margaret_container::framework_provider::FrameworkProvider;
-    use margaret_container::render_container::render_container;
-    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_http_codegen::declared_routes::DeclaredRoutes;
-    use margaret_http_codegen::http_plan::HttpPlan;
-    use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
-    use margaret_request_binding_codegen::binding_registries::BindingRegistries;
-    use margaret_request_binding_codegen::views_availability::ViewsAvailability;
-    use margaret_serve_input_codegen::scan::scan;
-    use margaret_tag_codegen_tests::collected_tags::collected_tags;
+    use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
+    use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
+    use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use super::derive_provider_endpoints;
+    use crate::consent_page::ConsentPage;
+    use crate::declared_endpoint_routes::DeclaredEndpointRoutes;
+    use crate::derived_authorization::DerivedAuthorization;
     use crate::derived_endpoint::DerivedEndpoint;
     use crate::derived_provider_endpoints::DerivedProviderEndpoints;
     use crate::oidc_provider_codegen_error::OidcProviderCodegenError;
-    use crate::oidc_provider_item::OidcProviderItem;
-    use crate::oidc_provider_item_path::oidc_provider_item_path;
     use crate::provider_endpoint::ProviderEndpoint;
+    use crate::served_authorization::ServedAuthorization;
 
-    const ENDPOINTS: [ProviderEndpoint; 7] = [
+    const ISSUANCE: &str = "use margaret::framework::sessions::session_cookies::SessionCookies;\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n\n#[renders_view(name = \"consent_view\")]\n#[singleton]\npub struct ConsentView;\n\n";
+
+    const SESSIONS: &str = "#[issues_sessions(issuer = provider, audience = \"browser\", cookies = SessionCookies::HostOnly)]\npub struct BrowserSessions;\n\n";
+
+    const ENDPOINTS: [ProviderEndpoint; 8] = [
         ProviderEndpoint::Authorization,
+        ProviderEndpoint::Consent,
         ProviderEndpoint::Discovery,
         ProviderEndpoint::Introspection,
         ProviderEndpoint::Jwks,
@@ -77,104 +70,6 @@ mod tests {
         ProviderEndpoint::Token,
         ProviderEndpoint::Userinfo,
     ];
-
-    #[derive(Clone, Copy)]
-    struct FixtureRoute {
-        handler: &'static str,
-        method: &'static str,
-        name: &'static str,
-        path: &'static str,
-        server: &'static str,
-    }
-
-    fn route(
-        name: &'static str,
-        method: &'static str,
-        path: &'static str,
-        handler: &'static str,
-    ) -> FixtureRoute {
-        FixtureRoute {
-            handler,
-            method,
-            name,
-            path,
-            server: "public",
-        }
-    }
-
-    fn provider_routes() -> Vec<FixtureRoute> {
-        vec![
-            route(
-                "GetAuthorize",
-                "Get",
-                "/authorize",
-                "oidc_provider::AuthorizationEndpoint",
-            ),
-            route(
-                "PostAuthorize",
-                "Post",
-                "/authorize",
-                "oidc_provider::AuthorizationEndpoint",
-            ),
-            route(
-                "PostConsent",
-                "Post",
-                "/consent",
-                "oidc_provider::ConsentEndpoint",
-            ),
-            route(
-                "GetDiscovery",
-                "Get",
-                "/.well-known/openid-configuration",
-                "oidc_provider::ProviderMetadataHandler",
-            ),
-            route(
-                "PostIntrospect",
-                "Post",
-                "/introspect",
-                "oidc_provider::IntrospectionEndpoint",
-            ),
-            route("GetJwks", "Get", "/jwks.json", "jwks::PublicJwksHandler"),
-            route(
-                "PostRevoke",
-                "Post",
-                "/revoke",
-                "oidc_provider::RevocationEndpoint",
-            ),
-            route(
-                "PostToken",
-                "Post",
-                "/token",
-                "oidc_provider::TokenEndpoint",
-            ),
-            route(
-                "GetUserinfo",
-                "Get",
-                "/userinfo",
-                "oidc_provider::UserinfoEndpoint",
-            ),
-        ]
-    }
-
-    fn source_of(routes: &[FixtureRoute]) -> String {
-        routes
-            .iter()
-            .map(
-                |FixtureRoute {
-                     handler,
-                     method,
-                     name,
-                     path,
-                     server,
-                 }| {
-                    format!(
-                        "#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::{method}, path = \"{path}\", server = \"{server}\")]\nstruct {name};\n\nimpl {name} {{\n    #[constructor]\n    fn create(handler: std::sync::Arc<crate::margaret::{handler}>) -> anyhow::Result<Self> {{}}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {{}}\n}}\n\n"
-                    )
-                },
-            )
-            .collect::<Vec<String>>()
-            .concat()
-    }
 
     const EVERY_CAPABILITY: &[ProviderEndpoint] = &[
         ProviderEndpoint::Authorization,
@@ -185,60 +80,101 @@ mod tests {
 
     const NO_CAPABILITY: &[ProviderEndpoint] = &[];
 
+    #[derive(Clone, Copy)]
+    struct FixtureRoute {
+        endpoint: &'static str,
+        method: &'static str,
+        name: &'static str,
+        path: &'static str,
+        server: &'static str,
+    }
+
+    fn route(
+        name: &'static str,
+        method: &'static str,
+        path: &'static str,
+        endpoint: &'static str,
+    ) -> FixtureRoute {
+        FixtureRoute {
+            endpoint,
+            method,
+            name,
+            path,
+            server: "public",
+        }
+    }
+
+    fn provider_routes() -> Vec<FixtureRoute> {
+        vec![
+            route("GetAuthorize", "Get", "/authorize", "Authorization"),
+            route("PostAuthorize", "Post", "/authorize", "Authorization"),
+            route(
+                "PostConsent",
+                "Post",
+                "/consent",
+                "Consent(view = ConsentView)",
+            ),
+            route(
+                "GetDiscovery",
+                "Get",
+                "/.well-known/openid-configuration",
+                "Discovery",
+            ),
+            route("PostIntrospect", "Post", "/introspect", "Introspection"),
+            route("GetJwks", "Get", "/jwks.json", "Jwks"),
+            route("PostRevoke", "Post", "/revoke", "Revocation"),
+            route("PostToken", "Post", "/token", "Token"),
+            route("GetUserinfo", "Get", "/userinfo", "Userinfo"),
+        ]
+    }
+
+    fn source_of(routes: &[FixtureRoute]) -> String {
+        routes
+            .iter()
+            .map(
+                |FixtureRoute {
+                     endpoint,
+                     method,
+                     name,
+                     path,
+                     server,
+                 }| {
+                    format!(
+                        "#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::{method}, path = \"{path}\", server = \"{server}\")]\n#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::{endpoint})]\nstruct {name};\n\n"
+                    )
+                },
+            )
+            .collect::<Vec<String>>()
+            .concat()
+    }
+
+    fn derived_with(
+        sessions: &str,
+        routes: &[FixtureRoute],
+        issuer: &str,
+        capable: &[ProviderEndpoint],
+    ) -> Result<DerivedProviderEndpoints, OidcProviderCodegenError> {
+        let indexed = IndexedSource::new(&format!("{ISSUANCE}{sessions}{}", source_of(routes)));
+        let index = &indexed.index;
+        let issuance = DeclaredTokenIssuance::read(index).expect("the token issuance is read");
+        let resources = DeclaredResourceIssuances::read(index, &issuance)
+            .expect("the resource issuances are read");
+        let declared = DeclaredRoutes::read(index).expect("the routes are declared");
+
+        derive_provider_endpoints(
+            &DeclaredEndpointRoutes::read(index, &declared).expect("the endpoint routes are read"),
+            &issuer.parse().expect("the issuer is an https url"),
+            capable,
+            &DeclaredSessions::read(index, &issuance, &resources).expect("the sessions are read"),
+        )
+    }
+
     fn derived_for(
         routes: &[FixtureRoute],
         issuer: &str,
         capable: &[ProviderEndpoint],
     ) -> Result<DerivedProviderEndpoints, OidcProviderCodegenError> {
-        let indexed = IndexedSource::new(&source_of(routes));
-        let index = &indexed.index;
-        let handlers: Vec<FrameworkProvider> = ENDPOINTS
-            .into_iter()
-            .map(ProviderEndpoint::handler_path)
-            .chain([oidc_provider_item_path(OidcProviderItem::ConsentEndpoint)])
-            .map(|provided| FrameworkProvider {
-                construction: FrameworkConstruction::Unit,
-                enablement: FrameworkEnablement::WhenReferenced,
-                injection: FrameworkInjectionRole::Unmarked,
-                provided,
-            })
-            .collect();
-        let bindings = render_container(
-            index,
-            &scan(index).expect("the serve inputs are scanned"),
-            &handlers,
-            &DeclaredPostgresDatabase::Absent,
-            &DeclaredTokenIssuance::Absent,
-        )
-        .expect("the container renders")
-        .bindings;
-        let tags = collected_tags(index);
-        let registries = BindingRegistries::collect(
-            index,
-            ViewsAvailability::Unavailable,
-            &tags,
-            &bindings,
-            &[],
-        )
-        .expect("the registries are collected");
-        let middleware_plans = MiddlewarePlans::collect(index, &registries, &tags)
-            .expect("the middleware plans are collected");
-        let plan = HttpPlan::build(
-            index,
-            DeclaredRoutes::read(index).expect("the routes are declared"),
-            false,
-            &BTreeMap::new(),
-            &middleware_plans,
-            &registries,
-        )
-        .expect("the http plan builds");
-
-        derive_provider_endpoints(
-            &plan.route_locations(),
-            &bindings,
-            &issuer.parse().expect("the issuer is an https url"),
-            capable,
-        )
+        derived_with(SESSIONS, routes, issuer, capable)
     }
 
     fn derived(
@@ -251,18 +187,25 @@ mod tests {
         DerivedEndpoint::Served(url.to_string())
     }
 
-    fn required_routes() -> Vec<FixtureRoute> {
-        provider_routes()
-            .into_iter()
-            .filter(|route| ["GetDiscovery", "GetJwks", "PostToken"].contains(&route.name))
-            .collect()
-    }
-
     fn rejection(routes: &[FixtureRoute]) -> String {
         derived(routes)
             .err()
             .expect("the provider routes are rejected")
             .to_string()
+    }
+
+    fn named(names: &[&str]) -> Vec<FixtureRoute> {
+        provider_routes()
+            .into_iter()
+            .filter(|route| names.contains(&route.name))
+            .collect()
+    }
+
+    fn without(name: &str) -> Vec<FixtureRoute> {
+        provider_routes()
+            .into_iter()
+            .filter(|route| route.name != name)
+            .collect()
     }
 
     fn replaced(name: &'static str, replacement: FixtureRoute) -> Vec<FixtureRoute> {
@@ -285,10 +228,19 @@ mod tests {
     fn locates_every_endpoint_at_the_issuer() {
         let endpoints = derived(&provider_routes()).expect("every endpoint is routed");
 
-        assert_eq!(
+        assert!(matches!(
             endpoints.authorization,
-            served("https://issuer.example/authorize")
-        );
+            DerivedAuthorization::Served(ServedAuthorization {
+                consent: ConsentPage {
+                    decision: RouteUrlInput { path, server },
+                    view,
+                },
+                url,
+            }) if path == "/consent"
+                && server == "public"
+                && view.to_string() == "crate::ConsentView"
+                && url == "https://issuer.example/authorize"
+        ));
         assert_eq!(
             endpoints.introspection,
             served("https://issuer.example/introspect")
@@ -308,11 +260,26 @@ mod tests {
     }
 
     #[test]
-    fn leaves_the_endpoints_no_admitted_client_needs_unserved() {
-        let endpoints = derived_for(&required_routes(), "https://issuer.example", NO_CAPABILITY)
-            .expect("the required endpoints are routed");
+    fn locates_an_endpoint_route_with_escaped_braces_at_its_literal_path() {
+        let endpoints = derived(&replaced(
+            "PostToken",
+            route("", "Post", "/oauth/{{token}}", "Token"),
+        ))
+        .expect("every endpoint is routed");
 
-        assert_eq!(endpoints.authorization, DerivedEndpoint::Unserved);
+        assert_eq!(endpoints.token, "https://issuer.example/oauth/%7Btoken%7D");
+    }
+
+    #[test]
+    fn leaves_the_endpoints_no_admitted_client_needs_unserved() {
+        let endpoints = derived_for(
+            &named(&["GetDiscovery", "GetJwks", "PostToken"]),
+            "https://issuer.example",
+            NO_CAPABILITY,
+        )
+        .expect("the required endpoints are routed");
+
+        assert_eq!(endpoints.authorization, DerivedAuthorization::Unserved);
         assert_eq!(endpoints.introspection, DerivedEndpoint::Unserved);
         assert_eq!(endpoints.revocation, DerivedEndpoint::Unserved);
         assert_eq!(endpoints.userinfo, DerivedEndpoint::Unserved);
@@ -320,37 +287,46 @@ mod tests {
 
     #[test]
     fn rejects_a_route_of_an_endpoint_no_admitted_client_needs() {
-        let routes: Vec<FixtureRoute> = provider_routes()
-            .into_iter()
-            .filter(|route| {
-                ["GetDiscovery", "GetJwks", "PostToken", "PostIntrospect"].contains(&route.name)
-            })
-            .collect();
-
         assert_eq!(
-            derived_for(&routes, "https://issuer.example", NO_CAPABILITY)
-                .err()
-                .expect("the introspection route is rejected")
-                .to_string(),
+            derived_for(
+                &named(&["GetDiscovery", "GetJwks", "PostToken", "PostIntrospect"]),
+                "https://issuer.example",
+                NO_CAPABILITY
+            )
+            .err()
+            .expect("the introspection route is rejected")
+            .to_string(),
             "the introspection endpoint is routed, but no admitted client introspects tokens"
         );
     }
 
     #[test]
-    fn rejects_a_consent_route_of_a_provider_that_grants_no_authorization_codes() {
-        let routes: Vec<FixtureRoute> = provider_routes()
-            .into_iter()
-            .filter(|route| {
-                ["GetDiscovery", "GetJwks", "PostToken", "PostConsent"].contains(&route.name)
-            })
-            .collect();
-
+    fn rejects_an_authorization_route_of_a_provider_that_grants_no_authorization_codes() {
         assert_eq!(
-            derived_for(&routes, "https://issuer.example", NO_CAPABILITY)
-                .err()
-                .expect("the consent route is rejected")
-                .to_string(),
-            "a route serves the consent endpoint, but no admitted client grants authorization codes an end user could consent to"
+            derived_for(
+                &named(&["GetDiscovery", "GetJwks", "PostToken", "GetAuthorize"]),
+                "https://issuer.example",
+                NO_CAPABILITY
+            )
+            .err()
+            .expect("the authorization route is rejected")
+            .to_string(),
+            "the authorization endpoint is routed, but no admitted client grants authorization codes"
+        );
+    }
+
+    #[test]
+    fn rejects_a_consent_route_of_a_provider_that_grants_no_authorization_codes() {
+        assert_eq!(
+            derived_for(
+                &named(&["GetDiscovery", "GetJwks", "PostToken", "PostConsent"]),
+                "https://issuer.example",
+                NO_CAPABILITY
+            )
+            .err()
+            .expect("the consent route is rejected")
+            .to_string(),
+            "the consent endpoint is routed, but no admitted client grants authorization codes"
         );
     }
 
@@ -371,12 +347,10 @@ mod tests {
 
     #[test]
     fn rejects_a_provider_without_a_discovery_route() {
-        let routes: Vec<FixtureRoute> = provider_routes()
-            .into_iter()
-            .filter(|route| route.name != "GetDiscovery")
-            .collect();
-
-        assert_eq!(rejection(&routes), "no route serves the discovery document");
+        assert_eq!(
+            rejection(&without("GetDiscovery")),
+            "no route serves the discovery document"
+        );
     }
 
     #[test]
@@ -389,7 +363,7 @@ mod tests {
                 "GetInternalDiscovery",
                 "Get",
                 "/.well-known/openid-configuration",
-                "oidc_provider::ProviderMetadataHandler",
+                "Discovery",
             )
         });
 
@@ -406,7 +380,7 @@ mod tests {
                 "GetUserinfo",
                 FixtureRoute {
                     server: "internal",
-                    ..route("", "Get", "/userinfo", "oidc_provider::UserinfoEndpoint")
+                    ..route("", "Get", "/userinfo", "Userinfo")
                 },
             )),
             "no route of the server 'public' serves the userinfo endpoint"
@@ -417,12 +391,7 @@ mod tests {
     fn rejects_an_endpoint_served_at_several_paths() {
         let mut routes = provider_routes();
 
-        routes.push(route(
-            "GetKeys",
-            "Get",
-            "/keys.json",
-            "jwks::PublicJwksHandler",
-        ));
+        routes.push(route("GetKeys", "Get", "/keys.json", "Jwks"));
 
         assert_eq!(
             rejection(&routes),
@@ -431,13 +400,27 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_endpoint_route_of_a_method_it_does_not_admit() {
+    fn rejects_a_discovery_document_served_at_several_paths() {
+        let mut routes = provider_routes();
+
+        routes.push(route(
+            "GetOtherDiscovery",
+            "Get",
+            "/.well-known/other-configuration",
+            "Discovery",
+        ));
+
         assert_eq!(
-            rejection(&replaced(
-                "PostToken",
-                route("", "Get", "/token", "oidc_provider::TokenEndpoint"),
-            )),
-            "the token endpoint is served by a Get route at '/token', which it does not admit"
+            rejection(&routes),
+            r#"the discovery document is served at several paths of the server 'public': ["/.well-known/openid-configuration", "/.well-known/other-configuration"]"#
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_without_a_token_route() {
+        assert_eq!(
+            rejection(&without("PostToken")),
+            "no route of the server 'public' serves the token endpoint"
         );
     }
 
@@ -446,59 +429,58 @@ mod tests {
         assert_eq!(
             rejection(&replaced(
                 "PostRevoke",
-                route(
-                    "",
-                    "Post",
-                    "/revoke/{tenant}",
-                    "oidc_provider::RevocationEndpoint"
-                ),
+                route("", "Post", "/revoke/{tenant}", "Revocation"),
             )),
             "the revocation endpoint is served at '/revoke/{tenant}', which has route parameters"
         );
     }
 
     #[test]
-    fn rejects_an_authorization_route_of_a_method_other_than_get_or_post() {
-        assert_eq!(
-            rejection(&replaced(
-                "PostAuthorize",
-                route(
-                    "",
-                    "Put",
-                    "/authorize",
-                    "oidc_provider::AuthorizationEndpoint"
-                ),
-            )),
-            "the authorization endpoint is served by a Put route at '/authorize', which it does not admit"
-        );
-    }
-
-    #[test]
-    fn rejects_a_discovery_document_served_by_a_post_route() {
-        assert_eq!(
-            rejection(&replaced(
-                "GetDiscovery",
-                route(
-                    "",
-                    "Post",
-                    "/.well-known/openid-configuration",
-                    "oidc_provider::ProviderMetadataHandler"
-                ),
-            )),
-            "the discovery document is served by a Post route at '/.well-known/openid-configuration', which it does not admit"
-        );
-    }
-
-    #[test]
     fn rejects_a_provider_without_a_consent_route() {
-        let routes: Vec<FixtureRoute> = provider_routes()
-            .into_iter()
-            .filter(|route| route.name != "PostConsent")
-            .collect();
-
         assert_eq!(
-            rejection(&routes),
-            "no route uses the consent endpoint, so the authorization endpoint cannot ask an end user for consent"
+            rejection(&without("PostConsent")),
+            "no route of the server 'public' serves the consent endpoint"
+        );
+    }
+
+    #[test]
+    fn rejects_a_consent_route_of_another_server() {
+        assert_eq!(
+            rejection(&replaced(
+                "PostConsent",
+                FixtureRoute {
+                    server: "internal",
+                    ..route("", "Post", "/consent", "Consent(view = ConsentView)")
+                },
+            )),
+            "the consent endpoint 'crate::PostConsent' is served by the server 'internal', but the authorization endpoint is served by 'public'"
+        );
+    }
+
+    #[test]
+    fn rejects_a_parameterized_consent_route() {
+        assert_eq!(
+            rejection(&replaced(
+                "PostConsent",
+                route("", "Post", "/consent/{id}", "Consent(view = ConsentView)"),
+            )),
+            "the consent endpoint is served at '/consent/{id}', which has route parameters"
+        );
+    }
+
+    #[test]
+    fn rejects_an_authorization_endpoint_of_a_crate_without_issued_sessions() {
+        assert_eq!(
+            derived_with(
+                "",
+                &provider_routes(),
+                "https://issuer.example",
+                EVERY_CAPABILITY
+            )
+            .err()
+            .expect("the authorization endpoint is rejected")
+            .to_string(),
+            "the authorization endpoint is routed, but the crate declares no #[issues_sessions] to authenticate its end users"
         );
     }
 
@@ -507,12 +489,7 @@ mod tests {
         assert_eq!(
             rejection(&replaced(
                 "GetDiscovery",
-                route(
-                    "",
-                    "Get",
-                    "/openid-configuration",
-                    "oidc_provider::ProviderMetadataHandler"
-                ),
+                route("", "Get", "/openid-configuration", "Discovery"),
             )),
             "the discovery document is served at '/openid-configuration', but its issuer publishes it at '/.well-known/openid-configuration'"
         );
@@ -520,13 +497,8 @@ mod tests {
 
     #[test]
     fn rejects_a_provider_without_an_introspection_route() {
-        let routes: Vec<FixtureRoute> = provider_routes()
-            .into_iter()
-            .filter(|route| route.name != "PostIntrospect")
-            .collect();
-
         assert_eq!(
-            rejection(&routes),
+            rejection(&without("PostIntrospect")),
             "no route of the server 'public' serves the introspection endpoint"
         );
     }
@@ -537,6 +509,7 @@ mod tests {
             ENDPOINTS.map(|endpoint| endpoint.to_string()),
             [
                 "authorization endpoint",
+                "consent endpoint",
                 "discovery document",
                 "introspection endpoint",
                 "jwks document",

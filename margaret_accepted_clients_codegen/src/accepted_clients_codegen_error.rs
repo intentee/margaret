@@ -6,7 +6,6 @@ use margaret_declaration_anchor::declaration_anchor_error::DeclarationAnchorErro
 use margaret_https_url::https_url_rejection::HttpsUrlRejection;
 use margaret_oauth_vocabulary::client_id_rejection::ClientIdRejection;
 use margaret_oauth_vocabulary::resource_scope_rejection::ResourceScopeRejection;
-use margaret_oauth_vocabulary::scope_rejection::ScopeRejection;
 
 #[derive(Debug, Error)]
 pub enum AcceptedClientsCodegenError {
@@ -73,14 +72,6 @@ pub enum AcceptedClientsCodegenError {
     MalformedClientId {
         anchor: String,
         rejection: ClientIdRejection,
-    },
-
-    #[error(
-        "an authorization_code scope #[admits_oauth_client] declares on '{anchor}' is malformed: {rejection}"
-    )]
-    MalformedCodeScope {
-        anchor: String,
-        rejection: ScopeRejection,
     },
 
     #[error("the jwks_uri #[admits_oauth_client] declares on '{anchor}' is malformed: {rejection}")]
@@ -185,14 +176,6 @@ pub enum AcceptedClientsCodegenError {
     )]
     UuidClientId { anchor: String, client_id: String },
 
-    #[error(
-        "a token_exchange scope #[admits_oauth_client] declares on '{anchor}' is malformed: {rejection}"
-    )]
-    MalformedTokenExchangeScope {
-        anchor: String,
-        rejection: ScopeRejection,
-    },
-
     #[error("#[admits_oauth_client] on '{anchor}' names a tag that is not a single plain name")]
     MalformedTag { anchor: String },
 
@@ -243,6 +226,11 @@ pub enum AcceptedClientsCodegenError {
         "#[admits_oauth_client] on '{anchor}' names the resource '{tag}', which no #[issues_resource_tokens] declares"
     )]
     UnknownResource { anchor: String, tag: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' names the scope '{written}', which no #[oauth_scope] declares and which is not margaret::framework::oauth_vocabulary::openid_scope::OpenidScope"
+    )]
+    UnknownScope { anchor: String, written: String },
 
     #[error(
         "#[admits_oauth_client] on '{anchor}' pins its assertions to '{written}', which is not a variant of margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm"

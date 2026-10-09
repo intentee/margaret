@@ -1,4 +1,7 @@
+use proc_macro2::Ident;
+
 use margaret_container::injected_dependency::InjectedDependency;
+use margaret_tag_codegen::session_source::SessionSource;
 
 use crate::bound_parameter::BoundParameter;
 use crate::request_binding::RequestBinding;
@@ -10,6 +13,11 @@ pub enum AuthenticatedUserChallenge {
     },
     Introspection {
         authorization_server: InjectedDependency,
+    },
+    Session {
+        holder: Ident,
+        sessions: InjectedDependency,
+        source: SessionSource,
     },
     Unchallenged,
 }
@@ -32,6 +40,13 @@ impl AuthenticatedUserChallenge {
                         authorization_server: authorization_server.clone(),
                     };
                 }
+                RequestBinding::Session { sessions, source } => {
+                    return Self::Session {
+                        holder: parameter.holder.clone(),
+                        sessions: sessions.clone(),
+                        source: *source,
+                    };
+                }
                 _ => {}
             }
         }
@@ -50,6 +65,7 @@ impl AuthenticatedUserChallenge {
             Self::Introspection {
                 authorization_server,
             } => vec![authorization_server],
+            Self::Session { sessions, .. } => vec![sessions],
             Self::Unchallenged => Vec::new(),
         }
     }

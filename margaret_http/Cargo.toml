@@ -21,6 +21,7 @@ http-body = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["tokio"] }
+margaret_handler_error = { workspace = true }
 margaret_http_uploaded_file = { workspace = true }
 margaret_peer_identity = { workspace = true }
 margaret_route_method = { workspace = true }
@@ -39,7 +40,6 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "rt", "time"] }
 tokio-rustls = { workspace = true }
 tokio-util = { workspace = true }
-url = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "test-util"] }

@@ -3,12 +3,13 @@ use std::collections::HashSet;
 use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
+use crate::inference_channel::InferenceChannel;
 use crate::request_binding::RequestBinding;
 use crate::request_binding_error::RequestBindingError;
 
 #[derive(Default)]
 pub(crate) struct ExclusiveBindings {
-    bearer_inference: bool,
+    inference_channels: HashSet<InferenceChannel>,
     inferred_models: HashSet<CanonicalPath>,
     next: bool,
     peer_spiffe_id: bool,
@@ -49,18 +50,26 @@ impl ExclusiveBindings {
 
                 match application.challenge {
                     AuthenticatedUserChallenge::Bearer { .. }
-                    | AuthenticatedUserChallenge::Introspection { .. }
-                        if self.bearer_inference =>
-                    {
-                        Err(RequestBindingError::MultipleBearerAuthenticatedUsers {
-                            subject: subject.to_string(),
-                        })
-                    }
-                    AuthenticatedUserChallenge::Bearer { .. }
                     | AuthenticatedUserChallenge::Introspection { .. } => {
-                        self.bearer_inference = true;
-
-                        Ok(())
+                        if self
+                            .inference_channels
+                            .insert(InferenceChannel::BearerCredential)
+                        {
+                            Ok(())
+                        } else {
+                            Err(RequestBindingError::MultipleBearerAuthenticatedUsers {
+                                subject: subject.to_string(),
+                            })
+                        }
+                    }
+                    AuthenticatedUserChallenge::Session { .. } => {
+                        if self.inference_channels.insert(InferenceChannel::Session) {
+                            Ok(())
+                        } else {
+                            Err(RequestBindingError::MultipleSessionAuthenticatedUsers {
+                                subject: subject.to_string(),
+                            })
+                        }
                     }
                     AuthenticatedUserChallenge::Unchallenged => Ok(()),
                 }
@@ -78,6 +87,7 @@ impl ExclusiveBindings {
             | RequestBinding::RequestBodyStream
             | RequestBinding::RouteParameterValue { .. }
             | RequestBinding::Routes
+            | RequestBinding::Session { .. }
             | RequestBinding::UploadedFiles
             | RequestBinding::Views => Ok(()),
         }

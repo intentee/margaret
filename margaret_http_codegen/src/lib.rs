@@ -1,7 +1,13 @@
 mod active_servers;
+mod application_responder;
 mod content_method_tokens;
+mod content_reading;
 pub mod declared_route;
 pub mod declared_routes;
+pub mod framework_input;
+pub mod framework_responder;
+pub mod framework_responders;
+mod framework_route;
 pub mod http_artifacts;
 pub mod http_codegen_error;
 pub mod http_plan;
@@ -17,8 +23,9 @@ pub mod render_http;
 mod render_routes;
 mod route_content;
 mod route_group;
-pub mod route_location;
+mod route_handling;
 mod route_methods;
+mod route_responder;
 pub mod server_origin_source;
 mod server_route_group;
 pub mod server_transport_policy;
@@ -37,6 +44,11 @@ mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
     use margaret_container::container_bindings::ContainerBindings;
+    use margaret_container::framework_construction::FrameworkConstruction;
+    use margaret_container::framework_enablement::FrameworkEnablement;
+    use margaret_container::framework_injection_role::FrameworkInjectionRole;
+    use margaret_container::framework_provider::FrameworkProvider;
+    use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
     use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
@@ -44,10 +56,15 @@ mod tests {
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_sessions_codegen::sessions_item::SessionsItem;
+    use margaret_sessions_codegen::sessions_item_path::sessions_item_path;
     use margaret_tag_codegen_tests::collected_tags::collected_tags;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use crate::declared_routes::DeclaredRoutes;
+    use crate::framework_input::FrameworkInput;
+    use crate::framework_responder::FrameworkResponder;
+    use crate::framework_responders::FrameworkResponders;
     use crate::http_artifacts::HttpArtifacts;
     use crate::http_codegen_error::HttpCodegenError;
     use crate::http_plan::HttpPlan;
@@ -59,8 +76,34 @@ mod tests {
     use crate::web_socket_server_requirements::WebSocketServerRequirements;
     use crate::web_socket_session_route::WebSocketSessionRoute;
 
+    fn no_framework_responders() -> FrameworkResponders {
+        FrameworkResponders {
+            responders: BTreeMap::new(),
+        }
+    }
+
     fn render_http(
         index: &AttributeIndex,
+        has_views: bool,
+        websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
+        middleware_plans: &MiddlewarePlans,
+        bindings: &ContainerBindings,
+        registries: &BindingRegistries,
+    ) -> Result<HttpArtifacts, HttpCodegenError> {
+        render_http_with(
+            index,
+            no_framework_responders(),
+            has_views,
+            websocket_servers,
+            middleware_plans,
+            bindings,
+            registries,
+        )
+    }
+
+    fn render_http_with(
+        index: &AttributeIndex,
+        framework_responders: FrameworkResponders,
         has_views: bool,
         websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
         middleware_plans: &MiddlewarePlans,
@@ -72,6 +115,7 @@ mod tests {
                 HttpPlan::build(
                     index,
                     routes,
+                    framework_responders,
                     has_views,
                     websocket_servers,
                     middleware_plans,
@@ -164,6 +208,222 @@ mod tests {
         })
         .collect::<Vec<String>>()
         .join("\n"))
+    }
+
+    const FRAMEWORK_ENDPOINTS: &str = r#"
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
+
+#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/discovery", server = "identity")]
+#[middleware(traced)]
+struct GetDiscovery;
+
+#[responds_to_http(max_body_bytes = 2_048, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = "/token", server = "identity")]
+struct PostToken;
+
+#[handles_middleware_attribute(attribute = traced)]
+struct Tracer;
+
+impl Tracer {
+    #[process]
+    fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
+}
+"#;
+
+    fn framework_responders(discovery_input: FrameworkInput) -> FrameworkResponders {
+        let mut responders = BTreeMap::new();
+
+        responders.insert(
+            CanonicalPath::new(vec!["crate".to_string(), "GetDiscovery".to_string()]),
+            framework_responder("discovery_handler", discovery_input),
+        );
+        responders.insert(
+            CanonicalPath::new(vec!["crate".to_string(), "PostToken".to_string()]),
+            framework_responder("token_handler", FrameworkInput::Content),
+        );
+
+        FrameworkResponders { responders }
+    }
+
+    fn framework_responder(field: &str, input: FrameworkInput) -> FrameworkResponder {
+        FrameworkResponder {
+            handler: InjectedDependency {
+                concrete: CanonicalPath::new(vec!["crate".to_string(), field.to_string()]),
+                field: field.to_string(),
+            },
+            input,
+        }
+    }
+
+    fn framework_endpoints_plan(
+        index: &AttributeIndex,
+        discovery_input: FrameworkInput,
+    ) -> Result<HttpPlan, HttpCodegenError> {
+        let registries = registries_for(index, false);
+
+        HttpPlan::build(
+            index,
+            DeclaredRoutes::read(index).expect("the routes are declared"),
+            framework_responders(discovery_input),
+            false,
+            &no_websocket_servers(),
+            &MiddlewarePlans::collect(index, &registries, &collected_tags(index))
+                .expect("the middleware is planned"),
+            &registries,
+        )
+    }
+
+    fn framework_endpoints_source(index: &AttributeIndex) -> String {
+        render_http::render_http(
+            framework_endpoints_plan(index, FrameworkInput::Head)
+                .expect("the endpoints are planned"),
+            &bindings_for(index),
+        )
+        .into_modules()
+        .into_iter()
+        .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
+        .map(|module| {
+            module
+                .format()
+                .expect("the module formats")
+                .source()
+                .split_whitespace()
+                .collect::<String>()
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
+    }
+
+    #[test]
+    fn serves_a_framework_head_endpoint_through_its_container_handler() {
+        let source = framework_endpoints_source(&IndexedSource::new(FRAMEWORK_ENDPOINTS).index);
+
+        assert!(source.contains(
+            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer(),}),container.discovery_handler()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>,)"
+        ));
+    }
+
+    #[test]
+    fn serves_a_framework_content_endpoint_with_the_body_limit_of_its_route() {
+        let source = framework_endpoints_source(&IndexedSource::new(FRAMEWORK_ENDPOINTS).index);
+
+        assert!(source.contains(
+            "margaret::framework::http::limited_content_handler::limited_content_handler(container.token_handler(),margaret::framework::http::body_limit::BodyLimit::new(2_048),)"
+        ));
+    }
+
+    #[test]
+    fn retains_the_container_handler_of_a_framework_endpoint() {
+        let HttpPlan { retained_roots, .. } = framework_endpoints_plan(
+            &IndexedSource::new(FRAMEWORK_ENDPOINTS).index,
+            FrameworkInput::Head,
+        )
+        .expect("the endpoints are planned");
+
+        assert!(retained_roots.contains(&CanonicalPath::new(vec![
+            "crate".to_string(),
+            "token_handler".to_string()
+        ])));
+        assert!(!retained_roots.contains(&CanonicalPath::new(vec![
+            "crate".to_string(),
+            "PostToken".to_string()
+        ])));
+    }
+
+    #[test]
+    fn rejects_a_framework_endpoint_that_reads_the_body_of_a_get_route() {
+        assert!(matches!(
+            framework_endpoints_plan(
+                &IndexedSource::new(FRAMEWORK_ENDPOINTS).index,
+                FrameworkInput::Content,
+            ),
+            Err(HttpCodegenError::ContentOnGetRoute { responder }) if responder == "crate::GetDiscovery"
+        ));
+    }
+
+    const SESSION_READER: &str = r#"
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::sessions::session::Session;
+
+#[issues_tokens(provider, issuer = "https://issuer.example")]
+struct ProviderIssuance;
+
+#[issues_sessions(issuer = provider, audience = "browser", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]
+struct BrowserSessions;
+
+struct Reader;
+
+#[singleton]
+#[infers_authenticated_user(user_model = Reader)]
+struct ReaderProvider;
+
+impl ReaderProvider {
+    #[infer_from_request]
+    fn infer(&self, #[session(issuer = provider)] session: Option<Session>) -> anyhow::Result<AuthenticatedUserOutcome<Reader>> {}
+}
+
+#[singleton]
+#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/profile", server = "public")]
+struct GetProfile;
+
+impl GetProfile {
+    #[process]
+    fn respond(&self, #[authenticated_user] reader: Reader) -> anyhow::Result<Response> {}
+}
+"#;
+
+    fn session_bindings(index: &AttributeIndex) -> ContainerBindings {
+        render_container(
+            index,
+            &scan(index).expect("the serve inputs are scanned"),
+            &[FrameworkProvider {
+                construction: FrameworkConstruction::Unit,
+                enablement: FrameworkEnablement::Declared,
+                injection: FrameworkInjectionRole::Unmarked,
+                provided: sessions_item_path(SessionsItem::IssuedSessions),
+            }],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings
+    }
+
+    #[test]
+    fn applies_the_session_cookie_changes_to_what_a_responder_returns() {
+        let index = IndexedSource::new(SESSION_READER).index;
+        let bindings = session_bindings(&index);
+        let tags = collected_tags(&index);
+        let registries = BindingRegistries::collect(
+            &index,
+            ViewsAvailability::Unavailable,
+            &tags,
+            &bindings,
+            &[],
+        )
+        .expect("the binding registries are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware is planned");
+        let source: String = render_http(
+            &index,
+            false,
+            &no_websocket_servers(),
+            &plans,
+            &bindings,
+            &registries,
+        )
+        .expect("the routes render")
+        .into_modules()
+        .into_iter()
+        .filter(|module| module.name().starts_with("http/"))
+        .map(|module| module.to_source())
+        .collect::<String>()
+        .split_whitespace()
+        .collect();
+
+        assert!(source.contains(
+            "margaret::framework::http::responded::responded(responder.respond(argument_1)).map(|continuation|changed_cookies.apply(continuation))"
+        ));
     }
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"

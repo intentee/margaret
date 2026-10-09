@@ -1,8 +1,13 @@
 pub mod begun_sign_in;
 pub mod callback_request;
+pub mod clears_the_transaction;
 pub mod email_claims;
+pub mod fixture_admission;
+pub mod fixture_callback_handler;
+pub mod fixture_landing;
 pub mod fixture_sign_in_flow;
 pub mod id_token_claims;
 pub mod issued_token_answer;
 pub mod sign_in_fixture;
+pub mod signed_in_callback;
 pub mod token_endpoint;

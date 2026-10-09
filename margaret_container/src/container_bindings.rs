@@ -16,7 +16,6 @@ use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
-use crate::dependency_kind::DependencyKind;
 use crate::framework_injection_role::FrameworkInjectionRole;
 use crate::injected_dependency::InjectedDependency;
 use crate::provider_binding::ProviderBinding;
@@ -34,7 +33,6 @@ fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
 pub struct ContainerBindings {
     asynchronous_constructions: BTreeSet<CanonicalPath>,
     concrete_providers: BTreeMap<CanonicalPath, Arc<[SlottedServeInput]>>,
-    direct_dependencies: BTreeMap<CanonicalPath, BTreeSet<CanonicalPath>>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
     serve_input_naming: ServeInputNaming,
 }
@@ -44,7 +42,6 @@ impl ContainerBindings {
         let mut providers = BTreeMap::new();
         let mut asynchronous_constructions = BTreeSet::new();
         let mut concrete_providers = BTreeMap::new();
-        let mut direct_dependencies = BTreeMap::new();
 
         for entry in plan.planned_entries() {
             if entry.is_async {
@@ -65,22 +62,11 @@ impl ContainerBindings {
                 entry.provider.concrete_path.clone(),
                 Arc::clone(&entry.serve_inputs),
             );
-            direct_dependencies.insert(
-                entry.provider.concrete_path.clone(),
-                entry
-                    .provider
-                    .dependencies()
-                    .iter()
-                    .flat_map(DependencyKind::provider_keys)
-                    .cloned()
-                    .collect(),
-            );
         }
 
         Self {
             asynchronous_constructions,
             concrete_providers,
-            direct_dependencies,
             providers,
             serve_input_naming: plan.serve_input_naming(),
         }
@@ -114,17 +100,6 @@ impl ContainerBindings {
     #[must_use]
     pub fn construction_is_async(&self, root: &CanonicalPath) -> bool {
         self.asynchronous_constructions.contains(root)
-    }
-
-    #[must_use]
-    pub fn depends_directly_on(
-        &self,
-        concrete_path: &CanonicalPath,
-        provider_key: &CanonicalPath,
-    ) -> bool {
-        self.direct_dependencies
-            .get(concrete_path)
-            .is_some_and(|dependencies| dependencies.contains(provider_key))
     }
 
     #[must_use]

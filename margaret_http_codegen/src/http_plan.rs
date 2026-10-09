@@ -9,24 +9,31 @@ use margaret_request_binding_codegen::binding_roots::binding_roots;
 
 use crate::active_servers::active_servers;
 use crate::declared_routes::DeclaredRoutes;
+use crate::framework_responders::FrameworkResponders;
+use crate::framework_route::FrameworkRoute;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_routes::http_routes;
 use crate::http_server::HttpServer;
-use crate::route_location::RouteLocation;
+use crate::route_responder::RouteResponder;
 use crate::web_socket_server_requirements::WebSocketServerRequirements;
 
 fn retained_roots(table: &HttpRouteTable) -> Vec<CanonicalPath> {
     let mut roots = BTreeSet::new();
 
     for route in table.routes() {
-        roots.insert(route.responder_path.clone());
+        match &route.responder {
+            RouteResponder::Application(_) => roots.insert(route.responder_path.clone()),
+            RouteResponder::Framework(FrameworkRoute { handler, .. }) => {
+                roots.insert(handler.concrete.clone())
+            }
+        };
 
         for layer in &route.layers {
             roots.insert(layer.concrete.clone());
         }
 
-        for parameter in &route.arguments {
+        for parameter in route.arguments() {
             roots.extend(binding_roots(&parameter.binding).into_iter().cloned());
         }
     }
@@ -49,12 +56,19 @@ impl HttpPlan {
     pub fn build(
         index: &AttributeIndex,
         routes: DeclaredRoutes,
+        framework_responders: FrameworkResponders,
         has_views: bool,
         websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
         middleware_plans: &MiddlewarePlans,
         registries: &BindingRegistries,
     ) -> Result<Self, HttpCodegenError> {
-        let mut table = http_routes(index, routes, middleware_plans, registries)?;
+        let mut table = http_routes(
+            index,
+            routes,
+            framework_responders,
+            middleware_plans,
+            registries,
+        )?;
 
         for (server, requirements) in websocket_servers {
             for route in &requirements.sessions {
@@ -72,22 +86,5 @@ impl HttpPlan {
             table,
             websocket_servers: websocket_servers.keys().cloned().collect(),
         })
-    }
-
-    #[must_use]
-    pub fn route_locations(&self) -> Vec<RouteLocation<'_>> {
-        self.servers
-            .iter()
-            .flat_map(|server| {
-                self.table.route_groups(server.name()).flat_map(|group| {
-                    group.method_routes().map(|route| RouteLocation {
-                        method: route.method(),
-                        path: group.path(),
-                        responder_path: &route.responder_path,
-                        server: server.name(),
-                    })
-                })
-            })
-            .collect()
     }
 }

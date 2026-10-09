@@ -10,6 +10,7 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
+use margaret_request_binding_codegen::binds_session_user::binds_session_user;
 use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
 use margaret_request_binding_codegen::captured_providers::CapturedProviders;
@@ -126,6 +127,7 @@ fn factory_initializers(
 fn create_extractions(
     session: &WebSocketSession,
     handshake: &Ident,
+    cookie_changes: &Ident,
     captured: &CapturedProviders,
 ) -> TokenStream {
     let continuation_return = quote! {
@@ -148,6 +150,7 @@ fn create_extractions(
         captured,
         &HeadExtractionContext {
             continuation_return: &continuation_return,
+            cookie_changes,
             error_return: &error_return,
             owner: &quote! { self. },
             request_local: handshake,
@@ -181,10 +184,20 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
     } else {
         format_ident!("_handshake")
     };
-    let extractions = create_extractions(session, &handshake, captured);
+    let cookie_changes = format_ident!("changed_cookies");
+    let extractions = create_extractions(session, &handshake, &cookie_changes, captured);
     let arguments = build_arguments(session);
     let method_name = &session.method_name;
     let create_too_many_lines = too_many_lines_allow();
+    let created_cookie_changes = if binds_session_user(&session.parameters) {
+        quote! { #cookie_changes }
+    } else {
+        quote! {
+            margaret::framework::http::cookie_changes::CookieChanges {
+                cookies: ::std::vec::Vec::new(),
+            }
+        }
+    };
 
     quote! {
         struct Factory {
@@ -206,8 +219,14 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
                 #extractions
 
                 #session_path::#method_name(#arguments)
-                    .map(::std::sync::Arc::new)
-                    .map(margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created)
+                    .map(|created| {
+                        margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created(
+                            margaret::framework::websocket_session::created_web_socket_session::CreatedWebSocketSession {
+                                cookie_changes: #created_cookie_changes,
+                                session: ::std::sync::Arc::new(created),
+                            },
+                        )
+                    })
                     .map_err(
                         margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
                     )

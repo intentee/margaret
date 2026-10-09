@@ -19,7 +19,7 @@ use crate::token_endpoint::TokenEndpoint;
 
 pub struct SignInFixture {
     pub client: Arc<AuthorizationServerClient>,
-    pub flow: SignInFlow,
+    pub flow: Arc<SignInFlow>,
     pub issuer_secret: JwksSecret,
     pub secrets: Arc<JwksSecretHolder>,
     pub server: FixtureAuthorizationServer,

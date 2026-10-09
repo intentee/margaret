@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use cookie::Cookie;
 use http::StatusCode;
 use oauth2::AccessToken;
 
@@ -39,7 +38,6 @@ async fn relays_a_refused_userinfo_request() {
             access_token: AccessToken::new("2YotnFZFEjr1zCsicMWpAA".to_string()),
             claims: (),
             subject: "subject".to_string(),
-            transaction_removal: Cookie::new("transaction", ""),
         })
         .await;
 

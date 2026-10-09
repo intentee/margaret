@@ -6,7 +6,6 @@ use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
 use url::Url;
-use uuid::Uuid;
 
 use margaret_jws_verification::jws_rejection::JwsRejection;
 use margaret_jwt_verification::claims_rejection::ClaimsRejection;
@@ -21,8 +20,8 @@ use margaret_oidc_sign_in_tests::callback_request::callback_request;
 use margaret_openid_conformance_tests::conformance_suite::ConformanceSuite;
 use margaret_openid_conformance_tests::module_result::ModuleResult;
 use margaret_openid_conformance_tests::module_status::ModuleStatus;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
-use margaret_token_trust::token_trust::TokenTrust;
+use margaret_openid_conformance_tests::relying_party_alias::RELYING_PARTY_ALIAS;
+use margaret_openid_conformance_tests::relying_party_issuer::RELYING_PARTY_ISSUER;
 
 const SUITE_CLIENT_CALLBACK: &str = "https://margaret-client.test/callback";
 const SUITE_CLIENT_ID: &str = "margaret";
@@ -47,16 +46,10 @@ async fn authorization_response(suite: &ConformanceSuite, authorization: &Url) -
     .expect("the redirect location is a url")
 }
 
-async fn sign_in_at_suite(
-    suite: &ConformanceSuite,
-    issuer: IssuerIdentifier,
-) -> RelyingPartyOutcome {
+async fn sign_in_at_suite(suite: &ConformanceSuite) -> RelyingPartyOutcome {
     let client = MargaretClient::signing_in(
         || suite.issuer_request_client(),
-        TokenTrust {
-            audience: SUITE_CLIENT_ID,
-            issuer: String::leak(issuer.as_str().to_string()),
-        },
+        &RELYING_PARTY_ISSUER,
         SUITE_CLIENT_ID,
         SUITE_CLIENT_SECRET
             .parse()
@@ -284,7 +277,6 @@ const EXPECTATIONS: [ModuleExpectation; 14] = [
 #[tokio::test(flavor = "multi_thread")]
 async fn passes_the_openid_connect_basic_relying_party_certification_plan() {
     let suite = ConformanceSuite::start().await;
-    let alias = Uuid::new_v4().simple().to_string();
     let plan = suite
         .api
         .create_plan(
@@ -294,7 +286,7 @@ async fn passes_the_openid_connect_basic_relying_party_certification_plan() {
                 "request_type": "plain_http_request",
             }),
             &json!({
-                "alias": alias,
+                "alias": RELYING_PARTY_ALIAS,
                 "client": {
                     "client_id": SUITE_CLIENT_ID,
                     "client_secret": SUITE_CLIENT_SECRET,
@@ -328,7 +320,7 @@ async fn passes_the_openid_connect_basic_relying_party_certification_plan() {
             ModuleStatus::Waiting
         );
 
-        let outcome = sign_in_at_suite(&suite, suite.relying_party_issuer(&alias)).await;
+        let outcome = sign_in_at_suite(&suite).await;
         let description = described(&outcome);
 
         assert!(

@@ -173,6 +173,11 @@ impl AttributeArgs {
 
         paths
     }
+
+    #[must_use]
+    pub fn positional_paths(&self) -> Vec<&Path> {
+        self.positional.iter().flat_map(written_paths).collect()
+    }
 }
 
 #[cfg(test)]
@@ -593,6 +598,85 @@ mod tests {
                 })
             })
         })
+    }
+
+    fn read_positional_variant(
+        arguments: &AttributeArgs,
+    ) -> Result<Option<ReadVariant>, AttributeArgumentsError> {
+        arguments.interpret(|reader| {
+            reader.take_positional_variant(|variant, arguments| {
+                Ok(ReadVariant {
+                    introspection: arguments.take_flag("introspection"),
+                    variant: format_path(variant),
+                })
+            })
+        })
+    }
+
+    #[test]
+    fn reads_a_positional_variant_with_arguments() {
+        assert_eq!(
+            read_positional_variant(&parsed(
+                &parse_quote!(#[endpoint(Endpoint::Token(introspection))])
+            ))
+            .expect("the positional variant reads"),
+            Some(ReadVariant {
+                introspection: true,
+                variant: "Endpoint::Token".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn reads_a_positional_unit_variant() {
+        assert_eq!(
+            read_positional_variant(&parsed(&parse_quote!(#[endpoint(Endpoint::Jwks)])))
+                .expect("the positional variant reads"),
+            Some(ReadVariant {
+                introspection: false,
+                variant: "Endpoint::Jwks".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn finds_no_positional_variant_written_as_a_literal() {
+        assert!(matches!(
+            read_positional_variant(&parsed(&parse_quote!(#[endpoint("token")]))),
+            Err(AttributeArgumentsError::UnrecognizedArgument { argument, .. }) if argument == "\"token\""
+        ));
+    }
+
+    #[test]
+    fn finds_no_positional_variant_called_through_an_expression() {
+        assert!(matches!(
+            read_positional_variant(&parsed(
+                &parse_quote!(#[endpoint((Endpoint::Token)(introspection))])
+            )),
+            Err(AttributeArgumentsError::UnrecognizedArgument { argument, .. })
+                if argument == "(Endpoint :: Token) (introspection)"
+        ));
+    }
+
+    #[test]
+    fn reports_a_leftover_argument_of_a_positional_variant_under_its_path() {
+        assert!(matches!(
+            read_positional_variant(&parsed(&parse_quote!(#[endpoint(Endpoint::Token(scopes = ["openid"]))]))),
+            Err(AttributeArgumentsError::UnrecognizedArgument { attribute_path, argument })
+                if attribute_path == "endpoint::Endpoint::Token" && argument == "scopes"
+        ));
+    }
+
+    #[test]
+    fn positional_paths_reach_the_variant_of_every_positional_argument() {
+        assert_eq!(
+            parsed(&parse_quote!(#[endpoint(Endpoint::Consent(view = ConsentView), tag, client = blog)]))
+                .positional_paths()
+                .into_iter()
+                .map(format_path)
+                .collect::<Vec<String>>(),
+            vec!["Endpoint::Consent".to_string(), "tag".to_string()]
+        );
     }
 
     #[test]

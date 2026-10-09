@@ -1,13 +1,15 @@
+use std::num::ParseIntError;
+
 use margaret_oauth_vocabulary::code_challenge_rejection::CodeChallengeRejection;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum AuthorizationError {
     AccessDenied,
     ConflictingPromptValues,
     ConsentRequired,
     LoginRequired,
     MalformedCodeChallenge(CodeChallengeRejection),
-    MalformedMaxAge,
+    MalformedMaxAge(ParseIntError),
     MalformedScope,
     MissingCodeChallenge,
     MissingCodeChallengeMethod,
@@ -20,7 +22,7 @@ pub(crate) enum AuthorizationError {
 }
 
 impl AuthorizationError {
-    pub(crate) fn description(self) -> &'static str {
+    pub(crate) fn description(&self) -> &'static str {
         match self {
             Self::AccessDenied => "the end-user denied the authorization",
             Self::ConflictingPromptValues => "the prompt value none cannot be combined with others",
@@ -32,7 +34,7 @@ impl AuthorizationError {
             Self::MalformedCodeChallenge(CodeChallengeRejection::WrongDigestLength) => {
                 "the code challenge is not a sha-256 digest"
             }
-            Self::MalformedMaxAge => "the max_age parameter is not a number of seconds",
+            Self::MalformedMaxAge(_) => "the max_age parameter is not a number of seconds",
             Self::MalformedScope => "the scope parameter is not a list of scope tokens",
             Self::MissingCodeChallenge => "the request carries no code challenge",
             Self::MissingCodeChallengeMethod => {
@@ -49,12 +51,12 @@ impl AuthorizationError {
         }
     }
 
-    pub(crate) fn wire_name(self) -> &'static str {
+    pub(crate) fn wire_name(&self) -> &'static str {
         match self {
             Self::AccessDenied => "access_denied",
             Self::ConflictingPromptValues
             | Self::MalformedCodeChallenge(_)
-            | Self::MalformedMaxAge
+            | Self::MalformedMaxAge(_)
             | Self::MissingCodeChallenge
             | Self::MissingCodeChallengeMethod
             | Self::UnsupportedCodeChallengeMethod

@@ -406,7 +406,7 @@ impl Flusher {
         let source = rendered(SERVICE, &public());
 
         assert!(source.contains(
-            r#"matches.get_one::<margaret::framework::http::server_origin::ServerOrigin,>("public-url")"#
+            r#"matches.get_one::<margaret::framework::server_origin::server_origin::ServerOrigin,>("public-url")"#
         ));
         assert!(source.contains(
             r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",routes:super::http::server_public::server_public(container,"#
@@ -601,7 +601,7 @@ impl Flusher {
         let routes = "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(::std::sync::Arc::clone(&origin_internal),::std::sync::Arc::clone(&origin_public),),);";
 
         assert!(source.contains(
-            r#"letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(matchmatches.get_one::<margaret::framework::http::server_origin::ServerOrigin,>("public-url"){Some(value)=>value.origin.ascii_serialization(),None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}},);"#
+            r#"letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(matchmatches.get_one::<margaret::framework::server_origin::server_origin::ServerOrigin,>("public-url"){Some(value)=>value.origin.ascii_serialization(),None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}},);"#
         ));
         assert!(source.contains(routes));
         assert!(

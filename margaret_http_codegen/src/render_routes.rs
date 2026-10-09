@@ -13,13 +13,6 @@ use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::named_route::NamedRoute;
 
-struct ServerLayout<'server> {
-    constructor: Ident,
-    origin: Ident,
-    server: &'server HttpServer,
-    struct_ident: Ident,
-}
-
 fn server_field_ident(server: &HttpServer) -> Ident {
     format_ident!("{}", server.name())
 }
@@ -232,6 +225,13 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
             #(#methods)*
         }
     }
+}
+
+struct ServerLayout<'server> {
+    constructor: Ident,
+    origin: Ident,
+    server: &'server HttpServer,
+    struct_ident: Ident,
 }
 
 pub(crate) fn render_routes(

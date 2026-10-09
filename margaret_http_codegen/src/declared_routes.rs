@@ -5,6 +5,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_route_method::route_method::RouteMethod;
+use margaret_route_parameter_codegen::literal_route_path::LiteralRoutePath;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
 
@@ -13,7 +14,7 @@ use crate::http_codegen_error::HttpCodegenError;
 use crate::http_responder_arguments::HttpResponderArguments;
 
 pub struct DeclaredRoutes<'index> {
-    pub(crate) routes: Vec<DeclaredRoute<'index>>,
+    pub routes: Vec<DeclaredRoute<'index>>,
 }
 
 impl<'index> DeclaredRoutes<'index> {
@@ -86,7 +87,7 @@ impl<'index> DeclaredRoutes<'index> {
     pub fn redirect_target(
         &self,
         route: &CanonicalPath,
-        client: &CanonicalPath,
+        referrer: &CanonicalPath,
     ) -> Result<RouteUrlInput, HttpCodegenError> {
         let Some(declared) = self
             .routes
@@ -94,30 +95,29 @@ impl<'index> DeclaredRoutes<'index> {
             .find(|declared| declared.item.canonical_path() == route)
         else {
             return Err(HttpCodegenError::RedirectRouteNotRouted {
-                client: client.to_string(),
+                referrer: referrer.to_string(),
                 route: route.to_string(),
             });
         };
 
         if declared.method != RouteMethod::Get {
             return Err(HttpCodegenError::RedirectRouteNotGet {
-                client: client.to_string(),
+                referrer: referrer.to_string(),
                 route: route.to_string(),
             });
         }
 
-        if declared.path.parameters().next().is_some() {
-            return Err(HttpCodegenError::ParameterizedRedirectRoute {
-                client: client.to_string(),
+        match declared.path.literal() {
+            LiteralRoutePath::Literal(path) => Ok(RouteUrlInput {
+                path,
+                server: declared.server.clone(),
+            }),
+            LiteralRoutePath::Parameterized => Err(HttpCodegenError::ParameterizedRedirectRoute {
                 path: declared.path.pattern().to_string(),
+                referrer: referrer.to_string(),
                 route: route.to_string(),
-            });
+            }),
         }
-
-        Ok(RouteUrlInput {
-            path: declared.path.pattern().to_string(),
-            server: declared.server.clone(),
-        })
     }
 }
 
@@ -130,7 +130,7 @@ mod tests {
     use super::DeclaredRoutes;
     use crate::http_codegen_error::HttpCodegenError;
 
-    const ROUTES: &str = "use margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(method = RouteMethod::Get, path = \"/sign-in/callback\", server = \"public\")]\nstruct Callback;\n#[responds_to_http(method = RouteMethod::Post, path = \"/sign-in\", server = \"public\")]\nstruct PostSignIn;\n#[responds_to_http(method = RouteMethod::Get, path = \"/articles/{article}\", server = \"public\")]\nstruct Article;\nstruct Unrouted;\n";
+    const ROUTES: &str = "use margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(method = RouteMethod::Get, path = \"/sign-in/callback\", server = \"public\")]\nstruct Callback;\n#[responds_to_http(method = RouteMethod::Post, path = \"/sign-in\", server = \"public\")]\nstruct PostSignIn;\n#[responds_to_http(method = RouteMethod::Get, path = \"/articles/{article}\", server = \"public\")]\nstruct Article;\n#[responds_to_http(method = RouteMethod::Get, path = \"/oauth/{{callback}}\", server = \"public\")]\nstruct EscapedCallback;\nstruct Unrouted;\n";
 
     fn path(name: &str) -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
@@ -162,10 +162,21 @@ mod tests {
     }
 
     #[test]
+    fn locates_a_redirect_route_with_escaped_braces_at_its_literal_path() {
+        assert_eq!(
+            redirect_target("EscapedCallback").expect("the redirect route is routed"),
+            RouteUrlInput {
+                path: "/oauth/{callback}".to_string(),
+                server: "public".to_string(),
+            }
+        );
+    }
+
+    #[test]
     fn rejects_a_redirect_route_that_responds_to_no_request() {
         assert_eq!(
             rejection("Unrouted"),
-            "the oauth client 'crate::Client' redirects to 'crate::Unrouted', which responds to no HTTP request"
+            "'crate::Client' redirects to 'crate::Unrouted', which responds to no HTTP request"
         );
     }
 
@@ -173,7 +184,7 @@ mod tests {
     fn rejects_a_redirect_route_of_another_method() {
         assert_eq!(
             rejection("PostSignIn"),
-            "the oauth client 'crate::Client' redirects to 'crate::PostSignIn', which does not respond to RouteMethod::Get"
+            "'crate::Client' redirects to 'crate::PostSignIn', which does not respond to RouteMethod::Get"
         );
     }
 
@@ -181,7 +192,7 @@ mod tests {
     fn rejects_a_redirect_route_with_parameters() {
         assert_eq!(
             rejection("Article"),
-            "the oauth client 'crate::Client' redirects to 'crate::Article', whose path '/articles/{article}' has parameters a redirect cannot fill"
+            "'crate::Client' redirects to 'crate::Article', whose path '/articles/{article}' has parameters a redirect cannot fill"
         );
     }
 }

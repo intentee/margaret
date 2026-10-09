@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use margaret_handler_error::handler_error::HandlerError;
+
 use crate::content_handler::ContentHandler;
-use crate::handler_error::HandlerError;
 use crate::http_middleware::HttpMiddleware;
 use crate::next::Next;
 use crate::request::Request;
