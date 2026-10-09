@@ -14,6 +14,7 @@ mod generated_model_module;
 mod generated_model_path;
 mod is_defaulted;
 mod key_block_tokens;
+mod key_field_parameter;
 mod key_targeting;
 mod loaded_field_tokens;
 mod loaded_target;

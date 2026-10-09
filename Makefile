@@ -137,6 +137,7 @@ COVERAGE_REPORTED_PACKAGES := \
 	-p margaret_trusted_issuer \
 	-p margaret_trusted_issuer_codegen \
 	-p margaret_umbrella_path \
+	-p margaret_url_path \
 	-p margaret_validation \
 	-p margaret_views \
 	-p margaret_views_codegen \
@@ -273,6 +274,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_trusted_issuer \
 	-p margaret_trusted_issuer_codegen \
 	-p margaret_umbrella_path \
+	-p margaret_url_path \
 	-p margaret_validation \
 	-p margaret_views \
 	-p margaret_views_codegen \
@@ -518,6 +520,7 @@ coverage: node_modules openid-conformance-images
 		--gated margaret_trusted_issuer=100 \
 		--gated margaret_trusted_issuer_codegen=100 \
 		--gated margaret_umbrella_path=100 \
+		--gated margaret_url_path=100 \
 		--gated margaret_validation=100 \
 		--gated margaret_views=100 \
 		--gated margaret_views_codegen=100 \

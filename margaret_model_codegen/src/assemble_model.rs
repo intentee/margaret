@@ -138,13 +138,17 @@ fn model_fields(
             CollectedFieldShape::Column(column) => {
                 column_field(collected_field, start, column, primary_key, model)?
             }
-            CollectedFieldShape::Key { on_delete, target } => {
+            CollectedFieldShape::Key {
+                column_base,
+                on_delete,
+                target,
+            } => {
                 let KeyField { field, foreign_key } = key_field(
                     collected_field,
                     start,
                     *on_delete,
                     target,
-                    key_columns.reference(&collected_field.name, target, model)?,
+                    key_columns.reference(&collected_field.name, column_base, target, model)?,
                 );
 
                 foreign_keys.push(foreign_key);

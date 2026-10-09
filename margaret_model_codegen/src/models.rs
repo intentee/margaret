@@ -243,6 +243,37 @@ struct FragmentMetadata {
     }
 
     #[test]
+    fn accepts_a_table_name_that_is_a_rust_keyword() {
+        assert_eq!(
+            tables(
+                "#[model(table = \"type\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n}\n"
+            ),
+            vec!["type".to_string()]
+        );
+    }
+
+    #[test]
+    fn rejects_a_raw_table_name() {
+        assert!(matches!(
+                rejection("#[model(table = \"r#type\")]\nstruct S;\n"),
+                ModelCodegenError::InvalidTableName { ref table, .. } if table == "r#type"
+        ));
+    }
+
+    #[test]
+    fn names_the_column_of_a_raw_field_after_its_unraw_identifier() {
+        assert_eq!(
+            column(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    r#type: i64,\n}\n",
+                "t",
+                "type"
+            )
+            .name,
+            "type"
+        );
+    }
+
+    #[test]
     fn rejects_a_table_name_that_is_too_long() {
         let table = "a".repeat(64);
 
@@ -366,6 +397,16 @@ struct FragmentMetadata {
                     "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, name = \"Id\")]\n    id: i64,\n}\n"
                 ),
                 ModelCodegenError::InvalidColumnName { ref column, .. } if column == "Id"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_raw_column_name() {
+        assert!(matches!(
+                rejection(
+                    "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, name = \"r#id\")]\n    id: i64,\n}\n"
+                ),
+                ModelCodegenError::InvalidColumnName { ref column, .. } if column == "r#id"
         ));
     }
 
@@ -974,6 +1015,18 @@ struct FragmentMetadata {
         assert_eq!(
             column(&source, "profiles", "author_id").default,
             ColumnDefault::NotSet
+        );
+    }
+
+    #[test]
+    fn derives_the_key_columns_of_a_raw_field_from_its_unraw_identifier() {
+        let source = with_author(
+            "#[model(table = \"profiles\")]\nstruct Profile {\n    #[column(primary_key)]\n    r#ref: Key<Author>,\n}\n",
+        );
+
+        assert_eq!(
+            index_columns(&source, "profiles", IndexKind::PrimaryKey),
+            vec![vec!["ref_id".to_string()]]
         );
     }
 

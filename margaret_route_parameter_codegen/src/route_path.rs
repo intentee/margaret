@@ -1,41 +1,32 @@
-use crate::literal_route_path::LiteralRoutePath;
-use crate::route_url_template::route_url_template;
+use crate::route_path_error::RoutePathError;
+use crate::route_url_template::RouteUrlTemplate;
 use crate::url_segment::UrlSegment;
 
 #[derive(Clone)]
 pub struct RoutePath {
     pattern: String,
-    segments: Vec<UrlSegment>,
+    template: RouteUrlTemplate,
 }
 
 impl RoutePath {
-    #[must_use]
-    pub fn parse(pattern: &str) -> Self {
-        Self {
-            segments: route_url_template(pattern),
+    /// # Errors
+    ///
+    /// Returns `RoutePathError` when the pattern cannot describe a route a request can reach.
+    pub fn parse(pattern: &str) -> Result<Self, RoutePathError> {
+        Ok(Self {
             pattern: pattern.to_owned(),
-        }
-    }
-
-    #[must_use]
-    pub fn literal(&self) -> LiteralRoutePath {
-        let mut literal = String::new();
-
-        for segment in &self.segments {
-            match segment {
-                UrlSegment::Literal(text) => literal.push_str(text),
-                UrlSegment::CatchAllParameter(_) | UrlSegment::Parameter(_) => {
-                    return LiteralRoutePath::Parameterized;
-                }
-            }
-        }
-
-        LiteralRoutePath::Literal(literal)
+            template: RouteUrlTemplate::parse(pattern)?,
+        })
     }
 
     pub fn parameters(&self) -> impl Iterator<Item = &str> {
-        self.segments.iter().filter_map(|segment| match segment {
-            UrlSegment::CatchAllParameter(name) | UrlSegment::Parameter(name) => {
+        let segments: &[UrlSegment] = match &self.template {
+            RouteUrlTemplate::Literal(_) => &[],
+            RouteUrlTemplate::Parameterized(segments) => segments,
+        };
+
+        segments.iter().filter_map(|segment| match segment {
+            UrlSegment::CatchAllParameter { name, .. } | UrlSegment::Parameter { name, .. } => {
                 Some(name.as_str())
             }
             UrlSegment::Literal(_) => None,
@@ -48,39 +39,45 @@ impl RoutePath {
     }
 
     #[must_use]
-    pub fn segments(&self) -> &[UrlSegment] {
-        &self.segments
+    pub fn template(&self) -> &RouteUrlTemplate {
+        &self.template
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::RoutePath;
-    use crate::literal_route_path::LiteralRoutePath;
+    use crate::route_url_template::RouteUrlTemplate;
 
-    #[test]
-    fn unescapes_the_literal_of_a_path_without_parameters() {
-        assert!(matches!(
-            RoutePath::parse("/oauth/{{token}}").literal(),
-            LiteralRoutePath::Literal(literal) if literal == "/oauth/{token}"
-        ));
+    fn parsed(pattern: &str) -> RoutePath {
+        RoutePath::parse(pattern).expect("the route path is routable")
     }
 
     #[test]
-    fn finds_no_literal_in_a_path_with_parameters() {
+    fn keeps_the_pattern_it_was_declared_with() {
+        assert_eq!(parsed("/oauth/{{token}}").pattern(), "/oauth/{{token}}");
+    }
+
+    #[test]
+    fn encodes_the_literal_of_a_path_without_parameters() {
         assert_eq!(
-            RoutePath::parse("/articles/{article}").literal(),
-            LiteralRoutePath::Parameterized
+            parsed("/oauth/{{token}}").template(),
+            &RouteUrlTemplate::Literal("/oauth/%7Btoken%7D".to_string())
         );
     }
 
     #[test]
     fn lists_named_and_catch_all_parameters_and_skips_literals() {
-        let route_path = RoutePath::parse("/files/{bucket}/{*rest}");
-
         assert_eq!(
-            route_path.parameters().collect::<Vec<_>>(),
+            parsed("/files/{bucket}/{*rest}")
+                .parameters()
+                .collect::<Vec<_>>(),
             vec!["bucket", "rest"]
         );
+    }
+
+    #[test]
+    fn lists_no_parameters_of_a_literal_path() {
+        assert_eq!(parsed("/greeting").parameters().count(), 0);
     }
 }

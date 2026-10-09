@@ -15,13 +15,10 @@ pub fn optional_authenticated_user<User>(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use margaret_http::forwardable_route::ForwardableRoute;
     use margaret_http::requirement::Requirement;
     use margaret_http::response::Response;
     use margaret_http::response_continuation::ResponseContinuation;
-    use margaret_http::url_segment::UrlSegment;
 
     use super::optional_authenticated_user;
     use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
@@ -69,11 +66,7 @@ mod tests {
     fn keeps_a_redirecting_interruption_intact() {
         assert_eq!(
             interruption_status(ResponseContinuation::from(
-                ForwardableRoute::new(
-                    Arc::from("http://localhost"),
-                    vec![UrlSegment::Literal("/sign-in")],
-                )
-                .see_other(),
+                ForwardableRoute::new("http://localhost/sign-in".to_string()).see_other(),
             )),
             None
         );

@@ -147,7 +147,7 @@ mod tests {
             "letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.issuer_origin,);"
         ));
         assert!(source.contains(
-            "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(::std::sync::Arc::clone(&origin_public)),);"
+            "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(&origin_public),);"
         ));
         assert!(!source.contains("public-url"));
     }
@@ -189,7 +189,7 @@ mod tests {
             source.contains("fntick_interval(&self)->std::time::Duration{crate::schedule::PERIOD}")
         );
         assert!(source.contains(
-            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{tokio::time::MissedTickBehavior::Delay}"
+            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{::tokio::time::MissedTickBehavior::Delay}"
         ));
         assert!(source.contains("_tick_context:trzcina::TickContext"));
         assert!(source.contains(
@@ -224,7 +224,7 @@ impl Flusher {
             source.contains("fntick_interval(&self)->std::time::Duration{crate::schedule::PERIOD}")
         );
         assert!(source.contains(
-            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{tokio::time::MissedTickBehavior::Delay}"
+            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{::tokio::time::MissedTickBehavior::Delay}"
         ));
     }
 
@@ -598,7 +598,7 @@ impl Flusher {
             ],
         );
 
-        let routes = "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(::std::sync::Arc::clone(&origin_internal),::std::sync::Arc::clone(&origin_public),),);";
+        let routes = "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(&origin_internal,&origin_public),);";
 
         assert!(source.contains(
             r#"letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(matchmatches.get_one::<margaret::framework::server_origin::server_origin::ServerOrigin,>("public-url"){Some(value)=>value.origin.ascii_serialization(),None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}},);"#
@@ -796,7 +796,7 @@ impl Roller {
         assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains("manager.register_service(Roller{inner:container.roller(),});"));
         assert!(source.contains(
-            r#"letserve_input_0=matchmatches.get_one::<std::path::PathBuf>("secret-path")"#
+            r#"letserve_input_0=matchmatches.get_one::<::std::path::PathBuf>("secret-path")"#
         ));
     }
 
@@ -880,11 +880,9 @@ impl Worker {
             "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run();outcome"
         ));
         assert!(source.contains("manager.register_service(Worker{inner:container.worker(),});"));
-        assert!(
-            source.contains(
-                r#"letserve_input_0=matchmatches.get_one::<std::string::String>("label")"#
-            )
-        );
+        assert!(source.contains(
+            r#"letserve_input_0=matchmatches.get_one::<::std::string::String>("label")"#
+        ));
     }
 
     #[test]

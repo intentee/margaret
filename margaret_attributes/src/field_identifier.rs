@@ -2,16 +2,18 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
+use syn::Ident;
+
 #[derive(Debug, Eq, PartialEq)]
 pub enum FieldIdentifier {
-    Named(String),
+    Named(Ident),
     Positional(usize),
 }
 
 impl Display for FieldIdentifier {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         match self {
-            Self::Named(name) => formatter.write_str(name),
+            Self::Named(identifier) => write!(formatter, "{identifier}"),
             Self::Positional(position) => write!(formatter, "{position}"),
         }
     }

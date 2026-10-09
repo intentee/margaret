@@ -69,7 +69,7 @@ fn rendered(fixture: &str) -> Result<String, ContainerError> {
 #[test]
 fn hands_the_declared_database_to_the_framework_constructor() {
     assert!(rendered("declared_database").expect("the fixture renders").contains(
-        "crate::KeyRoller::create(::std::sync::Arc::<margaret::framework::database::database::Database,>::clone("
+        "crate::KeyRoller::create(::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone("
     ));
 }
 

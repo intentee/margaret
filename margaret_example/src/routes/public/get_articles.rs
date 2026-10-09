@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use margaret::framework::database::database::Database;
 use margaret::framework::http::response::Response;
+use margaret::framework::http::route_addressing::RouteAddressing;
+use margaret::framework::http::unaddressable_parameter::UnaddressableParameter;
 use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
@@ -41,12 +43,21 @@ impl GetArticles {
             let links = Article::listed(self.database.as_ref(), author)
                 .await?
                 .into_iter()
-                .map(|article| {
-                    let url = routes.public.get_article(article.id.to_string()).url();
-
-                    format!("{}: {url}", article.title)
-                })
-                .collect::<Vec<String>>()
+                .map(
+                    |article| match routes.public.get_article(article.id.to_string()) {
+                        RouteAddressing::Addressed(route) => {
+                            Ok(format!("{}: {}", article.title, route.url()))
+                        }
+                        RouteAddressing::Unaddressable(UnaddressableParameter {
+                            name,
+                            rejection,
+                        }) => Err(anyhow::Error::from(rejection).context(format!(
+                            "the article {} cannot fill the route parameter '{name}'",
+                            article.id
+                        ))),
+                    },
+                )
+                .collect::<anyhow::Result<Vec<String>>>()?
                 .join("\n");
 
             Response::text(

@@ -74,11 +74,7 @@ mod tests {
                 GreetingView::create(card_layout).expect("the greeting view is constructed"),
             ),
         };
-        let routes = Routes::from_origins(
-            Arc::from("http://identity"),
-            Arc::from("http://internal"),
-            Arc::from("http://public"),
-        );
+        let routes = Routes::from_origins("http://identity", "http://internal", "http://public");
         let app_name = AppName::create().expect("the app name is constructed");
         let responder =
             GetFarewellCard::create(Arc::new(app_name)).expect("the responder is constructed");

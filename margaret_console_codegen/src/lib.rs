@@ -181,12 +181,12 @@ impl Farewell {
                 r#"clap::Arg::new("loud").long("loud").action(clap::ArgAction::SetTrue)"#
             )
         );
-        assert!(source.contains("clap::value_parser!(std::string::String)"));
+        assert!(source.contains("clap::value_parser!(::std::string::String)"));
 
         assert!(source.contains("super::container::build::construct_demo("));
-        assert!(source.contains(r#"matches.get_one::<std::string::String>("name")"#));
+        assert!(source.contains(r#"matches.get_one::<::std::string::String>("name")"#));
         assert!(
-            source.contains(r#"matches.get_one::<std::string::String>("salutation").cloned()"#)
+            source.contains(r#"matches.get_one::<::std::string::String>("salutation").cloned()"#)
         );
         assert!(source.contains(r#"matches.get_flag("loud")"#));
 

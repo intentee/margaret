@@ -3,6 +3,7 @@ use serde_json::json;
 
 use margaret_cluster_tests::cluster::Cluster;
 
+use crate::addressed_route::addressed_route;
 use crate::cluster_binary::cluster_binary;
 use crate::note_written::note_written;
 use crate::stored_note::StoredNote;
@@ -15,7 +16,7 @@ async fn notes_are_written_read_updated_and_deleted_across_instances() {
     let read = |index: usize| {
         cluster
             .client
-            .get(routes(index).public.get_note(id.to_string()).url())
+            .get(addressed_route(routes(index).public.get_note(id.to_string())).url())
             .send()
     };
 
@@ -34,7 +35,7 @@ async fn notes_are_written_read_updated_and_deleted_across_instances() {
     assert_eq!(
         cluster
             .client
-            .patch(routes(2).public.patch_note(id.to_string()).url())
+            .patch(addressed_route(routes(2).public.patch_note(id.to_string())).url())
             .json(&json!({ "body": "second draft" }))
             .send()
             .await
@@ -55,7 +56,7 @@ async fn notes_are_written_read_updated_and_deleted_across_instances() {
     assert_eq!(
         cluster
             .client
-            .delete(routes(1).public.delete_note(id.to_string()).url())
+            .delete(addressed_route(routes(1).public.delete_note(id.to_string())).url())
             .send()
             .await
             .expect("the note is deleted")

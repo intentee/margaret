@@ -2,6 +2,7 @@ use reqwest::StatusCode;
 
 use margaret_cluster_tests::cluster::Cluster;
 
+use crate::addressed_route::addressed_route;
 use crate::cluster_binary::cluster_binary;
 
 #[tokio::test]
@@ -12,11 +13,13 @@ async fn assets_are_identical_on_every_instance() {
         let response = cluster
             .client
             .get(
-                cluster
-                    .instance_routes(index)
-                    .public
-                    .get_asset("cluster_C1A2B3C4.css".to_string())
-                    .url(),
+                addressed_route(
+                    cluster
+                        .instance_routes(index)
+                        .public
+                        .get_asset("cluster_C1A2B3C4.css".to_string()),
+                )
+                .url(),
             )
             .send()
             .await

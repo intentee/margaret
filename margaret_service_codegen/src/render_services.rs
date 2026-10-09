@@ -187,7 +187,7 @@ fn served_routes(servers: &[HttpServer]) -> TokenStream {
     let origin_arguments = servers.iter().map(|server| {
         let origin = server_origin_ident(server.name());
 
-        quote! { ::std::sync::Arc::clone(&#origin) }
+        quote! { &#origin }
     });
     let routes = routes_ident();
 

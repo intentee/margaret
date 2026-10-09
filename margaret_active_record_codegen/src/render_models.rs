@@ -128,7 +128,7 @@ mod tests {
     fn reads_and_writes_the_fields_of_a_record() {
         let record = module(COUNTER, "models/counter/record");
 
-        assert!(record.contains("typePrimaryKey=std::string::String;"));
+        assert!(record.contains("typePrimaryKey=::std::string::String;"));
         assert!(record.contains(
             "constPRIMARY_KEY:&'static[margaret::framework::active_record::field_span::FieldSpan]=&[margaret::framework::active_record::field_span::FieldSpan{start:0usize,width:1usize,}];"
         ));
@@ -148,10 +148,10 @@ mod tests {
             "implmargaret::framework::active_record::key_target::KeyTargetforcrate::Lock{fnprimary_key(&self)->Self::PrimaryKey{crate::margaret::models::lock::primary_key::PrimaryKey{repository:::std::clone::Clone::clone(&self.repository),branch:::std::clone::Clone::clone(&self.branch)}}}"
         ));
         assert!(module(&source, "models/lock/primary_key").contains(
-            "constWIDTH:usize=<std::string::Stringasmargaret::framework::active_record::value::Value>::WIDTH+<std::string::Stringasmargaret::framework::active_record::value::Value>::WIDTH;"
+            "constWIDTH:usize=<::std::string::Stringasmargaret::framework::active_record::value::Value>::WIDTH+<::std::string::Stringasmargaret::framework::active_record::value::Value>::WIDTH;"
         ));
         assert!(module(&source, "models/lock/primary_key").contains(
-            "#[derive(Clone,Debug,PartialEq)]pubstructPrimaryKey{pubrepository:std::string::String,pubbranch:std::string::String}"
+            "#[derive(Clone,Debug,Eq,PartialEq)]pubstructPrimaryKey<Field0=::std::string::String,Field1=::std::string::String>{pubrepository:Field0,pubbranch:Field1}"
         ));
     }
 
@@ -160,7 +160,7 @@ mod tests {
         let primary_key = module(LOCK, "models/lock/primary_key");
 
         assert!(primary_key.contains(
-            "#[derive(Clone,Debug,PartialEq)]pubstructPrimaryKey{pubrepository:std::string::String,pubbranch:std::string::String}"
+            "#[derive(Clone,Debug,Eq,PartialEq)]pubstructPrimaryKey<Field0=::std::string::String,Field1=::std::string::String>{pubrepository:Field0,pubbranch:Field1}"
         ));
         assert!(!primary_key.contains("Value"));
         assert!(!module(LOCK, "models/lock/record").contains("KeyTarget"));
@@ -177,9 +177,8 @@ mod tests {
     fn excludes_defaulted_fields_from_the_draft() {
         assert!(
             module(ARTICLE, "models/article/draft").contains(
-                "pubstructDraft{pubtitle:std::string::String,pubstatus:crate::Status,pubauthor:margaret::framework::active_record::key::Key<crate::Author>}"
-            )
-        );
+                "pubstructDraft{pubtitle:::std::string::String,pubstatus:crate::Status,pubauthor:margaret::framework::active_record::key::Key<crate::Author>}"
+            ));
     }
 
     #[test]
@@ -210,7 +209,7 @@ mod tests {
         let query = module(ARTICLE, "models/article/query");
 
         assert!(query.contains("pubmodedge;pubmodthen;"));
-        assert!(query.contains("pubid:margaret::framework::active_record::next::Next<crate::Article,uuid::Uuid,crate::margaret::models::article::query::edge::id::Edge,margaret::framework::active_record::root::Root>"));
+        assert!(query.contains("pubid:margaret::framework::active_record::next::Next<crate::Article,::uuid::Uuid,crate::margaret::models::article::query::edge::id::Edge,margaret::framework::active_record::root::Root>"));
         assert!(query.contains("pubauthor:margaret::framework::active_record::next::Next<crate::Article,margaret::framework::active_record::key::Key<crate::Author>,crate::margaret::models::article::query::edge::author::Edge,margaret::framework::active_record::root::Root>"));
         assert!(query.contains("id:margaret::framework::active_record::next::Next::new(margaret::framework::active_record::root::Root,0usize)"));
     }
@@ -323,7 +322,7 @@ mod tests {
         let source = "#[model(table = \"payloads\")]\nstruct Payload {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    document: Option<margaret::framework::active_record::json::Json<std::collections::BTreeMap<String, i64>>>,\n}\n";
 
         assert!(module(source, "models/payload/conditions").contains(
-            "pubdocument:margaret::framework::active_record::operand::Operand<crate::Payload,::std::option::Option<margaret::framework::active_record::json::Json<std::collections::BTreeMap<std::string::String,i64>>>>"
+            "pubdocument:margaret::framework::active_record::operand::Operand<crate::Payload,::std::option::Option<margaret::framework::active_record::json::Json<::std::collections::BTreeMap<::std::string::String,i64>>>>"
         ));
     }
 }

@@ -4,7 +4,7 @@ use url::Url;
 
 use margaret_oidc_discovery::oidc_discovery_url::oidc_discovery_url;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
-use margaret_route_parameter_codegen::literal_route_path::LiteralRoutePath;
+use margaret_route_parameter_codegen::route_url_template::RouteUrlTemplate;
 use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
 use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
 
@@ -165,15 +165,15 @@ impl<'plan> EndpointRoutes<'plan> {
             });
         }
 
-        match path.literal() {
-            LiteralRoutePath::Literal(path) => Ok(ConsentPage {
+        match path.template() {
+            RouteUrlTemplate::Literal(literal) => Ok(ConsentPage {
                 decision: RouteUrlInput {
-                    path,
+                    path: literal.clone(),
                     server: consent_server.clone(),
                 },
                 view: view.clone(),
             }),
-            LiteralRoutePath::Parameterized => {
+            RouteUrlTemplate::Parameterized(_) => {
                 Err(OidcProviderCodegenError::ParameterizedEndpointRoute {
                     endpoint: ProviderEndpoint::Consent,
                     path: path.pattern().to_string(),
@@ -194,9 +194,9 @@ impl<'plan> EndpointRoutes<'plan> {
             .into_iter()
             .filter(|location| location.server == server)
         {
-            match location.path.literal() {
-                LiteralRoutePath::Literal(literal) => paths.insert(literal),
-                LiteralRoutePath::Parameterized => {
+            match location.path.template() {
+                RouteUrlTemplate::Literal(literal) => paths.insert(literal.clone()),
+                RouteUrlTemplate::Parameterized(_) => {
                     return Err(OidcProviderCodegenError::ParameterizedEndpointRoute {
                         endpoint,
                         path: location.path.pattern().to_string(),

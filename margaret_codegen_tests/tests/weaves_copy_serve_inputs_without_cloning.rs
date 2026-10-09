@@ -16,7 +16,7 @@ fn module(generated: &GeneratedCode, name: &str) -> String {
 #[test]
 fn reads_a_required_standard_library_copy_argument_without_cloning() {
     assert!(module(&generated(), "run").contains(
-        "matches.get_one::<std::num::NonZeroU32>(\"max-connections\"){Some(value)=>*value"
+        "matches.get_one::<::std::num::NonZeroU32>(\"max-connections\"){Some(value)=>*value"
     ));
 }
 
@@ -32,7 +32,7 @@ fn reads_a_required_consumer_copy_argument_without_cloning() {
 fn reads_an_optional_copy_argument_as_a_copied_option() {
     assert!(
         module(&generated(), "run")
-            .contains("matches.get_one::<std::num::NonZeroU32>(\"spare-connections\").copied()")
+            .contains("matches.get_one::<::std::num::NonZeroU32>(\"spare-connections\").copied()")
     );
 }
 

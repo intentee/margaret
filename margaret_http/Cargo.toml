@@ -26,6 +26,7 @@ margaret_http_uploaded_file = { workspace = true }
 margaret_peer_identity = { workspace = true }
 margaret_route_method = { workspace = true }
 margaret_route_parameter_binding = { workspace = true }
+margaret_url_path = { workspace = true }
 matchit = { workspace = true }
 maud = { workspace = true }
 mime = { workspace = true }

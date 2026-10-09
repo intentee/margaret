@@ -1,23 +1,34 @@
+use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 
+const CRATE_ROOT: &str = "crate";
+
+fn segment_identifiers(segments: &[String]) -> impl Iterator<Item = Ident> {
+    segments.iter().map(|segment| format_ident!("{}", segment))
+}
+
 #[must_use]
 pub fn path_tokens(path: &CanonicalPath) -> TokenStream {
-    let mut segments = path.segments().iter();
-    let Some(first) = segments.next() else {
-        return TokenStream::new();
-    };
-    let rest = segments.map(|segment| format_ident!("{}", segment));
+    match path.segments() {
+        [first, rest @ ..] if first == CRATE_ROOT => {
+            let rest = segment_identifiers(rest);
 
-    if first == "crate" {
-        quote! { crate #(:: #rest)* }
-    } else {
-        let crate_name = format_ident!("{}", first);
+            quote! { crate #(:: #rest)* }
+        }
+        foreign @ [_, _, ..] => {
+            let foreign = segment_identifiers(foreign);
 
-        quote! { #crate_name #(:: #rest)* }
+            quote! { #(:: #foreign)* }
+        }
+        primitive => {
+            let primitive = segment_identifiers(primitive);
+
+            quote! { #(#primitive)* }
+        }
     }
 }
 
@@ -42,16 +53,16 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_foreign_crate_root_as_its_crate_name() {
+    fn renders_a_foreign_crate_root_as_an_absolute_path() {
         assert_eq!(
             rendered(&["margaret_http", "response", "Response"]),
-            "margaret_http :: response :: Response"
+            ":: margaret_http :: response :: Response"
         );
     }
 
     #[test]
-    fn renders_a_single_segment_foreign_root() {
-        assert_eq!(rendered(&["other"]), "other");
+    fn renders_a_primitive_type_bare() {
+        assert_eq!(rendered(&["u8"]), "u8");
     }
 
     #[test]

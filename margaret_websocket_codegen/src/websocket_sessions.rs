@@ -34,7 +34,16 @@ pub(crate) fn websocket_sessions(
         let SessionArguments { path, server } = SessionArguments::parse(matched.args()?, &session)?;
         let method = build_for_session_method(item, &session)?;
 
-        let route_path = RoutePath::parse(&path);
+        let route_path = match RoutePath::parse(&path) {
+            Ok(parsed) => parsed,
+            Err(source) => {
+                return Err(WebSocketCodegenError::UnroutableSessionPath {
+                    path,
+                    session,
+                    source,
+                });
+            }
+        };
         let subject = format!("session '{session}'");
         let parameters = classify_parameters(
             index,

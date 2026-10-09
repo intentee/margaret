@@ -4,7 +4,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
-use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
+use margaret_attributes::is_snake_case_name::is_snake_case_name;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 use margaret_attributes::select_framework_attributes::select_framework_attributes;
 use margaret_schema_identifier_naming::validate_identifier_length::validate_identifier_length;
@@ -30,7 +30,7 @@ use crate::relation_kind::RelationKind;
 fn table_name(arguments: ModelArguments, model: &str) -> Result<String, ModelCodegenError> {
     let ModelArguments { table } = arguments;
 
-    if !is_snake_case_identifier(&table) {
+    if !is_snake_case_name(&table) {
         return Err(ModelCodegenError::InvalidTableName {
             model: model.to_string(),
             table,

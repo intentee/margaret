@@ -64,7 +64,7 @@ mod tests {
             &["std", "string", "String"],
         ))
         .contains(
-            "margaret::framework::environment_variable::read_required::read_required::<std::string::String>(\"DATABASE_URL\")"
+            "margaret::framework::environment_variable::read_required::read_required::<::std::string::String>(\"DATABASE_URL\")"
         ));
     }
 

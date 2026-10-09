@@ -1,7 +1,14 @@
 use crate::url_parameter::UrlParameter;
 
 pub enum UrlSegment {
-    CatchAllParameter(UrlParameter),
+    CatchAllParameter {
+        parameter: UrlParameter,
+        prefix: &'static str,
+    },
     Literal(&'static str),
-    Parameter(UrlParameter),
+    Parameter {
+        parameter: UrlParameter,
+        prefix: &'static str,
+        suffix: &'static str,
+    },
 }

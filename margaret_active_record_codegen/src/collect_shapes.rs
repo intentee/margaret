@@ -189,7 +189,7 @@ fn shape_declaration<'model>(
 
     for field in declared.item.fields() {
         let field_name = match field.identifier() {
-            FieldIdentifier::Named(name) => name.clone(),
+            FieldIdentifier::Named(identifier) => identifier.to_string(),
             FieldIdentifier::Positional(position) => {
                 return Err(ActiveRecordCodegenError::ShapeRequiresNamedFields {
                     position: *position,

@@ -1,10 +1,12 @@
+use syn::ext::IdentExt;
+
 use margaret_attribute_arguments::format_path::format_path;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::field_identifier::FieldIdentifier;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_field::IndexedField;
 use margaret_attributes::indexed_item::IndexedItem;
-use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
+use margaret_attributes::is_snake_case_name::is_snake_case_name;
 use margaret_attributes::select_framework_attributes::select_framework_attributes;
 use margaret_model::column_default::ColumnDefault;
 use margaret_model::column_type::ColumnType;
@@ -25,13 +27,23 @@ use crate::field_type_shape::FieldTypeShape;
 use crate::foreign_key_arguments::ForeignKeyArguments;
 use crate::model_codegen_error::ModelCodegenError;
 
-fn field_name(field: &IndexedField, model: &str) -> Result<String, ModelCodegenError> {
+fn field_names(field: &IndexedField, model: &str) -> Result<FieldNames, ModelCodegenError> {
     match field.identifier() {
-        FieldIdentifier::Named(name) if is_snake_case_identifier(name) => Ok(name.clone()),
-        FieldIdentifier::Named(name) => Err(ModelCodegenError::FieldNameNotSnakeCase {
-            field: name.clone(),
-            model: model.to_string(),
-        }),
+        FieldIdentifier::Named(identifier) => {
+            let column_base = identifier.unraw().to_string();
+
+            if is_snake_case_name(&column_base) {
+                Ok(FieldNames {
+                    column_base,
+                    name: identifier.to_string(),
+                })
+            } else {
+                Err(ModelCodegenError::FieldNameNotSnakeCase {
+                    field: identifier.to_string(),
+                    model: model.to_string(),
+                })
+            }
+        }
         FieldIdentifier::Positional(position) => Err(ModelCodegenError::ModelRequiresNamedFields {
             model: model.to_string(),
             position: *position,
@@ -70,12 +82,12 @@ fn field_index(
 
 fn column_name(
     declared: Option<String>,
-    field: &str,
+    column_base: &str,
     model: &str,
 ) -> Result<String, ModelCodegenError> {
-    let name = declared.unwrap_or_else(|| field.to_string());
+    let name = declared.unwrap_or_else(|| column_base.to_string());
 
-    if !is_snake_case_identifier(&name) {
+    if !is_snake_case_name(&name) {
         return Err(ModelCodegenError::InvalidColumnName {
             column: name,
             model: model.to_string(),
@@ -140,6 +152,11 @@ fn column_default(
     }
 }
 
+struct FieldNames {
+    column_base: String,
+    name: String,
+}
+
 pub(crate) fn collect_field(
     index: &AttributeIndex,
     item: &IndexedItem,
@@ -150,7 +167,7 @@ pub(crate) fn collect_field(
 ) -> Result<CollectedField, ModelCodegenError> {
     reject_model_attributes(field, model)?;
 
-    let name = field_name(field, model)?;
+    let FieldNames { column_base, name } = field_names(field, model)?;
     let column_attribute = field
         .framework_attribute(FrameworkAttribute::Column)
         .ok_or_else(|| ModelCodegenError::UnattributedField {
@@ -188,7 +205,7 @@ pub(crate) fn collect_field(
                 });
             }
 
-            let column = column_name(declared_column, &name, model)?;
+            let column = column_name(declared_column, &column_base, model)?;
 
             CollectedFieldShape::Column(CollectedColumn {
                 checks: check.resolve(column_type, table, &column, model)?,
@@ -221,6 +238,7 @@ pub(crate) fn collect_field(
             }
 
             CollectedFieldShape::Key {
+                column_base,
                 on_delete: key_on_delete(index, item, field, &name, nullable, model)?,
                 target,
             }

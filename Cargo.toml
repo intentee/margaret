@@ -165,6 +165,7 @@ members = [
     "margaret_trusted_issuer",
     "margaret_trusted_issuer_codegen",
     "margaret_umbrella_path",
+    "margaret_url_path",
     "margaret_validation",
     "margaret_views",
     "margaret_views_codegen",
@@ -348,6 +349,7 @@ margaret_toposort = { path = "margaret_toposort", version = "0.1.0" }
 margaret_trusted_issuer = { path = "margaret_trusted_issuer", version = "0.1.0" }
 margaret_trusted_issuer_codegen = { path = "margaret_trusted_issuer_codegen", version = "0.1.0" }
 margaret_umbrella_path = { path = "margaret_umbrella_path", version = "0.1.0" }
+margaret_url_path = { path = "margaret_url_path", version = "0.1.0" }
 margaret_validation = { path = "margaret_validation", version = "0.1.0" }
 margaret_views = { path = "margaret_views", version = "0.1.0" }
 margaret_views_codegen = { path = "margaret_views_codegen", version = "0.4.0" }

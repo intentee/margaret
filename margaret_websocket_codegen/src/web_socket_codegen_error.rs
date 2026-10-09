@@ -4,6 +4,7 @@ use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsE
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
+use margaret_route_parameter_codegen::route_path_error::RoutePathError;
 
 #[derive(Debug, Error)]
 pub enum WebSocketCodegenError {
@@ -64,6 +65,14 @@ pub enum WebSocketCodegenError {
 
     #[error("session '{session}' is missing the required 'path' argument")]
     MissingSessionPath { session: String },
+
+    #[error("session '{session}' serves the path '{path}', which no request can reach: {source}")]
+    UnroutableSessionPath {
+        session: String,
+        path: String,
+        #[source]
+        source: RoutePathError,
+    },
 
     #[error("session '{session}' is missing the required 'server' argument")]
     MissingSessionServer { session: String },

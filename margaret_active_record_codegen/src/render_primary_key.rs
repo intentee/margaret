@@ -10,6 +10,7 @@ use crate::chained_writes::chained_writes;
 use crate::field_identifier::field_identifier;
 use crate::field_type_tokens::field_type_tokens;
 use crate::generated_model_module::generated_model_module;
+use crate::key_field_parameter::key_field_parameter;
 use crate::key_targeting::KeyTargeting;
 use crate::value_identifier::value_identifier;
 
@@ -18,11 +19,17 @@ pub(crate) fn render_primary_key(
     key_targeting: KeyTargeting,
 ) -> GeneratedModuleTokens {
     let key_fields = &model.indexes.primary_key.fields;
-    let declarations = key_fields.iter().map(|field| {
-        let identifier = field_identifier(field);
+    let parameters = key_fields.iter().enumerate().map(|(position, field)| {
+        let parameter = key_field_parameter(position);
         let field_type = field_type_tokens(field);
 
-        quote! { pub #identifier: #field_type }
+        quote! { #parameter = #field_type }
+    });
+    let declarations = key_fields.iter().enumerate().map(|(position, field)| {
+        let identifier = field_identifier(field);
+        let parameter = key_field_parameter(position);
+
+        quote! { pub #identifier: #parameter }
     });
     let widths = key_fields.iter().map(|field| {
         let field_type = field_type_tokens(field);
@@ -87,8 +94,8 @@ pub(crate) fn render_primary_key(
     GeneratedModuleTokens::new(
         generated_model_module(model, "primary_key"),
         quote! {
-            #[derive(Clone, Debug, PartialEq)]
-            pub struct PrimaryKey {
+            #[derive(Clone, Debug, Eq, PartialEq)]
+            pub struct PrimaryKey<#(#parameters),*> {
                 #(#declarations),*
             }
 

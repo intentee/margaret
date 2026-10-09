@@ -1469,11 +1469,11 @@ impl GetIdentity {
             .collect();
         assert!(construction.contains("crate::margaret::jwks::JwksRoller::create("));
         assert!(construction.contains(
-            "::std::sync::Arc::new(margaret::framework::jwks_keygen::generated_rsa_signing_keys::GeneratedRsaSigningKeys,)"
+            "::std::sync::Arc::new(::margaret::framework::jwks_keygen::generated_rsa_signing_keys::GeneratedRsaSigningKeys,)"
         ));
         assert!(construction.contains(".public_jwks_handler()"));
         assert!(construction.contains(
-            "crate::margaret::jwks::JwksRoller::create(::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),"
+            "crate::margaret::jwks::JwksRoller::create(::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone(&framework_database_database_database),"
         ));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
@@ -1531,7 +1531,7 @@ impl GetIdentity {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(construction.contains(
-            "letframework_issuer_directory_issuer_directory_issuer_directory=::std::sync::Arc::new(margaret::framework::issuer_directory::issuer_directory::IssuerDirectory::create(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::vec::Vec::from([::std::sync::Arc::<crate::margaret::trusted_issuers::auth::PolledKeySet,>::clone(&margaret_trusted_issuers_auth_polled_key_set),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::PolledKeySet,>::clone(&margaret_trusted_issuers_partner_polled_key_set),]),),);"
+            "letframework_issuer_directory_issuer_directory_issuer_directory=::std::sync::Arc::new(::margaret::framework::issuer_directory::issuer_directory::IssuerDirectory::create(::std::sync::Arc::<::margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::vec::Vec::from([::std::sync::Arc::<crate::margaret::trusted_issuers::auth::PolledKeySet,>::clone(&margaret_trusted_issuers_auth_polled_key_set),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::PolledKeySet,>::clone(&margaret_trusted_issuers_partner_polled_key_set),]),),);"
         ));
         assert!(construction.contains(
             "margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient::create().map_err(margaret::framework::anyhow::Error::from),)?;"
@@ -1880,36 +1880,36 @@ struct ApplicationDatabase;
             "crate::margaret::oidc_provider::subject_token_exchangers::ci::SubjectTokenExchanger::create(::std::sync::Arc::<crate::margaret::trusted_issuers::ci::TrustedIssuer,>::clone(&margaret_trusted_issuers_ci_trusted_issuer),::std::sync::Arc::<crate::CiExchanger>::clone(&ci_exchanger),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::oidc_provider::ConsentEndpoint::create(::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::token_issuance::TOKEN_ISSUANCE,)"
+            "crate::margaret::oidc_provider::ConsentEndpoint::create(::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::token_issuance::TOKEN_ISSUANCE,)"
         ));
         assert!(construction.contains(
-            "crate::margaret::oidc_provider::RevocationEndpoint::create(::std::sync::Arc::<crate::margaret::oidc_provider::AcceptedClients,>::clone(&margaret_oidc_provider_accepted_clients),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::accepted_clients::accepted_resources::ACCEPTED_RESOURCES,)"
+            "crate::margaret::oidc_provider::RevocationEndpoint::create(::std::sync::Arc::<crate::margaret::oidc_provider::AcceptedClients,>::clone(&margaret_oidc_provider_accepted_clients),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::accepted_clients::accepted_resources::ACCEPTED_RESOURCES,)"
         ));
         assert!(
             module(&code, "serve")
                 .split_whitespace()
                 .collect::<String>()
-                .contains("letserve_input_0=matchmargaret::framework::environment_variable::read_required::read_required::<margaret::framework::database::database_url::DatabaseUrl,>(\"APPLICATION_DATABASE_URL\")")
+                .contains("letserve_input_0=matchmargaret::framework::environment_variable::read_required::read_required::<::margaret::framework::database::database_url::DatabaseUrl,>(\"APPLICATION_DATABASE_URL\")")
         );
         assert!(
             module(&code, "serve")
                 .split_whitespace()
                 .collect::<String>()
-                .contains("letserve_input_1=matchmargaret::framework::environment_variable::read_required::read_required::<margaret::framework::database::max_connections::MaxConnections,>(\"APPLICATION_DATABASE_MAX_CONNECTIONS\")")
+                .contains("letserve_input_1=matchmargaret::framework::environment_variable::read_required::read_required::<::margaret::framework::database::max_connections::MaxConnections,>(\"APPLICATION_DATABASE_MAX_CONNECTIONS\")")
         );
         assert!(!module(&code, "serve").contains("serve_input_4"));
         assert!(
             module(&code, "schema")
                 .split_whitespace()
                 .collect::<String>()
-                .contains("table_sets:&[margaret::framework::signing_keys::margaret::tables::TABLES,margaret::framework::authorization_grants::margaret::tables::TABLES,margaret::framework::client_assertions::margaret::tables::TABLES,margaret::framework::sessions::margaret::tables::TABLES,]")
+                .contains("table_sets:&[::margaret::framework::signing_keys::margaret::tables::TABLES,::margaret::framework::authorization_grants::margaret::tables::TABLES,::margaret::framework::client_assertions::margaret::tables::TABLES,::margaret::framework::sessions::margaret::tables::TABLES,]")
         );
         assert!(
             module(&code, "serve")
                 .split_whitespace()
                 .collect::<String>()
                 .contains(
-                    "letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.issuer_origin,);letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(::std::sync::Arc::clone(&origin_public)),);"
+                    "letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.issuer_origin,);letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(&origin_public),);"
                 )
         );
         assert!(!module(&code, "run").contains("public-url"));
@@ -1931,7 +1931,7 @@ struct ApplicationDatabase;
             "pub type AuthorizationHandler = margaret::framework::oidc_provider::authorization_handler::AuthorizationHandler<\n    crate::ConsentView,\n    crate::margaret::routes::Routes,\n>;\n"
         );
         assert!(serve.contains(
-            "letserve_input_2=margaret::framework::http::build_url::build_url(&origin_public,&[margaret::framework::http::url_segment::UrlSegment::Literal(\"/consent\")],);letserve_input_3=::std::sync::Arc::clone(&routes);"
+            "letserve_input_2=margaret::framework::http::literal_url::literal_url(&origin_public,\"/consent\",);letserve_input_3=::std::sync::Arc::clone(&routes);"
         ));
         assert!(construction.contains(
             "crate::margaret::oidc_provider::authorization_handler::AuthorizationHandler::create(::std::sync::Arc::<crate::margaret::oidc_provider::AuthorizationEndpoint,>::clone(&margaret_oidc_provider_authorization_endpoint),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),::std::sync::Arc::<crate::ConsentView>::clone(&consent_view),serve_input_2,serve_input_3,)"
@@ -1959,13 +1959,13 @@ struct ApplicationDatabase;
 
         assert!(module(&code, "mod").contains("pub mod accepted_clients;"));
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::portal_client::RegisteredClient::private_key_jwt_with_code_grant(crate::margaret::accepted_clients::clients::portal_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::portal_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_client_key_set),::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::accepted_clients::clients::portal_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://portal.fixture/callback\"),]),)"
+            "crate::margaret::accepted_clients::clients::portal_client::RegisteredClient::private_key_jwt_with_code_grant(crate::margaret::accepted_clients::clients::portal_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::portal_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_client_key_set),::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::accepted_clients::clients::portal_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://portal.fixture/callback\"),]),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::service_client::RegisteredClient::private_key_jwt(crate::margaret::accepted_clients::clients::service_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::service_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::service_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_service_client_client_key_set),::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),)"
+            "crate::margaret::accepted_clients::clients::service_client::RegisteredClient::private_key_jwt(crate::margaret::accepted_clients::clients::service_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::service_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::service_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_service_client_client_key_set),::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone(&framework_database_database_database),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::kiosk_client::RegisteredClient::public_with_code_grant(crate::margaret::accepted_clients::clients::kiosk_client::accepted_client::ACCEPTED_CLIENT,::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::accepted_clients::clients::kiosk_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://kiosk.fixture/callback\"),]),)"
+            "crate::margaret::accepted_clients::clients::kiosk_client::RegisteredClient::public_with_code_grant(crate::margaret::accepted_clients::clients::kiosk_client::accepted_client::ACCEPTED_CLIENT,::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::accepted_clients::clients::kiosk_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://kiosk.fixture/callback\"),]),)"
         ));
         assert!(!module(&code, "serve").contains("serve_input_4"));
         assert!(construction.contains(
@@ -2003,7 +2003,7 @@ struct ApplicationDatabase;
             "crate::margaret::accepted_clients::clients::portal_client::PolledKeySet::published(crate::margaret::accepted_clients::clients::portal_client::jwks_endpoint_issuer::JWKS_ENDPOINT_ISSUER,::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::IssuerKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_issuer_key_set),)"
         ));
         assert!(construction.contains(
-            "margaret::framework::issuer_directory::issuer_directory::IssuerDirectory::create(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::vec::Vec::from([::std::sync::Arc::<crate::margaret::trusted_issuers::ci::PolledKeySet,>::clone(&margaret_trusted_issuers_ci_polled_key_set),::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::PolledKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_polled_key_set),]),)"
+            "::margaret::framework::issuer_directory::issuer_directory::IssuerDirectory::create(::std::sync::Arc::<::margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::vec::Vec::from([::std::sync::Arc::<crate::margaret::trusted_issuers::ci::PolledKeySet,>::clone(&margaret_trusted_issuers_ci_polled_key_set),::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::PolledKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_polled_key_set),]),)"
         ));
     }
 
@@ -2234,10 +2234,10 @@ struct GetDiscovery;
             .collect();
 
         assert!(serve.contains(
-            "letserve_input_2=margaret::framework::http::build_url::build_url(&origin_public,&[margaret::framework::http::url_segment::UrlSegment::Literal(\"/sign-in/callback\",),],);letserve_input_3=margaret::framework::http::build_url::build_url(&origin_public,&[margaret::framework::http::url_segment::UrlSegment::Literal(\"/welcome\")],);"
+            "letserve_input_2=margaret::framework::http::literal_url::literal_url(&origin_public,\"/sign-in/callback\",);letserve_input_3=margaret::framework::http::literal_url::literal_url(&origin_public,\"/welcome\",);"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client,),::std::sync::Arc::<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_2,crate::margaret::oauth_clients::partner_client::sign_in_scopes::SIGN_IN_SCOPES,).map_err(margaret::framework::anyhow::Error::from)"
+            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client,),::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_2,crate::margaret::oauth_clients::partner_client::sign_in_scopes::SIGN_IN_SCOPES,).map_err(margaret::framework::anyhow::Error::from)"
         ));
         assert!(construction.contains(
             "crate::margaret::oauth_clients::partner_client::SignInStartHandler::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::SignInFlow,>::clone(&margaret_oauth_clients_partner_client_sign_in_flow),)"
@@ -2335,7 +2335,7 @@ struct GetDiscovery;
             "pub use margaret::framework::client_credentials::client_credentials::ClientCredentials;"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::AuthorizationServerClient::with_client_secret_basic(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::IssuerMetadata,>::clone(&margaret_trusted_issuers_partner_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::TrustedIssuer,>::clone(&margaret_trusted_issuers_partner_trusted_issuer),crate::margaret::oauth_clients::partner_client::client_id::CLIENT_ID,serve_input_0"
+            "crate::margaret::oauth_clients::partner_client::AuthorizationServerClient::with_client_secret_basic(::std::sync::Arc::<::margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::IssuerMetadata,>::clone(&margaret_trusted_issuers_partner_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::TrustedIssuer,>::clone(&margaret_trusted_issuers_partner_trusted_issuer),crate::margaret::oauth_clients::partner_client::client_id::CLIENT_ID,serve_input_0"
         ));
         assert!(construction.contains(
             "crate::margaret::oauth_clients::partner_client::ClientCredentials::create("
@@ -2395,7 +2395,7 @@ struct GetDiscovery;
             "crate::margaret::trusted_issuers::service_client::TrustedIssuer::own(::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),crate::margaret::trusted_issuers::service_client::token_trust::TOKEN_TRUST,)"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::service_client::AuthorizationServerClient::with_private_key_jwt(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::sync::Arc::<crate::margaret::oidc_provider::IssuerMetadata,>::clone(&margaret_oidc_provider_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::service_client::TrustedIssuer,>::clone(&margaret_trusted_issuers_service_client_trusted_issuer),crate::margaret::oauth_clients::service_client::client_id::CLIENT_ID,::std::sync::Arc::<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),)"
+            "crate::margaret::oauth_clients::service_client::AuthorizationServerClient::with_private_key_jwt(::std::sync::Arc::<::margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::sync::Arc::<crate::margaret::oidc_provider::IssuerMetadata,>::clone(&margaret_oidc_provider_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::service_client::TrustedIssuer,>::clone(&margaret_trusted_issuers_service_client_trusted_issuer),crate::margaret::oauth_clients::service_client::client_id::CLIENT_ID,::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),)"
         ));
     }
 
@@ -2414,7 +2414,7 @@ struct GetDiscovery;
                 .split_whitespace()
                 .collect::<String>()
                 .contains(
-                    "letserve_input_2=margaret::framework::http::build_url::build_url(&origin_public,&[margaret::framework::http::url_segment::UrlSegment::Literal(\"/blog/callback\")],);"
+                    "letserve_input_2=margaret::framework::http::literal_url::literal_url(&origin_public,\"/blog/callback\",);"
                 )
         );
         assert!(!module(&code, "serve").contains("serve_input_6"));
@@ -2422,7 +2422,7 @@ struct GetDiscovery;
             "crate::margaret::accepted_clients::clients::blog_app::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([serve_input_2"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::blog::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::blog::AuthorizationServerClient,>::clone(&margaret_oauth_clients_blog_authorization_server_client),::std::sync::Arc::<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_2"
+            "crate::margaret::oauth_clients::blog::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::blog::AuthorizationServerClient,>::clone(&margaret_oauth_clients_blog_authorization_server_client),::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_2"
         ));
         assert_eq!(
             module(&code, "oauth_clients/blog/sign_in_scopes"),
@@ -2437,7 +2437,7 @@ struct GetDiscovery;
             .collect();
 
         assert!(code.contains(
-            "margaret::framework::environment_variable::read_required::read_required::<margaret::framework::oauth_vocabulary::client_secret::ClientSecret,>(\"PARTNER_CLIENT_SECRET\")"
+            "margaret::framework::environment_variable::read_required::read_required::<::margaret::framework::oauth_vocabulary::client_secret::ClientSecret,>(\"PARTNER_CLIENT_SECRET\")"
         ));
     }
 
@@ -3582,11 +3582,9 @@ struct ApplicationDatabase;
         let schema: String = module(&code, "schema").split_whitespace().collect();
         let run: String = module(&code, "run").split_whitespace().collect();
 
-        assert!(
-            schema.contains(
-                "table_sets:&[margaret::framework::signing_keys::margaret::tables::TABLES]"
-            )
-        );
+        assert!(schema.contains(
+            "table_sets:&[::margaret::framework::signing_keys::margaret::tables::TABLES]"
+        ));
         assert!(run.contains("super::schema::SCHEMA"));
     }
 
@@ -3924,7 +3922,7 @@ struct PostSignOut;
         let code = generate(ISSUED_SESSIONS_CRATE).expect("the build succeeds");
 
         assert!(collapsed(&concatenated(&code)).contains(
-            "crate::margaret::sessions::IssuedSessions::host_only(::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),crate::margaret::sessions::session_audience::SESSION_AUDIENCE,)"
+            "crate::margaret::sessions::IssuedSessions::host_only(::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone(&framework_database_database_database),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),crate::margaret::sessions::session_audience::SESSION_AUDIENCE,)"
         ));
         assert_eq!(
             collapsed(module(&code, "sessions/session_audience")),

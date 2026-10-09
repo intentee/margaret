@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use margaret_cluster_tests::cluster::Cluster;
 
+use crate::addressed_route::addressed_route;
 use crate::cluster_binary::cluster_binary;
 
 #[derive(Deserialize)]
@@ -31,11 +32,7 @@ async fn an_upload_on_one_instance_downloads_identically_from_another() {
         cluster
             .client
             .get(
-                cluster
-                    .instance_routes(1)
-                    .public
-                    .get_upload(id.to_string())
-                    .url()
+                addressed_route(cluster.instance_routes(1).public.get_upload(id.to_string())).url()
             )
             .send()
             .await

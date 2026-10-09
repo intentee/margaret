@@ -50,7 +50,7 @@ mod tests {
         assert_eq!(schema.name(), "schema");
         assert_eq!(
             schema.to_source().split_whitespace().collect::<String>(),
-            "pubconstSCHEMA:margaret::framework::model::schema::Schema=margaret::framework::model::schema::Schema{table_sets:&[margaret::framework::grants::margaret::tables::TABLES,crate::margaret::tables::TABLES],};"
+            "pubconstSCHEMA:margaret::framework::model::schema::Schema=margaret::framework::model::schema::Schema{table_sets:&[::margaret::framework::grants::margaret::tables::TABLES,crate::margaret::tables::TABLES],};"
         );
     }
 }

@@ -1233,7 +1233,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             "pubget_greeting:margaret::framework::http::forwardable_route::ForwardableRoute,"
         ));
         assert!(source.contains(
-            "get_greeting:margaret::framework::http::forwardable_route::ForwardableRoute::new(origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/greeting\",),]),)"
+            "get_greeting:margaret::framework::http::forwardable_route::ForwardableRoute::new(margaret::framework::http::literal_url::literal_url(origin,\"/greeting\"),),"
         ));
     }
 
@@ -1242,10 +1242,10 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "pubfnget_article(&self,article:String,)->margaret::framework::http::forwardable_route::ForwardableRoute"
+            "pubfnget_article(&self,article:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::forwardable_route::ForwardableRoute,>"
         ));
         assert!(source.contains(
-            "margaret::framework::http::forwardable_route::ForwardableRoute::new(self.origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/articles/\",),margaret::framework::http::url_segment::UrlSegment::Parameter(margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:article,}),]),)"
+            "margaret::framework::http::build_url::build_url(&self.origin,&[margaret::framework::http::url_segment::UrlSegment::Literal(\"/articles/\",),margaret::framework::http::url_segment::UrlSegment::Parameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:article,},prefix:\"\",suffix:\"\",},],).map(margaret::framework::http::forwardable_route::ForwardableRoute::new)"
         ));
         assert!(!source.contains("Params"));
     }
@@ -1255,7 +1255,23 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "margaret::framework::http::url_segment::UrlSegment::CatchAllParameter(margaret::framework::http::url_parameter::UrlParameter{name:\"rest\",value:rest,})"
+            "margaret::framework::http::url_segment::UrlSegment::CatchAllParameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"rest\",value:rest,},prefix:\"\",}"
+        ));
+    }
+
+    #[test]
+    fn builds_the_url_of_a_literal_route_from_its_encoded_path() {
+        let source = routes_source_for(
+            r#"
+#[singleton]
+#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = "get_callback", path = "/oauth/{{callback}}", server = "public")]
+struct GetCallback;
+impl GetCallback { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
+"#,
+        );
+
+        assert!(source.contains(
+            "get_callback:margaret::framework::http::forwardable_route::ForwardableRoute::new(margaret::framework::http::literal_url::literal_url(origin,\"/oauth/%7Bcallback%7D\",),),"
         ));
     }
 
@@ -1269,7 +1285,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             )
         );
         assert!(source.contains(
-            "pubfnpatch_article(&self,article:String,)->margaret::framework::http::route_reference::RouteReference"
+            "pubfnpatch_article(&self,article:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference,>"
         ));
         assert!(!source.contains("forward_to"));
     }
@@ -1285,12 +1301,12 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 
         assert!(source.contains("pubstructInternal{}"));
         assert!(source.contains(&format!(
-            "implInternal{{{allow}pub(crate)fnnew(_origin:::std::sync::Arc<str>)->Self{{Self{{}}}}}}"
+            "implInternal{{{allow}pub(crate)fnnew(_origin:&str)->Self{{Self{{}}}}}}"
         )));
     }
 
     #[test]
-    fn moves_the_origin_into_the_last_route_of_a_server_without_parameterized_routes() {
+    fn borrows_the_origin_for_the_literal_routes_of_a_server_without_parameterized_routes() {
         let source = routes_source_for(
             r#"
 #[singleton]
@@ -1311,7 +1327,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             .collect();
 
         assert!(source.contains(&format!(
-            "implIdentity{{{allow}pub(crate)fnnew(origin:::std::sync::Arc<str>)->Self{{Self{{get_login:margaret::framework::http::forwardable_route::ForwardableRoute::new(origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/login\"),]),),post_consent:margaret::framework::http::route_reference::RouteReference::new(origin,::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/consent\",),]),),}}}}}}"
+            "implIdentity{{{allow}pub(crate)fnnew(origin:&str)->Self{{Self{{get_login:margaret::framework::http::forwardable_route::ForwardableRoute::new(margaret::framework::http::literal_url::literal_url(origin,\"/login\"),),post_consent:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/consent\"),),}}}}}}"
         )));
     }
 
@@ -1319,9 +1335,9 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     fn constructs_the_routes_from_origins_in_alphabetical_server_order() {
         let source = routes_source_for(ROUTES_FIXTURE);
 
-        assert!(source.contains(
-            "pubfnfrom_origins(origin_internal:::std::sync::Arc<str>,origin_public:::std::sync::Arc<str>,)->Self"
-        ));
+        assert!(
+            source.contains("pubfnfrom_origins(origin_internal:&str,origin_public:&str)->Self")
+        );
         assert!(source.contains(
             "internal:servers::internal::Internal::new(origin_internal),public:servers::public::Public::new(origin_public),"
         ));
@@ -2092,6 +2108,27 @@ impl GetGreeting {
     }
 
     #[test]
+    fn names_the_routes_of_a_server_whose_name_starts_with_a_digit_after_its_underscore() {
+        let source = routes_source_for(
+            "#[singleton]
+#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_x\", path = \"/x\", server = \"_1\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+        );
+
+        assert!(source.contains("pub_1:servers::_1::_1,"));
+    }
+
+    #[test]
+    fn rejects_a_raw_server_name() {
+        assert!(matches!(
+            rejection_for(
+                "#[singleton]
+        #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"r#type\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            ),
+            HttpCodegenError::InvalidServerName { server, .. } if server == "r#type"
+        ));
+    }
+
+    #[test]
     fn disambiguates_a_route_named_origin_from_the_internal_origin_field() {
         let source = routes_source_for(
             "#[singleton]
@@ -2105,7 +2142,7 @@ impl GetGreeting {
                 "puborigin:margaret::framework::http::forwardable_route::ForwardableRoute,"
             )
         );
-        assert!(source.contains("self.origin_2.clone()"));
+        assert!(source.contains("build_url(&self.origin_2,"));
     }
 
     #[test]
@@ -2115,9 +2152,9 @@ impl GetGreeting {
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"new\", path = \"/n/{id}\", server = \"public\")]\nstruct New;\nimpl New {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(source.contains("pub(crate)fnnew_2(origin:::std::sync::Arc<str>)"));
+        assert!(source.contains("pub(crate)fnnew_2(origin:&str)"));
         assert!(source.contains(
-            "pubfnnew(&self,id:String,)->margaret::framework::http::forwardable_route::ForwardableRoute"
+            "pubfnnew(&self,id:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::forwardable_route::ForwardableRoute,>"
         ));
         assert!(source.contains("servers::public::Public::new_2(origin_public)"));
     }

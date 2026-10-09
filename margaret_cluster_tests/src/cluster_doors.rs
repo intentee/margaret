@@ -50,16 +50,14 @@ impl ClusterDoors {
     #[must_use]
     pub fn routes(&self) -> Routes {
         Routes::from_origins(
-            Arc::from(
-                self.url(ClusterServer::Identity)
-                    .origin()
-                    .ascii_serialization(),
-            ),
-            Arc::from(
-                self.url(ClusterServer::Public)
-                    .origin()
-                    .ascii_serialization(),
-            ),
+            &self
+                .url(ClusterServer::Identity)
+                .origin()
+                .ascii_serialization(),
+            &self
+                .url(ClusterServer::Public)
+                .origin()
+                .ascii_serialization(),
         )
     }
 

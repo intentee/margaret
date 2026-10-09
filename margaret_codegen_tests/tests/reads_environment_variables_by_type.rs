@@ -40,13 +40,13 @@ fn declares_each_variable_with_its_canonical_value_type() {
     assert!(construction.contains(":u16,"));
     assert!(construction.contains(":bool,"));
     assert!(construction.contains(":::std::option::Option<u16>,"));
-    assert!(construction.contains(":::std::option::Option<std::string::String>,"));
+    assert!(construction.contains(":::std::option::Option<::std::string::String>,"));
 }
 
 #[test]
 fn reads_a_required_variable_through_the_required_reader() {
     assert!(fixture().serve.contains(
-        "margaret::framework::environment_variable::read_required::read_required::<std::string::String>(\"DATABASE_URL\")"
+        "margaret::framework::environment_variable::read_required::read_required::<::std::string::String>(\"DATABASE_URL\")"
     ));
 }
 

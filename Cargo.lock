@@ -2619,6 +2619,7 @@ dependencies = [
  "margaret_peer_identity",
  "margaret_route_method",
  "margaret_route_parameter_binding",
+ "margaret_url_path",
  "matchit",
  "maud",
  "mime",
@@ -3616,6 +3617,11 @@ dependencies = [
 [[package]]
 name = "margaret_route_parameter_codegen"
 version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_url_path",
+ "thiserror 2.0.18",
+]
 
 [[package]]
 name = "margaret_schema_codegen"
@@ -4338,6 +4344,15 @@ name = "margaret_umbrella_path"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+]
+
+[[package]]
+name = "margaret_url_path"
+version = "0.1.0"
+dependencies = [
+ "percent-encoding",
+ "thiserror 2.0.18",
+ "url",
 ]
 
 [[package]]

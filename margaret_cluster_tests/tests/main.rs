@@ -39,6 +39,8 @@ mod a_terminated_instance_exits_cleanly_while_peers_serve;
 #[cfg(feature = "tests_that_use_cluster")]
 mod a_view_shows_a_note_written_on_another_instance;
 #[cfg(feature = "tests_that_use_cluster")]
+mod addressed_route;
+#[cfg(feature = "tests_that_use_cluster")]
 mod an_expired_code_is_refused_everywhere;
 #[cfg(feature = "tests_that_use_cluster")]
 mod an_expired_pending_authorization_is_unknown_everywhere;

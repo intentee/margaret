@@ -7,6 +7,7 @@ use margaret_injection_codegen::injection_error::InjectionError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 use margaret_route_method::route_method::RouteMethod;
+use margaret_route_parameter_codegen::route_path_error::RoutePathError;
 
 #[derive(Debug, Error)]
 pub enum HttpCodegenError {
@@ -75,6 +76,16 @@ pub enum HttpCodegenError {
         path: String,
         #[source]
         source: InsertError,
+    },
+
+    #[error(
+        "responder '{responder}' declares the route path '{path}', which no request can reach: {source}"
+    )]
+    UnroutableRoutePath {
+        responder: String,
+        path: String,
+        #[source]
+        source: RoutePathError,
     },
 
     #[error(

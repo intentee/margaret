@@ -18,10 +18,10 @@ fn fixture_source(fixture: &str) -> String {
 fn declares_each_environment_variable_as_a_bootstrap_argument_field() {
     let source = fixture_source("environment_variables");
 
-    assert!(source.contains("pubargument0:std::string::String,"));
+    assert!(source.contains("pubargument0:::std::string::String,"));
     assert!(source.contains("pubargument1:::std::option::Option<u16>,"));
     assert!(source.contains("pubargument2:bool,"));
-    assert!(source.contains("pubargument3:std::path::PathBuf,"));
+    assert!(source.contains("pubargument3:::std::path::PathBuf,"));
 }
 
 #[test]

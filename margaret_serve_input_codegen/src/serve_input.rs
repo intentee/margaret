@@ -150,7 +150,7 @@ mod tests {
     fn a_console_argument_delegates_its_shape_to_the_argument() {
         let input = console_argument();
 
-        assert_eq!(collapsed(&input.field_type()), "std::string::String");
+        assert_eq!(collapsed(&input.field_type()), "::std::string::String");
         assert_eq!(input.name(), "label");
         assert_eq!(input.weaving(), WeavingKind::BorrowedStr);
         assert!(input.is_shareable());
@@ -179,7 +179,7 @@ mod tests {
 
         assert_eq!(
             collapsed(&input.field_type()),
-            "::std::option::Option<std::string::String>"
+            "::std::option::Option<::std::string::String>"
         );
         assert_eq!(input.name(), "DATABASE_URL");
         assert_eq!(input.weaving(), WeavingKind::Cloned);

@@ -1,5 +1,6 @@
 use margaret_cluster_tests::cluster::Cluster;
 
+use crate::addressed_route::addressed_route;
 use crate::cluster_binary::cluster_binary;
 use crate::note_written::note_written;
 
@@ -12,11 +13,13 @@ async fn a_view_shows_a_note_written_on_another_instance() {
         cluster
             .client
             .get(
-                cluster
-                    .instance_routes(1)
-                    .public
-                    .get_note_view(id.to_string())
-                    .url()
+                addressed_route(
+                    cluster
+                        .instance_routes(1)
+                        .public
+                        .get_note_view(id.to_string())
+                )
+                .url()
             )
             .send()
             .await

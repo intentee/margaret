@@ -17,6 +17,7 @@ mod deletes_the_rows_of_a_branching_prefix;
 mod deletes_the_rows_of_a_range;
 mod deletes_the_rows_of_an_index_prefix;
 mod describes_a_key_by_its_primary_key;
+mod finds_a_record_by_a_composite_key_over_a_secret;
 mod finds_a_record_by_a_composite_primary_key;
 mod finds_a_record_by_a_unique_field;
 mod finds_a_record_by_its_primary_key;

@@ -27,6 +27,7 @@ mod is_copy_primitive;
 pub mod is_copy_type;
 mod is_identifier;
 pub mod is_snake_case_identifier;
+pub mod is_snake_case_name;
 mod is_std_copy_type;
 mod item_is_copy;
 pub mod item_kind;

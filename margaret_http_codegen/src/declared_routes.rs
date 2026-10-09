@@ -5,8 +5,8 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_route_method::route_method::RouteMethod;
-use margaret_route_parameter_codegen::literal_route_path::LiteralRoutePath;
 use margaret_route_parameter_codegen::route_path::RoutePath;
+use margaret_route_parameter_codegen::route_url_template::RouteUrlTemplate;
 use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
 
 use crate::declared_route::DeclaredRoute;
@@ -46,6 +46,17 @@ impl<'index> DeclaredRoutes<'index> {
                 return Err(HttpCodegenError::InvalidServerName { responder, server });
             }
 
+            let path = match RoutePath::parse(&path) {
+                Ok(parsed) => parsed,
+                Err(source) => {
+                    return Err(HttpCodegenError::UnroutableRoutePath {
+                        path,
+                        responder,
+                        source,
+                    });
+                }
+            };
+
             if let Some(name) = &name {
                 if !is_snake_case_identifier(name) {
                     return Err(HttpCodegenError::InvalidRouteName {
@@ -71,7 +82,7 @@ impl<'index> DeclaredRoutes<'index> {
                 max_body_bytes,
                 method,
                 name,
-                path: RoutePath::parse(&path),
+                path,
                 server,
             });
         }
@@ -107,16 +118,18 @@ impl<'index> DeclaredRoutes<'index> {
             });
         }
 
-        match declared.path.literal() {
-            LiteralRoutePath::Literal(path) => Ok(RouteUrlInput {
-                path,
+        match declared.path.template() {
+            RouteUrlTemplate::Literal(path) => Ok(RouteUrlInput {
+                path: path.clone(),
                 server: declared.server.clone(),
             }),
-            LiteralRoutePath::Parameterized => Err(HttpCodegenError::ParameterizedRedirectRoute {
-                path: declared.path.pattern().to_string(),
-                referrer: referrer.to_string(),
-                route: route.to_string(),
-            }),
+            RouteUrlTemplate::Parameterized(_) => {
+                Err(HttpCodegenError::ParameterizedRedirectRoute {
+                    path: declared.path.pattern().to_string(),
+                    referrer: referrer.to_string(),
+                    route: route.to_string(),
+                })
+            }
         }
     }
 }
@@ -162,11 +175,11 @@ mod tests {
     }
 
     #[test]
-    fn locates_a_redirect_route_with_escaped_braces_at_its_literal_path() {
+    fn locates_a_redirect_route_with_escaped_braces_at_its_encoded_literal_path() {
         assert_eq!(
             redirect_target("EscapedCallback").expect("the redirect route is routed"),
             RouteUrlInput {
-                path: "/oauth/{callback}".to_string(),
+                path: "/oauth/%7Bcallback%7D".to_string(),
                 server: "public".to_string(),
             }
         );
@@ -186,6 +199,19 @@ mod tests {
             rejection("PostSignIn"),
             "'crate::Client' redirects to 'crate::PostSignIn', which does not respond to RouteMethod::Get"
         );
+    }
+
+    #[test]
+    fn rejects_a_route_path_no_request_can_reach() {
+        let indexed = IndexedSource::new(
+            "use margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(method = RouteMethod::Get, path = \"/articles/../admin\", server = \"public\")]\nstruct Escaping;\n",
+        );
+
+        assert!(matches!(
+            DeclaredRoutes::read(&indexed.index),
+            Err(HttpCodegenError::UnroutableRoutePath { path, responder, .. })
+                if path == "/articles/../admin" && responder == "crate::Escaping"
+        ));
     }
 
     #[test]

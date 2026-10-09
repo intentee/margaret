@@ -3,7 +3,6 @@ use std::iter;
 use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 use std::net::TcpListener;
-use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::AtomicU16;
 use std::sync::atomic::Ordering;
@@ -46,8 +45,8 @@ impl InstancePorts {
     #[must_use]
     pub fn routes(&self) -> Routes {
         Routes::from_origins(
-            Arc::from(format!("http://{}", self.identity)),
-            Arc::from(format!("http://{}", self.public)),
+            &format!("http://{}", self.identity),
+            &format!("http://{}", self.public),
         )
     }
 

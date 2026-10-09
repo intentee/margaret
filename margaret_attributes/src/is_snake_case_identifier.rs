@@ -1,8 +1,9 @@
 use crate::is_identifier::is_identifier;
+use crate::is_snake_case_name::is_snake_case_name;
 
 #[must_use]
 pub fn is_snake_case_identifier(name: &str) -> bool {
-    is_identifier(name) && !name.chars().any(|character| character.is_ascii_uppercase())
+    is_snake_case_name(name) && is_identifier(name)
 }
 
 #[cfg(test)]
@@ -17,6 +18,11 @@ mod tests {
     #[test]
     fn rejects_an_identifier_that_contains_uppercase() {
         assert!(!is_snake_case_identifier("getArticle"));
+    }
+
+    #[test]
+    fn rejects_a_raw_identifier() {
+        assert!(!is_snake_case_identifier("r#type"));
     }
 
     #[test]

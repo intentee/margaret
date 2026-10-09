@@ -33,6 +33,7 @@ impl<'collected> PrimaryKeyColumns<'collected> {
     pub(crate) fn reference(
         &mut self,
         field: &str,
+        column_base: &str,
         target: &CanonicalPath,
         model: &str,
     ) -> Result<KeyReference, ModelCodegenError> {
@@ -44,7 +45,7 @@ impl<'collected> PrimaryKeyColumns<'collected> {
         for KeyColumn { column_type, name } in target_columns {
             columns.push(KeyColumn {
                 column_type,
-                name: schema_identifier(&[field, name.as_str()]).map_err(|source| {
+                name: schema_identifier(&[column_base, name.as_str()]).map_err(|source| {
                     ModelCodegenError::ForeignKeyColumnNameTooLong {
                         field: field.to_string(),
                         model: model.to_string(),

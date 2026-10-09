@@ -3,7 +3,6 @@ use std::sync::Arc;
 use margaret_http::forwardable_route::ForwardableRoute;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::route_entry::RouteEntry;
-use margaret_http::url_segment::UrlSegment;
 use margaret_http_tests::raw_exchange::raw_exchange;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::see_other_handler::SeeOtherHandler;
@@ -19,10 +18,7 @@ async fn answers_a_redirect_continuation_with_its_location() {
             vec![MethodHandler::head(
                 RouteMethod::Get,
                 Arc::new(SeeOtherHandler {
-                    route: ForwardableRoute::new(
-                        Arc::from("http://fixture.test"),
-                        vec![UrlSegment::Literal("/greeting")],
-                    ),
+                    route: ForwardableRoute::new("http://fixture.test/greeting".to_string()),
                 }),
             )],
         )],

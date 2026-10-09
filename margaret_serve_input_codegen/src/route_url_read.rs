@@ -10,10 +10,7 @@ pub fn route_url_read(RouteUrlInput { path, server }: &RouteUrlInput) -> TokenSt
     let origin = server_origin_ident(server);
 
     quote! {
-        margaret::framework::http::build_url::build_url(
-            &#origin,
-            &[margaret::framework::http::url_segment::UrlSegment::Literal(#path)],
-        )
+        margaret::framework::http::literal_url::literal_url(&#origin, #path)
     }
 }
 
@@ -32,7 +29,7 @@ mod tests {
             .to_string()
             .split_whitespace()
             .collect::<String>(),
-            "margaret::framework::http::build_url::build_url(&origin_public,&[margaret::framework::http::url_segment::UrlSegment::Literal(\"/sign-in/callback\")],)"
+            "margaret::framework::http::literal_url::literal_url(&origin_public,\"/sign-in/callback\")"
         );
     }
 }

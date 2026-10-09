@@ -58,7 +58,7 @@ fn scan_fields(fields: &Fields) -> Vec<ScannedField> {
         .enumerate()
         .map(|(position, field)| {
             let identifier = match &field.ident {
-                Some(name) => FieldIdentifier::Named(name.to_string()),
+                Some(identifier) => FieldIdentifier::Named(identifier.clone()),
                 None => FieldIdentifier::Positional(position),
             };
 

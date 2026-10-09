@@ -802,6 +802,23 @@ impl Guard {
     }
 
     #[test]
+    fn rejects_a_session_whose_path_no_request_can_reach() {
+        assert!(matches!(
+            error(
+                r#"#[websocket_session(path = "/rooms/../admin", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> anyhow::Result<Self> {}
+}
+"#
+            ),
+            WebSocketCodegenError::UnroutableSessionPath { path, .. } if path == "/rooms/../admin"
+        ));
+    }
+
+    #[test]
     fn rejects_a_session_without_a_server() {
         assert!(
             error(r#"#[websocket_session(path = "/x")] struct Bad;"#)

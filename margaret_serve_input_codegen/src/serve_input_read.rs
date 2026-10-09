@@ -89,7 +89,7 @@ mod tests {
                 path: "/callback".to_string(),
                 server: "public".to_string(),
             }))
-            .starts_with("margaret::framework::http::build_url::build_url(&origin_public")
+            .starts_with("margaret::framework::http::literal_url::literal_url(&origin_public")
         );
     }
 
