@@ -9,14 +9,12 @@ use serde_json::Value;
 
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
 use margaret_accepted_clients_tests::assertion_claims::assertion_claims;
-use margaret_database_tests::started_database::StartedDatabase;
 use margaret_http_tests::fixture_client_builder::fixture_client_builder;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
-use margaret_jwks_secret_store_tests::fixture_secrets::fixture_secrets;
-use margaret_jwks_secret_store_tests::published_jwks_handler::published_jwks_handler;
+use margaret_jwks_secret_store_tests::fixture_roller::fixture_roller;
 use margaret_oauth_vocabulary::jwt_bearer_client_assertion_type::JWT_BEARER_CLIENT_ASSERTION_TYPE;
 use margaret_oidc_provider::authorization_endpoint::AuthorizationEndpoint;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
@@ -28,14 +26,15 @@ use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::answer::Answer;
 use crate::client_credentials::ClientCredentials;
+use crate::fixture_authorization_grants::FixtureAuthorizationGrants;
 use crate::fixture_clients::FixtureClients;
 use crate::fixture_endpoints::fixture_endpoints;
+use crate::grant_interference::GrantInterference;
 use crate::provider_issuance::provider_issuance;
 use crate::provider_parts::ProviderParts;
 use crate::provider_url::provider_url;
 use crate::published_endpoints::PublishedEndpoints;
 use crate::signed_in_end_user::signed_in_end_user;
-use crate::started_with_provider_state::started_with_provider_state;
 use crate::validated_form::validated_form;
 
 const FORM_CONTENT_TYPE: &str = "application/x-www-form-urlencoded";
@@ -70,13 +69,11 @@ pub struct ProviderFixture {
     pub consent: ConsentEndpoint,
     pub issuer: &'static str,
     pub server: RunningFixtureServer,
-    pub storage: StartedDatabase,
     pub tls: TlsFixture,
 }
 
 impl ProviderFixture {
     async fn assembled(
-        storage: StartedDatabase,
         clients: FixtureClients,
         exchangers: Vec<Arc<SubjectTokenExchanger>>,
         ProviderPublication {
@@ -90,14 +87,14 @@ impl ProviderFixture {
             tls,
         }: ProviderPublication,
     ) -> Self {
-        let secrets = fixture_secrets();
-        let secret_store = Arc::new(JwksSecretStore::create(Arc::clone(&secrets), issuance));
+        let roller = fixture_roller().await;
+        let secret_store = Arc::new(JwksSecretStore::create(Arc::clone(&roller), issuance));
         let parts = ProviderParts {
             clients: Arc::new(AcceptedClients::create(clients.registered(), issuance)),
-            database: Arc::clone(&storage.database),
             endpoints,
+            grants: Arc::clone(&clients.grants),
             issuance,
-            public_jwks_handler: published_jwks_handler(&secrets),
+            roller,
             secret_store,
         };
         let server =
@@ -115,11 +112,10 @@ impl ProviderFixture {
                 parts.issuance,
             ),
             client,
-            consent: ConsentEndpoint::create(parts.database, parts.issuance),
+            consent: ConsentEndpoint::create(Arc::clone(&clients.grants), parts.issuance),
             clients,
             issuer: parts.issuance.issuer,
             server,
-            storage,
             tls,
         }
     }
@@ -130,12 +126,9 @@ impl ProviderFixture {
     /// cannot be prepared.
     pub async fn published(issuer: IssuerIdentifier, ip: IpAddr) -> Self {
         let tls = TlsFixture::serving(issuer.url().host_str().expect("the issuer names a host"));
-        let storage = started_with_provider_state().await;
-        let clients = FixtureClients::standard(&storage.database);
 
         Self::assembled(
-            storage,
-            clients,
+            FixtureClients::standard().await,
             Vec::new(),
             ProviderPublication {
                 endpoints: fixture_endpoints(&issuer),
@@ -153,16 +146,13 @@ impl ProviderFixture {
     /// # Panics
     ///
     /// Panics when the fixture clients, endpoints or tls client cannot be prepared.
-    pub async fn serving(
-        storage: StartedDatabase,
-        clients: FixtureClients,
-        exchangers: Vec<Arc<SubjectTokenExchanger>>,
-    ) -> Self {
-        Self::assembled(
-            storage,
-            clients,
-            exchangers,
-            ProviderPublication::on_localhost(),
+    pub async fn interfered(interference: GrantInterference) -> Self {
+        Self::serving(
+            FixtureClients::over_grants(Arc::new(FixtureAuthorizationGrants::interfered(
+                interference,
+            )))
+            .await,
+            Vec::new(),
         )
         .await
     }
@@ -170,11 +160,18 @@ impl ProviderFixture {
     /// # Panics
     ///
     /// Panics when the fixture clients, endpoints or tls client cannot be prepared.
-    pub async fn start(exchangers: Vec<Arc<SubjectTokenExchanger>>) -> Self {
-        let storage = started_with_provider_state().await;
-        let clients = FixtureClients::standard(&storage.database);
+    pub async fn serving(
+        clients: FixtureClients,
+        exchangers: Vec<Arc<SubjectTokenExchanger>>,
+    ) -> Self {
+        Self::assembled(clients, exchangers, ProviderPublication::on_localhost()).await
+    }
 
-        Self::serving(storage, clients, exchangers).await
+    /// # Panics
+    ///
+    /// Panics when the fixture clients, endpoints or tls client cannot be prepared.
+    pub async fn start(exchangers: Vec<Arc<SubjectTokenExchanger>>) -> Self {
+        Self::serving(FixtureClients::standard().await, exchangers).await
     }
 
     /// # Panics

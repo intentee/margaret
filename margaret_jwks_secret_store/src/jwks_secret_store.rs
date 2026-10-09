@@ -18,7 +18,7 @@ use margaret_identity_session::refresh_token_claims_signed::RefreshTokenClaimsSi
 use margaret_identity_session::refresh_token_lifetime_secs::REFRESH_TOKEN_LIFETIME_SECS;
 use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
 use margaret_jose_parameters::jwt_type::JwtType;
-use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification::attributed_jwt::AttributedJwt;
@@ -55,13 +55,13 @@ fn verify_attributed<TClaims: DeserializeOwned, TProfile: JwtProfile>(
 
 pub struct JwksSecretStore {
     issuance: TokenIssuance,
-    secrets: Arc<JwksSecretHolder>,
+    roller: Arc<JwksRoller>,
 }
 
 impl JwksSecretStore {
     #[must_use]
-    pub fn create(secrets: Arc<JwksSecretHolder>, issuance: TokenIssuance) -> Self {
-        Self { issuance, secrets }
+    pub fn create(roller: Arc<JwksRoller>, issuance: TokenIssuance) -> Self {
+        Self { issuance, roller }
     }
 
     #[must_use]
@@ -81,7 +81,8 @@ impl JwksSecretStore {
         AccessTokenClaimsSigned {
             exp: registered.exp.seconds_since_epoch(),
             signed_claims: self
-                .secrets
+                .roller
+                .jwks_secret_holder()
                 .get()
                 .current()
                 .sign_json(&access.to_payload(&registered), JwtType::AccessToken),
@@ -101,7 +102,7 @@ impl JwksSecretStore {
             aud: AudienceClaim::Single(claims.client_id.to_string()),
             ..self.issuance.registered_claims(now, ID_TOKEN_LIFETIME_SECS)
         });
-        let secret = self.secrets.get();
+        let secret = self.roller.jwks_secret_holder().get();
 
         match signing {
             IdTokenSigning::EllipticCurve => Ok(secret.current().sign_json(&payload, JwtType::Jwt)),
@@ -127,7 +128,8 @@ impl JwksSecretStore {
         RefreshTokenClaimsSigned {
             exp: registered.exp.seconds_since_epoch(),
             signed_claims: self
-                .secrets
+                .roller
+                .jwks_secret_holder()
                 .get()
                 .current()
                 .sign_json(&claims.to_payload(&registered), JwtType::Refresh),
@@ -136,7 +138,12 @@ impl JwksSecretStore {
 
     #[must_use]
     pub fn mint_access_token(&self, refresh_token: &str, now: DateTime<Utc>) -> AccessTokenMinting {
-        mint_access_token(&self.secrets.get(), &self.issuance, refresh_token, now)
+        mint_access_token(
+            &self.roller.jwks_secret_holder().get(),
+            &self.issuance,
+            refresh_token,
+            now,
+        )
     }
 
     /// # Errors
@@ -155,7 +162,8 @@ impl JwksSecretStore {
             .map(|payload| AccessTokenClaimsSigned {
                 exp: stamp.registered.exp.seconds_since_epoch(),
                 signed_claims: self
-                    .secrets
+                    .roller
+                    .jwks_secret_holder()
                     .get()
                     .current()
                     .sign_json(&Value::Object(payload), JwtType::AccessToken),
@@ -169,7 +177,7 @@ impl JwksSecretStore {
         now: DateTime<Utc>,
     ) -> JwtVerification<TClaims, AccessTokenProfile> {
         verify_serialized_jwt(
-            self.secrets.get().token_key_set(),
+            self.roller.jwks_secret_holder().get().token_key_set(),
             token,
             &self.issuance.expectation(),
             NumericDate::from(now),
@@ -182,7 +190,11 @@ impl JwksSecretStore {
         jwt: &AttributedJwt<'_>,
         now: NumericDate,
     ) -> JwtVerification<TClaims, TProfile> {
-        verify_attributed(jwt, self.secrets.get().published_key_set(), now)
+        verify_attributed(
+            jwt,
+            self.roller.jwks_secret_holder().get().published_key_set(),
+            now,
+        )
     }
 
     #[must_use]
@@ -191,7 +203,11 @@ impl JwksSecretStore {
         jwt: &AttributedJwt<'_>,
         now: NumericDate,
     ) -> JwtVerification<TClaims, TProfile> {
-        verify_attributed(jwt, self.secrets.get().token_key_set(), now)
+        verify_attributed(
+            jwt,
+            self.roller.jwks_secret_holder().get().token_key_set(),
+            now,
+        )
     }
 
     #[must_use]
@@ -202,7 +218,7 @@ impl JwksSecretStore {
         now: DateTime<Utc>,
     ) -> JwtVerification<ResourceAccessTokenClaims, AccessTokenProfile> {
         verify_serialized_jwt(
-            self.secrets.get().token_key_set(),
+            self.roller.jwks_secret_holder().get().token_key_set(),
             token,
             &JwtExpectation {
                 audience: ExpectedAudience::AnyOf(audiences),

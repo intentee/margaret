@@ -11,9 +11,9 @@ use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_token_signer_tests::unix_time::unix_time;
 
-#[test]
-fn rejects_an_expired_access_token() {
-    let store = rolled_store(fresh_secret(SigningCurve::P256));
+#[tokio::test]
+async fn rejects_an_expired_access_token() {
+    let store = rolled_store(fresh_secret(SigningCurve::P256)).await;
     let signed = store
         .sign_access_token(&json!({ "name": "demo" }), unix_time(500))
         .expect("the claims are signed");

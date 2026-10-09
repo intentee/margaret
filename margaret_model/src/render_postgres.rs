@@ -1,20 +1,28 @@
-use margaret_sql_identifier::framework_namespace::FRAMEWORK_NAMESPACE;
-use margaret_sql_identifier::qualified_table::qualified_table;
-use margaret_sql_identifier::quote_identifier::quote_identifier;
-use margaret_sql_identifier::table_namespace::TableNamespace;
-
 use crate::check_predicate::CheckPredicate;
 use crate::column::Column;
 use crate::column_check::ColumnCheck;
 use crate::column_default::ColumnDefault;
 use crate::foreign_key::ForeignKey;
+use crate::framework_namespace::FRAMEWORK_NAMESPACE;
 use crate::index::Index;
 use crate::on_delete::OnDelete;
+use crate::qualified_framework_table::qualified_framework_table;
 use crate::schema::Schema;
 use crate::table::Table;
 use crate::unique_constraint::UniqueConstraint;
 
-fn quote_identifier_list(identifiers: &[&str]) -> String {
+fn quote_identifier(identifier: &str) -> String {
+    format!("\"{identifier}\"")
+}
+
+fn qualified_table(namespace: TableNamespace, table: &str) -> String {
+    match namespace {
+        TableNamespace::Application => quote_identifier(table),
+        TableNamespace::Framework => qualified_framework_table(table),
+    }
+}
+
+fn quote_identifier_list(identifiers: &[String]) -> String {
     identifiers
         .iter()
         .map(|identifier| quote_identifier(identifier))
@@ -36,7 +44,7 @@ fn render_check_predicate(column_name: &str, predicate: CheckPredicate) -> Strin
 fn render_column_check(column_name: &str, check: &ColumnCheck) -> String {
     format!(
         "CONSTRAINT {} CHECK ({})",
-        quote_identifier(check.name),
+        quote_identifier(&check.name),
         render_check_predicate(column_name, check.predicate)
     )
 }
@@ -44,7 +52,7 @@ fn render_column_check(column_name: &str, check: &ColumnCheck) -> String {
 fn render_column(column: &Column) -> String {
     let mut definition = format!(
         "{} {}",
-        quote_identifier(column.name),
+        quote_identifier(&column.name),
         column.column_type.render()
     );
 
@@ -60,7 +68,7 @@ fn render_column(column: &Column) -> String {
     let mut check_definitions: Vec<String> = column
         .checks
         .iter()
-        .map(|check| render_column_check(column.name, check))
+        .map(|check| render_column_check(&column.name, check))
         .collect();
 
     check_definitions.sort();
@@ -76,15 +84,16 @@ fn render_column(column: &Column) -> String {
 fn render_foreign_key(namespace: TableNamespace, foreign_key: &ForeignKey) -> String {
     let mut definition = format!(
         "FOREIGN KEY ({}) REFERENCES {} ({})",
-        quote_identifier_list(foreign_key.columns),
-        qualified_table(namespace, foreign_key.references_table),
-        quote_identifier_list(foreign_key.references_columns)
+        quote_identifier_list(&foreign_key.columns),
+        qualified_table(namespace, &foreign_key.references_table),
+        quote_identifier_list(&foreign_key.references_columns)
     );
 
     match foreign_key.on_delete {
         OnDelete::Cascade => definition.push_str(" ON DELETE CASCADE"),
         OnDelete::NoAction => {}
         OnDelete::Restrict => definition.push_str(" ON DELETE RESTRICT"),
+        OnDelete::SetDefault => definition.push_str(" ON DELETE SET DEFAULT"),
         OnDelete::SetNull => definition.push_str(" ON DELETE SET NULL"),
     }
 
@@ -94,28 +103,27 @@ fn render_foreign_key(namespace: TableNamespace, foreign_key: &ForeignKey) -> St
 fn render_index(namespace: TableNamespace, table_name: &str, index: &Index) -> String {
     format!(
         "CREATE INDEX {} ON {} ({});",
-        quote_identifier(index.name),
+        quote_identifier(&index.name),
         qualified_table(namespace, table_name),
-        quote_identifier_list(index.columns)
+        quote_identifier_list(&index.columns)
     )
 }
 
 fn render_unique_constraint(unique_constraint: &UniqueConstraint) -> String {
     format!(
         "UNIQUE ({})",
-        quote_identifier_list(unique_constraint.columns)
+        quote_identifier_list(&unique_constraint.columns)
     )
 }
 
-fn render_table(table: &Table) -> String {
-    let namespace = table.namespace;
-    let name = qualified_table(namespace, table.name);
+fn render_table(namespace: TableNamespace, table: &Table) -> String {
+    let name = qualified_table(namespace, &table.name);
     let mut lines: Vec<String> = table.columns.iter().map(render_column).collect();
 
     if !table.primary_key.is_empty() {
         lines.push(format!(
             "PRIMARY KEY ({})",
-            quote_identifier_list(table.primary_key)
+            quote_identifier_list(&table.primary_key)
         ));
     }
 
@@ -152,7 +160,7 @@ fn render_table(table: &Table) -> String {
     let mut index_statements: Vec<String> = table
         .indexes
         .iter()
-        .map(|index| render_index(namespace, table.name, index))
+        .map(|index| render_index(namespace, &table.name, index))
         .collect();
 
     index_statements.sort();
@@ -167,28 +175,40 @@ fn render_table(table: &Table) -> String {
     statements.join("\n\n")
 }
 
+#[derive(Clone, Copy)]
+enum TableNamespace {
+    Application,
+    Framework,
+}
+
 #[must_use]
-pub fn render_postgres(Schema { table_sets }: &Schema) -> String {
-    let tables: Vec<&Table> = table_sets
-        .iter()
-        .flat_map(|set| set.iter().copied())
-        .collect();
-    let framework_namespace = tables
-        .iter()
-        .any(|table| table.namespace == TableNamespace::Framework)
+pub fn render_postgres(
+    Schema {
+        framework_tables,
+        tables,
+    }: &Schema,
+) -> String {
+    let framework_namespace = (!framework_tables.is_empty())
         .then(|| format!("CREATE SCHEMA {};", quote_identifier(FRAMEWORK_NAMESPACE)));
 
     framework_namespace
         .into_iter()
-        .chain(tables.into_iter().map(render_table))
+        .chain(
+            framework_tables
+                .iter()
+                .map(|table| render_table(TableNamespace::Framework, table)),
+        )
+        .chain(
+            tables
+                .iter()
+                .map(|table| render_table(TableNamespace::Application, table)),
+        )
         .collect::<Vec<String>>()
         .join("\n\n")
 }
 
 #[cfg(test)]
 mod tests {
-    use margaret_sql_identifier::table_namespace::TableNamespace;
-
     use crate::check_predicate::CheckPredicate;
     use crate::column::Column;
     use crate::column_check::ColumnCheck;
@@ -202,809 +222,816 @@ mod tests {
     use crate::table::Table;
     use crate::unique_constraint::UniqueConstraint;
 
-    const AUTHOR_FOREIGN_KEY: ForeignKey = ForeignKey {
-        columns: &["author_id"],
-        on_delete: OnDelete::NoAction,
-        references_columns: &["id"],
-        references_table: "authors",
-    };
-    const COLUMN: Column = Column {
-        checks: &[],
-        column_type: ColumnType::Text,
-        default: ColumnDefault::NotSet,
-        name: "",
-        nullable: false,
-    };
-    const TABLE: Table = Table {
-        columns: &[],
-        foreign_keys: &[],
-        indexes: &[],
-        name: "",
-        namespace: TableNamespace::Application,
-        primary_key: &[],
-        unique_constraints: &[],
-    };
+    fn column(
+        name: &str,
+        column_type: ColumnType,
+        nullable: bool,
+        default: ColumnDefault,
+    ) -> Column {
+        Column {
+            checks: Vec::new(),
+            column_type,
+            default,
+            name: name.to_string(),
+            nullable,
+        }
+    }
+
+    fn checked_column(name: &str, column_type: ColumnType, checks: Vec<ColumnCheck>) -> Column {
+        Column {
+            checks,
+            column_type,
+            default: ColumnDefault::NotSet,
+            name: name.to_string(),
+            nullable: false,
+        }
+    }
+
+    fn column_check(name: &str, predicate: CheckPredicate) -> ColumnCheck {
+        ColumnCheck {
+            name: name.to_string(),
+            predicate,
+        }
+    }
+
+    fn foreign_key(
+        columns: &[&str],
+        references_columns: &[&str],
+        references_table: &str,
+        on_delete: OnDelete,
+    ) -> ForeignKey {
+        ForeignKey {
+            columns: columns.iter().map(ToString::to_string).collect(),
+            on_delete,
+            references_columns: references_columns.iter().map(ToString::to_string).collect(),
+            references_table: references_table.to_string(),
+        }
+    }
+
+    fn index(columns: &[&str], name: &str) -> Index {
+        Index {
+            columns: columns.iter().map(ToString::to_string).collect(),
+            name: name.to_string(),
+        }
+    }
+
+    fn unique_constraint(columns: &[&str]) -> UniqueConstraint {
+        UniqueConstraint {
+            columns: columns.iter().map(ToString::to_string).collect(),
+        }
+    }
 
     #[test]
     fn renders_framework_tables_in_the_framework_namespace_before_application_tables() {
-        const TOKENS: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Uuid,
-                name: "family",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: vec![Table {
+                columns: vec![column(
+                    "family",
+                    ColumnType::Uuid,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key(
+                    &["family"],
+                    &["family"],
+                    "families",
+                    OnDelete::Cascade,
+                )],
+                indexes: vec![index(&["family"], "tokens_family")],
+                name: "tokens".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            foreign_keys: &[ForeignKey {
-                columns: &["family"],
-                on_delete: OnDelete::Cascade,
-                references_columns: &["family"],
-                references_table: "families",
+            tables: vec![Table {
+                columns: vec![column("id", ColumnType::Uuid, false, ColumnDefault::NotSet)],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "things".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            indexes: &[Index {
-                columns: &["family"],
-                name: "tokens_family",
-            }],
-            name: "tokens",
-            namespace: TableNamespace::Framework,
-            primary_key: &[],
-            unique_constraints: &[],
-        };
-        const THINGS: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Uuid,
-                name: "id",
-                ..COLUMN
-            }],
-            name: "things",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&TOKENS], &[&THINGS]],
-            }),
+            render_postgres(&schema),
             "CREATE SCHEMA \"margaret\";\n\nCREATE TABLE \"margaret\".\"tokens\" (\n    \"family\" UUID NOT NULL,\n    FOREIGN KEY (\"family\") REFERENCES \"margaret\".\"families\" (\"family\") ON DELETE CASCADE\n);\n\nCREATE INDEX \"tokens_family\" ON \"margaret\".\"tokens\" (\"family\");\n\nCREATE TABLE \"things\" (\n    \"id\" UUID NOT NULL\n);"
         );
     }
 
     #[test]
     fn renders_columns_types_nullability_default_and_primary_key() {
-        const THINGS: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Uuid,
-                    default: ColumnDefault::UuidV7,
-                    name: "id",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Integer,
-                    name: "count",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::BigInt,
-                    name: "big",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Boolean,
-                    name: "flag",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Text,
-                    name: "label",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Text,
-                    name: "note",
-                    nullable: true,
-                    ..COLUMN
-                },
-            ],
-            name: "things",
-            primary_key: &["id"],
-            ..TABLE
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![
+                    column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
+                    column("count", ColumnType::Integer, false, ColumnDefault::NotSet),
+                    column("big", ColumnType::BigInt, false, ColumnDefault::NotSet),
+                    column("flag", ColumnType::Boolean, false, ColumnDefault::NotSet),
+                    column("label", ColumnType::Text, false, ColumnDefault::NotSet),
+                    column("note", ColumnType::Text, true, ColumnDefault::NotSet),
+                ],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "things".to_string(),
+                primary_key: vec!["id".to_string()],
+                unique_constraints: Vec::new(),
+            }],
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&THINGS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"things\" (\n    \"id\" UUID NOT NULL DEFAULT uuidv7(),\n    \"count\" INTEGER NOT NULL,\n    \"big\" BIGINT NOT NULL,\n    \"flag\" BOOLEAN NOT NULL,\n    \"label\" TEXT NOT NULL,\n    \"note\" TEXT,\n    PRIMARY KEY (\"id\")\n);"
         );
     }
 
     #[test]
     fn renders_a_timestamptz_column() {
-        const EVENTS: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Timestamptz,
-                name: "created_at",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "created_at",
+                    ColumnType::Timestamptz,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "events".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "events",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&EVENTS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"events\" (\n    \"created_at\" TIMESTAMPTZ NOT NULL\n);"
         );
     }
 
     #[test]
     fn renders_a_bytea_column() {
-        const FILES: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Bytea,
-                name: "data",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "data",
+                    ColumnType::Bytea,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "files".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "files",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&FILES]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"files\" (\n    \"data\" BYTEA NOT NULL\n);"
         );
     }
 
     #[test]
     fn renders_a_real_column() {
-        const AUTHORS: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Real,
-                name: "reputation",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "reputation",
+                    ColumnType::Real,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "authors".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "authors",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&AUTHORS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"authors\" (\n    \"reputation\" REAL NOT NULL\n);"
         );
     }
 
     #[test]
     fn renders_a_double_precision_column() {
-        const ARTICLES: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::DoublePrecision,
-                name: "reading_minutes",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "reading_minutes",
+                    ColumnType::DoublePrecision,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "articles".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "articles",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&ARTICLES]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"articles\" (\n    \"reading_minutes\" DOUBLE PRECISION NOT NULL\n);"
         );
     }
 
     #[test]
     fn renders_a_numeric_column_with_its_precision_and_scale() {
-        const LINE_ITEMS: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Numeric {
-                    precision: 12,
-                    scale: 2,
-                },
-                name: "price",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "price",
+                    ColumnType::Numeric {
+                        precision: 12,
+                        scale: 2,
+                    },
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "line_items".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "line_items",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&LINE_ITEMS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"line_items\" (\n    \"price\" NUMERIC(12, 2) NOT NULL\n);"
         );
     }
 
     #[test]
     fn renders_a_nullable_numeric_column() {
-        const LINE_ITEMS: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Numeric {
-                    precision: 5,
-                    scale: 4,
-                },
-                name: "discount",
-                nullable: true,
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "discount",
+                    ColumnType::Numeric {
+                        precision: 5,
+                        scale: 4,
+                    },
+                    true,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "line_items".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "line_items",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&LINE_ITEMS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"line_items\" (\n    \"discount\" NUMERIC(5, 4)\n);"
         );
     }
 
     #[test]
     fn renders_a_composite_primary_key() {
-        const PAIRS: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Uuid,
-                    default: ColumnDefault::UuidV7,
-                    name: "left",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Uuid,
-                    default: ColumnDefault::UuidV7,
-                    name: "right",
-                    ..COLUMN
-                },
-            ],
-            name: "pairs",
-            primary_key: &["left", "right"],
-            ..TABLE
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![
+                    column("left", ColumnType::Uuid, false, ColumnDefault::UuidV7),
+                    column("right", ColumnType::Uuid, false, ColumnDefault::UuidV7),
+                ],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "pairs".to_string(),
+                primary_key: vec!["left".to_string(), "right".to_string()],
+                unique_constraints: Vec::new(),
+            }],
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&PAIRS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"pairs\" (\n    \"left\" UUID NOT NULL DEFAULT uuidv7(),\n    \"right\" UUID NOT NULL DEFAULT uuidv7(),\n    PRIMARY KEY (\"left\", \"right\")\n);"
         );
     }
 
     #[test]
     fn renders_a_single_column_unique_constraint() {
-        const USERS: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Uuid,
-                    default: ColumnDefault::UuidV7,
-                    name: "id",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Text,
-                    name: "email",
-                    ..COLUMN
-                },
-            ],
-            name: "users",
-            primary_key: &["id"],
-            unique_constraints: &[UniqueConstraint {
-                columns: &["email"],
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![
+                    column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
+                    column("email", ColumnType::Text, false, ColumnDefault::NotSet),
+                ],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "users".to_string(),
+                primary_key: vec!["id".to_string()],
+                unique_constraints: vec![unique_constraint(&["email"])],
             }],
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&USERS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"users\" (\n    \"id\" UUID NOT NULL DEFAULT uuidv7(),\n    \"email\" TEXT NOT NULL,\n    PRIMARY KEY (\"id\"),\n    UNIQUE (\"email\")\n);"
         );
     }
 
     #[test]
     fn renders_a_composite_unique_constraint_before_foreign_keys() {
-        const LINE_ITEMS: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Text,
-                    name: "region",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::BigInt,
-                    name: "number",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Uuid,
-                    name: "author_id",
-                    ..COLUMN
-                },
-            ],
-            foreign_keys: &[AUTHOR_FOREIGN_KEY],
-            name: "line_items",
-            unique_constraints: &[UniqueConstraint {
-                columns: &["region", "number"],
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![
+                    column("region", ColumnType::Text, false, ColumnDefault::NotSet),
+                    column("number", ColumnType::BigInt, false, ColumnDefault::NotSet),
+                    column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
+                ],
+                foreign_keys: vec![foreign_key(
+                    &["author_id"],
+                    &["id"],
+                    "authors",
+                    OnDelete::NoAction,
+                )],
+                indexes: Vec::new(),
+                name: "line_items".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: vec![unique_constraint(&["region", "number"])],
             }],
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&LINE_ITEMS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"line_items\" (\n    \"region\" TEXT NOT NULL,\n    \"number\" BIGINT NOT NULL,\n    \"author_id\" UUID NOT NULL,\n    UNIQUE (\"region\", \"number\"),\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\")\n);"
         );
     }
 
     #[test]
-    fn renders_unique_constraints_in_a_deterministic_order() {
-        const PAIRS: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Text,
-                    name: "left",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Text,
-                    name: "right",
-                    ..COLUMN
-                },
-            ],
-            name: "pairs",
-            unique_constraints: &[
-                UniqueConstraint {
-                    columns: &["right"],
-                },
-                UniqueConstraint { columns: &["left"] },
-            ],
-            ..TABLE
-        };
-
-        assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&PAIRS]],
-            }),
-            "CREATE TABLE \"pairs\" (\n    \"left\" TEXT NOT NULL,\n    \"right\" TEXT NOT NULL,\n    UNIQUE (\"left\"),\n    UNIQUE (\"right\")\n);"
-        );
-    }
-
-    #[test]
     fn renders_multiple_tables_separated_by_a_blank_line() {
-        const FIRST: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Text,
-                name: "id",
-                ..COLUMN
-            }],
-            name: "first",
-            ..TABLE
-        };
-        const SECOND: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Text,
-                name: "id",
-                ..COLUMN
-            }],
-            name: "second",
-            ..TABLE
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![
+                Table {
+                    columns: vec![column("id", ColumnType::Text, false, ColumnDefault::NotSet)],
+                    foreign_keys: Vec::new(),
+                    indexes: Vec::new(),
+                    name: "first".to_string(),
+                    primary_key: Vec::new(),
+                    unique_constraints: Vec::new(),
+                },
+                Table {
+                    columns: vec![column("id", ColumnType::Text, false, ColumnDefault::NotSet)],
+                    foreign_keys: Vec::new(),
+                    indexes: Vec::new(),
+                    name: "second".to_string(),
+                    primary_key: Vec::new(),
+                    unique_constraints: Vec::new(),
+                },
+            ],
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&FIRST, &SECOND]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"first\" (\n    \"id\" TEXT NOT NULL\n);\n\nCREATE TABLE \"second\" (\n    \"id\" TEXT NOT NULL\n);"
         );
     }
 
     #[test]
     fn renders_a_table_without_columns() {
-        const EMPTY: Table = Table {
-            columns: &[],
-            name: "empty",
-            ..TABLE
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: Vec::new(),
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "empty".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
         };
 
-        assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&EMPTY]],
-            }),
-            "CREATE TABLE \"empty\" ();"
-        );
+        assert_eq!(render_postgres(&schema), "CREATE TABLE \"empty\" ();");
     }
 
     #[test]
     fn renders_a_single_column_foreign_key() {
-        const ARTICLES: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Uuid,
-                    default: ColumnDefault::UuidV7,
-                    name: "id",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Text,
-                    name: "title",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Uuid,
-                    name: "author_id",
-                    ..COLUMN
-                },
-            ],
-            foreign_keys: &[AUTHOR_FOREIGN_KEY],
-            name: "articles",
-            primary_key: &["id"],
-            ..TABLE
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![
+                    column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
+                    column("title", ColumnType::Text, false, ColumnDefault::NotSet),
+                    column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
+                ],
+                foreign_keys: vec![foreign_key(
+                    &["author_id"],
+                    &["id"],
+                    "authors",
+                    OnDelete::NoAction,
+                )],
+                indexes: Vec::new(),
+                name: "articles".to_string(),
+                primary_key: vec!["id".to_string()],
+                unique_constraints: Vec::new(),
+            }],
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&ARTICLES]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"articles\" (\n    \"id\" UUID NOT NULL DEFAULT uuidv7(),\n    \"title\" TEXT NOT NULL,\n    \"author_id\" UUID NOT NULL,\n    PRIMARY KEY (\"id\"),\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\")\n);"
         );
     }
 
     #[test]
     fn renders_a_nullable_foreign_key_column() {
-        const POSTS: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Uuid,
-                name: "author_id",
-                nullable: true,
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "author_id",
+                    ColumnType::Uuid,
+                    true,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key(
+                    &["author_id"],
+                    &["id"],
+                    "authors",
+                    OnDelete::NoAction,
+                )],
+                indexes: Vec::new(),
+                name: "posts".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            foreign_keys: &[AUTHOR_FOREIGN_KEY],
-            name: "posts",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&POSTS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"posts\" (\n    \"author_id\" UUID,\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\")\n);"
         );
     }
 
     #[test]
     fn renders_foreign_keys_in_a_deterministic_order() {
-        const DOCS: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Uuid,
-                    name: "author_id",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Uuid,
-                    name: "editor_id",
-                    ..COLUMN
-                },
-            ],
-            foreign_keys: &[
-                ForeignKey {
-                    columns: &["editor_id"],
-                    on_delete: OnDelete::NoAction,
-                    references_columns: &["id"],
-                    references_table: "users",
-                },
-                ForeignKey {
-                    columns: &["author_id"],
-                    on_delete: OnDelete::NoAction,
-                    references_columns: &["id"],
-                    references_table: "users",
-                },
-            ],
-            name: "docs",
-            ..TABLE
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![
+                    column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
+                    column("editor_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
+                ],
+                foreign_keys: vec![
+                    foreign_key(&["editor_id"], &["id"], "users", OnDelete::NoAction),
+                    foreign_key(&["author_id"], &["id"], "users", OnDelete::NoAction),
+                ],
+                indexes: Vec::new(),
+                name: "docs".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&DOCS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"docs\" (\n    \"author_id\" UUID NOT NULL,\n    \"editor_id\" UUID NOT NULL,\n    FOREIGN KEY (\"author_id\") REFERENCES \"users\" (\"id\"),\n    FOREIGN KEY (\"editor_id\") REFERENCES \"users\" (\"id\")\n);"
         );
     }
 
     #[test]
     fn renders_on_delete_cascade() {
-        const POSTS: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Uuid,
-                name: "author_id",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "author_id",
+                    ColumnType::Uuid,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key(
+                    &["author_id"],
+                    &["id"],
+                    "authors",
+                    OnDelete::Cascade,
+                )],
+                indexes: Vec::new(),
+                name: "posts".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            foreign_keys: &[ForeignKey {
-                on_delete: OnDelete::Cascade,
-                ..AUTHOR_FOREIGN_KEY
-            }],
-            name: "posts",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&POSTS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"posts\" (\n    \"author_id\" UUID NOT NULL,\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\") ON DELETE CASCADE\n);"
         );
     }
 
     #[test]
     fn renders_on_delete_restrict() {
-        const POSTS: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Uuid,
-                name: "author_id",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "author_id",
+                    ColumnType::Uuid,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key(
+                    &["author_id"],
+                    &["id"],
+                    "authors",
+                    OnDelete::Restrict,
+                )],
+                indexes: Vec::new(),
+                name: "posts".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            foreign_keys: &[ForeignKey {
-                on_delete: OnDelete::Restrict,
-                ..AUTHOR_FOREIGN_KEY
-            }],
-            name: "posts",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&POSTS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"posts\" (\n    \"author_id\" UUID NOT NULL,\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\") ON DELETE RESTRICT\n);"
         );
     }
 
     #[test]
     fn renders_on_delete_set_null() {
-        const POSTS: Table = Table {
-            columns: &[Column {
-                column_type: ColumnType::Uuid,
-                name: "author_id",
-                nullable: true,
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "author_id",
+                    ColumnType::Uuid,
+                    true,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key(
+                    &["author_id"],
+                    &["id"],
+                    "authors",
+                    OnDelete::SetNull,
+                )],
+                indexes: Vec::new(),
+                name: "posts".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            foreign_keys: &[ForeignKey {
-                on_delete: OnDelete::SetNull,
-                ..AUTHOR_FOREIGN_KEY
-            }],
-            name: "posts",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&POSTS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"posts\" (\n    \"author_id\" UUID,\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\") ON DELETE SET NULL\n);"
         );
     }
 
     #[test]
-    fn renders_a_single_column_index() {
-        const ARTICLES: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Uuid,
-                    default: ColumnDefault::UuidV7,
-                    name: "id",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Timestamptz,
-                    name: "created_at",
-                    ..COLUMN
-                },
-            ],
-            indexes: &[Index {
-                columns: &["created_at"],
-                name: "articles_created_at_index",
+    fn renders_on_delete_set_default() {
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![column(
+                    "author_id",
+                    ColumnType::Uuid,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key(
+                    &["author_id"],
+                    &["id"],
+                    "authors",
+                    OnDelete::SetDefault,
+                )],
+                indexes: Vec::new(),
+                name: "posts".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "articles",
-            primary_key: &["id"],
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&ARTICLES]],
-            }),
+            render_postgres(&schema),
+            "CREATE TABLE \"posts\" (\n    \"author_id\" UUID NOT NULL,\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\") ON DELETE SET DEFAULT\n);"
+        );
+    }
+
+    #[test]
+    fn renders_a_single_column_index() {
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![
+                    column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
+                    column(
+                        "created_at",
+                        ColumnType::Timestamptz,
+                        false,
+                        ColumnDefault::NotSet,
+                    ),
+                ],
+                foreign_keys: Vec::new(),
+                indexes: vec![index(&["created_at"], "articles_created_at_index")],
+                name: "articles".to_string(),
+                primary_key: vec!["id".to_string()],
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
             "CREATE TABLE \"articles\" (\n    \"id\" UUID NOT NULL DEFAULT uuidv7(),\n    \"created_at\" TIMESTAMPTZ NOT NULL,\n    PRIMARY KEY (\"id\")\n);\n\nCREATE INDEX \"articles_created_at_index\" ON \"articles\" (\"created_at\");"
         );
     }
 
     #[test]
     fn renders_a_multi_column_index() {
-        const AUTHORS: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Uuid,
-                    default: ColumnDefault::UuidV7,
-                    name: "id",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Boolean,
-                    name: "is_active",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Timestamptz,
-                    name: "joined_at",
-                    ..COLUMN
-                },
-            ],
-            indexes: &[Index {
-                columns: &["is_active", "joined_at"],
-                name: "authors_active_joined",
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![
+                    column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
+                    column(
+                        "is_active",
+                        ColumnType::Boolean,
+                        false,
+                        ColumnDefault::NotSet,
+                    ),
+                    column(
+                        "joined_at",
+                        ColumnType::Timestamptz,
+                        false,
+                        ColumnDefault::NotSet,
+                    ),
+                ],
+                foreign_keys: Vec::new(),
+                indexes: vec![index(&["is_active", "joined_at"], "authors_active_joined")],
+                name: "authors".to_string(),
+                primary_key: vec!["id".to_string()],
+                unique_constraints: Vec::new(),
             }],
-            name: "authors",
-            primary_key: &["id"],
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&AUTHORS]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"authors\" (\n    \"id\" UUID NOT NULL DEFAULT uuidv7(),\n    \"is_active\" BOOLEAN NOT NULL,\n    \"joined_at\" TIMESTAMPTZ NOT NULL,\n    PRIMARY KEY (\"id\")\n);\n\nCREATE INDEX \"authors_active_joined\" ON \"authors\" (\"is_active\", \"joined_at\");"
         );
     }
 
     #[test]
     fn renders_indexes_in_a_deterministic_order() {
-        const ARTICLES: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Uuid,
-                    name: "author_id",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Timestamptz,
-                    name: "created_at",
-                    ..COLUMN
-                },
-            ],
-            indexes: &[
-                Index {
-                    columns: &["created_at"],
-                    name: "articles_created_at_index",
-                },
-                Index {
-                    columns: &["author_id"],
-                    name: "articles_author_id_index",
-                },
-            ],
-            name: "articles",
-            ..TABLE
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![
+                    column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
+                    column(
+                        "created_at",
+                        ColumnType::Timestamptz,
+                        false,
+                        ColumnDefault::NotSet,
+                    ),
+                ],
+                foreign_keys: Vec::new(),
+                indexes: vec![
+                    index(&["created_at"], "articles_created_at_index"),
+                    index(&["author_id"], "articles_author_id_index"),
+                ],
+                name: "articles".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&ARTICLES]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"articles\" (\n    \"author_id\" UUID NOT NULL,\n    \"created_at\" TIMESTAMPTZ NOT NULL\n);\n\nCREATE INDEX \"articles_author_id_index\" ON \"articles\" (\"author_id\");\n\nCREATE INDEX \"articles_created_at_index\" ON \"articles\" (\"created_at\");"
         );
     }
 
     #[test]
     fn renders_a_byte_length_check() {
-        const FRAGMENT_METADATA: Table = Table {
-            columns: &[Column {
-                checks: &[ColumnCheck {
-                    name: "fragment_metadata_hash_byte_length",
-                    predicate: CheckPredicate::ByteLength { length: 32 },
-                }],
-                column_type: ColumnType::Bytea,
-                name: "hash",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![checked_column(
+                    "hash",
+                    ColumnType::Bytea,
+                    vec![column_check(
+                        "fragment_metadata_hash_byte_length",
+                        CheckPredicate::ByteLength { length: 32 },
+                    )],
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "fragment_metadata".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "fragment_metadata",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&FRAGMENT_METADATA]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"fragment_metadata\" (\n    \"hash\" BYTEA NOT NULL CONSTRAINT \"fragment_metadata_hash_byte_length\" CHECK (length(\"hash\") = 32)\n);"
         );
     }
 
     #[test]
     fn renders_a_minimum_check() {
-        const FRAGMENT_METADATA: Table = Table {
-            columns: &[Column {
-                checks: &[ColumnCheck {
-                    name: "fragment_metadata_size_payload_minimum",
-                    predicate: CheckPredicate::Minimum { minimum: 0 },
-                }],
-                column_type: ColumnType::BigInt,
-                name: "size_payload",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![checked_column(
+                    "size_payload",
+                    ColumnType::BigInt,
+                    vec![column_check(
+                        "fragment_metadata_size_payload_minimum",
+                        CheckPredicate::Minimum { minimum: 0 },
+                    )],
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "fragment_metadata".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "fragment_metadata",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&FRAGMENT_METADATA]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"fragment_metadata\" (\n    \"size_payload\" BIGINT NOT NULL CONSTRAINT \"fragment_metadata_size_payload_minimum\" CHECK (\"size_payload\" >= 0)\n);"
         );
     }
 
     #[test]
     fn renders_checks_on_one_column_in_a_deterministic_order() {
-        const HASHES: Table = Table {
-            columns: &[Column {
-                checks: &[
-                    ColumnCheck {
-                        name: "hashes_hash_minimum",
-                        predicate: CheckPredicate::Minimum { minimum: 1 },
-                    },
-                    ColumnCheck {
-                        name: "hashes_hash_byte_length",
-                        predicate: CheckPredicate::ByteLength { length: 32 },
-                    },
-                ],
-                column_type: ColumnType::Bytea,
-                name: "hash",
-                ..COLUMN
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![checked_column(
+                    "hash",
+                    ColumnType::Bytea,
+                    vec![
+                        column_check(
+                            "hashes_hash_minimum",
+                            CheckPredicate::Minimum { minimum: 1 },
+                        ),
+                        column_check(
+                            "hashes_hash_byte_length",
+                            CheckPredicate::ByteLength { length: 32 },
+                        ),
+                    ],
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "hashes".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "hashes",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&HASHES]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"hashes\" (\n    \"hash\" BYTEA NOT NULL CONSTRAINT \"hashes_hash_byte_length\" CHECK (length(\"hash\") = 32) CONSTRAINT \"hashes_hash_minimum\" CHECK (\"hash\" >= 1)\n);"
         );
     }
 
     #[test]
     fn renders_a_composite_foreign_key() {
-        const FRAGMENT: Table = Table {
-            columns: &[
-                Column {
-                    column_type: ColumnType::Uuid,
-                    name: "partition",
-                    ..COLUMN
-                },
-                Column {
-                    column_type: ColumnType::Bytea,
-                    name: "hash",
-                    ..COLUMN
-                },
-            ],
-            foreign_keys: &[ForeignKey {
-                columns: &["partition", "hash"],
-                on_delete: OnDelete::NoAction,
-                references_columns: &["partition", "hash"],
-                references_table: "fragment_metadata",
+        let schema = Schema {
+            framework_tables: Vec::new(),
+            tables: vec![Table {
+                columns: vec![
+                    column("partition", ColumnType::Uuid, false, ColumnDefault::NotSet),
+                    column("hash", ColumnType::Bytea, false, ColumnDefault::NotSet),
+                ],
+                foreign_keys: vec![foreign_key(
+                    &["partition", "hash"],
+                    &["partition", "hash"],
+                    "fragment_metadata",
+                    OnDelete::NoAction,
+                )],
+                indexes: Vec::new(),
+                name: "fragment".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
-            name: "fragment",
-            ..TABLE
         };
 
         assert_eq!(
-            render_postgres(&Schema {
-                table_sets: &[&[&FRAGMENT]],
-            }),
+            render_postgres(&schema),
             "CREATE TABLE \"fragment\" (\n    \"partition\" UUID NOT NULL,\n    \"hash\" BYTEA NOT NULL,\n    FOREIGN KEY (\"partition\", \"hash\") REFERENCES \"fragment_metadata\" (\"partition\", \"hash\")\n);"
         );
     }

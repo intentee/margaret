@@ -7,7 +7,6 @@ use margaret::framework::macros::model;
 use crate::models::token_acquisition_outcome::TokenAcquisitionOutcome;
 
 #[model(table = "token_acquisitions")]
-#[index(name = "token_acquisitions_by_outcome", fields = [outcome, id])]
 pub struct TokenAcquisition {
     #[column(primary_key)]
     pub id: Uuid,

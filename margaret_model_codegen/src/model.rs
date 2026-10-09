@@ -1,26 +1,31 @@
-use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_sql_identifier::table_namespace::TableNamespace;
+use margaret_model::column_default::ColumnDefault;
+use margaret_model::column_type::ColumnType;
 
-use crate::model_field::ModelField;
-use crate::model_foreign_key::ModelForeignKey;
-use crate::model_indexes::ModelIndexes;
-use crate::model_relation::ModelRelation;
 use crate::resolved_column::ResolvedColumn;
+use crate::resolved_foreign_key::ResolvedForeignKey;
+use crate::resolved_index::ResolvedIndex;
+use crate::resolved_unique_constraint::ResolvedUniqueConstraint;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct Model {
-    pub fields: Vec<ModelField>,
-    pub foreign_keys: Vec<ModelForeignKey>,
-    pub indexes: ModelIndexes,
-    pub module: String,
-    pub namespace: TableNamespace,
-    pub path: CanonicalPath,
-    pub relations: Vec<ModelRelation>,
+    pub columns: Vec<ResolvedColumn>,
+    pub foreign_keys: Vec<ResolvedForeignKey>,
+    pub indexes: Vec<ResolvedIndex>,
+    pub primary_key: Vec<String>,
     pub table: String,
+    pub unique_constraints: Vec<ResolvedUniqueConstraint>,
 }
 
 impl Model {
-    pub fn columns(&self) -> impl Iterator<Item = &ResolvedColumn> {
-        self.fields.iter().flat_map(|field| field.columns.iter())
+    #[must_use]
+    pub fn column_default(&self, column: &ResolvedColumn) -> ColumnDefault {
+        match self.primary_key.as_slice() {
+            [identity]
+                if *identity == column.name && column.inferred.column_type == ColumnType::Uuid =>
+            {
+                ColumnDefault::UuidV7
+            }
+            _ => ColumnDefault::NotSet,
+        }
     }
 }

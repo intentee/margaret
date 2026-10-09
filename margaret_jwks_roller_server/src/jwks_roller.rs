@@ -6,7 +6,6 @@ use chrono::Utc;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
-use margaret_database::database::Database;
 use margaret_deadline::await_deadline::await_deadline;
 use margaret_deadline::deadline_wake::DeadlineWake;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
@@ -16,6 +15,7 @@ use margaret_jwks_roller::held_secret::HeldSecret;
 use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller::roll_due_at::roll_due_at;
 use margaret_jwks_roller::signing_keys_synchronizer::SigningKeysSynchronizer;
+use margaret_jwks_roller::stores_signing_keys::StoresSigningKeys;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 use crate::jwks_curve::JWKS_CURVE;
@@ -47,7 +47,7 @@ fn wall_clock() -> NumericDate {
 
 pub struct JwksRoller {
     jwks_document_holder: JwksDocumentHolder,
-    jwks_secret_holder: Arc<JwksSecretHolder>,
+    jwks_secret_holder: JwksSecretHolder,
     public_jwks_handler: Arc<PublicJwksHandler>,
     synchronizer: SigningKeysSynchronizer,
 }
@@ -59,13 +59,13 @@ impl JwksRoller {
     /// and `JwksRollerServerError::DocumentSerialization` when their public document cannot be
     /// serialized.
     pub async fn create(
-        database: Arc<Database>,
+        storage: Arc<dyn StoresSigningKeys>,
         rsa_keys: Arc<dyn ProvidesRsaSigningKeys>,
     ) -> Result<Self, JwksRollerServerError> {
         let synchronizer = SigningKeysSynchronizer {
             curve: JWKS_CURVE,
-            database,
             rsa_keys,
+            storage,
         };
         let secret = synchronizer
             .synchronized(&HeldSecret::Unheld, wall_clock())
@@ -78,7 +78,7 @@ impl JwksRoller {
             Self {
                 public_jwks_handler: Arc::new(PublicJwksHandler::new(jwks_document_holder.clone())),
                 jwks_document_holder,
-                jwks_secret_holder: Arc::new(JwksSecretHolder::new(secret)),
+                jwks_secret_holder: JwksSecretHolder::new(secret),
                 synchronizer,
             }
         })
@@ -90,8 +90,8 @@ impl JwksRoller {
     }
 
     #[must_use]
-    pub fn jwks_secret_holder(&self) -> Arc<JwksSecretHolder> {
-        Arc::clone(&self.jwks_secret_holder)
+    pub fn jwks_secret_holder(&self) -> JwksSecretHolder {
+        self.jwks_secret_holder.clone()
     }
 
     #[must_use]

@@ -25,9 +25,9 @@ fn signed_token_identifier(store: &JwksSecretStore) -> String {
         .expect("the signed token carries a token identifier")
 }
 
-#[test]
-fn identifies_every_access_token() {
-    let store = rolled_store(fresh_secret(SigningCurve::P256));
+#[tokio::test]
+async fn identifies_every_access_token() {
+    let store = rolled_store(fresh_secret(SigningCurve::P256)).await;
 
     assert_ne!(
         signed_token_identifier(&store),

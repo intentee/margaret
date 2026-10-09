@@ -7,7 +7,7 @@ use margaret_authorization_server_client_tests::fixture_authorization_server::Fi
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::static_handler::StaticHandler;
-use margaret_jwks_secret_store_tests::fixture_secrets::fixture_secrets;
+use margaret_jwks_secret_store_tests::fixture_roller::fixture_roller;
 use margaret_oidc_sign_in::signed_in::SignedIn;
 use margaret_oidc_sign_in::userinfo_fetch::UserinfoFetch;
 use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
@@ -30,7 +30,7 @@ async fn fetches_userinfo_of_the_signed_in_subject() {
     .await;
     let flow = fixture_sign_in_flow(
         Arc::new(server.client(secret_basic_authentication())),
-        fixture_secrets(),
+        fixture_roller().await,
     );
 
     let fetched = flow

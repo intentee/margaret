@@ -1,49 +1,39 @@
 use std::sync::Arc;
 
-use margaret::framework::sql_identifier::table_namespace::TableNamespace;
-use margaret_database_tests::table_privilege::TablePrivilege;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_roller::held_secret::HeldSecret;
 use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller::roller_error::RollerError;
+use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
 use margaret_jwks_roller_tests::fixture_synchronizer::fixture_synchronizer;
-use margaret_jwks_roller_tests::seeded_signing_keys::seeded_signing_keys;
-use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
-use margaret_signing_keys_tests::stored_revision::StoredRevision;
+use margaret_jwks_roller_tests::signing_keys_steps::SigningKeysSteps;
+use margaret_jwks_roller_tests::stepped_signing_keys::SteppedSigningKeys;
 
 #[tokio::test]
 async fn synchronizer_reports_a_failed_replacement() {
-    let started = started_with_signing_keys().await;
     let stored = fresh_secret(SigningCurve::P256);
+    let storage = Arc::new(FixtureSigningKeys::storing(&stored));
+    let steps = SigningKeysSteps::default();
+    let synchronizer = fixture_synchronizer(Arc::new(SteppedSigningKeys {
+        inner: storage.clone(),
+        steps: steps.clone(),
+    }));
+    let due = stored.rolled_at().after(JWKS_ROLL_INTERVAL);
+    let synchronizing =
+        tokio::spawn(async move { synchronizer.synchronized(&HeldSecret::Unheld, due).await });
 
-    seeded_signing_keys(&started.database, &stored).await;
+    steps.pass().await;
+    steps.intervene(storage.break_down()).await;
 
-    let before = StoredRevision::loaded(&started.database).await;
-
-    started
-        .administration
-        .revoke(
-            TablePrivilege::Update,
-            TableNamespace::Framework,
-            "signing_key_sets",
-        )
-        .await;
-
-    let Err(error) = fixture_synchronizer(Arc::clone(&started.database))
-        .synchronized(
-            &HeldSecret::Unheld,
-            stored.rolled_at().after(JWKS_ROLL_INTERVAL),
-        )
-        .await
-    else {
+    let Err(error) = synchronizing.await.expect("the synchronization joins") else {
         panic!("the replacement cannot be stored");
     };
 
     assert!(matches!(error, RollerError::SecretReplace { .. }));
     assert_eq!(
         error.to_string(),
-        "the application could not replace its stored signing keys: the signing keys cannot be replaced in the database: the Update statement on table 'signing_key_sets' failed: the database does not execute the statement: db error"
+        "the application could not replace its stored signing keys: the jwks secret backend is unreachable"
     );
-    assert_eq!(StoredRevision::loaded(&started.database).await, before);
+    assert_eq!(storage.accepted_writes().await, 0);
 }

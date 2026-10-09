@@ -1,5 +1,4 @@
-pub mod fixture_secrets;
-pub mod peer_secrets;
-pub mod published_jwks_handler;
-pub mod rolled_secrets;
+pub mod fixture_roller;
+pub mod peer_rollers;
+pub mod rolled_roller;
 pub mod rolled_store;

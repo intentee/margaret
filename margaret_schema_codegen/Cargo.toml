@@ -10,12 +10,10 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
-margaret_attributes = { workspace = true }
 margaret_codegen_tokens = { workspace = true }
 margaret_generated_module = { workspace = true }
 margaret_model = { workspace = true }
 margaret_model_codegen = { workspace = true }
-margaret_sql_identifier = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 

@@ -15,12 +15,12 @@ categories = ["web-programming"]
 anyhow = { workspace = true, optional = true }
 margaret_accepted_clients = { workspace = true, optional = true }
 margaret_access_token_minter = { workspace = true, optional = true }
-margaret_active_record = { workspace = true, optional = true }
 margaret_asset_bag = { workspace = true, optional = true }
 margaret_authorization_grants = { workspace = true, optional = true }
+margaret_authorization_grants_database = { workspace = true, optional = true }
 margaret_authorization_server_client = { workspace = true, optional = true }
 margaret_bearer_token_verification = { workspace = true, optional = true }
-margaret_client_assertions = { workspace = true, optional = true }
+margaret_client_assertions_database = { workspace = true, optional = true }
 margaret_client_credentials = { workspace = true, optional = true }
 margaret_codegen = { workspace = true, optional = true }
 margaret_console = { workspace = true, optional = true }
@@ -55,12 +55,11 @@ margaret_registered_claims = { workspace = true, optional = true }
 margaret_route_method = { workspace = true, optional = true }
 margaret_route_parameter_binding = { workspace = true, optional = true }
 margaret_service = { workspace = true, optional = true }
-margaret_signing_keys = { workspace = true, optional = true }
+margaret_signing_keys_database = { workspace = true, optional = true }
 margaret_spiffe_svid = { workspace = true, optional = true }
 margaret_spiffe_svid_bundle = { workspace = true, optional = true }
 margaret_spiffe_svid_client = { workspace = true, optional = true }
 margaret_spiffe_svid_server = { workspace = true, optional = true }
-margaret_sql_identifier = { workspace = true, optional = true }
 margaret_subject_token_exchange = { workspace = true, optional = true }
 margaret_sync_holder = { workspace = true, optional = true }
 margaret_token_digest = { workspace = true, optional = true }
@@ -75,6 +74,7 @@ margaret_views = { workspace = true, optional = true }
 margaret_websocket = { workspace = true, optional = true }
 margaret_websocket_session = { workspace = true, optional = true }
 oauth2 = { workspace = true, optional = true }
+tokio-postgres = { workspace = true, optional = true, features = ["with-chrono-0_4", "with-uuid-1"] }
 
 [features]
 default = ["runtime"]
@@ -83,12 +83,12 @@ runtime = [
     "dep:anyhow",
     "dep:margaret_accepted_clients",
     "dep:margaret_access_token_minter",
-    "dep:margaret_active_record",
     "dep:margaret_asset_bag",
     "dep:margaret_authorization_grants",
+    "dep:margaret_authorization_grants_database",
     "dep:margaret_authorization_server_client",
     "dep:margaret_bearer_token_verification",
-    "dep:margaret_client_assertions",
+    "dep:margaret_client_assertions_database",
     "dep:margaret_client_credentials",
     "dep:margaret_console",
     "dep:margaret_construction",
@@ -122,12 +122,11 @@ runtime = [
     "dep:margaret_route_method",
     "dep:margaret_route_parameter_binding",
     "dep:margaret_service",
-    "dep:margaret_signing_keys",
+    "dep:margaret_signing_keys_database",
     "dep:margaret_spiffe_svid",
     "dep:margaret_spiffe_svid_bundle",
     "dep:margaret_spiffe_svid_client",
     "dep:margaret_spiffe_svid_server",
-    "dep:margaret_sql_identifier",
     "dep:margaret_subject_token_exchange",
     "dep:margaret_sync_holder",
     "dep:margaret_token_digest",
@@ -142,6 +141,7 @@ runtime = [
     "dep:margaret_websocket",
     "dep:margaret_websocket_session",
     "dep:oauth2",
+    "dep:tokio-postgres",
 ]
 
 [lints]

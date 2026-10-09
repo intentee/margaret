@@ -1,5 +1,0 @@
-error[E0609]: no field `id` on type `Ranged<Message, margaret_active_record_tests::margaret::models::models_message_message::query::then::posted_at::Step>`
-  --> compile_fail/narrows_after_a_range.rs:12:10
-   |
-12 |         .id
-   |          ^^ unknown field

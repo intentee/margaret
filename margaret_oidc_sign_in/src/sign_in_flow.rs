@@ -20,7 +20,7 @@ use margaret_identity_session::sign_in_transaction_claims::SignInTransactionClai
 use margaret_identity_session::sign_in_transaction_lifetime_secs::SIGN_IN_TRANSACTION_LIFETIME_SECS;
 use margaret_issuer_key_set::issuer_verification::IssuerVerification;
 use margaret_jose_parameters::jwt_type::JwtType;
-use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_jwt_verification::attribute_serialized_jwt::attribute_serialized_jwt;
 use margaret_jwt_verification::expected_audience::ExpectedAudience;
 use margaret_jwt_verification::id_token_profile::IdTokenProfile;
@@ -67,7 +67,7 @@ fn requested_scopes(scopes: &[&str]) -> Vec<oauth2::Scope> {
 pub struct SignInFlow {
     callback: RedirectUrl,
     requested_scopes: Vec<oauth2::Scope>,
-    secrets: Arc<JwksSecretHolder>,
+    roller: Arc<JwksRoller>,
     server: Arc<AuthorizationServerClient>,
     transaction_cookie: TransactionCookie,
     transaction_issuance: TokenIssuance,
@@ -79,7 +79,7 @@ impl SignInFlow {
     /// Returns `SignInFlowError::MalformedCallback` when the callback is not a url.
     pub fn create(
         server: Arc<AuthorizationServerClient>,
-        secrets: Arc<JwksSecretHolder>,
+        roller: Arc<JwksRoller>,
         callback: String,
         scopes: &[&str],
     ) -> Result<Self, SignInFlowError> {
@@ -92,7 +92,7 @@ impl SignInFlow {
             .map(|callback| Self {
                 callback,
                 requested_scopes: requested_scopes(scopes),
-                secrets,
+                roller,
                 transaction_cookie: TransactionCookie::of(&transaction_issuance),
                 server,
                 transaction_issuance,
@@ -221,7 +221,7 @@ impl SignInFlow {
             .transaction_issuance
             .registered_claims(Utc::now(), SIGN_IN_TRANSACTION_LIFETIME_SECS);
 
-        self.secrets.get().current().sign_json(
+        self.roller.jwks_secret_holder().get().current().sign_json(
             &transaction.to_payload(&registered),
             JwtType::SignInTransaction,
         )
@@ -275,7 +275,7 @@ impl SignInFlow {
         now: NumericDate,
     ) -> JwtVerification<SignInTransactionClaims, SignInTransactionProfile> {
         verify_serialized_jwt(
-            self.secrets.get().token_key_set(),
+            self.roller.jwks_secret_holder().get().token_key_set(),
             presented,
             &self.transaction_issuance.expectation(),
             now,

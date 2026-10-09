@@ -218,18 +218,15 @@ impl AccountProvider {
 }
 
 #[model(table = "records")]
-#[primary_key(fields = [id, label])]
-#[unique(fields = [label, id])]
-#[index(name = "records_label_id", fields = [label, id])]
-#[has_many(name = "accounts", model = Account, key = record)]
+#[primary_key(columns = [id, label])]
+#[unique(columns = [label, id])]
+#[index(name = "records_label_id", columns = [label, id])]
+#[foreign_key(columns = [id], references = Account, on_delete = OnDelete::Cascade)]
 struct Record {
     #[column(name = "id")]
     id: String,
     #[column]
     label: String,
-    #[column]
-    #[foreign_key(on_delete = OnDelete::Cascade)]
-    owner: String,
 }
 
 #[websocket_session(path = "/session/{topic}", server = "public")]
@@ -281,12 +278,10 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     let record = Record {
         id: "the-id".to_string(),
         label: "the-label".to_string(),
-        owner: "the-owner".to_string(),
     };
 
     assert_eq!(record.id, "the-id");
     assert_eq!(record.label, "the-label");
-    assert_eq!(record.owner, "the-owner");
 
     let session = Session::build("weather".to_string());
 

@@ -81,7 +81,7 @@ impl AuthorizationEndpoint {
             client,
             code_grant:
                 RegisteredCodeGrant::Granted {
-                    database,
+                    grants,
                     policy,
                     redirect_uris,
                 },
@@ -155,7 +155,7 @@ impl AuthorizationEndpoint {
             prompt,
             redirection,
         }
-        .concluded(database)
+        .concluded(grants.as_ref())
         .await
     }
 }

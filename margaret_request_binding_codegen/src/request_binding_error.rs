@@ -103,32 +103,6 @@ pub enum RequestBindingError {
     RouteParameterByReference { subject: String, parameter: String },
 
     #[error(
-        "route parameter '{parameter}' of {subject} loads '{model}', whose model has a composite primary key; a route binds a model by a single primary key field"
-    )]
-    RouteModelWithCompositePrimaryKey {
-        subject: String,
-        parameter: String,
-        model: String,
-    },
-
-    #[error(
-        "route parameter '{parameter}' of {subject} loads '{model}', but the crate declares no #[postgres_database] to load it from"
-    )]
-    RouteModelWithoutDatabase {
-        subject: String,
-        parameter: String,
-        model: String,
-    },
-
-    #[error(
-        "'{model}' is bound by its primary key and cannot also be the model of the route parameter binder '{binder}'"
-    )]
-    RouteModelWithBinder { model: String, binder: String },
-
-    #[error("'{model}' is bound by its primary key and cannot also be a #[route_parameter_value]")]
-    RouteModelDeclaredAsValue { model: String },
-
-    #[error(
         "#[route_parameter_value] is only supported on structs and enums, but '{value_type}' is neither"
     )]
     RouteParameterValueNotAStructOrEnum { value_type: String },

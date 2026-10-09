@@ -1,20 +1,21 @@
 use std::sync::Arc;
 
-use margaret::framework::active_record::key::Key;
-use margaret::framework::active_record::model::Model;
 use margaret::framework::console::command_outcome::CommandOutcome;
 use margaret::framework::database::database::Database;
-use margaret::framework::database::isolation::Isolation;
 use margaret::framework::macros::console_command;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::singleton;
 
-use crate::alice::ALICE;
-use crate::alice_session::ALICE_SESSION;
-use crate::models::user_account::UserAccount;
-use crate::models::user_session::UserSession;
+use crate::stores::alice::ALICE;
+use crate::stores::alice_session::ALICE_SESSION;
+use crate::stores::cluster_store_error::ClusterStoreError;
 use crate::system_clock::SystemClock;
+
+const SEED_SESSION: &str = "INSERT INTO user_sessions (id, authenticated_at, user_id) \
+     VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING";
+
+const SEED_USER: &str = "INSERT INTO users (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING";
 
 #[singleton]
 #[console_command(
@@ -37,26 +38,31 @@ impl Seed {
 
     /// # Errors
     ///
-    /// Returns an error when the user or the session cannot be stored.
+    /// Returns `ClusterStoreError` when the user or the session cannot be stored.
     #[process]
     pub async fn run(&self) -> anyhow::Result<CommandOutcome> {
-        let alice = UserAccount {
-            id: ALICE,
-            name: "alice".to_string(),
-        };
-        let mut connection = self.database.connection().await?;
-        let transaction = connection.transaction(Isolation::ReadCommitted).await?;
+        let mut client = self
+            .database
+            .client()
+            .await
+            .map_err(ClusterStoreError::Unavailable)?;
+        let transaction = client
+            .transaction()
+            .await
+            .map_err(ClusterStoreError::Seed)?;
 
-        alice.insert().or_ignore(&transaction).await?;
-        UserSession {
-            id: ALICE_SESSION,
-            authenticated_at: self.clock.now(),
-            user: Key::of(&alice),
-        }
-        .insert()
-        .or_ignore(&transaction)
-        .await?;
-        transaction.commit().await?;
+        transaction
+            .execute(SEED_USER, &[&ALICE, &"alice"])
+            .await
+            .map_err(ClusterStoreError::Seed)?;
+        transaction
+            .execute(SEED_SESSION, &[&ALICE_SESSION, &self.clock.now(), &ALICE])
+            .await
+            .map_err(ClusterStoreError::Seed)?;
+        transaction
+            .commit()
+            .await
+            .map_err(ClusterStoreError::Seed)?;
 
         Ok(CommandOutcome::Succeeded)
     }

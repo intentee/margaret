@@ -11,8 +11,9 @@ use tempfile::NamedTempFile;
 use url::Url;
 
 use margaret_cluster_fixture::margaret::routes::Routes;
-use margaret_cluster_fixture::margaret::schema::SCHEMA;
+use margaret_cluster_fixture::margaret::schema::schema;
 use margaret_cluster_fixture::margaret::token_issuance::TOKEN_ISSUANCE;
+use margaret_database_tests::apply_schema::apply_schema;
 use margaret_database_tests::started_database::StartedDatabase;
 use margaret_http_tests::tls_fixture::TlsFixture;
 
@@ -85,12 +86,13 @@ impl Cluster {
     /// Panics when the database, the doors or the seed cannot be prepared.
     pub async fn prepare(binary: &Path) -> Self {
         let tls = TlsFixture::generate();
-        let database = StartedDatabase::with_schema(&SCHEMA).await;
+        let database = StartedDatabase::start().await;
         let mut certificate_file = NamedTempFile::new().expect("the certificate file is created");
 
         certificate_file
             .write_all(tls.certificate_authority.certificate_pem().as_bytes())
             .expect("the certificate authority is written");
+        apply_schema(&database.database, &schema()).await;
 
         let front_door =
             FrontDoor::open(&tls.server_config, declared_port(TOKEN_ISSUANCE.issuer)).await;
@@ -100,7 +102,7 @@ impl Cluster {
             launch: InstanceLaunch {
                 binary: binary.to_path_buf(),
                 certificate_file,
-                database_url: database.database_url.to_string(),
+                database_url: database.ephemeral.database_url().to_string(),
                 public_url: front_door.doors.url(ClusterServer::Public),
             },
             running: HashMap::new(),

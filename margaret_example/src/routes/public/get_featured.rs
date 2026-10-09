@@ -4,8 +4,8 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
-use crate::featured_article_id::FEATURED_ARTICLE_ID;
 use crate::margaret::forwarders::public::Forwarder;
+use crate::stores::featured_article_id::FEATURED_ARTICLE_ID;
 
 #[singleton]
 #[responds_to_http(method = RouteMethod::Get, path = "/featured", server = "public")]

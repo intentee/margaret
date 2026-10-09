@@ -3,27 +3,22 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use margaret::framework::active_record::creatable::Creatable;
 use margaret::framework::authorization_server_client::target_audience::TargetAudience;
 use margaret::framework::authorization_server_client::token_target::TokenTarget;
 use margaret::framework::client_credentials::acquired_token::AcquiredToken;
-use margaret::framework::database::database::Database;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
 
-use crate::margaret::models::models_token_acquisition_token_acquisition::draft::Draft;
 use crate::margaret::oauth_clients::cluster::ClientCredentials;
 use crate::margaret::resource_tokens::notes::AUDIENCE;
-use crate::models::token_acquisition::TokenAcquisition;
 use crate::models::token_acquisition_outcome::TokenAcquisitionOutcome;
-use crate::system_clock::SystemClock;
+use crate::stores::token_acquisition_store::TokenAcquisitionStore;
 
 #[service]
 pub struct TokenAcquirer {
+    acquisitions: Arc<TokenAcquisitionStore>,
     client_credentials: Arc<ClientCredentials>,
-    clock: Arc<SystemClock>,
-    database: Arc<Database>,
 }
 
 impl TokenAcquirer {
@@ -32,14 +27,12 @@ impl TokenAcquirer {
     /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(
+        acquisitions: Arc<TokenAcquisitionStore>,
         client_credentials: Arc<ClientCredentials>,
-        clock: Arc<SystemClock>,
-        database: Arc<Database>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
+            acquisitions,
             client_credentials,
-            clock,
-            database,
         })
     }
 
@@ -61,12 +54,7 @@ impl TokenAcquirer {
             AcquiredToken::Unavailable(_) => TokenAcquisitionOutcome::Unavailable,
         };
 
-        TokenAcquisition::create(Draft {
-            attempted_at: self.clock.now(),
-            outcome,
-        })
-        .run(self.database.as_ref())
-        .await?;
+        self.acquisitions.record(&outcome).await?;
         cancellation_token.cancelled().await;
 
         Ok(())

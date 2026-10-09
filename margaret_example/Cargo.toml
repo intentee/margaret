@@ -10,13 +10,13 @@ async-trait = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 clap = { workspace = true }
 cookie = { workspace = true }
-futures-util = { workspace = true }
 margaret = { workspace = true, features = ["runtime"] }
 maud = { workspace = true }
-rust_decimal = { workspace = true }
+rust_decimal = { workspace = true, features = ["db-tokio-postgres"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types"] }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }

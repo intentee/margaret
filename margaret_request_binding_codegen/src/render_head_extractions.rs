@@ -74,7 +74,6 @@ mod tests {
     use crate::captured_providers::CapturedProviders;
     use crate::head_extraction_context::HeadExtractionContext;
     use crate::request_binding::RequestBinding;
-    use crate::route_parameter_lookup::RouteParameterLookup;
 
     fn route_model() -> BoundParameter {
         BoundParameter {
@@ -84,7 +83,6 @@ mod tests {
                     "crate".to_string(),
                     "ArticleStore".to_string(),
                 ]),
-                lookup: RouteParameterLookup::Binder,
                 path_key: "article".to_string(),
             },
             holder: format_ident!("article"),

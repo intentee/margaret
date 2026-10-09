@@ -7,15 +7,13 @@ use margaret_container::framework_provider::FrameworkProvider;
 use margaret_jwks_codegen::public_jwks_handler_canonical_path::public_jwks_handler_canonical_path;
 
 use crate::jwks_roller_canonical_path::jwks_roller_canonical_path;
-use crate::jwks_secret_holder_canonical_path::jwks_secret_holder_canonical_path;
 use crate::mint_access_token_handler_canonical_path::mint_access_token_handler_canonical_path;
 use crate::rsa_signing_keys_canonical_path::rsa_signing_keys_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
-use crate::signing_keys_tables_canonical_path::signing_keys_tables_canonical_path;
+use crate::signing_keys_store_canonical_path::signing_keys_store_canonical_path;
 
-pub(crate) fn jwks_framework_providers() -> [FrameworkProvider; 6] {
+pub(crate) fn jwks_framework_providers() -> [FrameworkProvider; 5] {
     let roller = jwks_roller_canonical_path();
-    let jwks_secret_holder = jwks_secret_holder_canonical_path();
     let rsa_signing_keys = rsa_signing_keys_canonical_path();
     let server_secret_store = server_secret_store_canonical_path();
 
@@ -29,9 +27,7 @@ pub(crate) fn jwks_framework_providers() -> [FrameworkProvider; 6] {
         FrameworkProvider {
             construction: FrameworkConstruction::Constructor {
                 dependencies: vec![
-                    FrameworkDependency::Database {
-                        framework_tables: vec![signing_keys_tables_canonical_path()],
-                    },
+                    FrameworkDependency::Provider(signing_keys_store_canonical_path()),
                     FrameworkDependency::Provider(rsa_signing_keys),
                 ],
                 is_async: true,
@@ -41,15 +37,6 @@ pub(crate) fn jwks_framework_providers() -> [FrameworkProvider; 6] {
             enablement: FrameworkEnablement::Dependency,
             injection: FrameworkInjectionRole::Runner,
             provided: roller.clone(),
-        },
-        FrameworkProvider {
-            construction: FrameworkConstruction::Accessor {
-                accessor: "jwks_secret_holder".to_string(),
-                source: roller.clone(),
-            },
-            enablement: FrameworkEnablement::Dependency,
-            injection: FrameworkInjectionRole::FrameworkState,
-            provided: jwks_secret_holder.clone(),
         },
         FrameworkProvider {
             construction: FrameworkConstruction::Accessor {
@@ -63,7 +50,7 @@ pub(crate) fn jwks_framework_providers() -> [FrameworkProvider; 6] {
         FrameworkProvider {
             construction: FrameworkConstruction::Constructor {
                 dependencies: vec![
-                    FrameworkDependency::Provider(jwks_secret_holder),
+                    FrameworkDependency::Provider(roller),
                     FrameworkDependency::TokenIssuance,
                 ],
                 is_async: false,

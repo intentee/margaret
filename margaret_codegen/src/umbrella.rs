@@ -7,9 +7,7 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
     let serves_http = features.serves_http();
     let mut source = String::from("#![forbid(unsafe_code)]\n");
 
-    if features.contains(GeneratedFeature::Container) {
-        source.push_str("#[rustfmt::skip]\npub mod container;\n");
-    }
+    source.push_str("#[rustfmt::skip]\npub mod container;\n");
 
     if features.contains(GeneratedFeature::AssetBag) {
         source.push_str("#[rustfmt::skip]\npub mod asset_bag;\n");
@@ -61,17 +59,8 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
         source.push_str("#[rustfmt::skip]\npub mod websocket;\n");
     }
 
-    if features.contains(GeneratedFeature::Models) {
-        source.push_str("#[rustfmt::skip]\npub mod models;\n");
-        source.push_str("#[rustfmt::skip]\npub mod tables;\n");
-    }
-
     if features.contains(GeneratedFeature::Schema) {
         source.push_str("#[rustfmt::skip]\npub mod schema;\n");
-    }
-
-    if features.contains(GeneratedFeature::Shapes) {
-        source.push_str("#[rustfmt::skip]\npub mod shapes;\n");
     }
 
     if features.contains(GeneratedFeature::Views) {

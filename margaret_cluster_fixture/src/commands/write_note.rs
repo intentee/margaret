@@ -1,15 +1,12 @@
 use std::sync::Arc;
 
-use margaret::framework::active_record::creatable::Creatable;
 use margaret::framework::console::command_outcome::CommandOutcome;
-use margaret::framework::database::database::Database;
 use margaret::framework::macros::console_command;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::singleton;
 
-use crate::margaret::models::models_note_note::draft::Draft;
-use crate::models::note::Note;
+use crate::stores::note_store::NoteStore;
 
 #[singleton]
 #[console_command(
@@ -18,7 +15,7 @@ use crate::models::note::Note;
 )]
 pub struct WriteNote {
     body: String,
-    database: Arc<Database>,
+    notes: Arc<NoteStore>,
 }
 
 impl WriteNote {
@@ -27,23 +24,18 @@ impl WriteNote {
     /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(
-        database: Arc<Database>,
+        notes: Arc<NoteStore>,
         #[console_argument(positional)] body: String,
     ) -> anyhow::Result<Self> {
-        Ok(Self { body, database })
+        Ok(Self { body, notes })
     }
 
     /// # Errors
     ///
-    /// Returns an error when the note cannot be stored.
+    /// Returns `ClusterStoreError` when the note cannot be stored.
     #[process]
     pub async fn run(&self) -> anyhow::Result<CommandOutcome> {
-        let note = Note::create(Draft {
-            body: self.body.clone(),
-            expires_at: None,
-        })
-        .run(self.database.as_ref())
-        .await?;
+        let note = self.notes.insert(&self.body, None).await?;
 
         println!("{}", note.id);
 

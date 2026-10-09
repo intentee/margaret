@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde_json::json;
 
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
-use margaret_database::database::Database;
+use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 use margaret_http::content_handler::ContentHandler;
 use margaret_http::content_responder::content_responder;
 use margaret_http::handler_future::HandlerFuture;
@@ -15,6 +15,7 @@ use margaret_http::request_body::RequestBody;
 use margaret_http::responded::responded;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::route_entry::RouteEntry;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_jwks_roller_server::public_jwks_handler::PublicJwksHandler;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_oidc_discovery::provider_endpoints::ProviderEndpoints;
@@ -140,10 +141,10 @@ fn userinfo(endpoint: Arc<UserinfoEndpoint>) -> Arc<dyn HeadHandler> {
 
 pub struct ProviderParts {
     pub clients: Arc<AcceptedClients>,
-    pub database: Arc<Database>,
+    pub grants: Arc<dyn StoresAuthorizationGrants>,
     pub endpoints: ProviderEndpoints,
     pub issuance: TokenIssuance,
-    pub public_jwks_handler: Arc<PublicJwksHandler>,
+    pub roller: Arc<JwksRoller>,
     pub secret_store: Arc<JwksSecretStore>,
 }
 
@@ -174,14 +175,14 @@ impl ProviderParts {
             ),
             head_route(
                 FIXTURE_ENDPOINT_PATHS.jwks,
-                jwks(Arc::clone(&self.public_jwks_handler)),
+                jwks(self.roller.public_jwks_handler()),
             ),
             content_route(
                 FIXTURE_ENDPOINT_PATHS.revocation,
                 revocation(Arc::new(RevocationEndpoint::create(
                     Arc::clone(&self.clients),
                     Arc::clone(&self.secret_store),
-                    Arc::clone(&self.database),
+                    Arc::clone(&self.grants),
                     FIXTURE_ACCEPTED_RESOURCES,
                 ))),
             ),

@@ -5,7 +5,6 @@ use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::models::article::Article;
-use crate::models::article_with_author::ArticleWithAuthor;
 use crate::models::author::Author;
 
 #[singleton]
@@ -24,24 +23,22 @@ impl GetArticle {
     #[process]
     pub fn respond(
         &self,
-        #[route_parameter(from = "article")] ArticleWithAuthor {
-            article:
-                Article {
-                    title,
-                    body,
-                    price,
-                    reading_minutes,
-                    created_at,
-                    ..
-                },
-            author:
-                Author {
-                    name: author_name,
-                    reputation,
-                    ..
-                },
-        }: ArticleWithAuthor,
+        #[route_parameter(from = "article")] Article {
+            title,
+            body,
+            price,
+            reading_minutes,
+            created_at,
+            author,
+            ..
+        }: Article,
     ) -> anyhow::Result<Response> {
+        let Author {
+            name: author_name,
+            reputation,
+            ..
+        } = author;
+
         Ok(Response::text(
             200,
             format!(

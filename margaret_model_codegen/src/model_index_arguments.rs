@@ -1,13 +1,14 @@
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 
+use crate::column_list_arity::ColumnListArity;
 use crate::explicit_index_name::explicit_index_name;
 use crate::model_codegen_error::ModelCodegenError;
-use crate::model_field_list::ModelFieldList;
+use crate::model_column_list::ModelColumnList;
 
 #[derive(Debug)]
 pub(crate) struct ModelIndexArguments {
-    pub(crate) fields: Vec<String>,
+    pub(crate) columns: Vec<String>,
     pub(crate) name: String,
 }
 
@@ -19,11 +20,15 @@ impl ModelIndexArguments {
                     model: model.to_string(),
                 }
             })?;
-            let ModelFieldList { fields } =
-                ModelFieldList::read(reader, FrameworkAttribute::Index, model)?;
+            let ModelColumnList { columns } = ModelColumnList::read(
+                reader,
+                FrameworkAttribute::Index,
+                ColumnListArity::TwoOrMore,
+                model,
+            )?;
 
             Ok(Self {
-                fields,
+                columns,
                 name: explicit_index_name(name, model)?,
             })
         })

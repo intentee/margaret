@@ -12,7 +12,6 @@ publish.workspace = true
 [dependencies]
 deadpool-postgres = { workspace = true }
 futures-util = { workspace = true }
-margaret_sql = { workspace = true }
 thiserror = { workspace = true }
 tokio-postgres = { workspace = true }
 

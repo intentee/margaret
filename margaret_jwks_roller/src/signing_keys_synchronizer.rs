@@ -3,22 +3,21 @@ use std::sync::Arc;
 
 use futures_util::TryFutureExt as _;
 
-use margaret_database::database::Database;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_registered_claims::numeric_date::NumericDate;
-use margaret_signing_keys::signing_key_set::SigningKeySet;
-use margaret_signing_keys::signing_keys_creation::SigningKeysCreation;
-use margaret_signing_keys::signing_keys_replacement::SigningKeysReplacement;
-use margaret_signing_keys::signing_keys_revision::SigningKeysRevision;
-use margaret_signing_keys::stored_signing_keys::StoredSigningKeys;
 
 use crate::held_secret::HeldSecret;
 use crate::restored_secret::restored_secret;
 use crate::roll_due_at::roll_due_at;
 use crate::roller_error::RollerError;
 use crate::signing_key_retention::signing_key_retention;
+use crate::signing_keys_creation::SigningKeysCreation;
+use crate::signing_keys_replacement::SigningKeysReplacement;
+use crate::signing_keys_revision::SigningKeysRevision;
+use crate::stored_signing_keys::StoredSigningKeys;
+use crate::stores_signing_keys::StoresSigningKeys;
 
 fn confirm_progression(held: &JwksSecret, stored: &JwksSecret) -> Result<(), RollerError> {
     if stored.generation() < held.generation() {
@@ -40,8 +39,8 @@ fn confirm_progression(held: &JwksSecret, stored: &JwksSecret) -> Result<(), Rol
 
 pub struct SigningKeysSynchronizer {
     pub curve: SigningCurve,
-    pub database: Arc<Database>,
     pub rsa_keys: Arc<dyn ProvidesRsaSigningKeys>,
+    pub storage: Arc<dyn StoresSigningKeys>,
 }
 
 impl SigningKeysSynchronizer {
@@ -87,15 +86,14 @@ impl SigningKeysSynchronizer {
         )
         .map_err(RollerError::KeyGeneration)?;
 
-        match ready(
-            SigningKeysRevision::from_secret(&fresh).map_err(RollerError::DocumentSerialization),
-        )
-        .and_then(|revision| async move {
-            SigningKeySet::create(&self.database, &revision)
-                .await
-                .map_err(|source| RollerError::SecretCreate { source })
-        })
-        .await?
+        match ready(SigningKeysRevision::from_secret(&fresh))
+            .and_then(|revision| async move {
+                self.storage
+                    .create_signing_keys(&revision)
+                    .await
+                    .map_err(|source| RollerError::SecretCreate { source })
+            })
+            .await?
         {
             SigningKeysCreation::Created => Ok(Arc::new(fresh)),
             SigningKeysCreation::AlreadyCreated => match self.loaded().await? {
@@ -108,7 +106,8 @@ impl SigningKeysSynchronizer {
     }
 
     async fn loaded(&self) -> Result<StoredSigningKeys, RollerError> {
-        SigningKeySet::load(&self.database)
+        self.storage
+            .load_signing_keys()
             .await
             .map_err(|source| RollerError::SecretLoad { source })
     }
@@ -122,15 +121,14 @@ impl SigningKeysSynchronizer {
             .rolled(self.rsa_keys.as_ref(), now)
             .map_err(RollerError::KeyRoll)?;
 
-        match ready(
-            SigningKeysRevision::from_secret(&rolled).map_err(RollerError::DocumentSerialization),
-        )
-        .and_then(|revision| async move {
-            SigningKeySet::replace(&self.database, stored.generation(), &revision)
-                .await
-                .map_err(|source| RollerError::SecretReplace { source })
-        })
-        .await?
+        match ready(SigningKeysRevision::from_secret(&rolled))
+            .and_then(|revision| async move {
+                self.storage
+                    .replace_signing_keys(stored.generation(), &revision)
+                    .await
+                    .map_err(|source| RollerError::SecretReplace { source })
+            })
+            .await?
         {
             SigningKeysReplacement::Replaced => Ok(Arc::new(rolled)),
             SigningKeysReplacement::Superseded => match self.loaded().await? {

@@ -1,6 +1,5 @@
 use chrono::Utc;
 
-use margaret_authorization_grants::authorization_code_record::AuthorizationCodeRecord;
 use margaret_authorization_grants::issued_code::IssuedCode;
 use margaret_oidc_provider_tests::code_exchange::code_exchange;
 use margaret_oidc_provider_tests::fixture_authorization_grant::fixture_authorization_grant;
@@ -17,17 +16,19 @@ async fn refuses_an_expired_authorization_code() {
     let fixture = ProviderFixture::start(Vec::new()).await;
     let now = NumericDate::from(Utc::now());
 
-    AuthorizationCodeRecord::issue(
-        &fixture.storage.database,
-        TokenDigest::of(EXPIRED_CODE),
-        IssuedCode {
-            expires_at: now,
-            grant: fixture_authorization_grant("portal", PORTAL_CALLBACK),
-        },
-        now,
-    )
-    .await
-    .expect("the fixture database issues the code");
+    fixture
+        .clients
+        .grants
+        .issue_code(
+            TokenDigest::of(EXPIRED_CODE),
+            IssuedCode {
+                expires_at: now,
+                grant: fixture_authorization_grant("portal", PORTAL_CALLBACK),
+            },
+            now,
+        )
+        .await
+        .expect("the fixture store issues the code");
 
     let answer = fixture
         .post_form("/token", &PORTAL_CREDENTIALS, &code_exchange(EXPIRED_CODE))

@@ -3,8 +3,6 @@ use std::sync::Arc;
 use serde::Serialize;
 use uuid::Uuid;
 
-use margaret::framework::active_record::creatable::Creatable;
-use margaret::framework::database::database::Database;
 use margaret::framework::http::request_body_chunk::RequestBodyChunk;
 use margaret::framework::http::request_body_stream::RequestBodyStream;
 use margaret::framework::http::response::Response;
@@ -14,8 +12,7 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
-use crate::margaret::models::models_upload_upload::draft::Draft;
-use crate::models::upload::Upload;
+use crate::stores::upload_store::UploadStore;
 
 #[derive(Serialize)]
 struct StoredUpload {
@@ -31,7 +28,7 @@ struct StoredUpload {
     server = "public",
 )]
 pub struct PostUpload {
-    database: Arc<Database>,
+    uploads: Arc<UploadStore>,
 }
 
 impl PostUpload {
@@ -39,8 +36,8 @@ impl PostUpload {
     ///
     /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub fn create(database: Arc<Database>) -> anyhow::Result<Self> {
-        Ok(Self { database })
+    pub fn create(uploads: Arc<UploadStore>) -> anyhow::Result<Self> {
+        Ok(Self { uploads })
     }
 
     /// # Errors
@@ -57,10 +54,7 @@ impl PostUpload {
                     return Ok(Response::json(
                         201,
                         &StoredUpload {
-                            id: Upload::create(Draft { content })
-                                .run(self.database.as_ref())
-                                .await?
-                                .id,
+                            id: self.uploads.insert(&content).await?,
                         },
                     ));
                 }

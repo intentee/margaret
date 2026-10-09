@@ -1,18 +1,25 @@
-use margaret::framework::active_record::key::Key;
+use uuid::Uuid;
+
 use margaret::framework::macros::model;
 use margaret::framework::model::on_delete::OnDelete;
 
 use crate::models::article_translation::ArticleTranslation;
 
 #[model(table = "translation_reviews")]
-#[primary_key(fields = [translation, reviewer])]
-#[unique(fields = [content_hash, reviewer])]
-#[index(name = "translation_reviews_reviewer_score", fields = [reviewer, score])]
+#[primary_key(columns = [article_id, locale, reviewer])]
+#[unique(columns = [content_hash, reviewer])]
+#[index(name = "translation_reviews_reviewer_score", columns = [reviewer, score])]
+#[foreign_key(
+    columns = [article_id, locale],
+    references = ArticleTranslation,
+    on_delete = OnDelete::Cascade
+)]
 #[derive(Clone)]
 pub struct TranslationReview {
     #[column]
-    #[foreign_key(on_delete = OnDelete::Cascade)]
-    pub translation: Key<ArticleTranslation>,
+    pub article_id: Uuid,
+    #[column]
+    pub locale: String,
     #[column]
     pub reviewer: String,
     #[column(byte_length = 32)]

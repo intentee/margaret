@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use margaret_database::database::Database;
+use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
 
 use crate::accepted_client::AcceptedClient;
 use crate::client_key_set::ClientKeySet;
@@ -8,6 +8,7 @@ use crate::code_grant_policy::CodeGrantPolicy;
 use crate::confidential_privileges::ConfidentialPrivileges;
 use crate::registered_authentication::RegisteredAuthentication;
 use crate::registered_code_grant::RegisteredCodeGrant;
+use crate::remembers_client_assertions::RemembersClientAssertions;
 
 pub struct RegisteredClient {
     pub authentication: RegisteredAuthentication,
@@ -21,11 +22,11 @@ impl RegisteredClient {
         client: AcceptedClient,
         privileges: ConfidentialPrivileges,
         keys: Arc<ClientKeySet>,
-        database: Arc<Database>,
+        assertions: Arc<dyn RemembersClientAssertions>,
     ) -> Self {
         Self {
             authentication: RegisteredAuthentication::PrivateKeyJwt {
-                database,
+                assertions,
                 keys,
                 privileges,
             },
@@ -39,19 +40,20 @@ impl RegisteredClient {
         client: AcceptedClient,
         privileges: ConfidentialPrivileges,
         keys: Arc<ClientKeySet>,
-        database: Arc<Database>,
+        assertions: Arc<dyn RemembersClientAssertions>,
         policy: CodeGrantPolicy,
         redirect_uris: Vec<String>,
+        grants: Arc<dyn StoresAuthorizationGrants>,
     ) -> Self {
         Self {
             authentication: RegisteredAuthentication::PrivateKeyJwt {
-                database: Arc::clone(&database),
+                assertions,
                 keys,
                 privileges,
             },
             client,
             code_grant: RegisteredCodeGrant::Granted {
-                database,
+                grants,
                 policy,
                 redirect_uris,
             },
@@ -70,15 +72,15 @@ impl RegisteredClient {
     #[must_use]
     pub fn public_with_code_grant(
         client: AcceptedClient,
-        database: Arc<Database>,
         policy: CodeGrantPolicy,
         redirect_uris: Vec<String>,
+        grants: Arc<dyn StoresAuthorizationGrants>,
     ) -> Self {
         Self {
             authentication: RegisteredAuthentication::None,
             client,
             code_grant: RegisteredCodeGrant::Granted {
-                database,
+                grants,
                 policy,
                 redirect_uris,
             },

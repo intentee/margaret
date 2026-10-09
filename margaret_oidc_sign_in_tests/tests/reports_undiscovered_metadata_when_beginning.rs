@@ -8,7 +8,7 @@ use margaret_authorization_server_client_tests::localhost_trust::localhost_trust
 use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
-use margaret_jwks_secret_store_tests::fixture_secrets::fixture_secrets;
+use margaret_jwks_secret_store_tests::fixture_roller::fixture_roller;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in_tests::fixture_sign_in_flow::fixture_sign_in_flow;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
@@ -27,7 +27,7 @@ async fn reports_undiscovered_metadata_when_beginning() {
             FIXTURE_CLIENT_ID,
             fixture_client_secret(),
         )),
-        fixture_secrets(),
+        fixture_roller().await,
     );
 
     assert!(matches!(

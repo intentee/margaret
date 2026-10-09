@@ -1,11 +1,23 @@
+use margaret::framework::model::qualified_framework_table::qualified_framework_table;
 use margaret_cluster_tests::cluster::Cluster;
 
-use crate::signing_key_sets::signing_key_sets;
-
 pub async fn signing_key_generations(cluster: &Cluster) -> Vec<i64> {
-    signing_key_sets(cluster)
+    cluster
+        .database
+        .database
+        .client()
         .await
-        .into_iter()
-        .map(|key_set| key_set.generation)
+        .expect("a connection is checked out")
+        .query(
+            &format!(
+                "SELECT generation FROM {}",
+                qualified_framework_table("signing_key_sets")
+            ),
+            &[],
+        )
+        .await
+        .expect("the key sets are read")
+        .iter()
+        .map(|row| row.get("generation"))
         .collect()
 }

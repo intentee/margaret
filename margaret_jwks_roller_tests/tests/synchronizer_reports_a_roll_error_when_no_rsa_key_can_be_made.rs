@@ -7,22 +7,16 @@ use margaret_jwks_roller::held_secret::HeldSecret;
 use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller::roller_error::RollerError;
 use margaret_jwks_roller::signing_keys_synchronizer::SigningKeysSynchronizer;
-use margaret_jwks_roller_tests::seeded_signing_keys::seeded_signing_keys;
-use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
-use margaret_signing_keys_tests::stored_revision::StoredRevision;
+use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
 
 #[tokio::test]
 async fn synchronizer_reports_a_roll_error_when_no_rsa_key_can_be_made() {
-    let started = started_with_signing_keys().await;
     let held = Arc::new(fresh_secret(SigningCurve::P256));
-
-    seeded_signing_keys(&started.database, &held).await;
-
-    let before = StoredRevision::loaded(&started.database).await;
+    let storage = Arc::new(FixtureSigningKeys::storing(&held));
     let synchronizer = SigningKeysSynchronizer {
         curve: SigningCurve::P256,
-        database: Arc::clone(&started.database),
         rsa_keys: Arc::new(MalformedRsaSigningKeys),
+        storage: storage.clone(),
     };
 
     assert!(matches!(
@@ -34,5 +28,5 @@ async fn synchronizer_reports_a_roll_error_when_no_rsa_key_can_be_made() {
             .await,
         Err(RollerError::KeyRoll(_))
     ));
-    assert_eq!(StoredRevision::loaded(&started.database).await, before);
+    assert_eq!(storage.accepted_writes().await, 0);
 }

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
-use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
 
 /// # Panics
@@ -10,11 +10,11 @@ use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
 #[must_use]
 pub fn fixture_sign_in_flow(
     server: Arc<AuthorizationServerClient>,
-    secrets: Arc<JwksSecretHolder>,
+    roller: Arc<JwksRoller>,
 ) -> SignInFlow {
     SignInFlow::create(
         server,
-        secrets,
+        roller,
         "https://client.example/callback".to_string(),
         &["profile"],
     )

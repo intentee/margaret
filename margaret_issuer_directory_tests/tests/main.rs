@@ -1,5 +1,5 @@
 mod admits_a_token_of_a_discovered_issuer;
-mod admits_a_token_of_a_margaret_issuer_publishing_its_signing_keys;
+mod admits_a_token_of_a_rolling_margaret_issuer;
 mod holds_the_discovered_metadata_of_an_oidc_issuer;
 mod holds_the_usable_keys_of_a_set_with_excluded_keys;
 mod keeps_awaiting_a_document_that_is_not_a_key_set;

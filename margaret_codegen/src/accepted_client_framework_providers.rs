@@ -8,7 +8,6 @@ use margaret_accepted_clients_codegen::declared_client_keys::DeclaredClientKeys;
 use margaret_accepted_clients_codegen::declared_code_grant::DeclaredCodeGrant;
 use margaret_accepted_clients_codegen::declared_code_policy::DeclaredCodePolicy;
 use margaret_accepted_clients_codegen::declared_confidential_client::DeclaredConfidentialClient;
-use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::constructor_outcome::ConstructorOutcome;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_dependency::FrameworkDependency;
@@ -19,8 +18,8 @@ use margaret_container::url_source::UrlSource;
 use margaret_http_codegen::declared_routes::DeclaredRoutes;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 
-use crate::authorization_grants_tables_canonical_path::authorization_grants_tables_canonical_path;
-use crate::client_assertions_tables_canonical_path::client_assertions_tables_canonical_path;
+use crate::authorization_grants_store_canonical_path::authorization_grants_store_canonical_path;
+use crate::client_assertions_store_canonical_path::client_assertions_store_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
 
 fn constructed(
@@ -60,7 +59,7 @@ fn code_grant_dependencies(
     client: &AcceptedClientDeclaration,
     policy: &DeclaredCodePolicy,
     routes: &DeclaredRoutes,
-) -> Result<[FrameworkDependency; 2], HttpCodegenError> {
+) -> Result<[FrameworkDependency; 3], HttpCodegenError> {
     let route_urls = policy
         .redirect_routes
         .iter()
@@ -81,18 +80,16 @@ fn code_grant_dependencies(
                 .chain(route_urls)
                 .collect(),
         ),
+        FrameworkDependency::Provider(authorization_grants_store_canonical_path()),
     ])
 }
 
-fn confidential_dependencies(
-    client: &AcceptedClientDeclaration,
-    framework_tables: Vec<CanonicalPath>,
-) -> [FrameworkDependency; 4] {
+fn confidential_dependencies(client: &AcceptedClientDeclaration) -> [FrameworkDependency; 4] {
     [
         constant(client, AcceptedClientConstant::AcceptedClient),
         constant(client, AcceptedClientConstant::ConfidentialPrivileges),
         item(client, AcceptedClientItem::ClientKeySet),
-        FrameworkDependency::Database { framework_tables },
+        FrameworkDependency::Provider(client_assertions_store_canonical_path()),
     ]
 }
 
@@ -113,35 +110,22 @@ fn registered_client(
         DeclaredAcceptedAuthentication::PrivateKeyJwt(_) => match &client.authorization_code {
             DeclaredCodeGrant::Granted(policy) => registered(
                 "private_key_jwt_with_code_grant",
-                confidential_dependencies(
-                    client,
-                    vec![
-                        client_assertions_tables_canonical_path(),
-                        authorization_grants_tables_canonical_path(),
-                    ],
-                )
-                .into_iter()
-                .chain(code_grant_dependencies(client, policy, routes)?)
-                .collect(),
+                confidential_dependencies(client)
+                    .into_iter()
+                    .chain(code_grant_dependencies(client, policy, routes)?)
+                    .collect(),
             ),
-            DeclaredCodeGrant::Withheld => registered(
-                "private_key_jwt",
-                confidential_dependencies(client, vec![client_assertions_tables_canonical_path()])
-                    .into(),
-            ),
+            DeclaredCodeGrant::Withheld => {
+                registered("private_key_jwt", confidential_dependencies(client).into())
+            }
         },
         DeclaredAcceptedAuthentication::Public => match &client.authorization_code {
             DeclaredCodeGrant::Granted(policy) => registered(
                 "public_with_code_grant",
-                [
-                    constant(client, AcceptedClientConstant::AcceptedClient),
-                    FrameworkDependency::Database {
-                        framework_tables: vec![authorization_grants_tables_canonical_path()],
-                    },
-                ]
-                .into_iter()
-                .chain(code_grant_dependencies(client, policy, routes)?)
-                .collect(),
+                [constant(client, AcceptedClientConstant::AcceptedClient)]
+                    .into_iter()
+                    .chain(code_grant_dependencies(client, policy, routes)?)
+                    .collect(),
             ),
             DeclaredCodeGrant::Withheld => registered(
                 "public",

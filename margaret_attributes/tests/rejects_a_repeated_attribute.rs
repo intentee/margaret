@@ -34,15 +34,6 @@ fn rejects_a_field_marker_declared_twice() {
 }
 
 #[test]
-fn rejects_a_marker_declared_twice_on_a_positional_field() {
-    assert!(matches!(
-        rejection("repeated_positional_field_marker"),
-        AttributeError::RepeatedAttribute { attribute_path, target }
-            if attribute_path == "column" && target == "repeated_positional_field_marker::Slug::0"
-    ));
-}
-
-#[test]
 fn rejects_a_method_attribute_declared_twice() {
     assert!(matches!(
         rejection("repeated_method_attribute"),

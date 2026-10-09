@@ -16,14 +16,8 @@ use margaret_tag_codegen::subject_token_exchanger_binding::SubjectTokenExchanger
 use margaret_trusted_issuer_codegen::trusted_issuer_item::TrustedIssuerItem;
 use margaret_trusted_issuer_codegen::trusted_issuer_item_path::trusted_issuer_item_path;
 
-use crate::authorization_grants_tables_canonical_path::authorization_grants_tables_canonical_path;
+use crate::authorization_grants_store_canonical_path::authorization_grants_store_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
-
-fn grants_database() -> FrameworkDependency {
-    FrameworkDependency::Database {
-        framework_tables: vec![authorization_grants_tables_canonical_path()],
-    }
-}
 
 fn constructed(
     dependencies: Vec<FrameworkDependency>,
@@ -116,7 +110,10 @@ pub(crate) fn oidc_provider_framework_providers(
             OidcProviderItem::AuthorizationEndpoint,
         ),
         endpoint(
-            vec![grants_database(), FrameworkDependency::TokenIssuance],
+            vec![
+                FrameworkDependency::Provider(authorization_grants_store_canonical_path()),
+                FrameworkDependency::TokenIssuance,
+            ],
             OidcProviderItem::ConsentEndpoint,
         ),
         endpoint(
@@ -148,7 +145,7 @@ pub(crate) fn oidc_provider_framework_providers(
             vec![
                 item(OidcProviderItem::AcceptedClients),
                 secret_store(),
-                grants_database(),
+                FrameworkDependency::Provider(authorization_grants_store_canonical_path()),
                 aggregate(ProviderAggregate::AcceptedResources),
             ],
             OidcProviderItem::RevocationEndpoint,

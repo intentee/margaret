@@ -2,9 +2,6 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use margaret::framework::active_record::lookup::Lookup;
-use margaret::framework::active_record::model::Model;
-use margaret::framework::database::database::Database;
 use margaret::framework::http::response::Response;
 use margaret::framework::http::response_continuation::ResponseContinuation;
 use margaret::framework::http_validation::request_input::RequestInput;
@@ -15,15 +12,13 @@ use margaret::framework::macros::infers_authenticated_user;
 use margaret::framework::macros::singleton;
 
 use crate::forms::session_cookie::SessionCookie;
-use crate::models::session_with_user::SessionWithUser;
 use crate::models::user::User;
-use crate::models::user_account::UserAccount;
-use crate::models::user_session::UserSession;
+use crate::stores::user_store::UserStore;
 
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
 pub struct SessionUserProvider {
-    database: Arc<Database>,
+    users: Arc<UserStore>,
 }
 
 impl SessionUserProvider {
@@ -31,8 +26,8 @@ impl SessionUserProvider {
     ///
     /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub fn create(database: Arc<Database>) -> anyhow::Result<Self> {
-        Ok(Self { database })
+    pub fn create(users: Arc<UserStore>) -> anyhow::Result<Self> {
+        Ok(Self { users })
     }
 
     /// # Errors
@@ -52,26 +47,9 @@ impl SessionUserProvider {
             ));
         };
 
-        Ok(
-            match UserSession::query()
-                .id
-                .eq(session)
-                .load::<SessionWithUser, _>(self.database.as_ref())
-                .await?
-            {
-                Lookup::Found(SessionWithUser {
-                    session:
-                        UserSession {
-                            authenticated_at, ..
-                        },
-                    user: UserAccount { id, name },
-                }) => AuthenticatedUserOutcome::Authenticated(User {
-                    authenticated_at,
-                    id,
-                    name,
-                }),
-                Lookup::Missing => AuthenticatedUserOutcome::Anonymous,
-            },
-        )
+        Ok(match self.users.find_user_by_session(session).await? {
+            Some(user) => AuthenticatedUserOutcome::Authenticated(user),
+            None => AuthenticatedUserOutcome::Anonymous,
+        })
     }
 }

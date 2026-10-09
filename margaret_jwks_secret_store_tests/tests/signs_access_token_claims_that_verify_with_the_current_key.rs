@@ -12,11 +12,11 @@ struct DemoClaims {
     name: String,
 }
 
-#[test]
-fn signs_access_token_claims_that_verify_with_the_current_key() {
+#[tokio::test]
+async fn signs_access_token_claims_that_verify_with_the_current_key() {
     let secret = fresh_secret(SigningCurve::P256);
     let current_kid = secret.current().kid().clone();
-    let store = rolled_store(secret);
+    let store = rolled_store(secret).await;
     let signed = store
         .sign_access_token(&json!({ "name": "demo" }), unix_time(500))
         .expect("the claims are signed");

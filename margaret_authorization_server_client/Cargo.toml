@@ -16,7 +16,7 @@ headers = { workspace = true }
 http = { workspace = true }
 margaret_issuer_metadata = { workspace = true }
 margaret_issuer_request = { workspace = true }
-margaret_jwks_keygen = { workspace = true }
+margaret_jwks_roller_server = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
 margaret_oauth_client = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }

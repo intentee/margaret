@@ -1,0 +1,18 @@
+[package]
+name = "margaret_authorization_grants_schema"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "The tables in which a Margaret provider keeps its authorization grants."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+margaret_macros = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

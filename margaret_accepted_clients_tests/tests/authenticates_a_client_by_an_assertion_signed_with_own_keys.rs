@@ -8,20 +8,20 @@ use margaret_accepted_clients_tests::asserted_parameters::asserted_parameters;
 use margaret_accepted_clients_tests::asserting_client::AssertingClient;
 use margaret_accepted_clients_tests::assertion_claims::assertion_claims;
 use margaret_accepted_clients_tests::fixture_client::fixture_client;
+use margaret_accepted_clients_tests::fixture_client_assertions::FixtureClientAssertions;
 use margaret_accepted_clients_tests::unprivileged::UNPRIVILEGED;
-use margaret_client_assertions_tests::started_with_client_assertions::started_with_client_assertions;
 use margaret_http::request_authorization::RequestAuthorization;
 use margaret_jwt_verification_tests::fixture_issuer::FIXTURE_ISSUER;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[tokio::test]
 async fn authenticates_a_client_by_an_assertion_signed_with_own_keys() {
-    let started = started_with_client_assertions().await;
     let client = AssertingClient::signing_with_own_keys(
         fixture_client("portal"),
         UNPRIVILEGED,
-        Arc::clone(&started.database),
-    );
+        Arc::new(FixtureClientAssertions::default()),
+    )
+    .await;
     let clients = accepted_clients_of(vec![Arc::clone(&client.registered)]);
 
     assert!(matches!(

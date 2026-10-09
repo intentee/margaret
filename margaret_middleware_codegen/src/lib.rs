@@ -60,7 +60,6 @@ mod tests {
             ViewsAvailability::Available,
             &collected_tags(index),
             &empty_bindings(),
-            &[],
         )
         .expect("the binding registries are collected")
     }

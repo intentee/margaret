@@ -1,0 +1,3 @@
+mod fixture_authorization_grants_honor_the_store_contract;
+mod fixture_client_assertions_honor_the_store_contract;
+mod fixture_signing_keys_honor_the_store_contract;

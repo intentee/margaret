@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_jose_parameters::jwt_type::JwtType;
-use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
-use margaret_jwks_secret_store_tests::peer_secrets::PeerSecrets;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
+use margaret_jwks_secret_store_tests::peer_rollers::PeerRollers;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
@@ -16,10 +16,10 @@ use margaret_oidc_sign_in_tests::issued_token_answer::issued_token_answer;
 use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
 
 async fn completed_on_peer(
-    beginning: Arc<JwksSecretHolder>,
-    completing: Arc<JwksSecretHolder>,
+    beginning: Arc<JwksRoller>,
+    completing: Arc<JwksRoller>,
 ) -> SignInCompletion<EmailClaims> {
-    let fixture = SignInFixture::with_secrets(secret_basic_authentication(), beginning).await;
+    let fixture = SignInFixture::with_roller(secret_basic_authentication(), beginning).await;
     let SignInBeginning::Redirected(response) = fixture.flow.begin().await else {
         panic!("the sign-in redirects to the authorization endpoint");
     };
@@ -56,7 +56,7 @@ async fn completed_on_peer(
 
 #[tokio::test]
 async fn completes_a_sign_in_begun_on_a_peer_one_generation_behind() {
-    let peers = PeerSecrets::one_generation_apart();
+    let peers = PeerRollers::one_generation_apart().await;
 
     assert!(matches!(
         completed_on_peer(peers.lagging, peers.rolled).await,
@@ -66,7 +66,7 @@ async fn completes_a_sign_in_begun_on_a_peer_one_generation_behind() {
 
 #[tokio::test]
 async fn completes_a_sign_in_begun_on_a_peer_one_generation_ahead() {
-    let peers = PeerSecrets::one_generation_apart();
+    let peers = PeerRollers::one_generation_apart().await;
 
     assert!(matches!(
         completed_on_peer(peers.rolled, peers.lagging).await,

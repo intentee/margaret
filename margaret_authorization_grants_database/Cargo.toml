@@ -1,0 +1,29 @@
+[package]
+name = "margaret_authorization_grants_database"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Keeps the authorization grants of a Margaret provider in its declared Postgres database."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+futures-util = { workspace = true }
+margaret_authorization_grants = { workspace = true }
+margaret_authorization_grants_schema = { workspace = true }
+margaret_database = { workspace = true }
+margaret_model = { workspace = true }
+margaret_oauth_vocabulary = { workspace = true }
+margaret_registered_claims = { workspace = true }
+margaret_token_digest = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio-postgres = { workspace = true, features = ["with-chrono-0_4", "with-uuid-1"] }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

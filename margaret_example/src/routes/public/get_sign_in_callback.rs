@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use margaret::framework::active_record::creation::Creation;
-use margaret::framework::database::database::Database;
 use margaret::framework::http::redirect::Redirect;
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
@@ -19,15 +17,13 @@ use crate::auth::sign_in_claims::SignInClaims;
 use crate::forms::session_cookie::SessionCookie;
 use crate::margaret::oauth_clients::blog::SignInFlow;
 use crate::margaret::routes::Routes;
-use crate::models::user_session::UserSession;
-use crate::system_clock::SystemClock;
+use crate::stores::user_store::UserStore;
 
 #[singleton]
 #[responds_to_http(method = RouteMethod::Get, path = "/sign-in/callback", server = "public")]
 pub struct GetSignInCallback {
-    clock: Arc<SystemClock>,
-    database: Arc<Database>,
     sign_in_flow: Arc<SignInFlow>,
+    users: Arc<UserStore>,
 }
 
 impl GetSignInCallback {
@@ -35,15 +31,10 @@ impl GetSignInCallback {
     ///
     /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub fn create(
-        clock: Arc<SystemClock>,
-        database: Arc<Database>,
-        sign_in_flow: Arc<SignInFlow>,
-    ) -> anyhow::Result<Self> {
+    pub fn create(sign_in_flow: Arc<SignInFlow>, users: Arc<UserStore>) -> anyhow::Result<Self> {
         Ok(Self {
-            clock,
-            database,
             sign_in_flow,
+            users,
         })
     }
 
@@ -76,18 +67,12 @@ impl GetSignInCallback {
 
     async fn signed_in(&self, subject: &str, routes: &Routes) -> anyhow::Result<Response> {
         Ok(match Uuid::parse_str(subject) {
-            Ok(user_id) => {
-                match UserSession::start(&self.database, user_id, self.clock.now()).await? {
-                    Creation::Created(session) => {
-                        Redirect::see_other(routes.public.get_profile.url())
-                            .into_response()
-                            .set_cookie(&SessionCookie::issued(session.id))
-                    }
-                    Creation::Refused => {
-                        Response::text(403, "The signed-in subject is not a reader of the blog")
-                    }
-                }
-            }
+            Ok(user_id) => match self.users.start_session(user_id).await? {
+                Some(session) => Redirect::see_other(routes.public.get_profile.url())
+                    .into_response()
+                    .set_cookie(&SessionCookie::issued(session)),
+                None => Response::text(403, "The signed-in subject is not a reader of the blog"),
+            },
             Err(error) => Response::text(
                 403,
                 format!("The signed-in subject is not a reader of the blog: {error}"),

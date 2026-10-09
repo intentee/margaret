@@ -30,7 +30,7 @@ use margaret_issuer_metadata::metadata_holding::MetadataHolding;
 use margaret_issuer_request::issuer_answer::IssuerAnswer;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_issuer_request::issuer_request_timeout::ISSUER_REQUEST_TIMEOUT;
-use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_oauth_client::client_authentication::ClientAuthentication;
 use margaret_oauth_client::presented_client_authentication::PresentedClientAuthentication;
 use margaret_oauth_vocabulary::client_secret::ClientSecret;
@@ -116,10 +116,10 @@ impl AuthorizationServerClient {
         metadata: Arc<IssuerMetadata>,
         trusted_issuer: Arc<TrustedIssuer>,
         client_id: &'static str,
-        secrets: Arc<JwksSecretHolder>,
+        roller: Arc<JwksRoller>,
     ) -> Self {
         Self {
-            authentication: ClientAuthentication::PrivateKeyJwt(secrets),
+            authentication: ClientAuthentication::PrivateKeyJwt(roller),
             client_id,
             metadata,
             request_client,

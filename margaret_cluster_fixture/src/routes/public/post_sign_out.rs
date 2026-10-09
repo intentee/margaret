@@ -2,9 +2,6 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use margaret::framework::active_record::model::Model;
-use margaret::framework::active_record::removal::Removal;
-use margaret::framework::database::database::Database;
 use margaret::framework::http::response::Response;
 use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::macros::constructor;
@@ -15,7 +12,7 @@ use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::forms::session_cookie::SessionCookie;
 use crate::models::user::User;
-use crate::models::user_session::UserSession;
+use crate::stores::user_store::UserStore;
 
 #[singleton]
 #[responds_to_http(
@@ -25,7 +22,7 @@ use crate::models::user_session::UserSession;
     server = "public"
 )]
 pub struct PostSignOut {
-    database: Arc<Database>,
+    users: Arc<UserStore>,
 }
 
 impl PostSignOut {
@@ -33,8 +30,8 @@ impl PostSignOut {
     ///
     /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub fn create(database: Arc<Database>) -> anyhow::Result<Self> {
-        Ok(Self { database })
+    pub fn create(users: Arc<UserStore>) -> anyhow::Result<Self> {
+        Ok(Self { users })
     }
 
     /// # Errors
@@ -47,14 +44,11 @@ impl PostSignOut {
         #[form_request(from = RequestInput::Cookie)] SessionCookie { session }: SessionCookie,
     ) -> anyhow::Result<Response> {
         Ok(match session.as_deref().map(Uuid::parse_str) {
-            Some(Ok(session)) => match UserSession::query()
-                .id
-                .eq(session)
-                .delete(self.database.as_ref())
-                .await?
-            {
-                Removal::Removed(_) | Removal::Missing => Response::text(200, "signed out"),
-            },
+            Some(Ok(session)) => {
+                self.users.end_session(session).await?;
+
+                Response::text(200, "signed out")
+            }
             Some(Err(_)) | None => Response::unauthorized(),
         })
     }

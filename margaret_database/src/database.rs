@@ -6,19 +6,9 @@ use deadpool_postgres::Object;
 use deadpool_postgres::Pool;
 use futures_util::TryFutureExt as _;
 use tokio_postgres::NoTls;
-use tokio_postgres::Row;
-
-use margaret_sql::statement::Statement;
 
 use crate::database_error::DatabaseError;
 use crate::database_url::DatabaseUrl;
-use crate::executor::Executor;
-use crate::executor_seal::ExecutorSeal;
-use crate::pooled_connection::PooledConnection;
-use crate::statement_affected::statement_affected;
-use crate::statement_optional_row::statement_optional_row;
-use crate::statement_row::statement_row;
-use crate::statement_rows::statement_rows;
 
 pub struct Database {
     pool: Pool,
@@ -51,34 +41,8 @@ impl Database {
     /// # Errors
     ///
     /// Returns `DatabaseError::Unavailable` when no connection to the database can be checked out.
-    pub async fn connection(&self) -> Result<PooledConnection, DatabaseError> {
-        self.client()
-            .await
-            .map(|object| PooledConnection { object })
-    }
-
-    async fn client(&self) -> Result<Object, DatabaseError> {
+    pub async fn client(&self) -> Result<Object, DatabaseError> {
         self.pool.get().await.map_err(DatabaseError::Unavailable)
-    }
-}
-
-impl ExecutorSeal for Database {}
-
-impl Executor for Database {
-    async fn affected(&self, statement: &Statement) -> Result<u64, DatabaseError> {
-        statement_affected(&self.client().await?, statement).await
-    }
-
-    async fn optional_row(&self, statement: &Statement) -> Result<Option<Row>, DatabaseError> {
-        statement_optional_row(&self.client().await?, statement).await
-    }
-
-    async fn row(&self, statement: &Statement) -> Result<Row, DatabaseError> {
-        statement_row(&self.client().await?, statement).await
-    }
-
-    async fn rows(&self, statement: &Statement) -> Result<Vec<Row>, DatabaseError> {
-        statement_rows(&self.client().await?, statement).await
     }
 }
 

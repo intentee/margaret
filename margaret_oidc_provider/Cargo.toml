@@ -10,13 +10,13 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
+anyhow = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 futures-util = { workspace = true }
 http = { workspace = true }
 margaret_accepted_clients = { workspace = true }
 margaret_authorization_grants = { workspace = true }
-margaret_database = { workspace = true }
 margaret_http = { workspace = true }
 margaret_identity_session = { workspace = true }
 margaret_jose_parameters = { workspace = true }

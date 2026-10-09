@@ -1,7 +1,7 @@
 use margaret::framework::macros::model;
 
 #[model(table = "fragment_metadata")]
-#[primary_key(fields = [partition, hash])]
+#[primary_key(columns = [partition, hash])]
 pub struct FragmentMetadata {
     #[column]
     pub partition: uuid::Uuid,

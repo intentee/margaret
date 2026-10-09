@@ -8,8 +8,6 @@ use margaret_tag_codegen::tag_pool::TagPool;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::authenticated_user_providers::authenticated_user_providers;
 use crate::request_binding_error::RequestBindingError;
-use crate::route_database::RouteDatabase;
-use crate::route_model::RouteModel;
 use crate::route_parameter_resolution::RouteParameterResolution;
 use crate::route_parameter_resolutions::route_parameter_resolutions;
 use crate::views_availability::ViewsAvailability;
@@ -29,15 +27,10 @@ impl BindingRegistries {
         views: ViewsAvailability,
         tags: &TagPool,
         container_bindings: &ContainerBindings,
-        route_models: &[RouteModel],
     ) -> Result<Self, RequestBindingError> {
         let mut registries = Self {
             authenticated_users: HashMap::new(),
-            route_parameters: route_parameter_resolutions(
-                index,
-                route_models,
-                &RouteDatabase::of(container_bindings),
-            )?,
+            route_parameters: route_parameter_resolutions(index)?,
             views,
         };
 

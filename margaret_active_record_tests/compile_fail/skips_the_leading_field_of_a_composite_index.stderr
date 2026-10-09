@@ -1,7 +1,0 @@
-error[E0609]: no field `title` on type `margaret_active_record_tests::margaret::models::models_article_article::query::Step`
- --> compile_fail/skips_the_leading_field_of_a_composite_index.rs:6:30
-  |
-6 |     let _ = Article::query().title.eq(String::new()).find(database).await;
-  |                              ^^^^^ unknown field
-  |
-  = note: available fields are: `id`, `author`

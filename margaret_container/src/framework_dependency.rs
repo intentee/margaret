@@ -6,9 +6,7 @@ use crate::url_source::UrlSource;
 
 pub enum FrameworkDependency {
     Constant(CanonicalPath),
-    Database {
-        framework_tables: Vec<CanonicalPath>,
-    },
+    Database,
     EnvironmentVariable {
         name: EnvironmentVariableName,
         value_type: CanonicalPath,

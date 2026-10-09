@@ -6,7 +6,7 @@ use margaret_registered_claims::claims_merge_error::ClaimsMergeError;
 
 #[tokio::test]
 async fn refuses_userinfo_claims_that_are_not_an_object() {
-    let provider = UnservedProvider::create();
+    let provider = UnservedProvider::create().await;
     let endpoint = UserinfoEndpoint::create(provider.secret_store, provider.issuance);
 
     assert!(matches!(

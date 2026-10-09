@@ -4,13 +4,14 @@ use chrono::Utc;
 
 use margaret_accepted_clients::client_authentication_outcome::ClientAuthenticationOutcome;
 use margaret_accepted_clients::client_refusal::ClientRefusal;
+use margaret_accepted_clients::registered_code_grant::RegisteredCodeGrant;
 use margaret_accepted_clients_tests::accepted_clients_of::accepted_clients_of;
 use margaret_accepted_clients_tests::asserted_parameters::asserted_parameters;
 use margaret_accepted_clients_tests::asserting_client::AssertingClient;
 use margaret_accepted_clients_tests::assertion_claims::assertion_claims;
 use margaret_accepted_clients_tests::fixture_client::fixture_client;
+use margaret_accepted_clients_tests::fixture_client_assertions::FixtureClientAssertions;
 use margaret_accepted_clients_tests::unprivileged::UNPRIVILEGED;
-use margaret_client_assertions_tests::started_with_client_assertions::started_with_client_assertions;
 use margaret_http::request_authorization::RequestAuthorization;
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
@@ -19,14 +20,16 @@ use margaret_registered_claims::numeric_date::NumericDate;
 
 #[tokio::test]
 async fn refuses_an_assertion_signed_with_an_algorithm_other_than_the_pinned_one() {
-    let started = started_with_client_assertions().await;
     let client = AssertingClient::holding_its_keys(
         fixture_client("portal"),
         UNPRIVILEGED,
-        Arc::clone(&started.database),
-    );
+        Arc::new(FixtureClientAssertions::default()),
+        RegisteredCodeGrant::Withheld,
+    )
+    .await;
     let rs256_assertion = client
-        .secrets
+        .roller
+        .jwks_secret_holder()
         .get()
         .rsa()
         .current()

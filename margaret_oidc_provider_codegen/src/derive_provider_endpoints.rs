@@ -213,14 +213,9 @@ mod tests {
         .expect("the container renders")
         .bindings;
         let tags = collected_tags(index);
-        let registries = BindingRegistries::collect(
-            index,
-            ViewsAvailability::Unavailable,
-            &tags,
-            &bindings,
-            &[],
-        )
-        .expect("the registries are collected");
+        let registries =
+            BindingRegistries::collect(index, ViewsAvailability::Unavailable, &tags, &bindings)
+                .expect("the registries are collected");
         let middleware_plans = MiddlewarePlans::collect(index, &registries, &tags)
             .expect("the middleware plans are collected");
         let plan = HttpPlan::build(

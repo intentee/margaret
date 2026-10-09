@@ -1,7 +1,0 @@
-error[E0609]: no field `price` on type `margaret_active_record_tests::margaret::models::models_article_article::query::Step`
- --> compile_fail/filters_by_an_unindexed_column.rs:8:30
-  |
-8 |     let _ = Article::query().price.eq(Decimal::ZERO).find(database).await;
-  |                              ^^^^^ unknown field
-  |
-  = note: available fields are: `id`, `author`

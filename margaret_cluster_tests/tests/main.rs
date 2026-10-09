@@ -73,9 +73,7 @@ mod every_instance_admits_the_external_issuer;
 #[cfg(feature = "tests_that_use_cluster")]
 mod exchanges_an_external_token_on_another_instance;
 #[cfg(feature = "tests_that_use_cluster")]
-mod expire_authorization_codes;
-#[cfg(feature = "tests_that_use_cluster")]
-mod expire_pending_authorizations;
+mod expire_framework_rows;
 #[cfg(feature = "tests_that_use_cluster")]
 mod instances_started_on_overdue_keys_roll_once;
 #[cfg(feature = "tests_that_use_cluster")]
@@ -94,8 +92,6 @@ mod poll_until;
 mod profile_status;
 #[cfg(feature = "tests_that_use_cluster")]
 mod signing_key_generations;
-#[cfg(feature = "tests_that_use_cluster")]
-mod signing_key_sets;
 #[cfg(feature = "tests_that_use_cluster")]
 mod stored_message;
 #[cfg(feature = "tests_that_use_cluster")]

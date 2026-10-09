@@ -6,31 +6,29 @@ publish = false
 autotests = false
 
 [dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 margaret_accepted_clients = { workspace = true }
-margaret_database = { workspace = true }
 margaret_issuer_key_set = { workspace = true }
 margaret_jose_parameters = { workspace = true }
-margaret_jwks_keygen = { workspace = true }
+margaret_jwks_roller_server = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
 margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_registered_claims = { workspace = true }
+margaret_token_digest = { workspace = true }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
 uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
-margaret_client_assertions_tests = { path = "../margaret_client_assertions_tests" }
-margaret_database_tests = { path = "../margaret_database_tests" }
 margaret_http = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
-margaret_sql_identifier = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
-
-[features]
-tests_that_use_postgres = []
 
 [[test]]
 name = "main"

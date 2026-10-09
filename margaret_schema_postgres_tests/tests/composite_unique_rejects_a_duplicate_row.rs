@@ -1,46 +1,51 @@
+use tokio_postgres::Client;
+use tokio_postgres::error::SqlState;
 use uuid::Uuid;
 
-use margaret::framework::active_record::active_record_error::ActiveRecordError;
-use margaret::framework::active_record::key::Key;
-use margaret::framework::active_record::model::Model;
-use margaret::framework::active_record::statement_kind::StatementKind;
-use margaret_schema_postgres_fixture::fragment::Fragment;
+use margaret_database_tests::apply_schema::apply_schema;
+use margaret_database_tests::started_database::StartedDatabase;
+use margaret_schema_postgres_fixture::margaret::schema::schema;
 
-use crate::inserted_fragment_metadata::inserted_fragment_metadata;
-use crate::started_with_fixture::started_with_fixture;
+const INSERT_FRAGMENT: &str = "INSERT INTO fragment (partition, hash, context) VALUES ($1, $2, $3)";
+
+async fn insert_fragment_metadata(client: &Client, partition: Uuid, hash: &[u8]) {
+    client
+        .execute(
+            "INSERT INTO fragment_metadata (partition, hash, size_payload) VALUES ($1, $2, $3)",
+            &[&partition, &hash, &0_i64],
+        )
+        .await
+        .expect("the fragment metadata is inserted");
+}
 
 #[tokio::test]
-async fn a_second_fragment_sharing_a_context_and_slot_is_rejected() {
-    let started = started_with_fixture().await;
-    let database = started.database.as_ref();
+async fn a_second_fragment_sharing_a_hash_and_context_is_rejected() {
+    let started = StartedDatabase::start().await;
+
+    apply_schema(&started.database, &schema()).await;
+
+    let client = started
+        .database
+        .client()
+        .await
+        .expect("a connection is checked out");
     let hash = vec![5u8; 32];
     let context = Uuid::new_v4();
-    let first = inserted_fragment_metadata(database, Uuid::new_v4(), hash.clone()).await;
-    let second = inserted_fragment_metadata(database, Uuid::new_v4(), hash).await;
+    let first_partition = Uuid::new_v4();
+    let second_partition = Uuid::new_v4();
 
-    Fragment {
-        metadata: Key::of(&first),
-        context,
-        slot: 1,
-    }
-    .insert()
-    .run(database)
-    .await
-    .expect("the first fragment is accepted");
+    insert_fragment_metadata(&client, first_partition, &hash).await;
+    insert_fragment_metadata(&client, second_partition, &hash).await;
 
-    assert!(matches!(
-        Fragment {
-            metadata: Key::of(&second),
-            context,
-            slot: 1,
-        }
-        .insert()
-        .run(database)
-        .await,
-        Err(ActiveRecordError::UniqueViolation {
-            statement: StatementKind::Insert,
-            table: "fragment",
-            ..
-        })
-    ));
+    client
+        .execute(INSERT_FRAGMENT, &[&first_partition, &hash, &context])
+        .await
+        .expect("the first fragment is accepted");
+
+    let rejection = client
+        .execute(INSERT_FRAGMENT, &[&second_partition, &hash, &context])
+        .await
+        .expect_err("a second fragment sharing the unique columns is rejected");
+
+    assert_eq!(rejection.code(), Some(&SqlState::UNIQUE_VIOLATION));
 }

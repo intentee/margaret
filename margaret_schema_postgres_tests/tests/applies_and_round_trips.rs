@@ -1,44 +1,68 @@
+use chrono::Utc;
 use uuid::Uuid;
 
-use margaret::framework::active_record::key::Key;
-use margaret::framework::active_record::lookup::Lookup;
-use margaret::framework::active_record::model::Model;
-use margaret_schema_postgres_fixture::article::Article;
-use margaret_schema_postgres_fixture::article_status::ArticleStatus;
-
-use crate::inserted_author::inserted_author;
-use crate::joined_at::joined_at;
-use crate::started_with_fixture::started_with_fixture;
+use margaret_database_tests::apply_schema::apply_schema;
+use margaret_database_tests::started_database::StartedDatabase;
+use margaret_schema_postgres_fixture::margaret::schema::schema;
 
 #[tokio::test]
 async fn applies_the_generated_schema_and_round_trips_a_model() {
-    let started = started_with_fixture().await;
-    let database = started.database.as_ref();
-    let author = inserted_author(database, "Ada Lovelace").await;
-    let article = Article {
-        id: Uuid::new_v4(),
-        title: "On Computable Numbers".to_string(),
-        body: "the body text".to_string(),
-        cover: Some(vec![0x89, 0x50, 0x4e, 0x47]),
-        published: true,
-        status: ArticleStatus::Published,
-        created_at: joined_at(),
-        author: Key::of(&author),
-    };
+    let started = StartedDatabase::start().await;
 
-    article
-        .insert()
-        .run(database)
+    apply_schema(&started.database, &schema()).await;
+
+    let client = started
+        .database
+        .client()
         .await
-        .expect("the article is inserted");
+        .expect("a connection is checked out");
+    let author_id = Uuid::new_v4();
 
-    assert_eq!(
-        Article::query()
-            .id
-            .eq(article.id)
-            .find(database)
-            .await
-            .expect("the article is read back"),
-        Lookup::Found(article)
-    );
+    client
+        .execute(
+            "INSERT INTO authors (id, name, is_active, joined_at, bio) VALUES ($1, $2, $3, $4, $5)",
+            &[
+                &author_id,
+                &"Ada Lovelace",
+                &true,
+                &Utc::now(),
+                &None::<String>,
+            ],
+        )
+        .await
+        .expect("the author row is inserted");
+
+    let article_id = Uuid::new_v4();
+    let cover: Vec<u8> = vec![0x89, 0x50, 0x4e, 0x47];
+
+    client
+        .execute(
+            "INSERT INTO articles (id, title, body, cover, published, status, created_at, author_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            &[
+                &article_id,
+                &"On Computable Numbers",
+                &"the body text",
+                &cover,
+                &true,
+                &"Published",
+                &Utc::now(),
+                &author_id,
+            ],
+        )
+        .await
+        .expect("the article row is inserted");
+
+    let article = client
+        .query_one(
+            "SELECT title, body, cover, published, author_id FROM articles WHERE id = $1",
+            &[&article_id],
+        )
+        .await
+        .expect("the article row is read back");
+
+    assert_eq!(article.get::<_, String>("title"), "On Computable Numbers");
+    assert_eq!(article.get::<_, String>("body"), "the body text");
+    assert_eq!(article.get::<_, Option<Vec<u8>>>("cover"), Some(cover));
+    assert!(article.get::<_, bool>("published"));
+    assert_eq!(article.get::<_, Uuid>("author_id"), author_id);
 }

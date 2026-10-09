@@ -4,7 +4,6 @@ use uuid::Uuid;
 use margaret::framework::macros::model;
 
 #[model(table = "line_items")]
-#[derive(Clone, Debug, PartialEq)]
 pub struct LineItem {
     #[column(primary_key)]
     pub id: Uuid,

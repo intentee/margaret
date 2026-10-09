@@ -1,5 +1,0 @@
-error[E0609]: no field `name` on type `Key<Author>`
- --> compile_fail/reads_through_a_key.rs:4:20
-  |
-4 |     article.author.name
-  |                    ^^^^ unknown field

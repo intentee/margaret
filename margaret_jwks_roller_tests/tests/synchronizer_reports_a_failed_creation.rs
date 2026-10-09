@@ -1,30 +1,32 @@
 use std::sync::Arc;
 
-use margaret::framework::sql_identifier::table_namespace::TableNamespace;
-use margaret_database_tests::table_privilege::TablePrivilege;
 use margaret_jwks_roller::held_secret::HeldSecret;
 use margaret_jwks_roller::roller_error::RollerError;
+use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
 use margaret_jwks_roller_tests::fixture_synchronizer::fixture_synchronizer;
+use margaret_jwks_roller_tests::signing_keys_steps::SigningKeysSteps;
+use margaret_jwks_roller_tests::stepped_signing_keys::SteppedSigningKeys;
 use margaret_registered_claims::numeric_date::NumericDate;
-use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
 
 #[tokio::test]
 async fn synchronizer_reports_a_failed_creation() {
-    let started = started_with_signing_keys().await;
+    let storage = Arc::new(FixtureSigningKeys::empty());
+    let steps = SigningKeysSteps::default();
+    let synchronizer = fixture_synchronizer(Arc::new(SteppedSigningKeys {
+        inner: storage.clone(),
+        steps: steps.clone(),
+    }));
+    let synchronizing = tokio::spawn(async move {
+        synchronizer
+            .synchronized(&HeldSecret::Unheld, NumericDate::new(0))
+            .await
+    });
 
-    started
-        .administration
-        .revoke(
-            TablePrivilege::Insert,
-            TableNamespace::Framework,
-            "signing_key_sets",
-        )
-        .await;
+    steps.pass().await;
+    steps.intervene(storage.break_down()).await;
 
     assert!(matches!(
-        fixture_synchronizer(Arc::clone(&started.database))
-            .synchronized(&HeldSecret::Unheld, NumericDate::new(0))
-            .await,
+        synchronizing.await.expect("the synchronization joins"),
         Err(RollerError::SecretCreate { .. })
     ));
 }

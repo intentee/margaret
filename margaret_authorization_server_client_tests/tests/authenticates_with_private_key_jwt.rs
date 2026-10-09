@@ -27,7 +27,7 @@ use margaret_http_tests::form_echo_handler::FormEchoHandler;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
-use margaret_jwks_secret_store_tests::rolled_secrets::rolled_secrets;
+use margaret_jwks_secret_store_tests::rolled_roller::rolled_roller;
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::header_type::HeaderType;
@@ -105,7 +105,9 @@ async fn authenticates_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(ClientAuthentication::PrivateKeyJwt(rolled_secrets(secret)))
+        .client(ClientAuthentication::PrivateKeyJwt(
+            rolled_roller(secret).await,
+        ))
         .client_credentials(&TokenTarget {
             audience: TargetAudience::Unspecified,
             scopes: BTreeSet::new(),
@@ -135,7 +137,9 @@ async fn authenticates_a_grant_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(ClientAuthentication::PrivateKeyJwt(rolled_secrets(secret)))
+        .client(ClientAuthentication::PrivateKeyJwt(
+            rolled_roller(secret).await,
+        ))
         .request_grant::<EmptyExtraTokenFields>(
             GrantType::TokenExchange,
             vec![FormParameter {
@@ -165,7 +169,9 @@ async fn authenticates_a_code_exchange_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(ClientAuthentication::PrivateKeyJwt(rolled_secrets(secret)))
+        .client(ClientAuthentication::PrivateKeyJwt(
+            rolled_roller(secret).await,
+        ))
         .exchange_authorization_code::<EmptyExtraTokenFields>(
             AuthorizationCode::new("SplxlOBeZQQYbYS6WxSbIA".to_string()),
             &rfc_7636_verifier(),
@@ -191,7 +197,9 @@ async fn authenticates_an_introspection_with_private_key_jwt() {
     let server = echo_server("/introspect", EchoWrapping::ActiveIntrospection).await;
 
     let outcome = server
-        .client(ClientAuthentication::PrivateKeyJwt(rolled_secrets(secret)))
+        .client(ClientAuthentication::PrivateKeyJwt(
+            rolled_roller(secret).await,
+        ))
         .introspect::<EchoFields>("opaque-token")
         .await;
 

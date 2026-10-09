@@ -9,8 +9,8 @@ use margaret::framework::macros::singleton;
 use margaret::framework::subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectTokens;
 use margaret::framework::subject_token_exchange::subject_token_exchange::SubjectTokenExchange;
 
-use crate::alice::ALICE;
 use crate::auth::external_claims::ExternalClaims;
+use crate::stores::alice::ALICE;
 
 #[singleton]
 #[exchanges_tokens_from(issuer = external)]
