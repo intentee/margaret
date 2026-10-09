@@ -22,8 +22,8 @@ impl Forward {
         &self.cookies
     }
 
-    pub(crate) fn carrying(mut self, cookies: &[Cookie<'static>]) -> Self {
-        self.cookies.extend_from_slice(cookies);
+    pub(crate) fn preceded_by(mut self, cookies: &[Cookie<'static>]) -> Self {
+        self.cookies.splice(0..0, cookies.iter().cloned());
 
         self
     }

@@ -8,6 +8,7 @@ use futures_util::Stream;
 use futures_util::TryStreamExt;
 use http::HeaderName;
 use http::StatusCode;
+use http::header::SET_COOKIE;
 use http_body::Frame;
 use http_body_util::BodyExt;
 use http_body_util::Full;
@@ -22,6 +23,13 @@ fn buffered(body: Bytes) -> UnsyncBoxBody<Bytes, io::Error> {
     Full::new(body)
         .map_err(|never: Infallible| match never {})
         .boxed_unsync()
+}
+
+fn set_cookie_header(cookie: &Cookie<'_>) -> Header {
+    Header {
+        name: SET_COOKIE.as_str().to_string(),
+        value: cookie.to_string(),
+    }
 }
 
 fn internal_server_error() -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
@@ -134,8 +142,10 @@ impl Response {
     }
 
     #[must_use]
-    pub fn set_cookie(self, cookie: &Cookie<'_>) -> Self {
-        self.header("set-cookie", cookie.to_string())
+    pub fn set_cookie(mut self, cookie: &Cookie<'_>) -> Self {
+        self.headers.push(set_cookie_header(cookie));
+
+        self
     }
 
     #[must_use]
@@ -161,6 +171,13 @@ impl Response {
                 internal_server_error()
             }
         }
+    }
+
+    pub(crate) fn preceded_by_cookies(mut self, cookies: &[Cookie<'_>]) -> Self {
+        self.headers
+            .splice(0..0, cookies.iter().map(set_cookie_header));
+
+        self
     }
 }
 

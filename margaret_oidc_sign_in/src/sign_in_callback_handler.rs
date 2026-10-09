@@ -84,7 +84,7 @@ impl<TAdmission: AdmitsSignIn> SignInCallbackHandler<TAdmission> {
         cookies.push(transaction_removal);
 
         Ok(
-            CookieChanges { cookies }.apply(ResponseContinuation::from(Redirect::see_other(
+            CookieChanges { cookies }.precede(ResponseContinuation::from(Redirect::see_other(
                 self.landing.clone(),
             ))),
         )

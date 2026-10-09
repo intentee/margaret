@@ -10,14 +10,15 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
-use margaret_request_binding_codegen::binds_session_user::binds_session_user;
 use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
 use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::head_extraction_context::HeadExtractionContext;
 use margaret_request_binding_codegen::render_authenticated_user_wrapper_construction::render_authenticated_user_wrapper_construction;
 use margaret_request_binding_codegen::render_head_extractions::render_head_extractions;
+use margaret_request_binding_codegen::render_session_user_inference::render_session_user_inference;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
+use margaret_request_binding_codegen::session_user_parameter::session_user_parameter;
 
 use crate::handler_binding::HandlerBinding;
 use crate::session_plan::SessionPlan;
@@ -124,10 +125,9 @@ fn factory_initializers(
     quote! { #(#holders)* #(#initializers)* }
 }
 
-fn create_extractions(
+fn create_body(
     session: &WebSocketSession,
     handshake: &Ident,
-    cookie_changes: &Ident,
     captured: &CapturedProviders,
 ) -> TokenStream {
     let continuation_return = quote! {
@@ -145,17 +145,56 @@ fn create_extractions(
         )
     };
 
-    render_head_extractions(
-        &session.parameters,
-        captured,
-        &HeadExtractionContext {
-            continuation_return: &continuation_return,
-            cookie_changes,
-            error_return: &error_return,
-            owner: &quote! { self. },
-            request_local: handshake,
-        },
-    )
+    let owner = quote! { self. };
+    let extraction_context = HeadExtractionContext {
+        continuation_return: &continuation_return,
+        error_return: &error_return,
+        owner: &owner,
+        request_local: handshake,
+    };
+    let extractions = render_head_extractions(&session.parameters, captured, &extraction_context);
+    let session_path = path_tokens(&session.session_path);
+    let method_name = &session.method_name;
+    let arguments = build_arguments(session);
+    let creation = quote! {
+        #extractions
+
+        #session_path::#method_name(#arguments)
+            .map(|created| {
+                margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created(
+                    margaret::framework::websocket_session::created_web_socket_session::CreatedWebSocketSession {
+                        cookie_changes: margaret::framework::http::cookie_changes::CookieChanges {
+                            cookies: ::std::vec::Vec::new(),
+                        },
+                        session: ::std::sync::Arc::new(created),
+                    },
+                )
+            })
+            .map_err(
+                margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
+            )
+    };
+
+    match session_user_parameter(&session.parameters) {
+        Some(session_user) => {
+            let cookie_changes = format_ident!("changed_cookies");
+            let inference = render_session_user_inference(
+                session_user,
+                captured,
+                &cookie_changes,
+                &extraction_context,
+            );
+
+            quote! {
+                #inference
+
+                async { #creation }
+                    .await
+                    .map(|outcome| outcome.preceded_by(&#cookie_changes))
+            }
+        }
+        None => creation,
+    }
 }
 
 fn build_arguments(session: &WebSocketSession) -> TokenStream {
@@ -184,20 +223,8 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
     } else {
         format_ident!("_handshake")
     };
-    let cookie_changes = format_ident!("changed_cookies");
-    let extractions = create_extractions(session, &handshake, &cookie_changes, captured);
-    let arguments = build_arguments(session);
-    let method_name = &session.method_name;
+    let body = create_body(session, &handshake, captured);
     let create_too_many_lines = too_many_lines_allow();
-    let created_cookie_changes = if binds_session_user(&session.parameters) {
-        quote! { #cookie_changes }
-    } else {
-        quote! {
-            margaret::framework::http::cookie_changes::CookieChanges {
-                cookies: ::std::vec::Vec::new(),
-            }
-        }
-    };
 
     quote! {
         struct Factory {
@@ -216,20 +243,7 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
                 margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome<Self::Session>,
                 margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError,
             > {
-                #extractions
-
-                #session_path::#method_name(#arguments)
-                    .map(|created| {
-                        margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created(
-                            margaret::framework::websocket_session::created_web_socket_session::CreatedWebSocketSession {
-                                cookie_changes: #created_cookie_changes,
-                                session: ::std::sync::Arc::new(created),
-                            },
-                        )
-                    })
-                    .map_err(
-                        margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
-                    )
+                #body
             }
         }
     }

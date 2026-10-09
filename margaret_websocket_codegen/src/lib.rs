@@ -1063,7 +1063,7 @@ impl RespondsToWebSocketMessage for Chatter {
 "#;
 
     #[test]
-    fn sets_the_session_cookie_changes_on_the_upgrade() {
+    fn precedes_every_creation_outcome_with_the_session_cookie_changes() {
         let index = IndexedSource::new(SESSION_HANDSHAKE).index;
         let bindings = bindings_providing(
             &index,
@@ -1089,10 +1089,17 @@ impl RespondsToWebSocketMessage for Chatter {
             .split_whitespace()
             .collect();
 
-        assert!(
-            source
-                .contains("cookie_changes:changed_cookies,session:::std::sync::Arc::new(created),")
-        );
+        let inference = source
+            .find("letmargaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:changed_cookies,")
+            .expect("the session user is inferred");
+        let block = source
+            .find("async{")
+            .expect("the outcomes are produced in one block");
+        let application = source
+            .find("}.await.map(|outcome|outcome.preceded_by(&changed_cookies))")
+            .expect("every outcome of the block is preceded by the session cookie changes");
+
+        assert!(inference < block && block < application);
     }
 
     #[test]

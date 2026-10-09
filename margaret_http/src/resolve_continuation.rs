@@ -37,7 +37,7 @@ pub(crate) async fn resolve_continuation(
                 };
 
                 request = request.with_path_params(forward.into_path_params());
-                outcome = carried.apply(target.handle(&request).await?);
+                outcome = carried.precede(target.handle(&request).await?);
             }
             ResponseContinuation::Redirect(redirect) => return Ok(redirect.into_response()),
         }

@@ -22,9 +22,6 @@ async fn rejects_a_malformed_authorization_request() {
     };
 
     assert_eq!(response.status(), 400);
-    assert!(response.headers().iter().any(|header| {
-        header.name == "content-security-policy" && header.value == "frame-ancestors 'none'"
-    }));
 
     fixture.stop().await;
 }

@@ -177,7 +177,6 @@ mod tests {
             &captured,
             &HeadExtractionContext {
                 continuation_return: &quote! { return response },
-                cookie_changes: &format_ident!("changed_cookies"),
                 error_return: &quote! { return error },
                 owner: &TokenStream::new(),
                 request_local: &format_ident!("request"),

@@ -21,7 +21,7 @@ impl HeadHandler for CookieChangingForwardHandler {
         Ok(CookieChanges {
             cookies: vec![self.cookie.clone()],
         }
-        .apply(ResponseContinuation::from(Forward::new(
+        .precede(ResponseContinuation::from(Forward::new(
             self.target,
             HashMap::new(),
         ))))

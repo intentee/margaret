@@ -4435,6 +4435,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "cookie",
  "margaret_http",
  "margaret_route_parameter_binding",
  "thiserror 2.0.18",

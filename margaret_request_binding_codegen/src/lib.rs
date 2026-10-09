@@ -9,7 +9,6 @@ pub mod binding_context;
 pub mod binding_reads_request;
 pub mod binding_registries;
 pub mod binding_roots;
-pub mod binds_session_user;
 mod bound_arguments;
 mod bound_credentials;
 pub mod bound_parameter;
@@ -40,6 +39,7 @@ pub mod render_content_extraction;
 pub mod render_head_extractions;
 mod render_model_extraction;
 pub mod render_request_extraction;
+pub mod render_session_user_inference;
 pub mod request_binding;
 pub mod request_binding_error;
 pub mod request_injectable;
@@ -56,6 +56,7 @@ pub mod route_parameter_lookup;
 pub mod route_parameter_resolution;
 pub mod route_parameter_resolutions;
 mod session_marker;
+pub mod session_user_parameter;
 pub mod views_availability;
 
 #[cfg(test)]
@@ -92,18 +93,19 @@ mod tests {
     use crate::binding_context::BindingContext;
     use crate::binding_registries::BindingRegistries;
     use crate::binding_roots::binding_roots;
-    use crate::binds_session_user::binds_session_user;
     use crate::bound_parameter::BoundParameter;
     use crate::captured_providers::CapturedProviders;
     use crate::classify_parameters::classify_parameters;
     use crate::head_extraction_context::HeadExtractionContext;
     use crate::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
     use crate::render_head_extractions::render_head_extractions;
+    use crate::render_session_user_inference::render_session_user_inference;
     use crate::request_binding::RequestBinding;
     use crate::request_binding_error::RequestBindingError;
     use crate::route_model::RouteModel;
     use crate::route_model_key::RouteModelKey;
     use crate::route_parameter_lookup::RouteParameterLookup;
+    use crate::session_user_parameter::session_user_parameter;
     use crate::views_availability::ViewsAvailability;
 
     const PRELUDE: &str = "\
@@ -1311,7 +1313,6 @@ struct SecondClient;
             &CapturedProviders::capture(&parameters, &mut NameAllocator::new()),
             &HeadExtractionContext {
                 continuation_return: &quote::quote! { return response },
-                cookie_changes: &format_ident!("changed_cookies"),
                 error_return: &quote::quote! { return error },
                 owner: &proc_macro2::TokenStream::new(),
                 request_local: &format_ident!("request"),
@@ -1568,27 +1569,33 @@ struct PartnerSessions;
             &registries,
         )
         .expect("the responder binds");
-        let extraction: String = render_head_extractions(
-            &parameters,
-            &CapturedProviders::capture(&parameters, &mut NameAllocator::new()),
-            &HeadExtractionContext {
-                continuation_return: &quote::quote! { return response },
-                cookie_changes: &format_ident!("changed_cookies"),
-                error_return: &quote::quote! { return error },
-                owner: &proc_macro2::TokenStream::new(),
-                request_local: &format_ident!("request"),
-            },
+        let captured = CapturedProviders::capture(&parameters, &mut NameAllocator::new());
+        let context = HeadExtractionContext {
+            continuation_return: &quote::quote! { return response },
+            error_return: &quote::quote! { return error },
+            owner: &proc_macro2::TokenStream::new(),
+            request_local: &format_ident!("request"),
+        };
+        let inference: String = render_session_user_inference(
+            session_user_parameter(&parameters).expect("the responder reads a session user"),
+            &captured,
+            &format_ident!("changed_cookies"),
+            &context,
         )
         .to_string()
         .split_whitespace()
         .collect();
+        let extraction: String = render_head_extractions(&parameters, &captured, &context)
+            .to_string()
+            .split_whitespace()
+            .collect();
 
-        assert!(binds_session_user(&parameters));
-        assert!(extraction.contains(
+        assert!(inference.contains(
             "letmargaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:changed_cookies,outcome:argument_1,}=matchmargaret::framework::identity::infers_session_user::InfersSessionUser::infer("
         ));
+        assert!(!extraction.contains("SessionUserInference"));
         assert!(extraction.contains(
-            "margaret::framework::http::requirement::Requirement::Unmet(response)=>{letresponse=changed_cookies.apply(response);returnresponse}"
+            "margaret::framework::http::requirement::Requirement::Unmet(response)=>returnresponse"
         ));
     }
 

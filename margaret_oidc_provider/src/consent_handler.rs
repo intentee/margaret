@@ -12,12 +12,14 @@ use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http_validation::responded_to_form::responded_to_form;
 use margaret_sessions::issued_sessions::IssuedSessions;
 use margaret_sessions::resolved_session::ResolvedSession;
+use margaret_sessions::session::Session;
 use margaret_validation::validation_result::ValidationResult;
 
 use crate::consent_endpoint::ConsentEndpoint;
 use crate::consent_outcome::ConsentOutcome;
 use crate::consent_submission::ConsentSubmission;
 use crate::end_user_of::end_user_of;
+use crate::frame_denied::frame_denied;
 
 pub struct ConsentHandler {
     consent: Arc<ConsentEndpoint>,
@@ -30,19 +32,12 @@ impl ConsentHandler {
         Self { consent, sessions }
     }
 
-    async fn respond(
+    async fn decided(
         &self,
-        request: &Request,
+        session: Session,
         submission: ValidationResult<ConsentSubmission>,
-    ) -> anyhow::Result<ResponseContinuation> {
-        let ResolvedSession {
-            cookie_changes,
-            session,
-        } = self.sessions.resolve(request).await?;
-        let Some(session) = session else {
-            return Ok(cookie_changes.apply(ResponseContinuation::from(Response::unauthorized())));
-        };
-        let response = match submission {
+    ) -> anyhow::Result<Response> {
+        Ok(match submission {
             ValidationResult::Valid(ConsentSubmission { decision, id }) => {
                 match self
                     .consent
@@ -59,9 +54,24 @@ impl ConsentHandler {
             ValidationResult::Invalid(_) | ValidationResult::Malformed(_) => {
                 Response::text(422, "The consent decision is malformed")
             }
+        })
+    }
+
+    async fn respond(
+        &self,
+        request: &Request,
+        submission: ValidationResult<ConsentSubmission>,
+    ) -> anyhow::Result<ResponseContinuation> {
+        let ResolvedSession {
+            cookie_changes,
+            session,
+        } = self.sessions.resolve(request).await?;
+        let response = match session {
+            Some(session) => self.decided(session, submission).await?,
+            None => Response::unauthorized(),
         };
 
-        Ok(cookie_changes.apply(ResponseContinuation::from(response)))
+        Ok(cookie_changes.precede(ResponseContinuation::from(frame_denied(response))))
     }
 }
 

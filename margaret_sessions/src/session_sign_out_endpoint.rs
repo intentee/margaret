@@ -29,7 +29,7 @@ impl HeadHandler for SessionSignOutEndpoint {
             .sign_out(request)
             .await
             .map(|removal| {
-                removal.apply(ResponseContinuation::from(Redirect::see_other(
+                removal.precede(ResponseContinuation::from(Redirect::see_other(
                     self.landing.clone(),
                 )))
             })

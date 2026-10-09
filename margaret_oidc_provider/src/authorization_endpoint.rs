@@ -19,7 +19,6 @@ use crate::authorization_outcome::AuthorizationOutcome;
 use crate::authorization_parameters::AuthorizationParameters;
 use crate::authorization_request::AuthorizationRequest;
 use crate::end_user_authentication::EndUserAuthentication;
-use crate::frame_denied::frame_denied;
 use crate::prompt::Prompt;
 use crate::provider_error::ProviderError;
 use crate::redirection::Redirection;
@@ -35,7 +34,7 @@ fn registered_redirect_uri(redirect_uris: &[String], requested: Option<&str>) ->
 }
 
 fn rejected(reason: &str) -> AuthorizationOutcome {
-    AuthorizationOutcome::Rejected(frame_denied(Response::text(400, reason)))
+    AuthorizationOutcome::Rejected(Response::text(400, reason))
 }
 
 pub struct AuthorizationEndpoint {

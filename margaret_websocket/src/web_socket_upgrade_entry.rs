@@ -117,7 +117,7 @@ where
             return ResponseContinuation::from(Response::text(500, "Internal Server Error"));
         }
 
-        cookie_changes.apply(ResponseContinuation::from(
+        cookie_changes.precede(ResponseContinuation::from(
             Response::text(101, "")
                 .header("connection", "Upgrade")
                 .header("sec-websocket-accept", accept)

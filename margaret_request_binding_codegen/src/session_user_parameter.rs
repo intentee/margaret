@@ -4,8 +4,8 @@ use crate::bound_parameter::BoundParameter;
 use crate::request_binding::RequestBinding;
 
 #[must_use]
-pub fn binds_session_user(parameters: &[BoundParameter]) -> bool {
-    parameters.iter().any(|parameter| {
+pub fn session_user_parameter(parameters: &[BoundParameter]) -> Option<&BoundParameter> {
+    parameters.iter().find(|parameter| {
         matches!(
             &parameter.binding,
             RequestBinding::AuthenticatedUser {

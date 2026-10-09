@@ -363,12 +363,12 @@ impl ReaderProvider {
 }
 
 #[singleton]
-#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/profile", server = "public")]
-struct GetProfile;
+#[responds_to_http(max_body_bytes = 1024, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = "/notes", server = "public")]
+struct PostNote;
 
-impl GetProfile {
+impl PostNote {
     #[process]
-    fn respond(&self, #[authenticated_user] reader: Reader) -> anyhow::Result<Response> {}
+    fn respond(&self, #[authenticated_user] reader: Reader, #[form_request(from = margaret::framework::http_validation::request_input::RequestInput::Form)] note: Note) -> anyhow::Result<Response> {}
 }
 "#;
 
@@ -390,7 +390,7 @@ impl GetProfile {
     }
 
     #[test]
-    fn applies_the_session_cookie_changes_to_what_a_responder_returns() {
+    fn applies_the_session_cookie_changes_to_every_continuation_of_a_responder() {
         let index = IndexedSource::new(SESSION_READER).index;
         let bindings = session_bindings(&index);
         let tags = collected_tags(&index);
@@ -421,9 +421,20 @@ impl GetProfile {
         .split_whitespace()
         .collect();
 
-        assert!(source.contains(
-            "margaret::framework::http::responded::responded(responder.respond(argument_1)).map(|continuation|changed_cookies.apply(continuation))"
-        ));
+        let inference = source
+            .find("letmargaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:changed_cookies,outcome:argument_1,}=matchmargaret::framework::identity::infers_session_user::InfersSessionUser::infer(")
+            .expect("the session user is inferred");
+        let block = source
+            .find("async{")
+            .expect("the continuations are produced in one block");
+        let content_rejection = source
+            .find("margaret::framework::http_validation::require_input::require_input(")
+            .expect("the content is required");
+        let application = source
+            .find("margaret::framework::http::responded::responded(responder.respond(argument_1,argument_2))}.await.map(|continuation|changed_cookies.precede(continuation))")
+            .expect("every continuation of the block receives the session cookie changes");
+
+        assert!(inference < block && block < content_rejection && content_rejection < application);
     }
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"

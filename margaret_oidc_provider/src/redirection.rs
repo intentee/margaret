@@ -6,7 +6,6 @@ use margaret_http::redirect::Redirect;
 use margaret_http::response::Response;
 
 use crate::authorization_error::AuthorizationError;
-use crate::frame_denied::frame_denied;
 
 pub(crate) struct Redirection {
     pub(crate) issuer: &'static str,
@@ -46,6 +45,6 @@ impl Redirection {
             }
         }
 
-        frame_denied(Redirect::see_other(redirect_uri.into()).into_response())
+        Redirect::see_other(redirect_uri.into()).into_response()
     }
 }

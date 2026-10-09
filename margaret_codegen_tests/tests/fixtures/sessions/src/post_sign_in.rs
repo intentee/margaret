@@ -39,7 +39,7 @@ impl PostSignIn {
             .start(Uuid::new_v4(), Utc::now())
             .await?
             .cookie_changes
-            .apply(ResponseContinuation::from(Redirect::see_other(
+            .precede(ResponseContinuation::from(Redirect::see_other(
                 routes.public.get_profile.url(),
             ))))
     }

@@ -23,6 +23,7 @@ use crate::authorization_request::AuthorizationRequest;
 use crate::consent_page_props::ConsentPageProps;
 use crate::end_user_authentication::EndUserAuthentication;
 use crate::end_user_of::end_user_of;
+use crate::frame_denied::frame_denied;
 
 pub struct AuthorizationHandler<TConsentView, TRoutes> {
     authorization: Arc<AuthorizationEndpoint>,
@@ -91,7 +92,7 @@ where
             | AuthorizationOutcome::Rejected(response) => response,
         };
 
-        Ok(cookie_changes.apply(ResponseContinuation::from(response)))
+        Ok(cookie_changes.precede(ResponseContinuation::from(frame_denied(response))))
     }
 }
 

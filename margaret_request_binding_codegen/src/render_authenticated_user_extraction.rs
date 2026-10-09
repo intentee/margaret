@@ -34,7 +34,6 @@ pub(crate) fn render_authenticated_user_extraction(
     AuthenticatedUserApplication { challenge, .. }: &AuthenticatedUserApplication,
     requirement: AuthenticatedUserRequirement,
     holder: &Ident,
-    cookie_changes: &Ident,
     ExtractionContext {
         continuation_return,
         error_return,
@@ -46,23 +45,9 @@ pub(crate) fn render_authenticated_user_extraction(
 
     match challenge {
         AuthenticatedUserChallenge::Session { .. } => quote! {
-            let margaret::framework::identity::session_user_inference::SessionUserInference {
-                cookie_changes: #cookie_changes,
-                outcome: #holder,
-            } = match margaret::framework::identity::infers_session_user::InfersSessionUser::infer(
-                    #provider_access.as_ref(),
-                    #request_local,
-                ).await {
-                ::std::result::Result::Ok(inference) => inference,
-                ::std::result::Result::Err(error) => #error_return,
-            };
             let #holder = match #resolver(#holder) {
                 margaret::framework::http::requirement::Requirement::Met(value) => value,
-                margaret::framework::http::requirement::Requirement::Unmet(response) => {
-                    let response = #cookie_changes.apply(response);
-
-                    #continuation_return
-                }
+                margaret::framework::http::requirement::Requirement::Unmet(response) => #continuation_return,
             };
         },
         AuthenticatedUserChallenge::Bearer { .. }

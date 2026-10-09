@@ -15,7 +15,6 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::fold_layers::fold_layers;
 use margaret_request_binding_codegen::authenticated_user_application::AuthenticatedUserApplication;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
-use margaret_request_binding_codegen::binds_session_user::binds_session_user;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
@@ -27,7 +26,9 @@ use margaret_request_binding_codegen::injects_views::injects_views;
 use margaret_request_binding_codegen::render_authenticated_user_wrapper_construction::render_authenticated_user_wrapper_construction;
 use margaret_request_binding_codegen::render_content_extraction::render_content_extraction;
 use margaret_request_binding_codegen::render_head_extractions::render_head_extractions;
+use margaret_request_binding_codegen::render_session_user_inference::render_session_user_inference;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
+use margaret_request_binding_codegen::session_user_parameter::session_user_parameter;
 use margaret_route_method::route_method::RouteMethod;
 
 use crate::application_responder::ApplicationResponder;
@@ -163,23 +164,20 @@ fn responder_body(
         views_local,
     }: &HandlerNames,
 ) -> TokenStream {
-    let head_extractions = render_head_extractions(
-        &responder.arguments,
-        captured,
-        &HeadExtractionContext {
-            continuation_return: &quote! {
-                return ::std::result::Result::Ok(response)
-            },
-            cookie_changes,
-            error_return: &quote! {
-                return ::std::result::Result::Err(
-                    margaret::framework::handler_error::handler_error::HandlerError::consumer(error),
-                )
-            },
-            owner: &TokenStream::new(),
-            request_local: request_binding,
+    let extraction_context = HeadExtractionContext {
+        continuation_return: &quote! {
+            return ::std::result::Result::Ok(response)
         },
-    );
+        error_return: &quote! {
+            return ::std::result::Result::Err(
+                margaret::framework::handler_error::handler_error::HandlerError::consumer(error),
+            )
+        },
+        owner: &TokenStream::new(),
+        request_local: request_binding,
+    };
+    let head_extractions =
+        render_head_extractions(&responder.arguments, captured, &extraction_context);
     let server = format_ident!("{server}");
     let argument_values = responder
         .arguments
@@ -192,13 +190,30 @@ fn responder_body(
         quote! { #responder_binding.#method_name(#(#argument_values),*) }
     };
     let content_tokens = content_bindings(responder, body_binding, content_local, request_binding);
-    let changed_cookies = binds_session_user(&responder.arguments)
-        .then(|| quote! { .map(|continuation| #cookie_changes.apply(continuation)) });
-
-    quote! {
+    let continuation = quote! {
         #head_extractions
         #content_tokens
-        margaret::framework::http::responded::responded(#respond_call)#changed_cookies
+        margaret::framework::http::responded::responded(#respond_call)
+    };
+
+    match session_user_parameter(&responder.arguments) {
+        Some(session_user) => {
+            let inference = render_session_user_inference(
+                session_user,
+                captured,
+                cookie_changes,
+                &extraction_context,
+            );
+
+            quote! {
+                #inference
+
+                async { #continuation }
+                    .await
+                    .map(|continuation| #cookie_changes.precede(continuation))
+            }
+        }
+        None => continuation,
     }
 }
 
