@@ -1,17 +1,31 @@
+use std::io::ErrorKind;
+use std::iter;
+use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 use std::net::TcpListener;
 use std::sync::Arc;
+use std::sync::OnceLock;
+use std::sync::atomic::AtomicU16;
+use std::sync::atomic::Ordering;
 
 use margaret_cluster_fixture::margaret::routes::Routes;
 
 use crate::cluster_server::ClusterServer;
+use crate::ephemeral_port_start::ephemeral_port_start;
+use crate::first_unprivileged_port::FIRST_UNPRIVILEGED_PORT;
 
-fn reserved_listener() -> TcpListener {
-    TcpListener::bind("127.0.0.1:0").expect("a free port is reserved")
-}
+static NEXT_CANDIDATE: OnceLock<AtomicU16> = OnceLock::new();
 
-fn reserved_address(listener: &TcpListener) -> SocketAddr {
-    listener.local_addr().expect("the reserved port is known")
+fn reserved_address() -> SocketAddr {
+    let cursor = NEXT_CANDIDATE.get_or_init(|| AtomicU16::new(ephemeral_port_start()));
+
+    iter::from_fn(|| Some(cursor.fetch_sub(1, Ordering::SeqCst) - 1))
+        .take_while(|candidate| *candidate >= FIRST_UNPRIVILEGED_PORT)
+        .map(|candidate| TcpListener::bind((Ipv4Addr::LOCALHOST, candidate)))
+        .find(|bound| !matches!(bound, Err(error) if error.kind() == ErrorKind::AddrInUse))
+        .expect("an unprivileged port below the ephemeral range is free")
+        .and_then(|listener| listener.local_addr())
+        .expect("the reserved port is bound")
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -23,12 +37,9 @@ pub struct InstancePorts {
 impl InstancePorts {
     #[must_use]
     pub fn reserve() -> Self {
-        let identity = reserved_listener();
-        let public = reserved_listener();
-
         Self {
-            identity: reserved_address(&identity),
-            public: reserved_address(&public),
+            identity: reserved_address(),
+            public: reserved_address(),
         }
     }
 
@@ -46,5 +57,55 @@ impl InstancePorts {
             ClusterServer::Identity => self.identity,
             ClusterServer::Public => self.public,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+    use std::net::Ipv4Addr;
+    use std::net::TcpListener;
+
+    use super::InstancePorts;
+    use crate::ephemeral_port_start::ephemeral_port_start;
+
+    #[test]
+    fn reserves_ports_the_system_never_assigns_ephemerally() {
+        let ports = InstancePorts::reserve();
+
+        assert!(ports.identity.port() < ephemeral_port_start());
+        assert!(ports.public.port() < ephemeral_port_start());
+    }
+
+    #[test]
+    fn skips_a_candidate_port_another_listener_holds() {
+        let first = InstancePorts::reserve();
+        let held = TcpListener::bind((Ipv4Addr::LOCALHOST, first.public.port() - 1))
+            .expect("the next candidate port is free");
+        let second = InstancePorts::reserve();
+
+        assert_eq!(
+            held.local_addr().expect("the held port is known").port() - 1,
+            second.identity.port()
+        );
+    }
+
+    #[test]
+    fn reserves_distinct_ports_for_every_instance() {
+        let first = InstancePorts::reserve();
+        let second = InstancePorts::reserve();
+
+        assert_eq!(
+            [
+                first.identity.port(),
+                first.public.port(),
+                second.identity.port(),
+                second.public.port(),
+            ]
+            .iter()
+            .collect::<BTreeSet<_>>()
+            .len(),
+            4
+        );
     }
 }

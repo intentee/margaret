@@ -34,7 +34,9 @@ use crate::request_binding::RequestBinding;
 use crate::request_binding_error::RequestBindingError;
 use crate::request_injectable::RequestInjectable;
 use crate::request_input_source::RequestInputSource;
+use crate::route_model_resolution::RouteModelResolution;
 use crate::route_parameter_arguments::RouteParameterArguments;
+use crate::route_parameter_lookup::RouteParameterLookup;
 use crate::route_parameter_resolution::RouteParameterResolution;
 use crate::views_availability::ViewsAvailability;
 
@@ -326,15 +328,44 @@ fn classify_route_parameter(
         written: declared.to_token_stream().to_string(),
     };
 
-    match resolved.and_then(|value_type| resolutions.get(value_type)) {
+    let Some(value_type) = resolved else {
+        return Err(missing());
+    };
+
+    match resolutions.get(value_type) {
         Some(RouteParameterResolution::Value) => {
             Ok(RequestBinding::RouteParameterValue { path_key: from })
         }
         Some(RouteParameterResolution::Binder(binder)) => Ok(RequestBinding::BoundRouteParameter {
             binder_field: binder.field.clone(),
             binder_provider: binder.provider.clone(),
+            lookup: RouteParameterLookup::Binder,
             path_key: from,
         }),
+        Some(RouteParameterResolution::Model(RouteModelResolution::Bindable(database))) => {
+            Ok(RequestBinding::BoundRouteParameter {
+                binder_field: database.field.clone(),
+                binder_provider: database.provider.clone(),
+                lookup: RouteParameterLookup::PrimaryKey {
+                    loaded: value_type.clone(),
+                },
+                path_key: from,
+            })
+        }
+        Some(RouteParameterResolution::Model(RouteModelResolution::CompositePrimaryKey)) => {
+            Err(RequestBindingError::RouteModelWithCompositePrimaryKey {
+                subject: subject.to_string(),
+                parameter: from,
+                model: value_type.to_string(),
+            })
+        }
+        Some(RouteParameterResolution::Model(RouteModelResolution::DatabaseUndeclared)) => {
+            Err(RequestBindingError::RouteModelWithoutDatabase {
+                subject: subject.to_string(),
+                parameter: from,
+                model: value_type.to_string(),
+            })
+        }
         None => Err(missing()),
     }
 }

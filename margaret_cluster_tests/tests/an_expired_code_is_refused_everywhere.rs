@@ -7,7 +7,7 @@ use margaret_cluster_tests::partner_code::partner_code;
 use margaret_cluster_tests::partner_token::partner_token;
 
 use crate::cluster_binary::cluster_binary;
-use crate::expire_framework_rows::expire_framework_rows;
+use crate::expire_authorization_codes::expire_authorization_codes;
 
 #[tokio::test]
 async fn an_expired_code_is_refused_everywhere() {
@@ -19,7 +19,7 @@ async fn an_expired_code_is_refused_everywhere() {
     )
     .await;
 
-    expire_framework_rows(&cluster, "authorization_codes").await;
+    expire_authorization_codes(&cluster).await;
 
     assert_eq!(
         partner_token(

@@ -13,6 +13,7 @@ autotests = false
 [dependencies]
 bytes = { workspace = true }
 chrono = { workspace = true }
+margaret_database = { workspace = true }
 margaret_deadline = { workspace = true }
 margaret_http = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
@@ -25,9 +26,16 @@ tokio = { workspace = true, features = ["time"] }
 tokio-util = { workspace = true }
 
 [dev-dependencies]
+margaret_database_tests = { path = "../margaret_database_tests" }
 margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller_tests = { path = "../margaret_jwks_roller_tests" }
+margaret_signing_keys = { workspace = true }
+margaret_signing_keys_tests = { path = "../margaret_signing_keys_tests" }
+margaret_sql_identifier = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "test-util", "time"] }
+
+[features]
+tests_that_use_postgres = []
 
 [[test]]
 name = "main"

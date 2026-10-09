@@ -6,7 +6,12 @@ filter = 'package(~_spiffe_svid)'
 slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = 'package(margaret_schema_postgres_tests) | package(margaret_example_tests) | binary_id(margaret_store_contract_tests::database)'
+filter = 'binary_id(margaret_active_record_tests::compile_fail)'
+slow-timeout = { period = "30s", terminate-after = 2 }
+threads-required = 'num-test-threads'
+
+[[profile.default.overrides]]
+filter = 'test(~postgres)'
 slow-timeout = { period = "3s", terminate-after = 2 }
 threads-required = 'num-test-threads'
 
@@ -24,6 +29,6 @@ slow-timeout = { period = "60s", terminate-after = 2 }
 threads-required = 'num-test-threads'
 
 [[profile.default.overrides]]
-filter = 'binary_id(margaret_cluster_tests::integration)'
+filter = 'package(margaret_cluster_tests)'
 slow-timeout = { period = "15s", terminate-after = 2 }
 threads-required = 'num-test-threads'

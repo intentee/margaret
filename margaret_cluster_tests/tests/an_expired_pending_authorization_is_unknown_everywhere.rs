@@ -6,7 +6,7 @@ use margaret_cluster_tests::consent_decision::consent_decision;
 use margaret_cluster_tests::partner_consent::partner_consent;
 
 use crate::cluster_binary::cluster_binary;
-use crate::expire_framework_rows::expire_framework_rows;
+use crate::expire_pending_authorizations::expire_pending_authorizations;
 
 #[tokio::test]
 async fn an_expired_pending_authorization_is_unknown_everywhere() {
@@ -14,7 +14,7 @@ async fn an_expired_pending_authorization_is_unknown_everywhere() {
     let consent =
         partner_consent(&cluster, &cluster.instance_url(0, ClusterServer::Identity)).await;
 
-    expire_framework_rows(&cluster, "pending_authorizations").await;
+    expire_pending_authorizations(&cluster).await;
 
     assert_eq!(
         consent_decision(&cluster, &cluster.instance_routes(1), consent)

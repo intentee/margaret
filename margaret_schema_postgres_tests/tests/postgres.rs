@@ -1,0 +1,12 @@
+mod applies_and_round_trips;
+mod check_constraints_reject_invalid_values;
+mod composite_foreign_key_rejects_an_orphan_row;
+mod composite_unique_rejects_a_duplicate_row;
+mod foreign_key_cascade_deletes_dependent_rows;
+mod inserted_author;
+mod inserted_fragment_metadata;
+mod joined_at;
+mod numeric_and_float_columns_round_trip;
+mod started_with_fixture;
+mod structure_matches_the_declared_schema;
+mod uuidv7_default_populates_the_primary_key;

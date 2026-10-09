@@ -2,6 +2,9 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
+use margaret::framework::active_record::lookup::Lookup;
+use margaret::framework::active_record::model::Model;
+use margaret::framework::database::database::Database;
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
 use margaret::framework::macros::constructor;
@@ -12,7 +15,7 @@ use margaret::framework::oidc_provider::userinfo_authentication::UserinfoAuthent
 use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::margaret::oidc_provider::UserinfoEndpoint;
-use crate::stores::user_store::UserStore;
+use crate::models::user_account::UserAccount;
 
 #[derive(Serialize)]
 struct ProfileClaims {
@@ -22,8 +25,8 @@ struct ProfileClaims {
 #[singleton]
 #[responds_to_http(method = RouteMethod::Get, path = "/userinfo", server = "identity")]
 pub struct GetUserinfo {
+    database: Arc<Database>,
     userinfo_endpoint: Arc<UserinfoEndpoint>,
-    users: Arc<UserStore>,
 }
 
 impl GetUserinfo {
@@ -32,12 +35,12 @@ impl GetUserinfo {
     /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(
+        database: Arc<Database>,
         userinfo_endpoint: Arc<UserinfoEndpoint>,
-        users: Arc<UserStore>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
+            database,
             userinfo_endpoint,
-            users,
         })
     }
 
@@ -48,11 +51,16 @@ impl GetUserinfo {
     pub async fn respond(&self, request: &Request) -> anyhow::Result<Response> {
         Ok(match self.userinfo_endpoint.authenticate(request) {
             UserinfoAuthentication::Authenticated(grant) => {
-                match self.users.find_user_name(grant.subject).await? {
-                    Some(name) => self
+                match UserAccount::query()
+                    .id
+                    .eq(grant.subject)
+                    .find(self.database.as_ref())
+                    .await?
+                {
+                    Lookup::Found(UserAccount { name, .. }) => self
                         .userinfo_endpoint
                         .answer(&grant, &ProfileClaims { name })?,
-                    None => Response::not_found(),
+                    Lookup::Missing => Response::not_found(),
                 }
             }
             UserinfoAuthentication::Refused(response) => response,

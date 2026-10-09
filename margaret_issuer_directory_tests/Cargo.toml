@@ -25,7 +25,6 @@ margaret_bearer_token_verification = { workspace = true }
 margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller = { workspace = true }
 margaret_jwks_roller_server = { workspace = true }
-margaret_jwks_roller_tests = { path = "../margaret_jwks_roller_tests" }
 margaret_jws_verification = { workspace = true }
 margaret_jws_verification_tests = { path = "../margaret_jws_verification_tests" }
 margaret_jwt_verification = { workspace = true }

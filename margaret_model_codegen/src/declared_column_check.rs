@@ -1,10 +1,10 @@
 use margaret_model::check_predicate::CheckPredicate;
-use margaret_model::column_check::ColumnCheck;
 use margaret_model::column_type::ColumnType;
 use margaret_schema_identifier_naming::byte_length_constraint_name::byte_length_constraint_name;
 use margaret_schema_identifier_naming::minimum_constraint_name::minimum_constraint_name;
 
 use crate::model_codegen_error::ModelCodegenError;
+use crate::resolved_check::ResolvedCheck;
 
 fn accepts_byte_length(column_type: ColumnType) -> bool {
     match column_type {
@@ -77,7 +77,7 @@ impl DeclaredColumnCheck {
         table: &str,
         column: &str,
         model: &str,
-    ) -> Result<Vec<ColumnCheck>, ModelCodegenError> {
+    ) -> Result<Vec<ResolvedCheck>, ModelCodegenError> {
         match self {
             DeclaredColumnCheck::NotDeclared => Ok(Vec::new()),
             DeclaredColumnCheck::ByteLength { length } => {
@@ -88,7 +88,7 @@ impl DeclaredColumnCheck {
                     });
                 }
 
-                Ok(vec![ColumnCheck {
+                Ok(vec![ResolvedCheck {
                     name: byte_length_constraint_name(table, column).map_err(|source| {
                         ModelCodegenError::ByteLengthConstraintNameTooLong {
                             model: model.to_string(),
@@ -106,7 +106,7 @@ impl DeclaredColumnCheck {
                     });
                 }
 
-                Ok(vec![ColumnCheck {
+                Ok(vec![ResolvedCheck {
                     name: minimum_constraint_name(table, column).map_err(|source| {
                         ModelCodegenError::MinimumConstraintNameTooLong {
                             model: model.to_string(),
@@ -123,12 +123,12 @@ impl DeclaredColumnCheck {
 #[cfg(test)]
 mod tests {
     use margaret_model::check_predicate::CheckPredicate;
-    use margaret_model::column_check::ColumnCheck;
     use margaret_model::column_type::ColumnType;
     use margaret_schema_identifier_naming::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
 
     use crate::declared_column_check::DeclaredColumnCheck;
     use crate::model_codegen_error::ModelCodegenError;
+    use crate::resolved_check::ResolvedCheck;
 
     fn parse(
         byte_length: Option<u32>,
@@ -140,7 +140,7 @@ mod tests {
     fn resolve(
         declared: &DeclaredColumnCheck,
         column_type: ColumnType,
-    ) -> Result<Vec<ColumnCheck>, ModelCodegenError> {
+    ) -> Result<Vec<ResolvedCheck>, ModelCodegenError> {
         declared.resolve(column_type, "fragment_metadata", "hash", "crate::Model")
     }
 
@@ -221,7 +221,7 @@ mod tests {
                 ColumnType::Bytea
             )
             .expect("a byte length on a bytea column resolves"),
-            vec![ColumnCheck {
+            vec![ResolvedCheck {
                 name: "fragment_metadata_hash_byte_length".to_string(),
                 predicate: CheckPredicate::ByteLength { length: 32 },
             }]
@@ -249,7 +249,7 @@ mod tests {
                 ColumnType::BigInt
             )
             .expect("a minimum on a big int column resolves"),
-            vec![ColumnCheck {
+            vec![ResolvedCheck {
                 name: "fragment_metadata_hash_minimum".to_string(),
                 predicate: CheckPredicate::Minimum { minimum: 0 },
             }]

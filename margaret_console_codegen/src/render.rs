@@ -196,7 +196,7 @@ fn schema_tokens(has_models: bool) -> SchemaTokens {
             Some(("schema", _matches)) => {
                 println!(
                     "{}",
-                    margaret::framework::model::render_postgres::render_postgres(&super::schema::schema())
+                    margaret::framework::model::render_postgres::render_postgres(&super::schema::SCHEMA)
                 );
 
                 margaret::framework::console::command_outcome::CommandOutcome::Succeeded

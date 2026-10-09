@@ -3,14 +3,15 @@ use crate::named_item::NamedItem;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ItemNamingArgument {
     ClientAuthentication,
+    ColumnDefault,
     Consent,
-    ForeignKeyReferences,
     FormRequestSource,
     IdTokenSigning,
     Keys,
     OnDelete,
     RedirectRoute,
     RedirectRoutes,
+    RelationModel,
     RouteMethod,
     Signing,
     TickBehavior,
@@ -24,14 +25,15 @@ impl ItemNamingArgument {
     pub fn key(self) -> &'static str {
         match self {
             Self::ClientAuthentication => "authentication",
+            Self::ColumnDefault => "default",
             Self::Consent => "consent",
-            Self::ForeignKeyReferences => "references",
             Self::FormRequestSource => "from",
             Self::IdTokenSigning => "id_token_signing",
             Self::Keys => "keys",
             Self::OnDelete => "on_delete",
             Self::RedirectRoute => "redirect_route",
             Self::RedirectRoutes => "redirect_routes",
+            Self::RelationModel => "model",
             Self::RouteMethod => "method",
             Self::Signing => "signing",
             Self::TickBehavior => "behavior",
@@ -44,11 +46,11 @@ impl ItemNamingArgument {
     #[must_use]
     pub fn named_item(self) -> NamedItem {
         match self {
-            Self::ForeignKeyReferences
-            | Self::RedirectRoute
-            | Self::RedirectRoutes
-            | Self::UserModel => NamedItem::Type,
+            Self::RedirectRoute | Self::RedirectRoutes | Self::RelationModel | Self::UserModel => {
+                NamedItem::Type
+            }
             Self::ClientAuthentication
+            | Self::ColumnDefault
             | Self::Consent
             | Self::FormRequestSource
             | Self::IdTokenSigning
@@ -72,9 +74,9 @@ mod tests {
     fn an_argument_naming_a_model_or_a_route_names_a_type() {
         assert_eq!(
             [
-                ItemNamingArgument::ForeignKeyReferences,
                 ItemNamingArgument::RedirectRoute,
                 ItemNamingArgument::RedirectRoutes,
+                ItemNamingArgument::RelationModel,
                 ItemNamingArgument::UserModel,
             ]
             .map(ItemNamingArgument::named_item),
@@ -87,6 +89,7 @@ mod tests {
         assert_eq!(
             [
                 ItemNamingArgument::ClientAuthentication,
+                ItemNamingArgument::ColumnDefault,
                 ItemNamingArgument::Consent,
                 ItemNamingArgument::FormRequestSource,
                 ItemNamingArgument::IdTokenSigning,
@@ -99,7 +102,7 @@ mod tests {
                 ItemNamingArgument::WebSocketResponse,
             ]
             .map(ItemNamingArgument::named_item),
-            [NamedItem::Value; 11]
+            [NamedItem::Value; 12]
         );
     }
 }

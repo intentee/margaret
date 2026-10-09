@@ -1,10 +1,8 @@
-use std::future::ready;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use futures_util::TryFutureExt as _;
 use oauth2::basic::BasicErrorResponseType;
 use url::Url;
 use uuid::Uuid;
@@ -19,14 +17,17 @@ use margaret_accepted_clients::registered_authentication::RegisteredAuthenticati
 use margaret_accepted_clients::registered_client::RegisteredClient;
 use margaret_accepted_clients::registered_code_grant::RegisteredCodeGrant;
 use margaret_accepted_clients::token_exchange_grant::TokenExchangeGrant;
+use margaret_authorization_grants::authorization_code_record::AuthorizationCodeRecord;
 use margaret_authorization_grants::authorization_grant::AuthorizationGrant;
 use margaret_authorization_grants::code_redemption::CodeRedemption;
 use margaret_authorization_grants::family_opening::FamilyOpening;
-use margaret_authorization_grants::issued_code::IssuedCode;
+use margaret_authorization_grants::redemption_decision::RedemptionDecision;
 use margaret_authorization_grants::refresh_family::RefreshFamily;
+use margaret_authorization_grants::refresh_family_record::RefreshFamilyRecord;
 use margaret_authorization_grants::refresh_rotation::RefreshRotation;
 use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
-use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
+use margaret_authorization_grants::refresh_token_record::RefreshTokenRecord;
+use margaret_database::database::Database;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_identity_session::id_token_claims::IdTokenClaims;
@@ -111,41 +112,11 @@ fn unauthorized_client() -> Response {
     )
 }
 
-async fn revoked_family(
-    grants: &dyn StoresAuthorizationGrants,
-    family: Uuid,
-    now: NumericDate,
-) -> Result<Response, ProviderError> {
-    grants
-        .revoke_refresh_family(family, now)
+async fn revoked_family(database: &Database, family: Uuid) -> Result<Response, ProviderError> {
+    RefreshFamilyRecord::revoke(database, family)
         .await
-        .map_err(ProviderError::RevokeRefreshFamily)
+        .map_err(ProviderError::AuthorizationGrants)
         .map(|()| replayed_refresh_token())
-}
-
-async fn committed_tokens(
-    grants: &dyn StoresAuthorizationGrants,
-    family: Uuid,
-    grant: &AuthorizationGrant,
-    now: NumericDate,
-    prepared: PreparedTokens,
-) -> Result<Response, ProviderError> {
-    match &prepared.refresh {
-        RefreshTokenIssue::Issued(refresh_token) => grants
-            .open_refresh_family(
-                family,
-                RefreshFamily::opened_by(grant, now),
-                TokenDigest::of(refresh_token),
-                now,
-            )
-            .await
-            .map_err(ProviderError::OpenRefreshFamily)
-            .map(|opening| match opening {
-                FamilyOpening::Opened => prepared.response(),
-                FamilyOpening::Revoked => replayed_code(),
-            }),
-        RefreshTokenIssue::Withheld => Ok(prepared.response()),
-    }
 }
 
 fn redeemed_issue(
@@ -208,7 +179,7 @@ impl TokenEndpoint {
     /// # Errors
     ///
     /// Returns `ProviderError::ClientAuthentication` when the client assertion cannot be
-    /// remembered, a grant store variant when the application cannot reach its grants,
+    /// remembered, `ProviderError::AuthorizationGrants` when the application cannot keep its grants,
     /// `ProviderError::Signing` when an id token cannot be signed, and
     /// `ProviderError::SubjectTokenExchange` when a subject token exchanger fails.
     pub async fn respond(
@@ -323,7 +294,10 @@ impl TokenEndpoint {
     ) -> Result<Response, ProviderError> {
         let RegisteredClient {
             client,
-            code_grant: RegisteredCodeGrant::Granted { grants, policy, .. },
+            code_grant:
+                RegisteredCodeGrant::Granted {
+                    database, policy, ..
+                },
             ..
         } = registered
         else {
@@ -336,53 +310,31 @@ impl TokenEndpoint {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(resource) => resource,
         };
-        let family = Uuid::new_v4();
-        let instant = NumericDate::from(now);
-        let grant = match grants
-            .redeem_code(TokenDigest::of(code), family)
-            .await
-            .map_err(ProviderError::RedeemCode)?
-        {
-            CodeRedemption::Redeemed(issued) if issued.expires_at > instant => {
-                let IssuedCode { grant, .. } = *issued;
-
-                grant
-            }
-            CodeRedemption::Redeemed(_) | CodeRedemption::Unknown => return Ok(unknown_code()),
-            CodeRedemption::AlreadyRedeemed { family } => {
-                return grants
-                    .revoke_refresh_family(family, instant)
-                    .await
-                    .map_err(ProviderError::RevokeRefreshFamily)
-                    .map(|()| replayed_code());
-            }
-        };
-
-        if let ControlFlow::Break(refusal) = (CodeAdmission {
+        let admission = CodeAdmission {
             client_id: client.client_id,
             code_verifier: &code_verifier,
             redirect_uri: &redirect_uri,
-        })
-        .admission(&grant)
-        {
-            return Ok(invalid_grant(refusal.description()));
-        }
+        };
 
-        ready(self.id_token(client, policy, &grant, now))
-            .and_then(|id_token| {
-                committed_tokens(
-                    grants.as_ref(),
-                    family,
-                    &grant,
-                    instant,
-                    self.prepared_tokens(
-                        client,
-                        redeemed_issue(policy, &grant, resource, id_token),
-                        now,
-                    ),
-                )
-            })
-            .await
+        match AuthorizationCodeRecord::redeem(
+            database,
+            TokenDigest::of(code),
+            Uuid::new_v4(),
+            NumericDate::from(now),
+            |grant| self.redemption_decision(client, policy, &admission, &grant, resource, now),
+        )
+        .await
+        .map_err(ProviderError::AuthorizationGrants)?
+        {
+            CodeRedemption::Redeemed(answer) => answer,
+            CodeRedemption::Unknown => Ok(unknown_code()),
+            CodeRedemption::AlreadyRedeemed { family } => {
+                RefreshFamilyRecord::revoke(database, family)
+                    .await
+                    .map_err(ProviderError::AuthorizationGrants)
+                    .map(|()| replayed_code())
+            }
+        }
     }
 
     fn client_credentials(
@@ -497,6 +449,46 @@ impl TokenEndpoint {
         }
     }
 
+    fn redemption_decision(
+        &self,
+        client: &AcceptedClient,
+        policy: &CodeGrantPolicy,
+        admission: &CodeAdmission<'_>,
+        grant: &AuthorizationGrant,
+        resource: &'static str,
+        now: DateTime<Utc>,
+    ) -> RedemptionDecision<Result<Response, ProviderError>> {
+        if let ControlFlow::Break(refusal) = admission.admission(grant) {
+            return RedemptionDecision::Consume(Ok(invalid_grant(refusal.description())));
+        }
+
+        let prepared = self.id_token(client, policy, grant, now).map(|id_token| {
+            self.prepared_tokens(
+                client,
+                redeemed_issue(policy, grant, resource, id_token),
+                now,
+            )
+        });
+
+        match &prepared {
+            Ok(PreparedTokens {
+                refresh: RefreshTokenIssue::Issued(refresh_token),
+                ..
+            }) => {
+                let opening = FamilyOpening {
+                    family: RefreshFamily::opened_by(grant, NumericDate::from(now)),
+                    first_token: TokenDigest::of(refresh_token),
+                };
+
+                RedemptionDecision::OpenFamily {
+                    decided: prepared.map(PreparedTokens::response),
+                    opening,
+                }
+            }
+            Ok(_) | Err(_) => RedemptionDecision::Consume(prepared.map(PreparedTokens::response)),
+        }
+    }
+
     async fn refresh_token(
         &self,
         registered: &RegisteredClient,
@@ -509,7 +501,7 @@ impl TokenEndpoint {
             client,
             code_grant:
                 RegisteredCodeGrant::Granted {
-                    grants,
+                    database,
                     policy:
                         CodeGrantPolicy {
                             refresh: RefreshTokenGrant::Granted,
@@ -536,10 +528,9 @@ impl TokenEndpoint {
             scopes: granted,
             subject,
             ..
-        } = match grants
-            .find_refresh_token(presented)
+        } = match RefreshTokenRecord::lookup(database, presented)
             .await
-            .map_err(ProviderError::FindRefreshToken)?
+            .map_err(ProviderError::AuthorizationGrants)?
         {
             RefreshTokenLookup::Current { record, .. }
                 if record.expires_at > instant && record.client_id == client.client_id =>
@@ -550,7 +541,7 @@ impl TokenEndpoint {
                 return Ok(unknown_refresh_token());
             }
             RefreshTokenLookup::Superseded { family } => {
-                return revoked_family(grants.as_ref(), family, instant).await;
+                return revoked_family(database, family).await;
             }
         };
         let scopes = match requested.within(&granted.iter().map(Scope::as_str).collect()) {
@@ -572,15 +563,12 @@ impl TokenEndpoint {
             now,
         );
 
-        match grants
-            .rotate_refresh_token(presented, next_digest, instant)
+        match RefreshTokenRecord::rotate(database, presented, next_digest, instant)
             .await
-            .map_err(ProviderError::RotateRefreshToken)?
+            .map_err(ProviderError::AuthorizationGrants)?
         {
             RefreshRotation::Rotated => Ok(prepared.response()),
-            RefreshRotation::Superseded { family } => {
-                revoked_family(grants.as_ref(), family, instant).await
-            }
+            RefreshRotation::Superseded { family } => revoked_family(database, family).await,
             RefreshRotation::Unknown => Ok(unknown_refresh_token()),
         }
     }

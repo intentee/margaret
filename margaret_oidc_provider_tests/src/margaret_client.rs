@@ -6,8 +6,8 @@ use margaret_issuer_directory_tests::polled_directory::PolledDirectory;
 use margaret_issuer_directory_tests::polled_fixture::PolledFixture;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
-use margaret_jwks_roller_server::jwks_roller::JwksRoller;
-use margaret_jwks_secret_store_tests::fixture_roller::fixture_roller;
+use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_secret_store_tests::fixture_secrets::fixture_secrets;
 use margaret_oauth_vocabulary::client_secret::ClientSecret;
 use margaret_oidc_discovery::oidc_discovery_url::oidc_discovery_url;
 use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
@@ -20,13 +20,13 @@ const PORTAL_CLIENT_ID: &str = "portal";
 
 pub struct MargaretClient {
     pub directory: PolledDirectory,
-    pub roller: Arc<JwksRoller>,
+    pub secrets: Arc<JwksSecretHolder>,
     pub server: Arc<AuthorizationServerClient>,
 }
 
 impl MargaretClient {
     pub async fn of_portal(fixture: &ProviderFixture) -> Self {
-        let roller = Arc::clone(&fixture.clients.asserting(PORTAL_CLIENT_ID).roller);
+        let secrets = Arc::clone(&fixture.clients.asserting(PORTAL_CLIENT_ID).secrets);
 
         Self::discovering(
             || fixture.issuer_request_client(),
@@ -34,14 +34,14 @@ impl MargaretClient {
                 audience: "artifacts",
                 issuer: fixture.issuer,
             },
-            Arc::clone(&roller),
+            Arc::clone(&secrets),
             |request_client, metadata, trusted_issuer| {
                 AuthorizationServerClient::with_private_key_jwt(
                     request_client,
                     metadata,
                     trusted_issuer,
                     PORTAL_CLIENT_ID,
-                    roller,
+                    secrets,
                 )
             },
         )
@@ -57,7 +57,7 @@ impl MargaretClient {
         Self::discovering(
             request_client,
             trust,
-            fixture_roller().await,
+            fixture_secrets(),
             |request_client, metadata, trusted_issuer| {
                 AuthorizationServerClient::with_client_secret_basic(
                     request_client,
@@ -78,7 +78,7 @@ impl MargaretClient {
     pub fn sign_in_flow(&self, callback: &str, scopes: &[&str]) -> SignInFlow {
         SignInFlow::create(
             Arc::clone(&self.server),
-            Arc::clone(&self.roller),
+            Arc::clone(&self.secrets),
             callback.to_string(),
             scopes,
         )
@@ -92,7 +92,7 @@ impl MargaretClient {
     async fn discovering(
         request_client: impl Fn() -> IssuerRequestClient,
         trust: TokenTrust,
-        roller: Arc<JwksRoller>,
+        secrets: Arc<JwksSecretHolder>,
         server: impl FnOnce(
             Arc<IssuerRequestClient>,
             Arc<IssuerMetadata>,
@@ -122,7 +122,7 @@ impl MargaretClient {
 
         Self {
             directory,
-            roller,
+            secrets,
             server: Arc::new(server(
                 Arc::new(request_client()),
                 metadata,

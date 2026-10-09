@@ -1,4 +1,4 @@
-use margaret_cluster_fixture::stores::alice::ALICE;
+use margaret_cluster_fixture::alice::ALICE;
 use margaret_cluster_tests::alice_session_cookie::alice_session_cookie;
 use margaret_cluster_tests::bearer_subject::bearer_subject;
 use margaret_cluster_tests::cluster::Cluster;

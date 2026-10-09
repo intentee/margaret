@@ -1,10 +1,8 @@
 use uuid::Uuid;
 
-use crate::issued_code::IssuedCode;
-
 #[derive(Debug, Eq, PartialEq)]
-pub enum CodeRedemption {
+pub enum CodeRedemption<Decided> {
     AlreadyRedeemed { family: Uuid },
-    Redeemed(Box<IssuedCode>),
+    Redeemed(Decided),
     Unknown,
 }

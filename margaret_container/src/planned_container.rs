@@ -75,11 +75,17 @@ impl PlannedContainer {
             }
         }
 
-        let mut modules = vec![GeneratedModuleTokens::new(
-            "container",
-            render(&served_roots),
-        )];
-        modules.extend(render_build(&self.plan, &served_roots, &builder_roots));
+        let modules = if served_roots.is_empty() && builder_roots.is_empty() {
+            Vec::new()
+        } else {
+            let mut modules = vec![GeneratedModuleTokens::new(
+                "container",
+                render(&served_roots),
+            )];
+
+            modules.extend(render_build(&self.plan, &served_roots, &builder_roots));
+            modules
+        };
 
         Ok(RenderedContainer {
             bindings: self.bindings,

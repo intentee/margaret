@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
+use margaret_database::database::Database;
+
 use crate::client_key_set::ClientKeySet;
 use crate::confidential_privileges::ConfidentialPrivileges;
-use crate::remembers_client_assertions::RemembersClientAssertions;
 
 pub enum RegisteredAuthentication {
     None,
     PrivateKeyJwt {
-        assertions: Arc<dyn RemembersClientAssertions>,
+        database: Arc<Database>,
         keys: Arc<ClientKeySet>,
         privileges: ConfidentialPrivileges,
     },

@@ -13,6 +13,7 @@ test = false
 margaret_attributes = { workspace = true }
 margaret_codegen = { workspace = true }
 margaret_generated_module = { workspace = true }
+margaret_sql_identifier = { workspace = true }
 
 [dev-dependencies]
 margaret_codegen_fallible_roles_fixture = { path = "tests/fixtures/fallible_roles" }

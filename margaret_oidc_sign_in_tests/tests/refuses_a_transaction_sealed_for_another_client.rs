@@ -43,7 +43,7 @@ async fn refuses_a_transaction_sealed_for_another_client() {
             "another:client",
             fixture_client_secret(),
         )),
-        Arc::clone(&fixture.roller),
+        Arc::clone(&fixture.secrets),
     );
     let SignInBeginning::Redirected(sealed) = fixture.flow.begin().await else {
         panic!("the sign-in redirects to the authorization endpoint");

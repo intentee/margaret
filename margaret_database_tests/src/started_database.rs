@@ -1,40 +1,102 @@
 use std::sync::Arc;
 
-use ephemeral_postgres::cluster::Cluster;
-use ephemeral_postgres::cluster_params::ClusterParams;
+use url::Url;
+use uuid::Uuid;
 
 use margaret_database::database::Database;
+use margaret_model::render_postgres::render_postgres;
+use margaret_model::schema::Schema;
+use margaret_sql_identifier::quote_identifier::quote_identifier;
 
-use crate::postgres_image::postgres_image;
+use crate::connected_client::connected_client;
+use crate::database_administration::DatabaseAdministration;
+use crate::test_postgres_url::test_postgres_url;
+
+async fn connected_pool(database_url: &Url) -> Database {
+    Database::connect(
+        database_url
+            .as_str()
+            .parse()
+            .expect("the test database url is a postgres url"),
+    )
+    .await
+    .expect("the test database accepts connections")
+}
 
 pub struct StartedDatabase {
+    pub administration: DatabaseAdministration,
     pub database: Arc<Database>,
-    pub ephemeral: ephemeral_postgres::database::Database,
+    pub database_url: Url,
 }
 
 impl StartedDatabase {
     /// # Panics
     ///
-    /// Panics when the Postgres cluster, its database or the connection to it cannot be prepared.
+    /// Panics when the role, the database or the connection to it cannot be prepared on the shared
+    /// test cluster.
     pub async fn start() -> Self {
-        let ephemeral = Cluster::start(ClusterParams::new(postgres_image()))
+        let cluster_url = test_postgres_url();
+        let name = format!("test_{}", Uuid::new_v4().simple());
+        let administration = connected_client(&cluster_url).await;
+
+        administration
+            .batch_execute(&format!("CREATE ROLE {} LOGIN", quote_identifier(&name)))
             .await
-            .expect("the Postgres 18 cluster starts")
-            .create_database()
+            .expect("the role of the test is created");
+        administration
+            .batch_execute(&format!(
+                "CREATE DATABASE {} OWNER {} STRATEGY FILE_COPY",
+                quote_identifier(&name),
+                quote_identifier(&name)
+            ))
             .await
-            .expect("an ephemeral database is created");
-        let database = Database::connect(
-            ephemeral
-                .database_url()
-                .parse()
-                .expect("the ephemeral database url is a postgres url"),
-        )
-        .await
-        .expect("the ephemeral database accepts connections");
+            .expect("the database of the test is created");
+
+        let mut administration_url = cluster_url.clone();
+        let mut database_url = cluster_url.clone();
+
+        administration_url.set_path(&name);
+        database_url
+            .set_username(&name)
+            .expect("the shared test cluster url carries a username");
+        database_url.set_path(&name);
+
+        let database = connected_pool(&database_url).await;
 
         Self {
+            administration: DatabaseAdministration {
+                cluster_url,
+                database_url: administration_url,
+                name,
+            },
             database: Arc::new(database),
-            ephemeral,
+            database_url,
         }
+    }
+
+    pub async fn with_schema(schema: &Schema) -> Self {
+        let started = Self::start().await;
+
+        started.execute(&render_postgres(schema)).await;
+
+        started
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the role of the test cannot execute the setup statements.
+    pub async fn execute(&self, statements: &str) {
+        connected_client(&self.database_url)
+            .await
+            .batch_execute(statements)
+            .await
+            .expect("the role of the test executes the setup statements");
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the test database refuses another pool of connections.
+    pub async fn separate_pool(&self) -> Arc<Database> {
+        Arc::new(connected_pool(&self.database_url).await)
     }
 }

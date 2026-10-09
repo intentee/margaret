@@ -1,13 +1,9 @@
 use std::sync::Arc;
 
 use margaret_accepted_clients::registered_client::RegisteredClient;
-use margaret_accepted_clients::registered_code_grant::RegisteredCodeGrant;
-use margaret_accepted_clients::remembers_client_assertions::RemembersClientAssertions;
 use margaret_accepted_clients_tests::asserting_client::AssertingClient;
-use margaret_accepted_clients_tests::fixture_client_assertions::FixtureClientAssertions;
-use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
+use margaret_database::database::Database;
 
-use crate::fixture_authorization_grants::FixtureAuthorizationGrants;
 use crate::portal_callback::PORTAL_CALLBACK;
 use crate::portal_client::PORTAL_CLIENT;
 use crate::portal_code_grant::PORTAL_CODE_GRANT;
@@ -20,48 +16,34 @@ use crate::spa_code_grant::SPA_CODE_GRANT;
 
 pub struct FixtureClients {
     pub asserting: Vec<AssertingClient>,
-    pub grants: Arc<dyn StoresAuthorizationGrants>,
     pub public: Vec<Arc<RegisteredClient>>,
 }
 
 impl FixtureClients {
-    pub async fn over_grants(grants: Arc<dyn StoresAuthorizationGrants>) -> Self {
-        let assertions: Arc<dyn RemembersClientAssertions> =
-            Arc::new(FixtureClientAssertions::default());
-
+    #[must_use]
+    pub fn standard(database: &Arc<Database>) -> Self {
         Self {
             asserting: vec![
-                AssertingClient::holding_its_keys(
+                AssertingClient::holding_its_keys_with_code_grant(
                     PORTAL_CLIENT,
                     PORTAL_PRIVILEGES,
-                    Arc::clone(&assertions),
-                    RegisteredCodeGrant::Granted {
-                        grants: Arc::clone(&grants),
-                        policy: PORTAL_CODE_GRANT,
-                        redirect_uris: vec![PORTAL_CALLBACK.to_string()],
-                    },
-                )
-                .await,
+                    Arc::clone(database),
+                    PORTAL_CODE_GRANT,
+                    vec![PORTAL_CALLBACK.to_string()],
+                ),
                 AssertingClient::holding_its_keys(
                     SERVICE_CLIENT,
                     SERVICE_PRIVILEGES,
-                    assertions,
-                    RegisteredCodeGrant::Withheld,
-                )
-                .await,
+                    Arc::clone(database),
+                ),
             ],
             public: vec![Arc::new(RegisteredClient::public_with_code_grant(
                 SPA_CLIENT,
+                Arc::clone(database),
                 SPA_CODE_GRANT,
                 vec![SPA_CALLBACK.to_string()],
-                Arc::clone(&grants),
             ))],
-            grants,
         }
-    }
-
-    pub async fn standard() -> Self {
-        Self::over_grants(Arc::new(FixtureAuthorizationGrants::undisturbed())).await
     }
 
     /// # Panics

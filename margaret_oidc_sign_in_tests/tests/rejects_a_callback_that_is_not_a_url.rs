@@ -10,7 +10,7 @@ async fn rejects_a_callback_that_is_not_a_url() {
     let fixture = SignInFixture::start(secret_basic_authentication()).await;
     let created = SignInFlow::create(
         Arc::new(fixture.server.client(secret_basic_authentication())),
-        Arc::clone(&fixture.roller),
+        Arc::clone(&fixture.secrets),
         "/sign-in/callback".to_string(),
         &["profile"],
     );

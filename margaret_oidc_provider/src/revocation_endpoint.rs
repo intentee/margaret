@@ -5,8 +5,10 @@ use chrono::Utc;
 use oauth2::basic::BasicErrorResponseType;
 
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
+use margaret_authorization_grants::refresh_family_record::RefreshFamilyRecord;
 use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
-use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
+use margaret_authorization_grants::refresh_token_record::RefreshTokenRecord;
+use margaret_database::database::Database;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
@@ -27,7 +29,7 @@ fn revoked_or_invalid() -> Response {
 
 pub struct RevocationEndpoint {
     clients: Arc<AcceptedClients>,
-    grants: Arc<dyn StoresAuthorizationGrants>,
+    database: Arc<Database>,
     resources: &'static [&'static str],
     secret_store: Arc<JwksSecretStore>,
 }
@@ -37,12 +39,12 @@ impl RevocationEndpoint {
     pub fn create(
         clients: Arc<AcceptedClients>,
         secret_store: Arc<JwksSecretStore>,
-        grants: Arc<dyn StoresAuthorizationGrants>,
+        database: Arc<Database>,
         resources: &'static [&'static str],
     ) -> Self {
         Self {
             clients,
-            grants,
+            database,
             resources,
             secret_store,
         }
@@ -51,8 +53,8 @@ impl RevocationEndpoint {
     /// # Errors
     ///
     /// Returns `ProviderError::ClientAuthentication` when the client assertion cannot be
-    /// remembered, and `ProviderError::FindRefreshToken` or `ProviderError::RevokeRefreshFamily`
-    /// when the application cannot reach the refresh token families.
+    /// remembered, and `ProviderError::AuthorizationGrants` when the application cannot reach the
+    /// refresh token families.
     pub async fn respond(
         &self,
         request: &Request,
@@ -90,19 +92,16 @@ impl RevocationEndpoint {
             ));
         }
 
-        match self
-            .grants
-            .find_refresh_token(TokenDigest::of(&token))
+        match RefreshTokenRecord::lookup(&self.database, TokenDigest::of(&token))
             .await
-            .map_err(ProviderError::FindRefreshToken)?
+            .map_err(ProviderError::AuthorizationGrants)?
         {
             RefreshTokenLookup::Current { family, record }
                 if record.client_id == client.client_id =>
             {
-                self.grants
-                    .revoke_refresh_family(family, instant)
+                RefreshFamilyRecord::revoke(&self.database, family)
                     .await
-                    .map_err(ProviderError::RevokeRefreshFamily)
+                    .map_err(ProviderError::AuthorizationGrants)
                     .map(|()| revoked_or_invalid())
             }
             RefreshTokenLookup::Current { .. } => Ok(oauth_error(

@@ -129,6 +129,7 @@ mod tests {
             views_availability(has_views),
             &collected_tags(index),
             &bindings_for(&IndexedSource::new("").index),
+            &[],
         )
     }
 

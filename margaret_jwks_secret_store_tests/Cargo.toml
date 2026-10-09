@@ -6,13 +6,13 @@ publish = false
 autotests = false
 
 [dependencies]
+bytes = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
-margaret_jwks_roller = { workspace = true }
 margaret_jwks_roller_server = { workspace = true }
-margaret_jwks_roller_tests = { path = "../margaret_jwks_roller_tests" }
 margaret_jwks_secret_store = { workspace = true }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 aws-lc-rs = { workspace = true }
@@ -23,7 +23,6 @@ margaret_jwt_verification = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_token_signer = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
 uuid = { workspace = true }
 

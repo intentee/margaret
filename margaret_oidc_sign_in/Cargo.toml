@@ -21,7 +21,7 @@ margaret_identity_session = { workspace = true }
 margaret_issuer_key_set = { workspace = true }
 margaret_issuer_metadata = { workspace = true }
 margaret_jose_parameters = { workspace = true }
-margaret_jwks_roller_server = { workspace = true }
+margaret_jwks_keygen = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_oidc_discovery = { workspace = true }

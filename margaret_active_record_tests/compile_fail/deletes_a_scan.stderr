@@ -1,0 +1,5 @@
+error[E0599]: no method named `delete` found for struct `margaret_model_facade::framework::margaret_active_record::scan::Scan<Modeled>` in the current scope
+ --> compile_fail/deletes_a_scan.rs:6:52
+  |
+6 |     let _ = Message::query().posted_at.ascending().delete(database).await;
+  |                                                    ^^^^^^ method not found in `margaret_model_facade::framework::margaret_active_record::scan::Scan<Message>`

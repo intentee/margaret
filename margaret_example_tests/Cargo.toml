@@ -10,6 +10,7 @@ margaret_database_tests = { path = "../margaret_database_tests" }
 margaret_example = { path = "../margaret_example" }
 
 [dev-dependencies]
+chrono = { workspace = true }
 margaret = { workspace = true, features = ["runtime"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 uuid = { workspace = true }

@@ -16,30 +16,25 @@ use margaret_registered_claims::registered_claims::RegisteredClaims;
 
 #[tokio::test]
 async fn refuses_userinfo_for_a_token_of_a_client_itself() {
-    let provider = UnservedProvider::create().await;
+    let provider = UnservedProvider::create();
     let issuer = provider.issuance.issuer.to_string();
     let issued_at = NumericDate::from(Utc::now());
-    let access_token = provider
-        .roller
-        .jwks_secret_holder()
-        .get()
-        .current()
-        .sign_json(
-            &IssuedAccessTokenClaims {
-                client_id: "portal",
-                scopes: BTreeSet::from(["openid".to_string()]),
-                subject: "portal".to_string(),
-            }
-            .to_payload(&RegisteredClaims {
-                aud: AudienceClaim::Single(issuer.clone()),
-                exp: issued_at.after(Duration::from_mins(1)),
-                iat: Some(issued_at),
-                iss: issuer,
-                jti: Some(Uuid::new_v4().to_string()),
-                nbf: None,
-            }),
-            JwtType::AccessToken,
-        );
+    let access_token = provider.secrets.get().current().sign_json(
+        &IssuedAccessTokenClaims {
+            client_id: "portal",
+            scopes: BTreeSet::from(["openid".to_string()]),
+            subject: "portal".to_string(),
+        }
+        .to_payload(&RegisteredClaims {
+            aud: AudienceClaim::Single(issuer.clone()),
+            exp: issued_at.after(Duration::from_mins(1)),
+            iat: Some(issued_at),
+            iss: issuer,
+            jti: Some(Uuid::new_v4().to_string()),
+            nbf: None,
+        }),
+        JwtType::AccessToken,
+    );
     let endpoint = UserinfoEndpoint::create(provider.secret_store, provider.issuance);
 
     assert!(matches!(

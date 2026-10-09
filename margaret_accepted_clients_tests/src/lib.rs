@@ -2,8 +2,5 @@ pub mod accepted_clients_of;
 pub mod asserted_parameters;
 pub mod asserting_client;
 pub mod assertion_claims;
-pub mod assertion_storage_error;
 pub mod fixture_client;
-pub mod fixture_client_assertions;
 pub mod unprivileged;
-pub mod unreachable_client_assertions;

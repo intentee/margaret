@@ -1,0 +1,8 @@
+error[E0308]: mismatched types
+  --> compile_fail/updates_nothing.rs:11:38
+   |
+11 |         .update(database, |_columns| ())
+   |                                      ^^ expected `Assigned<Article, Assigning>`, found `()`
+   |
+   = note: expected struct `Assigned<Article, Assigning>`
+           found unit type `()`

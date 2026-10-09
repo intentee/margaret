@@ -8,13 +8,14 @@ use crate::on_delete_actions::ON_DELETE_ACTIONS;
 
 pub(crate) enum OnDeleteArgument {
     Known(OnDelete),
+    Missing,
     Unknown(Path),
 }
 
 impl OnDeleteArgument {
     pub(crate) fn of(index: &AttributeIndex, item: &IndexedItem, declared: Option<Path>) -> Self {
         match declared {
-            None => Self::Known(OnDelete::NoAction),
+            None => Self::Missing,
             Some(path) => match index
                 .resolve_item_path(item, &path)
                 .as_ref()

@@ -10,9 +10,8 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
-anyhow = { workspace = true }
-async-trait = { workspace = true }
-margaret_authorization_grants = { workspace = true }
+margaret_client_assertions = { workspace = true }
+margaret_database = { workspace = true }
 margaret_http = { workspace = true }
 margaret_issuer_key_set = { workspace = true }
 margaret_jose_parameters = { workspace = true }

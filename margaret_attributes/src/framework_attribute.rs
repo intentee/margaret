@@ -7,17 +7,21 @@ pub enum FrameworkAttribute {
     ActsAsOAuthClient,
     AdmitsOAuthClient,
     AuthenticatedUser,
+    Base,
     BearerToken,
     BuildForSession,
     Column,
     ConsoleArgument,
     ConsoleCommand,
     Constructor,
+    EagerLoad,
     EnvironmentVariable,
     ExchangesTokensFrom,
     ForeignKey,
     FormRequest,
     HandlesMiddlewareAttribute,
+    HasMany,
+    HasOne,
     Index,
     InferFromRequest,
     InfersAuthenticatedUser,
@@ -29,6 +33,7 @@ pub enum FrameworkAttribute {
     PrimaryKey,
     Process,
     ProvidesRouteParameter,
+    Relation,
     RendersView,
     RespondsToHttp,
     RouteParameter,
@@ -44,21 +49,25 @@ pub enum FrameworkAttribute {
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 37] = [
+    pub const ALL: [Self; 42] = [
         Self::ActsAsOAuthClient,
         Self::AdmitsOAuthClient,
         Self::AuthenticatedUser,
+        Self::Base,
         Self::BearerToken,
         Self::BuildForSession,
         Self::Column,
         Self::ConsoleArgument,
         Self::ConsoleCommand,
         Self::Constructor,
+        Self::EagerLoad,
         Self::EnvironmentVariable,
         Self::ExchangesTokensFrom,
         Self::ForeignKey,
         Self::FormRequest,
         Self::HandlesMiddlewareAttribute,
+        Self::HasMany,
+        Self::HasOne,
         Self::Index,
         Self::InferFromRequest,
         Self::InfersAuthenticatedUser,
@@ -70,6 +79,7 @@ impl FrameworkAttribute {
         Self::PrimaryKey,
         Self::Process,
         Self::ProvidesRouteParameter,
+        Self::Relation,
         Self::RendersView,
         Self::RespondsToHttp,
         Self::RouteParameter,
@@ -101,14 +111,18 @@ impl FrameworkAttribute {
         matches!(
             self,
             Self::AuthenticatedUser
+                | Self::Base
                 | Self::BearerToken
                 | Self::Column
                 | Self::ConsoleArgument
                 | Self::EnvironmentVariable
                 | Self::ForeignKey
                 | Self::FormRequest
+                | Self::HasMany
+                | Self::HasOne
                 | Self::Index
                 | Self::PrimaryKey
+                | Self::Relation
                 | Self::RouteParameter
                 | Self::SpiffeHttpClient
                 | Self::Unique
@@ -121,17 +135,21 @@ impl FrameworkAttribute {
             Self::ActsAsOAuthClient => "acts_as_oauth_client",
             Self::AdmitsOAuthClient => "admits_oauth_client",
             Self::AuthenticatedUser => "authenticated_user",
+            Self::Base => "base",
             Self::BearerToken => "bearer_token",
             Self::BuildForSession => "build_for_session",
             Self::Column => "column",
             Self::ConsoleArgument => "console_argument",
             Self::ConsoleCommand => "console_command",
             Self::Constructor => "constructor",
+            Self::EagerLoad => "eager_load",
             Self::EnvironmentVariable => "environment_variable",
             Self::ExchangesTokensFrom => "exchanges_tokens_from",
             Self::ForeignKey => "foreign_key",
             Self::FormRequest => "form_request",
             Self::HandlesMiddlewareAttribute => "handles_middleware_attribute",
+            Self::HasMany => "has_many",
+            Self::HasOne => "has_one",
             Self::Index => "index",
             Self::InferFromRequest => "infer_from_request",
             Self::InfersAuthenticatedUser => "infers_authenticated_user",
@@ -143,6 +161,7 @@ impl FrameworkAttribute {
             Self::PrimaryKey => "primary_key",
             Self::Process => "process",
             Self::ProvidesRouteParameter => "provides_route_parameter",
+            Self::Relation => "relation",
             Self::RendersView => "renders_view",
             Self::RespondsToHttp => "responds_to_http",
             Self::RouteParameter => "route_parameter",
@@ -161,7 +180,12 @@ impl FrameworkAttribute {
     pub(crate) const fn repeats_on_items(self) -> bool {
         matches!(
             self,
-            Self::ForeignKey | Self::Index | Self::Middleware | Self::Unique
+            Self::ForeignKey
+                | Self::HasMany
+                | Self::HasOne
+                | Self::Index
+                | Self::Middleware
+                | Self::Unique
         )
     }
 

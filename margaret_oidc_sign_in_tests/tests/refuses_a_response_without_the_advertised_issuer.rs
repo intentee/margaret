@@ -42,7 +42,7 @@ async fn refuses_a_response_without_the_advertised_issuer() {
             FIXTURE_CLIENT_ID,
             fixture_client_secret(),
         )),
-        Arc::clone(&fixture.roller),
+        Arc::clone(&fixture.secrets),
     );
     let SignInBeginning::Redirected(response) = advertising.begin().await else {
         panic!("the sign-in redirects to the authorization endpoint");

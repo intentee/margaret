@@ -1,0 +1,5 @@
+mod jwks_roller_adopts_the_roll_of_a_peer_once_its_keys_are_due;
+mod jwks_roller_publishes_the_document_of_its_secret_when_created;
+mod jwks_roller_reports_an_unreachable_storage_when_created;
+mod jwks_roller_restores_the_stored_keys_across_a_restart;
+mod jwks_roller_stops_when_its_store_fails;

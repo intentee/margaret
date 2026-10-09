@@ -3,6 +3,7 @@ use thiserror::Error;
 use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen::signing_keys_generation::SigningKeysGeneration;
+use margaret_signing_keys::signing_keys_error::SigningKeysError;
 
 #[derive(Debug, Error)]
 pub enum RollerError {
@@ -50,19 +51,19 @@ pub enum RollerError {
     #[error("the application could not create its first signing keys: {source}")]
     SecretCreate {
         #[source]
-        source: anyhow::Error,
+        source: SigningKeysError,
     },
 
     #[error("the application could not load its stored signing keys: {source}")]
     SecretLoad {
         #[source]
-        source: anyhow::Error,
+        source: SigningKeysError,
     },
 
     #[error("the application could not replace its stored signing keys: {source}")]
     SecretReplace {
         #[source]
-        source: anyhow::Error,
+        source: SigningKeysError,
     },
 
     #[error("the signing keys of generation {generation} vanished from the store")]
