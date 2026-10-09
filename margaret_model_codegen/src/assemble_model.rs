@@ -259,7 +259,7 @@ fn plain_indexes(
 
 fn leads_a_key_of_kind(keys: &[&ModelIndex], kind: IndexKind, index: &ModelIndex) -> bool {
     keys.iter()
-        .any(|key| key.kind == kind && key.column_names().starts_with(&index.column_names()))
+        .any(|key| key.kind == kind && key.fields.starts_with(&index.fields))
 }
 
 fn reject_conflicting_indexes(
