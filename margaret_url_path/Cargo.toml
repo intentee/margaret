@@ -1,0 +1,20 @@
+[package]
+name = "margaret_url_path"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Routability and percent-encoding rules of Margaret URL path segments."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+percent-encoding = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+url = { workspace = true }
+
+[lints]
+workspace = true

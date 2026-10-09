@@ -5,7 +5,7 @@ use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 
 #[derive(Clone, Default)]
 pub struct RootCertStoreHolder {
-    inner: SyncHolder<RootCertStore>,
+    inner: SyncHolder<Option<RootCertStore>>,
 }
 
 impl RootCertStoreHolder {
@@ -19,7 +19,7 @@ impl RootCertStoreHolder {
     }
 
     #[must_use]
-    pub fn subscribe(&self) -> SyncHolderSubscription<RootCertStore> {
+    pub fn subscribe(&self) -> SyncHolderSubscription<Option<RootCertStore>> {
         self.inner.subscribe()
     }
 }

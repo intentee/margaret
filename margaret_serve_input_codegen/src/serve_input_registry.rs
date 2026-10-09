@@ -7,7 +7,6 @@ use crate::registered_serve_input::RegisteredServeInput;
 use crate::serve_input::ServeInput;
 use crate::serve_input_codegen_error::ServeInputCodegenError;
 use crate::serve_input_key::ServeInputKey;
-use crate::serve_input_slots::ServeInputSlots;
 
 pub struct ServeInputRegistry {
     entries: Vec<RegisteredServeInput>,
@@ -24,11 +23,8 @@ impl ServeInputRegistry {
     }
 
     #[must_use]
-    pub fn into_slots(self) -> ServeInputSlots {
-        ServeInputSlots {
-            inputs: self.entries.into_iter().map(|entry| entry.input).collect(),
-            slots: self.slots,
-        }
+    pub fn slot_count(&self) -> usize {
+        self.entries.len()
     }
 
     /// # Errors
@@ -90,7 +86,6 @@ mod tests {
 
     use crate::serve_input::ServeInput;
     use crate::serve_input_codegen_error::ServeInputCodegenError;
-    use crate::serve_input_key::ServeInputKey;
 
     use super::ServeInputRegistry;
 
@@ -139,29 +134,21 @@ mod tests {
 
     #[test]
     fn allocates_one_slot_per_distinct_key_in_declaration_order() {
-        let registry = {
-            let mut registry = ServeInputRegistry::empty();
+        let mut registry = ServeInputRegistry::empty();
 
+        assert_eq!(
             registry
                 .register(&owner("First"), named("first"))
-                .expect("the first key registers");
+                .expect("the first key registers"),
+            0
+        );
+        assert_eq!(
             registry
                 .register(&owner("Second"), named("second"))
-                .expect("the second key registers");
-
-            registry
-        };
-        let slots = registry.into_slots();
-
-        assert_eq!(slots.inputs.len(), 2);
-        assert_eq!(slots.inputs[0].name(), "first");
-        assert_eq!(slots.inputs[1].name(), "second");
-        assert_eq!(
-            slots.slots.get(&ServeInputKey::ConsoleArgument {
-                name: "second".to_string()
-            }),
-            Some(&1)
+                .expect("the second key registers"),
+            1
         );
+        assert_eq!(registry.slot_count(), 2);
     }
 
     #[test]

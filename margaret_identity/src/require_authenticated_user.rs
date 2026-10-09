@@ -1,61 +1,54 @@
+use margaret_http::requirement::Requirement;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 
 use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
 
-/// # Errors
-///
-/// Returns `ResponseContinuation` propagated from the work it performs.
+#[must_use]
 pub fn require_authenticated_user<User>(
     outcome: AuthenticatedUserOutcome<User>,
-) -> Result<User, ResponseContinuation> {
+) -> Requirement<User> {
     match outcome {
         AuthenticatedUserOutcome::Anonymous => {
-            Err(ResponseContinuation::from(Response::unauthorized()))
+            Requirement::Unmet(ResponseContinuation::from(Response::unauthorized()))
         }
-        AuthenticatedUserOutcome::Authenticated(user) => Ok(user),
-        AuthenticatedUserOutcome::Interrupted(continuation) => Err(continuation),
+        AuthenticatedUserOutcome::Authenticated(user) => Requirement::Met(user),
+        AuthenticatedUserOutcome::Interrupted(continuation) => Requirement::Unmet(continuation),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use margaret_http::forwardable_route::ForwardableRoute;
+    use margaret_http::requirement::Requirement;
     use margaret_http::response::Response;
     use margaret_http::response_continuation::ResponseContinuation;
-    use margaret_http::url_segment::UrlSegment;
 
     use super::require_authenticated_user;
     use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
 
     fn rejection_status(outcome: AuthenticatedUserOutcome<&str>) -> Option<u16> {
-        let rejection =
-            require_authenticated_user(outcome).expect_err("the outcome carries no user");
-
-        match rejection {
-            ResponseContinuation::Done(response) => Some(response.status()),
-            ResponseContinuation::Forward(_) | ResponseContinuation::Redirect(_) => None,
+        match require_authenticated_user(outcome) {
+            Requirement::Unmet(ResponseContinuation::Done(response)) => Some(response.status()),
+            Requirement::Met(_)
+            | Requirement::Unmet(
+                ResponseContinuation::Forward(_) | ResponseContinuation::Redirect(_),
+            ) => None,
         }
     }
 
     fn sign_in_redirect() -> ResponseContinuation {
         ResponseContinuation::from(
-            ForwardableRoute::new(
-                Arc::from("http://localhost"),
-                vec![UrlSegment::Literal("/sign-in")],
-            )
-            .see_other(),
+            ForwardableRoute::new("http://localhost/sign-in".to_string()).see_other(),
         )
     }
 
     #[test]
     fn hands_over_the_authenticated_user() {
-        assert_eq!(
-            require_authenticated_user(AuthenticatedUserOutcome::Authenticated("milo")).ok(),
-            Some("milo")
-        );
+        assert!(matches!(
+            require_authenticated_user(AuthenticatedUserOutcome::Authenticated("milo")),
+            Requirement::Met("milo")
+        ));
     }
 
     #[test]

@@ -1,33 +1,44 @@
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
-use http::Method;
+use http::request::Parts;
 
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::request_inputs::RequestInputs;
+use crate::request_outcome::RequestOutcome;
+use crate::server::Server;
+use crate::server_params::ServerParams;
 
 pub struct Request {
     pub inputs: RequestInputs,
     path_params: HashMap<String, String>,
     peer_identity: Arc<PeerIdentity>,
+    server: Arc<Server>,
 }
 
 impl Request {
-    pub(crate) fn from_inputs(inputs: RequestInputs) -> Self {
-        Self {
-            inputs,
-            path_params: HashMap::new(),
-            peer_identity: Arc::new(PeerIdentity::Anonymous),
-        }
-    }
-
     #[must_use]
-    pub fn new(method: Method, path: String) -> Self {
-        Self {
-            inputs: RequestInputs::synthetic(method, path),
-            path_params: HashMap::new(),
-            peer_identity: Arc::new(PeerIdentity::Anonymous),
+    pub fn from_head(
+        server: Arc<Server>,
+        parts: Parts,
+        remote_addr: SocketAddr,
+        peer_identity: Arc<PeerIdentity>,
+    ) -> RequestOutcome<Self> {
+        let server_params = match ServerParams::from_parts(parts, remote_addr) {
+            RequestOutcome::Parsed(server_params) => server_params,
+            RequestOutcome::Rejected(rejection) => return RequestOutcome::Rejected(rejection),
+        };
+
+        match RequestInputs::parse(server_params) {
+            RequestOutcome::Parsed(inputs) => RequestOutcome::Parsed(Self {
+                inputs,
+                path_params: HashMap::new(),
+                peer_identity,
+                server,
+            }),
+            RequestOutcome::Rejected(rejection) => RequestOutcome::Rejected(rejection),
         }
     }
 
@@ -40,56 +51,18 @@ impl Request {
         &self.peer_identity
     }
 
-    pub(crate) fn with_path_params(self, path_params: HashMap<String, String>) -> Self {
+    #[must_use]
+    pub fn server(&self) -> &Server {
+        &self.server
+    }
+
+    #[must_use]
+    pub fn with_path_params(self, path_params: HashMap<String, String>) -> Self {
         Self {
             inputs: self.inputs,
             path_params,
             peer_identity: self.peer_identity,
+            server: self.server,
         }
-    }
-
-    pub(crate) fn with_peer_identity(self, peer_identity: Arc<PeerIdentity>) -> Self {
-        Self {
-            inputs: self.inputs,
-            path_params: self.path_params,
-            peer_identity,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-
-    use http::Method;
-
-    use super::Request;
-    use crate::request_inputs::RequestInputs;
-    use crate::server_params::ServerParams;
-
-    #[test]
-    fn exposes_its_inputs_and_path_parameters() {
-        let request = Request::from_inputs(RequestInputs {
-            cookies: HashMap::new(),
-            files: HashMap::new(),
-            json: None,
-            form: HashMap::from([("title".to_string(), "hello".to_string())]),
-            query: HashMap::from([("page".to_string(), "2".to_string())]),
-            server: ServerParams::synthetic(Method::POST, "/articles".to_string()),
-        })
-        .with_path_params(HashMap::from([("id".to_string(), "42".to_string())]));
-
-        assert_eq!(
-            request.inputs.form.get("title").map(String::as_str),
-            Some("hello")
-        );
-        assert_eq!(
-            request.inputs.query.get("page").map(String::as_str),
-            Some("2")
-        );
-        assert_eq!(request.inputs.server.method(), "POST");
-        assert_eq!(request.inputs.server.path(), "/articles");
-        assert_eq!(request.path_param("id"), Some("42"));
-        assert_eq!(request.path_param("missing"), None);
     }
 }

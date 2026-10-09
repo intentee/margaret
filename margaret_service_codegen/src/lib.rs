@@ -1,6 +1,6 @@
 pub mod framework_service;
-pub mod framework_service_kind;
 pub mod render_services;
+pub mod runner_outcome;
 pub mod service_codegen_error;
 pub mod service_plan;
 
@@ -19,26 +19,37 @@ mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::framework_attribute::FrameworkAttribute;
     use margaret_attributes_tests::indexed_source::IndexedSource;
-    use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_container::container_bindings::ContainerBindings;
+    use margaret_container::framework_construction::FrameworkConstruction;
+    use margaret_container::framework_enablement::FrameworkEnablement;
+    use margaret_container::framework_injection_role::FrameworkInjectionRole;
+    use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
+    use margaret_http_codegen::server_uploads::ServerUploads;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_serve_input_codegen::serve_input::ServeInput;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use crate::framework_service::FrameworkService;
-    use crate::framework_service_kind::FrameworkServiceKind;
     use crate::render_services::render_services;
+    use crate::runner_outcome::RunnerOutcome;
     use crate::service_codegen_error::ServiceCodegenError;
     use crate::service_plan::ServicePlan;
 
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
-            .expect("the container is rendered")
-            .bindings
+        render_container(
+            index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container is rendered")
+        .bindings
     }
 
     fn serve_roots(index: &AttributeIndex) -> Vec<CanonicalPath> {
@@ -61,11 +72,7 @@ mod tests {
     fn render_source(lib_source: &str, servers: &[HttpServer], has_views: bool) -> String {
         let index = IndexedSource::new(lib_source).index;
         let bindings = bindings(&index);
-        let serve_inputs = bindings
-            .serve_inputs(&serve_roots(&index), &[])
-            .expect("the rendered roots have planned console arguments");
-
-        let plan = ServicePlan::build(&index, &[], &bindings, &serve_inputs)
+        let plan = ServicePlan::build(&index, &[], &bindings, &serve_roots(&index))
             .expect("the service construction is planned");
 
         render_services(&plan, servers, has_views, &bindings)
@@ -102,13 +109,48 @@ mod tests {
         vec![HttpServer::new(
             "public".to_string(),
             ServerTransportPolicy::Negotiable,
+            ServerUploads::Refused,
         )]
     }
 
     const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
-    const STATELESS_RESPONDER: &str = "#[singleton]\n#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
+    const STATELESS_RESPONDER: &str = "#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
     const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n";
     const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
+
+    #[test]
+    fn serves_the_issuer_server_at_the_origin_of_its_provider() {
+        let index = IndexedSource::new(STATELESS_RESPONDER).index;
+        let bindings = bindings(&index);
+        let plan = ServicePlan::build(&index, &[], &bindings, &serve_roots(&index))
+            .expect("the service construction is planned");
+        let servers: Vec<HttpServer> = public()
+            .into_iter()
+            .map(|server| {
+                server.served_at_issuer_origin(CanonicalPath::new(vec![
+                    "crate".to_string(),
+                    "margaret".to_string(),
+                    "oidc_provider".to_string(),
+                    "provider_endpoints".to_string(),
+                    "PROVIDER_ENDPOINTS".to_string(),
+                ]))
+            })
+            .collect();
+        let source: String = render_services(&plan, &servers, false, &bindings)
+            .format()
+            .expect("the module formats")
+            .source()
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(
+            "letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.issuer_origin,);"
+        ));
+        assert!(source.contains(
+            "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(&origin_public),);"
+        ));
+        assert!(!source.contains("public-url"));
+    }
 
     #[test]
     fn invokes_server_and_views_helpers_directly_when_the_container_has_no_accessors() {
@@ -116,7 +158,7 @@ mod tests {
 
         assert!(
             source.contains(
-                "routes:super::http::server_public::server_public(container,&routes,&views"
+                "routes:super::http::server_public::server_public(container,routes,&views"
             )
         );
         assert!(
@@ -147,7 +189,7 @@ mod tests {
             source.contains("fntick_interval(&self)->std::time::Duration{crate::schedule::PERIOD}")
         );
         assert!(source.contains(
-            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{tokio::time::MissedTickBehavior::Delay}"
+            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{::tokio::time::MissedTickBehavior::Delay}"
         ));
         assert!(source.contains("_tick_context:trzcina::TickContext"));
         assert!(source.contains(
@@ -182,7 +224,7 @@ impl Flusher {
             source.contains("fntick_interval(&self)->std::time::Duration{crate::schedule::PERIOD}")
         );
         assert!(source.contains(
-            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{tokio::time::MissedTickBehavior::Delay}"
+            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{::tokio::time::MissedTickBehavior::Delay}"
         ));
     }
 
@@ -216,7 +258,7 @@ impl Flusher {
     }
 
     #[test]
-    fn renders_framework_ticker_and_service_adapters_beside_user_units() {
+    fn renders_framework_service_adapters_beside_user_units() {
         let index = IndexedSource::new("#[singleton]\nstruct Placeholder;\n").index;
         let framework_services = vec![
             FrameworkService {
@@ -228,37 +270,46 @@ impl Flusher {
                     "JwksRoller",
                 ]),
                 field_name: "framework_jwks_roller_server_jwks_roller_jwks_roller".to_string(),
-                is_async: false,
-                kind: FrameworkServiceKind::Ticker {
-                    interval: canonical(&[
-                        "margaret",
-                        "framework",
-                        "jwks_roller_server",
-                        "jwks_roll_interval",
-                        "JWKS_ROLL_INTERVAL",
-                    ]),
-                },
+                is_async: true,
+                outcome: RunnerOutcome::Fallible,
                 runner: "run".to_string(),
-                takes_token: false,
+                takes_token: true,
                 type_name: "JwksRoller".to_string(),
             },
             FrameworkService {
                 concrete_path: canonical(&[
                     "margaret",
                     "framework",
-                    "jwks_client",
-                    "jwks_client",
-                    "JwksClient",
+                    "issuer_directory",
+                    "issuer_directory",
+                    "IssuerDirectory",
                 ]),
-                field_name: "framework_jwks_client_jwks_client_jwks_client".to_string(),
+                field_name: "framework_issuer_directory_issuer_directory_issuer_directory"
+                    .to_string(),
                 is_async: true,
-                kind: FrameworkServiceKind::Service,
+                outcome: RunnerOutcome::Infallible,
                 runner: "run".to_string(),
                 takes_token: true,
-                type_name: "JwksClient".to_string(),
+                type_name: "IssuerDirectory".to_string(),
             },
         ];
-        let container_bindings = bindings(&index);
+        let container_bindings = render_container(
+            &index,
+            &scan(&index).expect("the console arguments are scanned"),
+            &framework_services
+                .iter()
+                .map(|service| FrameworkProvider {
+                    construction: FrameworkConstruction::Unit,
+                    enablement: FrameworkEnablement::Declared,
+                    injection: FrameworkInjectionRole::Unmarked,
+                    provided: service.concrete_path.clone(),
+                })
+                .collect::<Vec<FrameworkProvider>>(),
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container is rendered")
+        .bindings;
         let plan = ServicePlan::build(&index, &framework_services, &container_bindings, &[])
             .expect("the framework services are planned");
         let source: String = render_services(&plan, &public(), false, &container_bindings)
@@ -268,21 +319,22 @@ impl Flusher {
             .split_whitespace()
             .collect();
 
-        assert!(source.contains("impltrzcina::TickerforJwksRoller"));
-        assert!(source.contains(
-            "fntick_interval(&self)->std::time::Duration{margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL}"
-        ));
+        assert!(source.contains("impltrzcina::ServiceforJwksRoller"));
         assert!(source.contains(
             "manager.register_service(JwksRoller{inner:container.framework_jwks_roller_server_jwks_roller_jwks_roller(),});"
         ));
-        assert!(source.contains("impltrzcina::ServiceforJwksClient"));
         assert!(
             source.contains(
                 "self.inner.run(cancellation_token).await?;::std::result::Result::Ok(())"
             )
         );
+        assert!(source.contains("impltrzcina::ServiceforIssuerDirectory"));
+        assert!(
+            source
+                .contains("self.inner.run(cancellation_token).await;::std::result::Result::Ok(())")
+        );
         assert!(source.contains(
-            "manager.register_service(JwksClient{inner:container.framework_jwks_client_jwks_client_jwks_client(),});"
+            "manager.register_service(IssuerDirectory{inner:container.framework_issuer_directory_issuer_directory_issuer_directory(),});"
         ));
     }
 
@@ -308,6 +360,7 @@ impl Flusher {
 
         assert!(source.contains("fntick_interval(&self)->std::time::Duration{crate::PERIOD}"));
         assert!(!source.contains("missed_tick_behavior"));
+        assert!(!source.contains("first_tick_timing"));
         assert!(!source.contains("impltrzcina::Servicefor"));
     }
 
@@ -352,12 +405,14 @@ impl Flusher {
     fn registers_the_http_server_when_responders_exist() {
         let source = rendered(SERVICE, &public());
 
-        assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"matches.get_one::<margaret::framework::server_origin::server_origin::ServerOrigin,>("public-url")"#
         ));
         assert!(source.contains(
-            r#"transport:margaret::framework::http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",routes:super::http::server_public::server_public(container,"#
+        ));
+        assert!(source.contains(
+            "transport:margaret::framework::http::transport_config::TransportConfig::Plain,uploads:margaret::framework::service::server_uploads::ServerUploads::Refused,"
         ));
         assert!(source.contains(
             "letserver_services=margaret::framework::service::serve_application::serve_application(matches,servers,)?;"
@@ -388,17 +443,22 @@ impl Flusher {
     }
 
     #[test]
-    fn rejects_a_serve_input_absent_from_the_container_plan() {
+    fn rejects_a_serving_root_absent_from_the_container_plan() {
         let index = IndexedSource::new("").index;
         let bindings = bindings(&index);
-        let serve_inputs = [ServeInput::ConsoleArgument(ConsoleArgument::Flag {
-            name: "missing".to_string(),
-        })];
-        let error = ServicePlan::build(&index, &[], &bindings, &serve_inputs)
-            .err()
-            .expect("every serve input must belong to the container plan");
+        let error = ServicePlan::build(
+            &index,
+            &[],
+            &bindings,
+            &[CanonicalPath::new(vec![
+                "crate".to_string(),
+                "Missing".to_string(),
+            ])],
+        )
+        .err()
+        .expect("every serving root must belong to the container plan");
 
-        assert!(error.to_string().contains("missing"));
+        assert!(error.to_string().contains("crate::Missing"));
     }
 
     #[test]
@@ -409,36 +469,45 @@ impl Flusher {
                 HttpServer::new(
                     "internal".to_string(),
                     ServerTransportPolicy::PinnedSpiffeMtls,
+                    ServerUploads::Refused,
                 ),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerTransportPolicy::Negotiable,
+                    ServerUploads::Refused,
+                ),
             ],
         );
 
         assert!(source.contains(
-            "iflet::std::result::Result::Err(error)=margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider(){returnmargaret::framework::console::report_failure::report_failure(error);}"
+            "letspiffe_bundle=matchmargaret::framework::spiffe_svid_server::svid_server_bundle::SvidServerBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
         ));
         assert!(source.contains(
-            "margaret::framework::spiffe_svid_server::svid_server_bundle::SvidServerBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
+            "{Ok(bundle)=>bundle,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
         assert!(source.contains(r#"matches.get_one::<String>("spiffe-trust-domain")"#));
         assert!(source.contains(r#"matches.get_one::<String>("spire-agent-addr")"#));
         assert!(source.contains(
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
         ));
+        assert_eq!(
+            source
+                .matches(
+                    "transport:matchmatches.get_one::<margaret::framework::service::transport_choice::TransportChoice"
+                )
+                .count(),
+            2
+        );
         assert!(source.contains(
-            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:::std::sync::Arc::clone(spiffe_server_config),}"
+            r#"("internal-transport"){Some(value)=>value.config(spiffe_server_config),"#
         ));
+        assert!(
+            source.contains(
+                r#"("public-transport"){Some(value)=>value.config(spiffe_server_config),"#
+            )
+        );
         assert!(source.contains(
-            r#"transport:matchmatches.get_one::<String>("public-transport").map(String::as_str)"#
-        ));
-        assert!(source.contains(
-            r#"Some("spiffe_mtls")=>{margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:::std::sync::Arc::clone(spiffe_server_config),}}"#
-        ));
-        assert!(source.contains(
-            r#"Some("plain")=>{margaret::framework::http::transport_config::TransportConfig::Plain}"#
-        ));
-        assert!(source.contains(
-            "Some(_)|None=>{return::std::result::Result::Err(margaret::framework::console::command_outcome::CommandOutcome::Failed,);}"
+            "value.config(spiffe_server_config),None=>{return::std::result::Result::Err(margaret::framework::console::command_outcome::CommandOutcome::Failed,);}"
         ));
         assert!(source.contains(
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
@@ -457,7 +526,7 @@ impl Flusher {
         let source = rendered(SPIFFE_CLIENT, &[]);
 
         assert!(source.contains(
-            "letspiffe_bundle=margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
+            "letspiffe_bundle=matchmargaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
         ));
         assert!(source.contains("letspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(source.contains(
@@ -486,11 +555,12 @@ impl Flusher {
             &[HttpServer::new(
                 "internal".to_string(),
                 ServerTransportPolicy::PinnedSpiffeMtls,
+                ServerUploads::Refused,
             )],
         );
 
         assert!(source.contains(
-            "letspiffe_bundle=margaret::framework::spiffe_svid_bundle::svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
+            "letspiffe_bundle=matchmargaret::framework::spiffe_svid_bundle::svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
         ));
         assert!(source.contains(
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
@@ -515,19 +585,31 @@ impl Flusher {
         let source = rendered(
             SERVICE,
             &[
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerTransportPolicy::Negotiable,
+                    ServerUploads::Refused,
+                ),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerTransportPolicy::Negotiable,
+                    ServerUploads::Refused,
+                ),
             ],
         );
 
+        let routes = "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(&origin_internal,&origin_public),);";
+
         assert!(source.contains(
-            r#"letorigin_public:::std::sync::Arc<str>=matchmatches.get_one::<String>("public-url"){Some(value)=>value.clone().into(),None=>{return::std::result::Result::Err(margaret::framework::console::command_outcome::CommandOutcome::Failed,);}};"#
+            r#"letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(matchmatches.get_one::<margaret::framework::server_origin::server_origin::ServerOrigin,>("public-url"){Some(value)=>value.origin.ascii_serialization(),None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}},);"#
         ));
-        assert!(source.contains(
-            "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(origin_internal.clone(),origin_public.clone(),),);"
-        ));
-        assert!(source.contains("super::http::server_internal::server_internal(container,"));
-        assert!(source.contains("super::http::server_public::server_public(container,"));
+        assert!(source.contains(routes));
+        assert!(
+            source.find(routes) < source.find("letcontainer=matchsuper::container::build::serve(")
+        );
+        assert!(source.contains("register_servers(&mutmanager,matches,container,&routes)"));
+        assert!(source.contains("super::http::server_internal::server_internal(container,routes)"));
+        assert!(source.contains("super::http::server_public::server_public(container,routes)"));
     }
 
     #[test]
@@ -535,22 +617,30 @@ impl Flusher {
         let source = rendered(
             SERVICE,
             &[
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerTransportPolicy::Negotiable,
+                    ServerUploads::Refused,
+                ),
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerTransportPolicy::Negotiable,
+                    ServerUploads::Accepted,
+                ),
             ],
         );
 
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
-            r#"upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
+            "uploads:margaret::framework::service::server_uploads::ServerUploads::Refused,"
         ));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:super::http::server_internal::server_internal(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",routes:super::http::server_internal::server_internal(container,"#
         ));
         assert!(source.contains(
-            r#"upload_dir_argument:"internal-upload-dir",uploads_argument:"internal-uploads","#
+            r#"uploads:margaret::framework::service::server_uploads::ServerUploads::Accepted{directory_argument:"internal-upload-dir",},"#
         ));
         assert!(source.contains(
             "margaret::framework::service::serve_application::serve_application(matches,servers,"
@@ -706,7 +796,7 @@ impl Roller {
         assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains("manager.register_service(Roller{inner:container.roller(),});"));
         assert!(source.contains(
-            r#"letserve_input_0=matchmatches.get_one::<std::path::PathBuf>("secret-path")"#
+            r#"letserve_input_0=matchmatches.get_one::<::std::path::PathBuf>("secret-path")"#
         ));
     }
 
@@ -790,11 +880,9 @@ impl Worker {
             "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run();outcome"
         ));
         assert!(source.contains("manager.register_service(Worker{inner:container.worker(),});"));
-        assert!(
-            source.contains(
-                r#"letserve_input_0=matchmatches.get_one::<std::string::String>("label")"#
-            )
-        );
+        assert!(source.contains(
+            r#"letserve_input_0=matchmatches.get_one::<::std::string::String>("label")"#
+        ));
     }
 
     #[test]

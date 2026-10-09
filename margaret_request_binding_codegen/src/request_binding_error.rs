@@ -103,6 +103,32 @@ pub enum RequestBindingError {
     RouteParameterByReference { subject: String, parameter: String },
 
     #[error(
+        "route parameter '{parameter}' of {subject} loads '{model}', whose model has a composite primary key; a route binds a model by a single primary key field"
+    )]
+    RouteModelWithCompositePrimaryKey {
+        subject: String,
+        parameter: String,
+        model: String,
+    },
+
+    #[error(
+        "route parameter '{parameter}' of {subject} loads '{model}', but the crate declares no #[postgres_database] to load it from"
+    )]
+    RouteModelWithoutDatabase {
+        subject: String,
+        parameter: String,
+        model: String,
+    },
+
+    #[error(
+        "'{model}' is bound by its primary key and cannot also be the model of the route parameter binder '{binder}'"
+    )]
+    RouteModelWithBinder { model: String, binder: String },
+
+    #[error("'{model}' is bound by its primary key and cannot also be a #[route_parameter_value]")]
+    RouteModelDeclaredAsValue { model: String },
+
+    #[error(
         "#[route_parameter_value] is only supported on structs and enums, but '{value_type}' is neither"
     )]
     RouteParameterValueNotAStructOrEnum { value_type: String },
@@ -127,13 +153,14 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "form request argument #{parameter} of {subject} reads the request body via '{input_source}', but a WebSocket upgrade handshake has no body; only `from = Query` or `from = Cookie` is available"
+        "argument #{parameter} of {subject} reads the request body, which only an HTTP responder receives; a request is authenticated and routed from its head before its body is read"
     )]
-    FormRequestBodyUnavailable {
-        subject: String,
-        parameter: String,
-        input_source: String,
-    },
+    ContentOutsideResponder { subject: String, parameter: String },
+
+    #[error(
+        "{subject} reads its request body in more than one way; a body is read once, as form fields, JSON, uploaded files (optionally with form fields) or a stream"
+    )]
+    ConflictingContentBindings { subject: String },
 
     #[error(
         "argument #{parameter} of {subject} has both #[route_parameter] and #[form_request]; an argument may use at most one"
@@ -254,16 +281,6 @@ pub enum RequestBindingError {
     AuthenticatedUserUnavailable { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} requests the authenticated user from '{provider}', which reads the request body via '{input_source}', but a WebSocket upgrade handshake has no body"
-    )]
-    AuthenticatedUserBodyUnavailable {
-        subject: String,
-        parameter: String,
-        provider: String,
-        input_source: String,
-    },
-
-    #[error(
         "parameter '{parameter}' of {subject} must be the current request, a form request, a bearer token, the peer SPIFFE id, the views, an asset bag, or the routes"
     )]
     UnmarkedProviderParameter { subject: String, parameter: String },
@@ -279,7 +296,7 @@ pub enum RequestBindingError {
     ConflictingBearerTokenMarkers { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} carries #[bearer_token] on '{written}'; it must be Option<margaret::framework::jwt_verification::verified_jwt::VerifiedJwt<Claims>> taken by value"
+        "argument #{parameter} of {subject} carries #[bearer_token] on '{written}'; it must be Option<margaret::framework::jwt_verification::verified_jwt::VerifiedJwt<Claims, Profile>> or Option<margaret::framework::token_introspection::introspected_token::IntrospectedToken<Claims>> taken by value"
     )]
     BearerTokenTypeMismatch {
         subject: String,
@@ -306,14 +323,99 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "{subject} reads the bearer token more than once; a request presents exactly one bearer token"
+        "argument #{parameter} of {subject} verifies the bearer token under the profile '{written}', which is not a named type without generic arguments"
     )]
-    MultipleBearerTokenParameters { subject: String },
+    UnsupportedBearerTokenProfile {
+        subject: String,
+        parameter: String,
+        written: String,
+    },
 
     #[error(
-        "argument #{parameter} of {subject} verifies the bearer token of the token issuer '{issuer}', whose client the container does not plan"
+        "argument #{parameter} of {subject} verifies the bearer token under the profile '{written}', which matches no type in scope"
     )]
-    UnplannedTokenIssuerClient {
+    UnknownBearerTokenProfile {
+        subject: String,
+        parameter: String,
+        written: String,
+    },
+
+    #[error(
+        "{subject} verifies bearer tokens of the trusted issuer '{issuer}' more than once; each trusted issuer admits the bearer token into exactly one argument"
+    )]
+    DuplicateBearerTokenIssuer { subject: String, issuer: String },
+
+    #[error(
+        "{subject} introspects the bearer token more than once; exactly one argument may admit an introspected bearer token"
+    )]
+    DuplicateIntrospectedBearerToken { subject: String },
+
+    #[error(
+        "{subject} both verifies and introspects the bearer token; a provider admits the bearer token either as verified jwts or as one introspected token"
+    )]
+    MixedBearerTokenCarriers { subject: String },
+
+    #[error(
+        "{subject} reads both a session and a bearer token; a provider infers its user either from the session cookies or from a bearer credential"
+    )]
+    SessionMixedWithBearerToken { subject: String },
+
+    #[error(
+        "{subject} reads the session more than once; exactly one argument may carry #[session]"
+    )]
+    DuplicateSession { subject: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[session], which is only available in an #[infer_from_request] method of an #[infers_authenticated_user] provider"
+    )]
+    SessionUnavailable { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[session] together with another argument marker; an argument may use at most one"
+    )]
+    ConflictingSessionMarkers { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[session] on '{written}'; it must be Option<margaret::framework::sessions::session::Session> taken by value"
+    )]
+    SessionTypeMismatch {
+        subject: String,
+        parameter: String,
+        written: String,
+    },
+
+    #[error(
+        "argument #{parameter} of {subject} reads a session, but the dependency container plans no '{sessions}'"
+    )]
+    UnplannedSessions {
+        subject: String,
+        parameter: String,
+        sessions: String,
+    },
+
+    #[error(
+        "{subject} infers more than one authenticated user from the session; a request resolves its session once, so exactly one #[infers_authenticated_user] provider reads it"
+    )]
+    MultipleSessionAuthenticatedUsers { subject: String },
+
+    #[error(
+        "argument #{parameter} of {subject} addresses its bearer token in a way its type cannot verify: a VerifiedJwt names `issuer = <tag>` or `resource = <tag>`, an IntrospectedToken names `client = <tag>`"
+    )]
+    MismatchedBearerTokenAddressee { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} introspects the bearer token with the oauth client '{client}', which the container does not plan"
+    )]
+    UnplannedOAuthClient {
+        subject: String,
+        parameter: String,
+        client: String,
+    },
+
+    #[error(
+        "argument #{parameter} of {subject} verifies the bearer token of the trusted issuer '{issuer}', which the container does not plan"
+    )]
+    UnplannedTrustedIssuer {
         subject: String,
         parameter: String,
         issuer: String,

@@ -1,9 +1,11 @@
 use crate::serve_input::ServeInput;
 
 #[must_use]
-pub fn has_spiffe_http_client(inputs: &[ServeInput]) -> bool {
+pub fn has_spiffe_http_client<'inputs>(
+    inputs: impl IntoIterator<Item = &'inputs ServeInput>,
+) -> bool {
     inputs
-        .iter()
+        .into_iter()
         .any(|input| matches!(input, ServeInput::SpiffeHttpClient))
 }
 

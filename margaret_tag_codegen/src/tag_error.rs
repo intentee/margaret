@@ -20,11 +20,11 @@ pub enum TagError {
         source: AttributeError,
     },
 
-    #[error("the {kind} '{concrete}' does not name a tag")]
-    MissingTag { concrete: String, kind: TagKind },
+    #[error("the middleware handler '{concrete}' does not name a tag")]
+    MissingMiddlewareTag { concrete: String },
 
-    #[error("the {kind} '{concrete}' names a tag that is not a single plain name")]
-    MalformedTag { concrete: String, kind: TagKind },
+    #[error("the middleware handler '{concrete}' names a tag that is not a single plain name")]
+    MalformedMiddlewareTag { concrete: String },
 
     #[error("the tag '{tag}' is declared more than once: by '{first}' and by '{second}'")]
     DuplicateTag {
@@ -51,6 +51,94 @@ pub enum TagError {
     #[error("{site} must reference exactly one tag by its plain name")]
     MalformedReference { site: String },
 
-    #[error("{site} must be `issuer = <tag>`")]
+    #[error(
+        "{site} must be exactly one of `client = <tag>`, `issuer = <tag>` or `resource = <tag>`"
+    )]
     MalformedBearerToken { site: String },
+
+    #[error("{site} must name the issuer of its session as `issuer = <tag>`")]
+    MalformedSessionMarker { site: String },
+
+    #[error(
+        "{site} reads the session of '{tag}', but no struct declares #[issues_sessions] or #[consumes_sessions]"
+    )]
+    SessionWithoutDeclaredSessions { site: String, tag: String },
+
+    #[error(
+        "{site} reads the session of '{tag}', but the sessions of this application belong to '{declared}'"
+    )]
+    ForeignSessionIssuer {
+        declared: String,
+        site: String,
+        tag: String,
+    },
+
+    #[error(
+        "the oauth clients '{first}' and '{second}' both identify as '{client_id}' at the issuer '{issuer}', so the issuer cannot tell them apart"
+    )]
+    DuplicateOAuthClient {
+        client_id: String,
+        first: String,
+        issuer: String,
+        second: String,
+    },
+
+    #[error(
+        "the oauth clients '{first}' and '{second}' both act as the admitted client '{admitted}', so the provider cannot tell them apart"
+    )]
+    DuplicateOwnClient {
+        admitted: String,
+        first: String,
+        second: String,
+    },
+
+    #[error(
+        "{site} introspects its bearer token through the oauth client '{client}', which acts as a client of this application's own provider; verify the provider's resource tokens with #[bearer_token(resource = <tag>)] instead"
+    )]
+    IntrospectionThroughOwnClient { client: String, site: String },
+
+    #[error(
+        "{site} verifies bearer tokens issued by '{tag}', the issuance of this application; its session tokens travel only in cookies, so read them with #[session(issuer = {tag})] inside #[infer_from_request]"
+    )]
+    BearerTokenOfOwnIssuance { site: String, tag: String },
+
+    #[error(
+        "{site} acts as the admitted client '{admitted}', which does not verify its assertions with ClientKeys::Own"
+    )]
+    OwnClientOfPublishedKeys { admitted: String, site: String },
+
+    #[error(
+        "the resource '{tag}' declared by '{anchor}' is never used: no admitted client is granted it and no bearer token is addressed to it"
+    )]
+    UnconsumedResourceIssuance { anchor: String, tag: String },
+
+    #[error(
+        "the admitted client '{tag}' declared by '{anchor}' verifies its assertions with ClientKeys::Own, but no #[oauth_client(admitted_as = {tag})] signs them"
+    )]
+    UnconsumedOwnKeys { anchor: String, tag: String },
+
+    #[error("{site} names the issuer '{issuer}', which publishes no discovery document")]
+    OAuthClientIssuerNotDiscovered { issuer: String, site: String },
+
+    #[error(
+        "the subject token exchanger '{concrete}' is never used: no admitted client may exchange tokens"
+    )]
+    UnconsumedSubjectTokenExchanger { concrete: String },
+
+    #[error(
+        "the admitted client '{client}' may exchange tokens, but no #[exchanges_tokens_from] exchanger accepts any subject token"
+    )]
+    MissingSubjectTokenExchanger { client: String },
+
+    #[error("the subject token exchanger '{concrete}' must name its issuer as `issuer = <tag>`")]
+    MalformedSubjectTokenExchangerIssuer { concrete: String },
+
+    #[error(
+        "the issuer '{issuer}' has more than one subject token exchanger: '{first}' and '{second}'"
+    )]
+    DuplicateSubjectTokenExchanger {
+        issuer: String,
+        first: String,
+        second: String,
+    },
 }

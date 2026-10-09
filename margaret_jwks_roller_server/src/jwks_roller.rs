@@ -1,33 +1,97 @@
 use std::sync::Arc;
+use std::time::Duration;
 
+use bytes::Bytes;
+use chrono::Utc;
+use tokio::time::Instant;
+use tokio_util::sync::CancellationToken;
+
+use margaret_database::database::Database;
+use margaret_deadline::await_deadline::await_deadline;
+use margaret_deadline::deadline_wake::DeadlineWake;
+use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
-use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
+use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
+use margaret_jwks_roller::held_secret::HeldSecret;
+use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
+use margaret_jwks_roller::roll_due_at::roll_due_at;
+use margaret_jwks_roller::signing_keys_synchronizer::SigningKeysSynchronizer;
+use margaret_registered_claims::numeric_date::NumericDate;
 
-use crate::jwks_roller_server_bundle::JwksRollerServerBundle;
-use crate::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
+use crate::jwks_curve::JWKS_CURVE;
+use crate::jwks_document_holder::JwksDocumentHolder;
 use crate::jwks_roller_server_error::JwksRollerServerError;
 use crate::public_jwks_handler::PublicJwksHandler;
 
+fn published_document(secret: &JwksSecret) -> Result<Bytes, JwksRollerServerError> {
+    serde_json::to_vec(secret.public_jwks())
+        .map(Bytes::from)
+        .map_err(JwksRollerServerError::DocumentSerialization)
+}
+
+fn roll_deadline(secret: &JwksSecret, now: NumericDate, instant: Instant) -> Instant {
+    instant
+        + Duration::from_secs(
+            roll_due_at(secret)
+                .seconds_since_epoch()
+                .saturating_sub(now.seconds_since_epoch())
+                .max(0)
+                .unsigned_abs(),
+        )
+        .min(JWKS_ROLL_INTERVAL)
+}
+
+fn wall_clock() -> NumericDate {
+    NumericDate::from(Utc::now())
+}
+
 pub struct JwksRoller {
-    bundle: JwksRollerServerBundle,
+    jwks_document_holder: JwksDocumentHolder,
+    jwks_secret_holder: Arc<JwksSecretHolder>,
     public_jwks_handler: Arc<PublicJwksHandler>,
+    synchronizer: SigningKeysSynchronizer,
 }
 
 impl JwksRoller {
-    #[must_use]
-    pub fn create(storage: Arc<dyn JwksSecretStorage>) -> Self {
-        let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams { storage });
-        let public_jwks_handler = bundle.public_jwks_handler();
+    /// # Errors
+    ///
+    /// Returns `JwksRollerServerError::SecretRoll` when the stored keys cannot be synchronized,
+    /// and `JwksRollerServerError::DocumentSerialization` when their public document cannot be
+    /// serialized.
+    pub async fn create(
+        database: Arc<Database>,
+        rsa_keys: Arc<dyn ProvidesRsaSigningKeys>,
+    ) -> Result<Self, JwksRollerServerError> {
+        let synchronizer = SigningKeysSynchronizer {
+            curve: JWKS_CURVE,
+            database,
+            rsa_keys,
+        };
+        let secret = synchronizer
+            .synchronized(&HeldSecret::Unheld, wall_clock())
+            .await
+            .map_err(JwksRollerServerError::SecretRoll)?;
 
-        Self {
-            bundle,
-            public_jwks_handler,
-        }
+        published_document(&secret).map(|document| {
+            let jwks_document_holder = JwksDocumentHolder::new(document);
+
+            Self {
+                public_jwks_handler: Arc::new(PublicJwksHandler::new(jwks_document_holder.clone())),
+                jwks_document_holder,
+                jwks_secret_holder: Arc::new(JwksSecretHolder::new(secret)),
+                synchronizer,
+            }
+        })
     }
 
     #[must_use]
-    pub fn jwks_secret_holder(&self) -> JwksSecretHolder {
-        self.bundle.jwks_secret_holder()
+    pub fn jwks_document_holder(&self) -> JwksDocumentHolder {
+        self.jwks_document_holder.clone()
+    }
+
+    #[must_use]
+    pub fn jwks_secret_holder(&self) -> Arc<JwksSecretHolder> {
+        Arc::clone(&self.jwks_secret_holder)
     }
 
     #[must_use]
@@ -37,47 +101,87 @@ impl JwksRoller {
 
     /// # Errors
     ///
-    /// Returns `JwksRollerServerError` propagated from the work it performs.
-    pub fn run(&self) -> Result<(), JwksRollerServerError> {
-        self.bundle.roll_and_publish()
+    /// Returns `JwksRollerServerError::SecretRoll` when the stored keys cannot be synchronized,
+    /// and `JwksRollerServerError::DocumentSerialization` when their public document cannot be
+    /// serialized.
+    pub async fn run(
+        &self,
+        cancellation_token: CancellationToken,
+    ) -> Result<(), JwksRollerServerError> {
+        while await_deadline(
+            roll_deadline(&self.jwks_secret_holder.get(), wall_clock(), Instant::now()),
+            &cancellation_token,
+        )
+        .await
+            == DeadlineWake::Reached
+        {
+            self.synchronizer
+                .synchronized(
+                    &HeldSecret::Held(self.jwks_secret_holder.get()),
+                    wall_clock(),
+                )
+                .await
+                .map_err(JwksRollerServerError::SecretRoll)
+                .and_then(|synchronized| self.published(synchronized))?;
+        }
+
+        Ok(())
+    }
+
+    fn published(&self, secret: Arc<JwksSecret>) -> Result<(), JwksRollerServerError> {
+        published_document(&secret).map(|document| {
+            self.jwks_document_holder.set(document);
+            self.jwks_secret_holder.set(secret);
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use tokio::time::Instant;
 
-    use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
+    use margaret_jwks_keygen::signing_curve::SigningCurve;
+    use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
+    use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
+    use margaret_jwks_roller::roll_due_at::roll_due_at;
+    use margaret_registered_claims::numeric_date::NumericDate;
 
-    use super::JwksRoller;
+    use super::roll_deadline;
 
-    fn roller() -> JwksRoller {
-        JwksRoller::create(Arc::new(MemoryJwksSecretStorage))
+    #[test]
+    fn waits_until_the_roll_is_due() {
+        let secret = fresh_secret(SigningCurve::P256);
+        let instant = Instant::now();
+
+        assert_eq!(
+            roll_deadline(&secret, secret.rolled_at(), instant),
+            instant + JWKS_ROLL_INTERVAL
+        );
     }
 
     #[test]
-    fn serves_no_document_before_the_first_roll() {
-        assert_eq!(roller().public_jwks_handler().respond().status(), 503);
+    fn wakes_at_once_for_an_overdue_roll() {
+        let secret = fresh_secret(SigningCurve::P256);
+        let instant = Instant::now();
+
+        assert_eq!(
+            roll_deadline(
+                &secret,
+                roll_due_at(&secret).after(JWKS_ROLL_INTERVAL),
+                instant
+            ),
+            instant
+        );
     }
 
     #[test]
-    fn serves_the_rolled_document_after_a_run() {
-        let roller = roller();
+    fn resynchronizes_within_one_interval_of_keys_rolled_ahead_of_its_clock() {
+        let secret = fresh_secret(SigningCurve::P256);
+        let instant = Instant::now();
 
-        roller.run().expect("the first roll publishes a document");
-
-        assert_eq!(roller.public_jwks_handler().respond().status(), 200);
-    }
-
-    #[test]
-    fn exposes_the_secret_it_rolls() {
-        let roller = roller();
-        let holder = roller.jwks_secret_holder();
-
-        assert!(holder.get().is_none());
-
-        roller.run().expect("the first roll seeds the secret");
-
-        assert!(holder.get().is_some());
+        assert_eq!(
+            roll_deadline(&secret, NumericDate::new(i64::MIN), instant),
+            instant + JWKS_ROLL_INTERVAL
+        );
     }
 }

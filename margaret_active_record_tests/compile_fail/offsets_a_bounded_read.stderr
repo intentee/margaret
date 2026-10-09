@@ -1,0 +1,12 @@
+error[E0599]: no method named `offset` found for struct `Bounded<Modeled, Ordering, Toward, LIMIT>` in the current scope
+  --> compile_fail/offsets_a_bounded_read.rs:10:10
+   |
+ 6 |       let _ = Message::query()
+   |  _____________-
+ 7 | |         .posted_at
+ 8 | |         .ascending()
+ 9 | |         .limit::<10>()
+10 | |         .offset(10)
+   | |         -^^^^^^ method not found in `Bounded<Message, margaret_active_record_tests::margaret::models::models_message_message::query::edge::posted_at::Edge, Ascending, 10>`
+   | |_________|
+   |

@@ -34,9 +34,9 @@ impl ServerTransportPolicy {
 
     #[must_use]
     pub fn combined_with(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Negotiable, Self::Negotiable) => Self::Negotiable,
-            (Self::PinnedSpiffeMtls, _) | (_, Self::PinnedSpiffeMtls) => Self::PinnedSpiffeMtls,
+        match self {
+            Self::Negotiable => other,
+            Self::PinnedSpiffeMtls => Self::PinnedSpiffeMtls,
         }
     }
 }

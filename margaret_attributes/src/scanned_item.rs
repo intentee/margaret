@@ -2,6 +2,7 @@ use syn::Attribute;
 use syn::Path;
 
 use crate::attribute_error::AttributeError;
+use crate::attribute_host::AttributeHost;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_item::IndexedItem;
 use crate::indexed_item_parts::IndexedItemParts;
@@ -69,17 +70,23 @@ impl ScannedItem {
             .split_last()
             .map_or(&[][..], |(_, module)| module);
         let resolve_item_path = |path: &Path| resolve(module_path, path);
-        let attributes = ScannedAttribute::resolve_all(self.attributes, resolve_item_path);
+        let owner = &self.canonical_path;
+        let attributes = ScannedAttribute::resolve_all(
+            self.attributes,
+            AttributeHost::Item,
+            || owner.to_string(),
+            resolve_item_path,
+        )?;
         let fields = self
             .fields
             .into_iter()
-            .map(|field| field.resolve(resolve_item_path))
-            .collect();
+            .map(|field| field.resolve(owner, resolve_item_path))
+            .collect::<Result<Vec<_>, _>>()?;
         let methods = self
             .methods
             .into_iter()
-            .map(|method| method.resolve(resolve))
-            .collect();
+            .map(|method| method.resolve(owner, resolve))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let is_copy = item_is_copy(&attributes, module_path, &self.trait_impls, resolve)?;
 

@@ -5,6 +5,8 @@ use syn::Pat;
 use syn::Path;
 use syn::Type;
 
+use crate::attribute_error::AttributeError;
+use crate::attribute_host::AttributeHost;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_parameter::IndexedParameter;
 use crate::scanned_attribute::ScannedAttribute;
@@ -12,8 +14,7 @@ use crate::scanned_attribute::ScannedAttribute;
 pub(crate) struct ScannedParameter {
     attributes: Vec<ScannedAttribute>,
     declared: Type,
-    diagnostic_name: String,
-    holder: Ident,
+    name: Ident,
     position: usize,
 }
 
@@ -24,32 +25,36 @@ impl ScannedParameter {
         pattern: &Pat,
         position: usize,
     ) -> Self {
-        let (diagnostic_name, holder) = match pattern {
-            Pat::Ident(pattern_ident) => {
-                (pattern_ident.ident.to_string(), pattern_ident.ident.clone())
-            }
-            _ => (position.to_string(), format_ident!("argument_{position}")),
+        let name = match pattern {
+            Pat::Ident(pattern_ident) => pattern_ident.ident.clone(),
+            _ => format_ident!("argument_{position}"),
         };
 
         Self {
             attributes: ScannedAttribute::scan_all(attributes),
             declared,
-            diagnostic_name,
-            holder,
+            name,
             position,
         }
     }
 
     pub(crate) fn resolve(
         self,
+        method: &str,
         resolve: impl Copy + Fn(&Path) -> CanonicalPath,
-    ) -> IndexedParameter {
-        IndexedParameter::from_parts(
-            ScannedAttribute::resolve_all(self.attributes, resolve),
+    ) -> Result<IndexedParameter, AttributeError> {
+        let attributes = ScannedAttribute::resolve_all(
+            self.attributes,
+            AttributeHost::Member,
+            || format!("argument #{} of '{method}'", self.position),
+            resolve,
+        )?;
+
+        Ok(IndexedParameter::from_parts(
+            attributes,
             self.declared,
-            self.diagnostic_name,
-            self.holder,
+            self.name,
             self.position,
-        )
+        ))
     }
 }

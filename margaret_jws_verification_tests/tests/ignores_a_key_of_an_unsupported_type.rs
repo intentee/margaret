@@ -14,7 +14,7 @@ fn ignores_a_key_of_an_unsupported_type() {
         .expect("the fixture jwk serializes");
     let members = published.as_object_mut().expect("a jwk is an object");
 
-    members.insert("kty".to_string(), json!("OKP"));
+    members.insert("kty".to_string(), json!("AKP"));
 
     let KeySetDocumentParsing::Accepted(AcceptedKeySetDocument { ignored_keys, .. }) =
         VerificationKeySet::parse(json!({ "keys": [published] }).to_string().as_bytes())
@@ -24,6 +24,6 @@ fn ignores_a_key_of_an_unsupported_type() {
 
     assert!(matches!(
         ignored_keys.as_slice(),
-        [IgnoredKey { index: 0, reason: IgnoredKeyReason::UnsupportedKeyType { kty } }] if kty == "OKP"
+        [IgnoredKey { index: 0, reason: IgnoredKeyReason::UnsupportedKeyType { kty } }] if kty == "AKP"
     ));
 }

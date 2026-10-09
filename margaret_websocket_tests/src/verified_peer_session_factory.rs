@@ -2,8 +2,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use margaret_http::cookie_changes::CookieChanges;
 use margaret_http::request::Request;
 use margaret_http::require_peer_spiffe_id::require_peer_spiffe_id;
+use margaret_http::requirement::Requirement;
+use margaret_websocket_session::created_web_socket_session::CreatedWebSocketSession;
 use margaret_websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError;
 use margaret_websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome;
 use margaret_websocket_session::web_socket_session_factory::WebSocketSessionFactory;
@@ -21,8 +24,17 @@ impl WebSocketSessionFactory for VerifiedPeerSessionFactory {
         handshake: &Request,
     ) -> Result<WebSocketSessionCreationOutcome<TestSession>, WebSocketSessionCreationError> {
         Ok(match require_peer_spiffe_id(handshake) {
-            Ok(_peer) => WebSocketSessionCreationOutcome::Created(Arc::new(TestSession::default())),
-            Err(response) => WebSocketSessionCreationOutcome::Interrupted(response.into()),
+            Requirement::Met(_peer) => {
+                WebSocketSessionCreationOutcome::Created(CreatedWebSocketSession {
+                    cookie_changes: CookieChanges {
+                        cookies: Vec::new(),
+                    },
+                    session: Arc::new(TestSession::default()),
+                })
+            }
+            Requirement::Unmet(continuation) => {
+                WebSocketSessionCreationOutcome::Interrupted(continuation)
+            }
         })
     }
 }

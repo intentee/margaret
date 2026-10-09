@@ -1,14 +1,39 @@
+use std::convert::Infallible;
+use std::error::Error;
+use std::io;
+
 use bytes::Bytes;
 use cookie::Cookie;
+use futures_util::Stream;
+use futures_util::TryStreamExt;
+use http::HeaderName;
 use http::StatusCode;
+use http::header::SET_COOKIE;
+use http_body::Frame;
+use http_body_util::BodyExt;
 use http_body_util::Full;
+use http_body_util::StreamBody;
+use http_body_util::combinators::UnsyncBoxBody;
 use maud::Markup;
 use serde::Serialize;
 
 use crate::header::Header;
 
-fn internal_server_error() -> http::Response<Full<Bytes>> {
-    let mut response = http::Response::new(Full::new(Bytes::from_static(b"Internal Server Error")));
+fn buffered(body: Bytes) -> UnsyncBoxBody<Bytes, io::Error> {
+    Full::new(body)
+        .map_err(|never: Infallible| match never {})
+        .boxed_unsync()
+}
+
+fn set_cookie_header(cookie: &Cookie<'_>) -> Header {
+    Header {
+        name: SET_COOKIE.as_str().to_string(),
+        value: cookie.to_string(),
+    }
+}
+
+fn internal_server_error() -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
+    let mut response = http::Response::new(buffered(Bytes::from_static(b"Internal Server Error")));
 
     *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
 
@@ -16,14 +41,14 @@ fn internal_server_error() -> http::Response<Full<Bytes>> {
 }
 
 pub struct Response {
-    body: Bytes,
+    body: UnsyncBoxBody<Bytes, io::Error>,
     headers: Vec<Header>,
     status: u16,
 }
 
 impl Response {
     pub fn bytes(status: u16, content_type: impl Into<String>, body: impl Into<Bytes>) -> Self {
-        Self::new(status, body.into()).header("content-type", content_type)
+        Self::new(status, buffered(body.into())).header("content-type", content_type)
     }
 
     #[must_use]
@@ -50,7 +75,7 @@ impl Response {
         }
     }
 
-    fn new(status: u16, body: Bytes) -> Self {
+    fn new(status: u16, body: UnsyncBoxBody<Bytes, io::Error>) -> Self {
         Self {
             body,
             headers: Vec::new(),
@@ -65,11 +90,27 @@ impl Response {
 
     #[must_use]
     pub fn static_bytes(status: u16, content_type: &'static str, body: &'static [u8]) -> Self {
-        Self::new(status, Bytes::from_static(body)).header("content-type", content_type)
+        Self::new(status, buffered(Bytes::from_static(body))).header("content-type", content_type)
+    }
+
+    pub fn stream<TChunks, TError>(
+        status: u16,
+        content_type: impl Into<String>,
+        chunks: TChunks,
+    ) -> Self
+    where
+        TChunks: Stream<Item = Result<Bytes, TError>> + Send + 'static,
+        TError: Into<Box<dyn Error + Send + Sync>> + 'static,
+    {
+        Self::new(
+            status,
+            StreamBody::new(chunks.map_ok(Frame::data).map_err(io::Error::other)).boxed_unsync(),
+        )
+        .header("content-type", content_type)
     }
 
     pub fn text(status: u16, body: impl Into<String>) -> Self {
-        Self::new(status, Bytes::from(body.into()))
+        Self::new(status, buffered(Bytes::from(body.into())))
     }
 
     #[must_use]
@@ -88,15 +129,31 @@ impl Response {
     }
 
     #[must_use]
-    pub fn set_cookie(self, cookie: &Cookie<'_>) -> Self {
-        self.header("set-cookie", cookie.to_string())
+    pub fn header_value(&self, name: &HeaderName) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|header| header.name.eq_ignore_ascii_case(name.as_str()))
+            .map(|header| header.value.as_str())
     }
 
+    #[must_use]
+    pub fn headers(&self) -> &[Header] {
+        &self.headers
+    }
+
+    #[must_use]
+    pub fn set_cookie(mut self, cookie: &Cookie<'_>) -> Self {
+        self.headers.push(set_cookie_header(cookie));
+
+        self
+    }
+
+    #[must_use]
     pub fn status(&self) -> u16 {
         self.status
     }
 
-    pub(crate) fn into_http(self) -> http::Response<Full<Bytes>> {
+    pub(crate) fn into_http(self) -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
         let status = self.status;
         let mut builder = http::Response::builder().status(status);
 
@@ -104,7 +161,7 @@ impl Response {
             builder = builder.header(header.name, header.value);
         }
 
-        match builder.body(Full::new(self.body)) {
+        match builder.body(self.body) {
             Ok(response) => response,
             Err(error) => {
                 eprintln!(
@@ -114,6 +171,13 @@ impl Response {
                 internal_server_error()
             }
         }
+    }
+
+    pub(crate) fn preceded_by_cookies(mut self, cookies: &[Cookie<'_>]) -> Self {
+        self.headers
+            .splice(0..0, cookies.iter().map(set_cookie_header));
+
+        self
     }
 }
 
@@ -126,6 +190,7 @@ impl From<Markup> for Response {
 #[cfg(test)]
 mod tests {
     use cookie::Cookie;
+    use http::header::LOCATION;
     use http_body_util::BodyExt;
     use serde::Serialize;
     use serde::Serializer;
@@ -268,6 +333,18 @@ mod tests {
         let response = Response::text(9999, "unreachable status").into_http();
 
         assert_eq!(response.status().as_u16(), 500);
+    }
+
+    #[test]
+    fn finds_a_header_value_regardless_of_the_case_of_its_name() {
+        let response = Response::text(303, "").header("Location", "https://localhost/");
+
+        assert_eq!(response.header_value(&LOCATION), Some("https://localhost/"));
+    }
+
+    #[test]
+    fn finds_no_value_of_an_absent_header() {
+        assert_eq!(Response::text(200, "").header_value(&LOCATION), None);
     }
 
     #[test]

@@ -5,10 +5,9 @@ use serde_json::json;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jws_verification::header_type::HeaderType;
 use margaret_jws_verification::key_set_assembly::KeySetAssembly;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
+use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
-use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_jwt_verification::type_rejection::TypeRejection;
 use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
@@ -23,14 +22,14 @@ fn rejects_a_token_of_an_unsupported_type() {
         token,
     } = SignedClaims::typed(
         "dpop+jwt",
-        &json!({ "aud": trust.audience.as_str(), "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900 }),
+        &json!({ "aud": trust.audience, "iss": trust.issuer, "exp": 1_000, "iat": 900 }),
     )
     else {
         panic!("the fixture key set is accepted");
     };
 
     assert!(matches!(
-        verify_serialized_jwt::<Map<String, Value>>(&key_set, &token, &JwtExpectation { audience: &trust.audience, issuer: &trust.issuer, token_type: TypeHeaderExpectation::Required(JwtType::AccessToken) }, NumericDate::new(950)),
+        verify_serialized_jwt::<Map<String, Value>, AccessTokenProfile>(&key_set, &token, &trust.expectation(), NumericDate::new(950)),
         JwtVerification::Rejected(JwtRejection::Type(TypeRejection::Mismatch {
             expected: JwtType::AccessToken,
             found: HeaderType::Unsupported(found),

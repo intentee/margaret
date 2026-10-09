@@ -3,7 +3,7 @@ name = "margaret_bearer_token_verification"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
-description = "Verifies the bearer token a request presents against a trusted token issuer, for the Margaret application framework."
+description = "Routes the bearer token a request presents to the trusted issuer it names and verifies it, for the Margaret application framework."
 license.workspace = true
 repository.workspace = true
 readme.workspace = true
@@ -11,11 +11,10 @@ publish.workspace = true
 
 [dependencies]
 margaret_http = { workspace = true }
-margaret_jose_parameters = { workspace = true }
+margaret_issuer_key_set = { workspace = true }
 margaret_jwt_verification = { workspace = true }
-margaret_key_set_poll = { workspace = true }
 margaret_registered_claims = { workspace = true }
-margaret_token_trust = { workspace = true }
+margaret_trusted_issuer = { workspace = true }
 serde = { workspace = true }
 
 [lints]

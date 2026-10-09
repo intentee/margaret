@@ -4,7 +4,10 @@ use std::ops::ControlFlow;
 
 use serde_json::Value;
 
+use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
+
 use crate::accepted_key_set_document::AcceptedKeySetDocument;
+use crate::admitted_key::AdmittedKey;
 use crate::compact_jws::CompactJws;
 use crate::disclosed_key::DisclosedKey;
 use crate::duplicate_key_id::DuplicateKeyId;
@@ -15,6 +18,7 @@ use crate::jws_rejection::JwsRejection;
 use crate::jws_verification::JwsVerification;
 use crate::key_exclusion::KeyExclusion;
 use crate::key_id::KeyId;
+use crate::key_selection::KeySelection;
 use crate::key_set_assembly::KeySetAssembly;
 use crate::key_set_composition::KeySetComposition;
 use crate::key_set_document::KeySetDocument;
@@ -22,8 +26,10 @@ use crate::key_set_document_parsing::KeySetDocumentParsing;
 use crate::key_set_document_rejection::KeySetDocumentRejection;
 use crate::parameter_value::ParameterValue;
 use crate::published_jwk::PublishedJwk;
+use crate::selected_material::SelectedMaterial;
 use crate::signature_check::SignatureCheck;
 use crate::verification_key::VerificationKey;
+use crate::verification_material::VerificationMaterial;
 use crate::verified_jws::VerifiedJws;
 
 fn published_jwk(entry: Value) -> ControlFlow<IgnoredKeyReason, PublishedJwk> {
@@ -45,28 +51,32 @@ fn composition(published: &[ControlFlow<IgnoredKeyReason, PublishedJwk>]) -> Key
 
 #[derive(Clone)]
 pub struct VerificationKeySet {
-    keys: HashMap<KeyId, VerificationKey>,
+    identified: HashMap<KeyId, VerificationMaterial>,
+    unidentified: Vec<VerificationMaterial>,
 }
 
 impl VerificationKeySet {
     #[must_use]
-    pub fn assemble(verification_keys: Vec<VerificationKey>) -> KeySetAssembly {
-        let mut keys = HashMap::with_capacity(verification_keys.len());
+    pub fn assemble(keys: Vec<VerificationKey>) -> KeySetAssembly {
+        let mut identified = HashMap::with_capacity(keys.len());
 
-        for key in verification_keys {
-            match keys.entry(key.kid.clone()) {
+        for VerificationKey { kid, material } in keys {
+            match identified.entry(kid) {
                 Entry::Occupied(occupied) => {
                     return KeySetAssembly::DuplicateKeyId(DuplicateKeyId {
                         kid: occupied.key().clone(),
                     });
                 }
                 Entry::Vacant(vacant) => {
-                    vacant.insert(key);
+                    vacant.insert(material);
                 }
             }
         }
 
-        KeySetAssembly::Assembled(Self { keys })
+        KeySetAssembly::Assembled(Self {
+            identified,
+            unidentified: Vec::new(),
+        })
     }
 
     #[must_use]
@@ -81,7 +91,8 @@ impl VerificationKeySet {
         };
         let published = keys.into_iter().map(published_jwk).collect::<Vec<_>>();
         let composition = composition(&published);
-        let mut admitted_keys = Vec::with_capacity(published.len());
+        let mut identified_keys = Vec::with_capacity(published.len());
+        let mut unidentified = Vec::new();
         let mut disclosed_keys = Vec::new();
         let mut ignored_keys = Vec::new();
 
@@ -92,7 +103,10 @@ impl VerificationKeySet {
             };
 
             match admission {
-                ControlFlow::Continue(key) => admitted_keys.push(key),
+                ControlFlow::Continue(AdmittedKey::Identified(key)) => identified_keys.push(key),
+                ControlFlow::Continue(AdmittedKey::Unidentified(material)) => {
+                    unidentified.push(material);
+                }
                 ControlFlow::Break(KeyExclusion::Disclosed(disclosure)) => {
                     disclosed_keys.push(DisclosedKey { disclosure, index });
                 }
@@ -102,12 +116,15 @@ impl VerificationKeySet {
             }
         }
 
-        match Self::assemble(admitted_keys) {
-            KeySetAssembly::Assembled(key_set) => {
+        match Self::assemble(identified_keys) {
+            KeySetAssembly::Assembled(Self { identified, .. }) => {
                 KeySetDocumentParsing::Accepted(AcceptedKeySetDocument {
                     disclosed_keys,
                     ignored_keys,
-                    key_set,
+                    key_set: Self {
+                        identified,
+                        unidentified,
+                    },
                 })
             }
             KeySetAssembly::DuplicateKeyId(duplicate) => {
@@ -127,16 +144,10 @@ impl VerificationKeySet {
     fn verified<'jws>(
         &self,
         CompactJws {
-            header:
-                JwsHeader {
-                    alg,
-                    crit,
-                    kid,
-                    typ,
-                },
-            payload,
+            header: JwsHeader { alg, crit, kid, .. },
             signature,
             signing_input,
+            ..
         }: &'jws CompactJws<'_>,
     ) -> ControlFlow<JwsRejection, VerifiedJws<'jws>> {
         if crit.is_some() {
@@ -149,37 +160,62 @@ impl VerificationKeySet {
                 return ControlFlow::Break(JwsRejection::UnsupportedAlgorithm { alg: alg.clone() });
             }
         };
-        let Some(kid) = kid else {
-            return ControlFlow::Break(JwsRejection::MissingKeyId);
-        };
-        let Some(key) = self.keys.get(kid) else {
-            return ControlFlow::Break(JwsRejection::UnknownKeyId { kid: kid.clone() });
-        };
+        let SelectedMaterial {
+            material,
+            selection,
+        } = self.material_for(kid.as_ref(), algorithm)?;
 
-        let key_algorithm = key.material.algorithm();
-
-        if key_algorithm != algorithm {
-            return ControlFlow::Break(JwsRejection::AlgorithmMismatch {
-                key: key_algorithm,
-                token: algorithm,
-            });
+        match material.check(signing_input.as_bytes(), signature) {
+            SignatureCheck::LengthMismatch { expected, found } => {
+                ControlFlow::Break(JwsRejection::SignatureLength { expected, found })
+            }
+            SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws { kid: kid.as_ref() }),
+            SignatureCheck::Mismatch(source) => {
+                ControlFlow::Break(JwsRejection::SignatureMismatch {
+                    algorithm,
+                    selection,
+                    source,
+                })
+            }
         }
+    }
 
-        match key.material.check(signing_input.as_bytes(), signature) {
-            SignatureCheck::EcdsaMalformed(source) => {
-                ControlFlow::Break(JwsRejection::EcdsaSignatureMalformed { source })
-            }
-            SignatureCheck::EcdsaMismatch(source) => {
-                ControlFlow::Break(JwsRejection::EcdsaSignatureMismatch { source })
-            }
-            SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws {
-                kid,
-                payload,
-                typ: typ.as_ref(),
-            }),
-            SignatureCheck::RsaMismatch(source) => {
-                ControlFlow::Break(JwsRejection::RsaSignatureMismatch { source })
-            }
+    fn material_for(
+        &self,
+        kid: Option<&KeyId>,
+        algorithm: JwsAlgorithm,
+    ) -> ControlFlow<JwsRejection, SelectedMaterial<'_>> {
+        match kid {
+            Some(kid) => match self.identified.get(kid) {
+                Some(material) if material.admits(algorithm) => {
+                    ControlFlow::Continue(SelectedMaterial {
+                        material,
+                        selection: KeySelection::ByKeyId,
+                    })
+                }
+                Some(material) => ControlFlow::Break(JwsRejection::AlgorithmMismatch {
+                    key: material.algorithm(),
+                    token: algorithm,
+                }),
+                None => ControlFlow::Break(JwsRejection::UnknownKeyId { kid: kid.clone() }),
+            },
+            None => match self
+                .identified
+                .values()
+                .chain(&self.unidentified)
+                .filter(|material| material.admits(algorithm))
+                .collect::<Vec<&VerificationMaterial>>()
+                .as_slice()
+            {
+                [] => ControlFlow::Break(JwsRejection::NoKeyForAlgorithm { algorithm }),
+                [material] => ControlFlow::Continue(SelectedMaterial {
+                    material,
+                    selection: KeySelection::SoleKeyOfAlgorithm,
+                }),
+                candidates => ControlFlow::Break(JwsRejection::KeyIdRequired {
+                    candidates: candidates.len(),
+                }),
+            },
         }
     }
 }

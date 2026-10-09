@@ -10,6 +10,8 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
+anyhow = { workspace = true }
+margaret_handler_error = { workspace = true }
 margaret_http = { workspace = true }
 margaret_validation = { workspace = true }
 serde = { workspace = true }
@@ -17,8 +19,9 @@ validator = { workspace = true }
 
 [dev-dependencies]
 http = { workspace = true }
+margaret_http_tests = { path = "../margaret_http_tests" }
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
 validator = { workspace = true, features = ["derive"] }
 
 [lints]

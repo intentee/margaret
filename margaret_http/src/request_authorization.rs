@@ -1,3 +1,6 @@
+use std::ops::ControlFlow;
+
+use crate::bearer_challenge::BearerChallenge;
 use crate::bearer_token::BearerToken;
 
 const BEARER_SCHEME: &str = "Bearer";
@@ -42,6 +45,20 @@ impl RequestAuthorization {
         }
     }
 
+    /// # Errors
+    ///
+    /// Breaks with the `BearerChallenge` answering a request that presents no bearer token, or a
+    /// malformed one.
+    pub fn bearer(&self) -> ControlFlow<BearerChallenge, &BearerToken> {
+        match self {
+            Self::Absent | Self::OtherScheme => {
+                ControlFlow::Break(BearerChallenge::MissingCredentials)
+            }
+            Self::Bearer(token) => ControlFlow::Continue(token),
+            Self::Malformed => ControlFlow::Break(BearerChallenge::InvalidRequest),
+        }
+    }
+
     fn scheme_only(scheme: &str) -> Self {
         if is_token(scheme) && !scheme.eq_ignore_ascii_case(BEARER_SCHEME) {
             Self::OtherScheme
@@ -71,7 +88,10 @@ impl RequestAuthorization {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::ControlFlow;
+
     use super::RequestAuthorization;
+    use crate::bearer_challenge::BearerChallenge;
     use crate::bearer_token::BearerToken;
 
     fn bearer(token: &str) -> RequestAuthorization {
@@ -163,6 +183,37 @@ mod tests {
         assert_eq!(
             RequestAuthorization::parse(Some("Basic dXNlcjpwYXNz")),
             RequestAuthorization::OtherScheme
+        );
+    }
+
+    #[test]
+    fn presents_a_bearer_token() {
+        assert_eq!(
+            bearer("abc").bearer(),
+            ControlFlow::Continue(&BearerToken::new("abc".to_string()))
+        );
+    }
+
+    #[test]
+    fn challenges_a_request_without_a_bearer_token_for_credentials() {
+        assert_eq!(
+            [
+                RequestAuthorization::Absent,
+                RequestAuthorization::parse(Some("Basic dXNlcjpwYXNz")),
+                RequestAuthorization::OtherScheme,
+            ]
+            .iter()
+            .map(RequestAuthorization::bearer)
+            .collect::<Vec<_>>(),
+            vec![ControlFlow::Break(BearerChallenge::MissingCredentials); 3]
+        );
+    }
+
+    #[test]
+    fn challenges_a_malformed_authorization_as_an_invalid_request() {
+        assert_eq!(
+            RequestAuthorization::Malformed.bearer(),
+            ControlFlow::Break(BearerChallenge::InvalidRequest)
         );
     }
 

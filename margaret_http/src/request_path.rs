@@ -1,11 +1,13 @@
 use percent_encoding::percent_decode_str;
 
+use margaret_url_path::admit_path_segment::admit_path_segment;
+use margaret_url_path::path_segment_admission::PathSegmentAdmission;
+use margaret_url_path::path_segment_rejection::PathSegmentRejection;
+
 use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
 
 const PATH_SEPARATOR: char = '/';
-const CURRENT_DIRECTORY_SEGMENT: &str = ".";
-const PARENT_DIRECTORY_SEGMENT: &str = "..";
 
 fn has_malformed_percent_escape(segment: &str) -> bool {
     let bytes = segment.as_bytes();
@@ -13,12 +15,15 @@ fn has_malformed_percent_escape(segment: &str) -> bool {
 
     while index < bytes.len() {
         if bytes[index] == b'%' {
-            match (bytes.get(index + 1), bytes.get(index + 2)) {
-                (Some(high), Some(low)) if high.is_ascii_hexdigit() && low.is_ascii_hexdigit() => {
-                    index += 3;
-                }
-                _ => return true,
+            let escaped = bytes
+                .get(index + 1..index + 3)
+                .is_some_and(|digits| digits.iter().all(u8::is_ascii_hexdigit));
+
+            if !escaped {
+                return true;
             }
+
+            index += 3;
         } else {
             index += 1;
         }
@@ -44,25 +49,27 @@ fn decode_segment(segment: &str) -> RequestOutcome<String> {
         }
     };
 
-    if decoded.contains(PATH_SEPARATOR) {
-        return RequestOutcome::Rejected(RequestRejection::EncodedPathSeparator {
-            segment: segment.to_string(),
-        });
+    match admit_path_segment(&decoded) {
+        PathSegmentAdmission::Admitted => RequestOutcome::Parsed(decoded),
+        PathSegmentAdmission::Rejected(PathSegmentRejection::ControlCharacter) => {
+            RequestOutcome::Rejected(RequestRejection::ControlCharacterInPathSegment {
+                segment: segment.to_string(),
+            })
+        }
+        PathSegmentAdmission::Rejected(PathSegmentRejection::DotSegment) => {
+            RequestOutcome::Rejected(RequestRejection::DotSegmentInPath {
+                segment: segment.to_string(),
+            })
+        }
+        PathSegmentAdmission::Rejected(PathSegmentRejection::Empty) => {
+            RequestOutcome::Rejected(RequestRejection::EmptyPathSegment)
+        }
+        PathSegmentAdmission::Rejected(PathSegmentRejection::Separator) => {
+            RequestOutcome::Rejected(RequestRejection::EncodedPathSeparator {
+                segment: segment.to_string(),
+            })
+        }
     }
-
-    if decoded.chars().any(char::is_control) {
-        return RequestOutcome::Rejected(RequestRejection::ControlCharacterInPathSegment {
-            segment: segment.to_string(),
-        });
-    }
-
-    if decoded == CURRENT_DIRECTORY_SEGMENT || decoded == PARENT_DIRECTORY_SEGMENT {
-        return RequestOutcome::Rejected(RequestRejection::DotSegmentInPath {
-            segment: segment.to_string(),
-        });
-    }
-
-    RequestOutcome::Parsed(decoded)
 }
 
 pub(crate) struct RequestPath {
@@ -70,38 +77,26 @@ pub(crate) struct RequestPath {
 }
 
 impl RequestPath {
-    pub(crate) fn from_decoded(decoded: String) -> Self {
-        Self { decoded }
-    }
-
     pub(crate) fn from_request_target(target: &str) -> RequestOutcome<Self> {
-        if !target.starts_with(PATH_SEPARATOR) {
+        let Some(path) = target.strip_prefix(PATH_SEPARATOR) else {
             return RequestOutcome::Rejected(RequestRejection::RequestTargetNotOriginForm);
-        }
-
-        if target.contains("//") {
-            return RequestOutcome::Rejected(RequestRejection::EmptyPathSegment);
-        }
-
+        };
         let mut decoded = String::with_capacity(target.len());
+        let mut segments = path.split(PATH_SEPARATOR).peekable();
 
-        for segment in target
-            .split(PATH_SEPARATOR)
-            .filter(|segment| !segment.is_empty())
-        {
+        while let Some(segment) = segments.next() {
+            decoded.push(PATH_SEPARATOR);
+
+            if segment.is_empty() && segments.peek().is_none() {
+                break;
+            }
+
             match decode_segment(segment) {
-                RequestOutcome::Parsed(decoded_segment) => {
-                    decoded.push(PATH_SEPARATOR);
-                    decoded.push_str(&decoded_segment);
-                }
+                RequestOutcome::Parsed(decoded_segment) => decoded.push_str(&decoded_segment),
                 RequestOutcome::Rejected(rejection) => {
                     return RequestOutcome::Rejected(rejection);
                 }
             }
-        }
-
-        if decoded.is_empty() || (target.len() > 1 && target.ends_with(PATH_SEPARATOR)) {
-            decoded.push(PATH_SEPARATOR);
         }
 
         RequestOutcome::Parsed(Self { decoded })
@@ -269,14 +264,6 @@ mod tests {
             &RequestRejection::ControlCharacterInPathSegment {
                 segment: any_segment(),
             },
-        );
-    }
-
-    #[test]
-    fn carries_a_path_that_is_already_decoded() {
-        assert_eq!(
-            RequestPath::from_decoded("/greeting".to_string()).as_str(),
-            "/greeting"
         );
     }
 }

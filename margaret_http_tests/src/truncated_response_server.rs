@@ -67,8 +67,8 @@ impl TruncatedResponseServer {
     }
 
     #[must_use]
-    pub fn port(&self) -> u16 {
-        self.address.port()
+    pub fn address(&self) -> SocketAddr {
+        self.address
     }
 
     /// # Panics

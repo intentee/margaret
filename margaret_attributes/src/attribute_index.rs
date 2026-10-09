@@ -8,6 +8,8 @@ use crate::field_base::field_base;
 use crate::framework_attribute::FrameworkAttribute;
 use crate::identifier::Identifier;
 use crate::indexed_item::IndexedItem;
+use crate::indexed_struct::IndexedStruct;
+use crate::item_kind::ItemKind;
 use crate::matched_attribute::MatchedAttribute;
 use crate::name_allocator::NameAllocator;
 use crate::path_resolver::PathResolver;
@@ -54,6 +56,20 @@ impl AttributeIndex {
     #[must_use]
     pub fn has_framework_attribute(&self, attribute: FrameworkAttribute) -> bool {
         self.select_framework_attribute(attribute).next().is_some()
+    }
+
+    #[must_use]
+    pub fn indexed_struct<'index>(
+        &'index self,
+        item: &'index IndexedItem,
+    ) -> Option<IndexedStruct<'index>> {
+        match item.kind() {
+            ItemKind::Struct(shape) => self
+                .identifiers
+                .get(item.canonical_path())
+                .map(|identifier| IndexedStruct { identifier, shape }),
+            ItemKind::Enum | ItemKind::Function | ItemKind::Module | ItemKind::Trait => None,
+        }
     }
 
     #[must_use]

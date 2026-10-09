@@ -4,7 +4,6 @@ use std::fmt::Result;
 
 use proc_macro2::Ident;
 use syn::Path;
-use syn::PathArguments;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Tag {
@@ -19,22 +18,12 @@ impl Tag {
 
     #[must_use]
     pub fn from_path(path: &Path) -> Option<Self> {
-        if path.leading_colon.is_some() {
-            return None;
-        }
+        path.get_ident().map(|name| Self { name: name.clone() })
+    }
 
-        let mut segments = path.segments.iter();
-        let (Some(segment), None) = (segments.next(), segments.next()) else {
-            return None;
-        };
-
-        if !matches!(segment.arguments, PathArguments::None) {
-            return None;
-        }
-
-        Some(Self {
-            name: segment.ident.clone(),
-        })
+    #[must_use]
+    pub fn ident(&self) -> &Ident {
+        &self.name
     }
 }
 

@@ -6,6 +6,8 @@ pub(crate) enum KeyType {
     Ec,
     #[serde(rename = "oct")]
     Oct,
+    #[serde(rename = "OKP")]
+    OctetKeyPair,
     #[serde(rename = "RSA")]
     Rsa,
 }

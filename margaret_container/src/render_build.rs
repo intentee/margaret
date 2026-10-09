@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -11,24 +9,26 @@ use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-use margaret_serve_input_codegen::serve_input::ServeInput;
 
 use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
 use crate::construct_singleton_path::construct_singleton_path;
-use crate::constructed_type::constructed_type;
 use crate::construction_error_path::construction_error_path;
 use crate::construction_errors_doc::construction_errors_doc;
 use crate::construction_flow::construction_flow;
+use crate::constructor_outcome::ConstructorOutcome;
 use crate::container_field_ident::container_field_ident;
 use crate::container_plan::ContainerPlan;
 use crate::direct_construction::DirectConstruction;
 use crate::field_ident::field_ident;
 use crate::field_type::field_type;
 use crate::planned_dependency::PlannedDependency;
+use crate::planned_field::PlannedField;
 use crate::planned_provider::PlannedProvider;
+use crate::planned_url::PlannedUrl;
 use crate::reverse_serve_input_weaver::ReverseServeInputWeaver;
-use crate::root_serve_inputs::RootServeInputs;
+use crate::slotted_serve_input::SlottedServeInput;
+use crate::unify_serve_inputs::unify_serve_inputs;
 
 fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream {
     match shape {
@@ -38,10 +38,23 @@ fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream 
     }
 }
 
-#[derive(Clone, Copy)]
-enum ArcClone {
-    Inferred,
-    Typed,
+fn field_expression(
+    PlannedField {
+        concrete_path,
+        field_name,
+    }: &PlannedField,
+    arc_clone: ArcClone,
+) -> TokenStream {
+    let dependency = format_ident!("{field_name}");
+
+    match arc_clone {
+        ArcClone::Inferred => quote! { ::std::sync::Arc::clone(&#dependency) },
+        ArcClone::Typed => {
+            let value_type = path_tokens(concrete_path);
+
+            quote! { ::std::sync::Arc::<#value_type>::clone(&#dependency) }
+        }
+    }
 }
 
 fn dependency_expression(
@@ -50,21 +63,29 @@ fn dependency_expression(
     arc_clone: ArcClone,
 ) -> TokenStream {
     match dependency {
+        PlannedDependency::Collection(fields) => {
+            let elements = fields
+                .iter()
+                .map(|field| field_expression(field, arc_clone));
+
+            quote! { ::std::vec::Vec::from([#(#elements),*]) }
+        }
+        PlannedDependency::Constant(path) => path_tokens(path),
         PlannedDependency::ServeInput { input, slot } => weaver.weave(input, *slot),
-        PlannedDependency::Single {
-            field_name,
-            provided,
-        } => {
-            let dependency = format_ident!("{field_name}");
+        PlannedDependency::Single(field) => field_expression(field, arc_clone),
+        PlannedDependency::Urls(urls) => {
+            let mut elements: Vec<TokenStream> = urls
+                .iter()
+                .rev()
+                .map(|url| match url {
+                    PlannedUrl::Declared(url) => quote! { ::std::string::String::from(#url) },
+                    PlannedUrl::Route { input, slot } => weaver.weave(input, *slot),
+                })
+                .collect();
 
-            match arc_clone {
-                ArcClone::Inferred => quote! { ::std::sync::Arc::clone(&#dependency) },
-                ArcClone::Typed => {
-                    let value_type = constructed_type(provided);
+            elements.reverse();
 
-                    quote! { ::std::sync::Arc::<#value_type>::clone(&#dependency) }
-                }
-            }
+            quote! { ::std::vec::Vec::from([#(#elements),*]) }
         }
     }
 }
@@ -107,15 +128,32 @@ fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver)
         }
         DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
         DirectConstruction::FrameworkConstructor {
-            is_async, method, ..
+            is_async,
+            method,
+            outcome,
+            ..
         } => {
             let constructor = format_ident!("{method}");
             let arguments = dependency_expressions(dependencies, weaver, ArcClone::Typed);
-
-            if *is_async {
+            let call = if *is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
             } else {
                 quote! { #concrete::#constructor(#(#arguments),*) }
+            };
+
+            match outcome {
+                ConstructorOutcome::Fallible => {
+                    let construct_singleton = construct_singleton_path();
+                    let singleton = provider.concrete_path.to_string();
+
+                    quote! {
+                        #construct_singleton(
+                            #singleton,
+                            #call.map_err(margaret::framework::anyhow::Error::from),
+                        )?
+                    }
+                }
+                ConstructorOutcome::Infallible => call,
             }
         }
         DirectConstruction::FrameworkUnit => quote! { #concrete },
@@ -125,54 +163,43 @@ fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver)
 
             quote! { #(#sources)*.#accessor() }
         }
-        DirectConstruction::Resolved { resolver, .. } => {
-            let resolver = path_tokens(resolver);
-            let arguments = dependency_expressions(dependencies, weaver, ArcClone::Inferred);
-
-            quote! { #resolver(#(#arguments),*) }
-        }
     }
 }
 
 fn statement(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver) -> TokenStream {
     let provider = &planned.provider;
     let binding = field_ident(provider);
-    let declared_type = provider.provided.is_trait_object().then(|| {
-        let value_type = field_type(provider);
-
-        quote! { : #value_type }
-    });
     let value = direct_value(planned, weaver);
     let constructed = match &provider.construction {
         DirectConstruction::Constructor { .. }
         | DirectConstruction::FrameworkAccessor { .. }
-        | DirectConstruction::Resolved { .. } => value,
+        | DirectConstruction::FrameworkConstructor {
+            outcome: ConstructorOutcome::Fallible,
+            ..
+        } => value,
         DirectConstruction::Fieldless { .. }
-        | DirectConstruction::FrameworkConstructor { .. }
+        | DirectConstruction::FrameworkConstructor {
+            outcome: ConstructorOutcome::Infallible,
+            ..
+        }
         | DirectConstruction::FrameworkUnit => quote! { ::std::sync::Arc::new(#value) },
     };
 
-    quote! { let #binding #declared_type = #constructed; }
-}
-
-struct RootBuilder {
-    arguments: Option<GeneratedModuleTokens>,
-    function: Ident,
-    tokens: TokenStream,
+    quote! { let #binding = #constructed; }
 }
 
 fn arguments_declaration(
     function: &Ident,
-    slots: &[usize],
+    inputs: &[SlottedServeInput],
     naming: ServeInputNaming,
 ) -> TokenStream {
-    if slots.is_empty() {
+    if inputs.is_empty() {
         return TokenStream::new();
     }
 
     let module = bootstrap_arguments_module(function);
     let arguments_type = bootstrap_arguments_type(function);
-    let bindings = slots.iter().map(|slot| {
+    let bindings = inputs.iter().map(|SlottedServeInput { slot, .. }| {
         let field = bootstrap_argument_field_ident(*slot);
         let binding = naming.ident(*slot);
 
@@ -186,15 +213,14 @@ fn arguments_declaration(
 
 fn arguments_module(
     function: &Ident,
-    inputs: &[ServeInput],
-    slots: &[usize],
+    inputs: &[SlottedServeInput],
 ) -> Option<GeneratedModuleTokens> {
     if inputs.is_empty() {
         return None;
     }
 
     let arguments_type = bootstrap_arguments_type(function);
-    let fields = inputs.iter().zip(slots).map(|(input, slot)| {
+    let fields = inputs.iter().map(|SlottedServeInput { input, slot }| {
         let field = bootstrap_argument_field_ident(*slot);
         let value_type = input.field_type();
 
@@ -228,7 +254,7 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
     let provider = &root.provider;
     let function = format_ident!("construct_{}", provider.field_name);
     let naming = plan.serve_input_naming();
-    let parameters = arguments_declaration(&function, &root.serve_input_slots, naming);
+    let parameters = arguments_declaration(&function, &root.serve_inputs, naming);
     let statements = flow_statements(&flow, naming);
     let root_binding = field_ident(provider);
     let root_type = field_type(provider);
@@ -262,39 +288,50 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
     };
 
     RootBuilder {
-        arguments: arguments_module(&function, &root.serve_inputs, &root.serve_input_slots),
+        arguments: arguments_module(&function, &root.serve_inputs),
         function,
         tokens,
     }
 }
 
+#[derive(Clone, Copy)]
+enum ArcClone {
+    Inferred,
+    Typed,
+}
+
+struct RootBuilder {
+    arguments: Option<GeneratedModuleTokens>,
+    function: Ident,
+    tokens: TokenStream,
+}
+
 pub(crate) fn render_build(
     plan: &ContainerPlan,
-    construction_roots: &[&PlannedProvider],
-    retained_roots: &[&PlannedProvider],
+    served_roots: &[&PlannedProvider],
     builder_roots: &[&PlannedProvider],
 ) -> Vec<GeneratedModuleTokens> {
     let root_builders = builder_roots
         .iter()
         .map(|root| root_builder(root, plan))
         .collect::<Vec<_>>();
-    let serve_flow = construction_flow(plan, construction_roots);
-    let RootServeInputs {
-        inputs: serve_inputs,
-        slots: serve_slots,
-    } = RootServeInputs::from_roots(construction_roots);
+    let serve_flow = construction_flow(plan, served_roots);
+    let serve_inputs = unify_serve_inputs(
+        served_roots
+            .iter()
+            .flat_map(|root| root.serve_inputs.iter()),
+    );
     let serve_function = format_ident!("serve");
     let naming = plan.serve_input_naming();
-    let serve_parameters = arguments_declaration(&serve_function, &serve_slots, naming);
-    let serve_arguments_module = arguments_module(&serve_function, &serve_inputs, &serve_slots);
+    let serve_parameters = arguments_declaration(&serve_function, &serve_inputs, naming);
+    let serve_arguments_module = arguments_module(&serve_function, &serve_inputs);
     let serve_statements = flow_statements(&serve_flow, naming);
-    let retained: BTreeSet<_> = retained_roots.iter().map(|entry| &entry.key).collect();
-    let fields = construction_roots
+    let fields = served_roots
         .iter()
         .enumerate()
         .map(|(position, planned)| {
             let binding = field_ident(&planned.provider);
-            let field = container_field_ident(position, retained.contains(&planned.key));
+            let field = container_field_ident(position);
 
             quote! { #field: #binding, }
         })
@@ -311,7 +348,7 @@ pub(crate) fn render_build(
     };
     let serve_too_many_lines = too_many_lines_allow();
     let serve_errors_doc = construction_errors_doc();
-    let serve = if construction_roots.iter().any(|entry| entry.is_async) {
+    let serve = if served_roots.iter().any(|entry| entry.is_async) {
         quote! {
             #serve_errors_doc
             #serve_too_many_lines

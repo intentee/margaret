@@ -11,10 +11,10 @@ use margaret_environment_variable_codegen::read_environment_variable::read_envir
 use margaret_injection_codegen::parameters::parameters;
 use margaret_input_weaving::constructor_parameter::ConstructorParameter;
 
+use crate::declared_serve_input_source::DeclaredServeInputSource;
 use crate::declared_serve_inputs::DeclaredServeInputs;
 use crate::serve_input::ServeInput;
 use crate::serve_input_codegen_error::ServeInputCodegenError;
-use crate::serve_input_source::DeclaredServeInputSource;
 use crate::serve_input_source::serve_input_source;
 
 fn console_argument_scope(item: &IndexedItem) -> ConsoleArgumentScope {
@@ -51,7 +51,7 @@ fn scan_item(
     for view in parameters(constructor) {
         let site = ConstructorParameter {
             owner: owner.clone(),
-            parameter: view.holder.to_string(),
+            parameter: view.name.to_string(),
         };
         let Some(DeclaredServeInputSource {
             attribute,
@@ -145,7 +145,9 @@ mod tests {
                 requiredness(variable.value.required),
                 variable.value.value_type
             ),
-            ServeInput::SpiffeHttpClient => "spiffe_http_client".to_string(),
+            ServeInput::RouteUrl(_) | ServeInput::Routes | ServeInput::SpiffeHttpClient => {
+                input.name().to_string()
+            }
         }
     }
 

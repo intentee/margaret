@@ -1,0 +1,30 @@
+[package]
+name = "margaret_token_exchange_client_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+margaret_authorization_server_client = { workspace = true }
+margaret_authorization_server_client_tests = { path = "../margaret_authorization_server_client_tests" }
+margaret_http = { workspace = true }
+margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_oauth_vocabulary = { workspace = true }
+margaret_route_method = { workspace = true }
+margaret_token_exchange_client = { workspace = true }
+serde_json = { workspace = true }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
+margaret_oauth_client = { workspace = true }
+oauth2 = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread"] }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

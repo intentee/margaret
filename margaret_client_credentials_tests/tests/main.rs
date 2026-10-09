@@ -1,0 +1,10 @@
+mod rejects_a_resource_grant_of_a_malformed_scope;
+mod relays_a_refused_client_credentials_grant;
+mod renews_a_token_that_expires_within_the_refresh_margin;
+mod renews_a_token_without_a_stated_lifetime;
+mod reports_an_unavailable_authorization_server;
+mod requests_a_client_credentials_grant_for_its_target;
+mod requests_a_token_per_distinct_target;
+mod requests_one_token_for_concurrent_callers;
+mod requests_the_declared_grant_of_its_resource;
+mod reuses_the_cached_token_of_a_target;

@@ -1,25 +1,26 @@
 use bytes::Bytes;
 
 use margaret_sync_holder::sync_holder::SyncHolder;
-use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct JwksDocumentHolder {
     inner: SyncHolder<Bytes>,
 }
 
 impl JwksDocumentHolder {
     #[must_use]
-    pub fn get(&self) -> Option<Bytes> {
-        self.inner.get()
-    }
-
-    pub fn set(&self, value: Option<Bytes>) {
-        self.inner.set(value);
+    pub fn new(document: Bytes) -> Self {
+        Self {
+            inner: SyncHolder::new(document),
+        }
     }
 
     #[must_use]
-    pub fn subscribe(&self) -> SyncHolderSubscription<Bytes> {
-        self.inner.subscribe()
+    pub fn get(&self) -> Bytes {
+        self.inner.get()
+    }
+
+    pub fn set(&self, document: Bytes) {
+        self.inner.set(document);
     }
 }

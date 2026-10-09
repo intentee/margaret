@@ -1,22 +1,9 @@
-use std::path::PathBuf;
-
-use margaret_attributes::crate_root::CrateRoot;
-use margaret_codegen::build::build;
 use margaret_codegen::generated_code::GeneratedCode;
+use margaret_codegen_tests::generate_fixture::generate_fixture;
 use margaret_codegen_tests::generated_module_source::generated_module_source;
 
 fn generated() -> GeneratedCode {
-    let source_directory =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/fallible_roles/src");
-    let assets_directory = source_directory.join("assets");
-
-    build(
-        &CrateRoot::new("crate", source_directory),
-        None,
-        &assets_directory,
-        ".",
-    )
-    .expect("the fallible_roles fixture generates")
+    generate_fixture("fallible_roles").expect("the fallible_roles fixture generates")
 }
 
 fn collapsed(source: &str) -> String {
@@ -61,7 +48,7 @@ fn http_server_assembly_reads_only_completed_dependencies() {
     assert!(source.contains("container.get_home_get_home()"));
     assert!(source.contains("super::super::websocket::public_routes(container,routes)"));
     assert!(source.contains(
-        "->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>"
+        "->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::router_error::RouterError,>"
     ));
     assert!(!source.contains("ConstructionError"));
 }

@@ -2,6 +2,9 @@ use margaret_attributes::tag::Tag;
 
 #[derive(Clone)]
 pub enum FrameworkInjectionRole {
-    TokenIssuerClient(Tag),
+    FrameworkState,
+    OAuthClient(Tag),
+    Runner,
+    TrustedIssuer(Tag),
     Unmarked,
 }

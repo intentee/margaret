@@ -1,11 +1,16 @@
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_umbrella_path::routes_path::routes_path;
 
 pub enum RequestInjectable {
     AssetBag,
     CurrentRequest,
+    IntrospectedToken,
     Next,
     PeerSpiffeId,
+    RequestBodyStream,
     Routes,
+    Session,
+    UploadedFiles,
     ValidationResult,
     VerifiedJwt,
     Views,
@@ -17,9 +22,13 @@ impl RequestInjectable {
         [
             Self::AssetBag,
             Self::CurrentRequest,
+            Self::IntrospectedToken,
             Self::Next,
             Self::PeerSpiffeId,
+            Self::RequestBodyStream,
             Self::Routes,
+            Self::Session,
+            Self::UploadedFiles,
             Self::ValidationResult,
             Self::VerifiedJwt,
             Self::Views,
@@ -49,6 +58,13 @@ impl RequestInjectable {
                 "request".to_string(),
                 "Request".to_string(),
             ]),
+            Self::IntrospectedToken => CanonicalPath::new(vec![
+                "margaret".to_string(),
+                "framework".to_string(),
+                "token_introspection".to_string(),
+                "introspected_token".to_string(),
+                "IntrospectedToken".to_string(),
+            ]),
             Self::Next => CanonicalPath::new(vec![
                 "margaret".to_string(),
                 "framework".to_string(),
@@ -61,11 +77,27 @@ impl RequestInjectable {
                 "spiffe_id".to_string(),
                 "SpiffeId".to_string(),
             ]),
-            Self::Routes => CanonicalPath::new(vec![
-                "crate".to_string(),
+            Self::RequestBodyStream => CanonicalPath::new(vec![
                 "margaret".to_string(),
-                "routes".to_string(),
-                "Routes".to_string(),
+                "framework".to_string(),
+                "http".to_string(),
+                "request_body_stream".to_string(),
+                "RequestBodyStream".to_string(),
+            ]),
+            Self::Routes => routes_path(),
+            Self::Session => CanonicalPath::new(vec![
+                "margaret".to_string(),
+                "framework".to_string(),
+                "sessions".to_string(),
+                "session".to_string(),
+                "Session".to_string(),
+            ]),
+            Self::UploadedFiles => CanonicalPath::new(vec![
+                "margaret".to_string(),
+                "framework".to_string(),
+                "http_uploaded_file".to_string(),
+                "uploaded_files".to_string(),
+                "UploadedFiles".to_string(),
             ]),
             Self::ValidationResult => CanonicalPath::new(vec![
                 "margaret".to_string(),
@@ -93,7 +125,14 @@ impl RequestInjectable {
     fn requires_reference(&self) -> bool {
         match self {
             Self::CurrentRequest | Self::PeerSpiffeId | Self::Routes | Self::Views => true,
-            Self::AssetBag | Self::Next | Self::ValidationResult | Self::VerifiedJwt => false,
+            Self::AssetBag
+            | Self::IntrospectedToken
+            | Self::Next
+            | Self::RequestBodyStream
+            | Self::Session
+            | Self::UploadedFiles
+            | Self::ValidationResult
+            | Self::VerifiedJwt => false,
         }
     }
 }
@@ -169,6 +208,34 @@ mod tests {
         assert!(!RequestInjectable::CurrentRequest.matches(Some(&request), false));
         assert!(RequestInjectable::PeerSpiffeId.matches(Some(&peer), true));
         assert!(!RequestInjectable::PeerSpiffeId.matches(Some(&peer), false));
+    }
+
+    #[test]
+    fn matches_the_request_body_stream_only_when_written_by_value() {
+        let stream = path(&[
+            "margaret",
+            "framework",
+            "http",
+            "request_body_stream",
+            "RequestBodyStream",
+        ]);
+
+        assert!(RequestInjectable::RequestBodyStream.matches(Some(&stream), false));
+        assert!(!RequestInjectable::RequestBodyStream.matches(Some(&stream), true));
+    }
+
+    #[test]
+    fn matches_the_uploaded_files_only_when_written_by_value() {
+        let files = path(&[
+            "margaret",
+            "framework",
+            "http_uploaded_file",
+            "uploaded_files",
+            "UploadedFiles",
+        ]);
+
+        assert!(RequestInjectable::UploadedFiles.matches(Some(&files), false));
+        assert!(!RequestInjectable::UploadedFiles.matches(Some(&files), true));
     }
 
     #[test]

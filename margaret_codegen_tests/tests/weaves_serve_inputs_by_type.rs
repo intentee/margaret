@@ -20,9 +20,16 @@ fn weaves_each_serve_input_category_with_its_type_appropriate_operation() {
     assert!(construction.contains(":u16,"));
     assert!(construction.contains(":bool,"));
     assert!(construction.contains(":::std::option::Option<u16>,"));
-    assert!(construction.contains(":::std::option::Option<std::string::String>,"));
+    assert!(construction.contains(":::std::option::Option<::std::string::String>,"));
 
-    assert!(serve.matches(".clone()").count() >= 3);
+    assert!(serve.contains(
+        r#"matches.get_one::<::std::string::String>("label"){Some(value)=>value.clone()"#
+    ));
+    assert!(
+        serve.contains(
+            r#"matches.get_one::<::std::path::PathBuf>("root"){Some(value)=>value.clone()"#
+        )
+    );
     assert!(serve.contains("Some(value)=>*value"));
     assert!(serve.contains("matches.get_flag"));
 }

@@ -20,7 +20,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::env;
+    use std::ffi::OsString;
+
+    use margaret_process_tests::child_variable::ChildVariable;
+    use margaret_process_tests::in_child_process::in_child_process;
 
     use crate::environment_variable_error::EnvironmentVariableError;
 
@@ -28,11 +31,19 @@ mod tests {
 
     #[test]
     fn reads_a_present_value() {
-        // SAFETY: `cargo nextest` runs every test in its own process, so no
-        // other thread observes the process environment while it is mutated.
-        unsafe { env::set_var("MARGARET_REQUIRED_PRESENT", "true") };
-
-        assert!(read_required::<bool>("MARGARET_REQUIRED_PRESENT").expect("the variable parses"));
+        in_child_process(
+            "read_required::tests::reads_a_present_value",
+            &[ChildVariable::Set {
+                name: "MARGARET_REQUIRED_PRESENT",
+                value: OsString::from("true"),
+            }],
+            || {
+                assert!(
+                    read_required::<bool>("MARGARET_REQUIRED_PRESENT")
+                        .expect("the variable parses")
+                );
+            },
+        );
     }
 
     #[test]
@@ -47,15 +58,20 @@ mod tests {
 
     #[test]
     fn propagates_a_value_that_does_not_parse() {
-        // SAFETY: `cargo nextest` runs every test in its own process, so no
-        // other thread observes the process environment while it is mutated.
-        unsafe { env::set_var("MARGARET_REQUIRED_MALFORMED", "maybe") };
-
-        assert!(matches!(
-            read_required::<bool>("MARGARET_REQUIRED_MALFORMED")
-                .expect_err("an unparseable value is rejected"),
-            EnvironmentVariableError::Malformed { ref name, .. }
-                if name == "MARGARET_REQUIRED_MALFORMED"
-        ));
+        in_child_process(
+            "read_required::tests::propagates_a_value_that_does_not_parse",
+            &[ChildVariable::Set {
+                name: "MARGARET_REQUIRED_MALFORMED",
+                value: OsString::from("maybe"),
+            }],
+            || {
+                assert!(matches!(
+                    read_required::<bool>("MARGARET_REQUIRED_MALFORMED")
+                        .expect_err("an unparseable value is rejected"),
+                    EnvironmentVariableError::Malformed { ref name, .. }
+                        if name == "MARGARET_REQUIRED_MALFORMED"
+                ));
+            },
+        );
     }
 }

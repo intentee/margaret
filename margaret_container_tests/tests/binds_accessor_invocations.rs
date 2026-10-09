@@ -3,6 +3,7 @@ use std::path::Path;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container_tests::bindings_for_fixture::bindings_for_fixture;
 
@@ -29,7 +30,11 @@ fn reads_a_completed_dependency_without_async_or_failure_handling() {
 #[test]
 fn invokes_the_selected_root_construction_function() {
     let bindings = bindings("fallible_constructor");
-    let invocation = bindings.construction_invocation("loader", &[]);
+    let invocation = bindings.construction_invocation(
+        &CanonicalPath::new(vec!["crate".to_string(), "Loader".to_string()]),
+        "loader",
+        &[],
+    );
 
     assert_eq!(
         collapsed(&invocation),

@@ -1,0 +1,27 @@
+[package]
+name = "margaret_example_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+margaret = { workspace = true, features = ["runtime"] }
+margaret_database_tests = { path = "../margaret_database_tests" }
+margaret_example = { path = "../margaret_example" }
+margaret_sessions_tests = { path = "../margaret_sessions_tests" }
+
+[dev-dependencies]
+chrono = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+uuid = { workspace = true }
+
+[features]
+tests_that_use_postgres = []
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

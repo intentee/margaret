@@ -15,7 +15,9 @@ use margaret_container::render_container::render_container;
 use margaret_container::rendered_container::RenderedContainer;
 use margaret_container::resolve_injectable::resolve_injectable;
 use margaret_container_tests::container_module_source::container_module_source;
+use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_serve_input_codegen::scan::scan;
+use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
 fn framework_provider(injection: FrameworkInjectionRole, name: &str) -> FrameworkProvider {
     FrameworkProvider {
@@ -30,7 +32,7 @@ fn issuer_client() -> FrameworkProvider {
     let path: syn::Path = syn::parse_str("auth").expect("the tag path parses");
 
     framework_provider(
-        FrameworkInjectionRole::TokenIssuerClient(
+        FrameworkInjectionRole::TrustedIssuer(
             Tag::from_path(&path).expect("the tag is a plain name"),
         ),
         "IssuerClient",
@@ -56,6 +58,8 @@ fn render(
         index,
         &scan(index).expect("the serve inputs are scanned"),
         providers,
+        &DeclaredPostgresDatabase::Absent,
+        &DeclaredTokenIssuance::Absent,
     )
 }
 
@@ -96,7 +100,7 @@ fn refuses_to_inject_a_token_issuer_client_into_a_request_site() {
         &[
             framework_provider(FrameworkInjectionRole::Unmarked, "FrameworkStore"),
             FrameworkProvider {
-                enablement: FrameworkEnablement::Always,
+                enablement: FrameworkEnablement::Declared,
                 ..issuer_client()
             },
         ],

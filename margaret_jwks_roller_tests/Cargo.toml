@@ -6,11 +6,26 @@ publish = false
 autotests = false
 
 [dependencies]
-anyhow = { workspace = true }
-margaret_jose_parameters = { workspace = true }
+margaret = { workspace = true, features = ["runtime"] }
+margaret_database = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller = { workspace = true }
-thiserror = { workspace = true }
+margaret_signing_keys = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+futures-util = { workspace = true }
+margaret_database_tests = { path = "../margaret_database_tests" }
+margaret_identity_session = { workspace = true }
+margaret_issuer_request = { workspace = true }
+margaret_registered_claims = { workspace = true }
+margaret_signing_keys_tests = { path = "../margaret_signing_keys_tests" }
+tokio = { workspace = true, features = ["macros", "rt"] }
+zeroize = { workspace = true }
+
+[features]
+tests_that_use_postgres = []
 
 [[test]]
 name = "main"

@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
+use margaret::framework::route_method::route_method::RouteMethod;
+
 #[singleton]
-#[responds_to_http(method = "get", path = "/configured", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/configured", server = "public")]
 struct Configured;
 
 impl Configured {

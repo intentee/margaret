@@ -35,18 +35,19 @@ pub struct SvidServerCertVerifier {
 impl SvidServerCertVerifier {
     /// # Errors
     ///
-    /// Returns `SvidError::CryptoProviderNotInstalled` or `SvidError::ServerVerifier`.
-    pub fn new(root_store: RootCertStore, spiffe_trust_domain: &str) -> Result<Self, SvidError> {
-        let default_crypto_provider =
-            CryptoProvider::get_default().ok_or(SvidError::CryptoProviderNotInstalled)?;
+    /// Returns `SvidError::TrustDomain` or `SvidError::ServerVerifier`.
+    pub fn new(
+        root_store: RootCertStore,
+        spiffe_trust_domain: &str,
+        crypto_provider: Arc<CryptoProvider>,
+    ) -> Result<Self, SvidError> {
         let spiffe_trust_domain = TrustDomain::new(spiffe_trust_domain)
             .map_err(|source| SvidError::TrustDomain { source })?;
-        let signature_verification_algorithms =
-            default_crypto_provider.signature_verification_algorithms;
+        let signature_verification_algorithms = crypto_provider.signature_verification_algorithms;
         let inner_verifier: Arc<WebPkiServerVerifier> =
             WebPkiServerVerifier::builder_with_provider(
                 Arc::new(root_store.clone()),
-                default_crypto_provider.clone(),
+                crypto_provider,
             )
             .build()
             .map_err(|source| SvidError::ServerVerifier { source })?;

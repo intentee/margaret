@@ -1,14 +1,13 @@
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 
-use crate::provided_type::ProvidedType;
+use crate::planned_field::PlannedField;
+use crate::planned_url::PlannedUrl;
 
 pub(crate) enum PlannedDependency {
-    ServeInput {
-        input: ServeInput,
-        slot: usize,
-    },
-    Single {
-        field_name: String,
-        provided: ProvidedType,
-    },
+    Collection(Vec<PlannedField>),
+    Constant(CanonicalPath),
+    ServeInput { input: ServeInput, slot: usize },
+    Single(PlannedField),
+    Urls(Vec<PlannedUrl>),
 }

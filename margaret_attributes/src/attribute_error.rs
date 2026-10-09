@@ -29,13 +29,6 @@ pub enum AttributeError {
     #[error("glob import is not allowed in '{file}'")]
     GlobImport { file: String },
 
-    #[error("invalid attribute selector '{input}': {source}")]
-    InvalidSelector {
-        input: String,
-        #[source]
-        source: syn::Error,
-    },
-
     #[error("module '{module}' resolves to both '{file_module}' and '{directory_module}'")]
     ModuleFileCollision {
         module: String,

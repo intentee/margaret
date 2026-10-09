@@ -3,10 +3,14 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_request_binding_codegen::request_binding::RequestBinding;
+use margaret_route_method::route_method::RouteMethod;
 
+use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::named_route::NamedRoute;
+use crate::route_group::RouteGroup;
 
 fn forward_method(named: &NamedRoute<'_>) -> TokenStream {
     let method = format_ident!("{}", named.name);
@@ -37,18 +41,35 @@ fn forward_method(named: &NamedRoute<'_>) -> TokenStream {
     }
 }
 
+fn injects_forwarder(table: &HttpRouteTable, server: &HttpServer) -> bool {
+    table
+        .route_groups(server.name())
+        .flat_map(RouteGroup::method_routes)
+        .flat_map(HttpRoute::arguments)
+        .any(|argument| matches!(argument.binding, RequestBinding::Forwarder))
+}
+
 fn server_forwarder(table: &HttpRouteTable, server: &HttpServer) -> TokenStream {
     let methods: Vec<TokenStream> = table
         .named_routes(server.name())
         .iter()
-        .filter(|named| named.route.method == "GET")
+        .filter(|named| named.route.method() == RouteMethod::Get)
         .map(forward_method)
         .collect();
+    let constructor = injects_forwarder(table, server).then(|| {
+        quote! {
+            pub(in crate::margaret) fn new() -> Self {
+                Self(())
+            }
+        }
+    });
 
     quote! {
-        pub struct Forwarder;
+        pub struct Forwarder(());
 
         impl Forwarder {
+            #constructor
+
             #(#methods)*
         }
     }

@@ -35,28 +35,6 @@ use crate::scanned_method::ScannedMethod;
 use crate::struct_shape::StructShape;
 use crate::walk_output::WalkOutput;
 
-struct Recordable<'item> {
-    attributes: &'item [Attribute],
-    fields: Vec<ScannedField>,
-    identifier: &'item Ident,
-    kind: ItemKind,
-    variants: Vec<IndexedVariant>,
-}
-
-enum PendingMemberKind {
-    Method(ScannedMethod),
-    TraitImpl {
-        associated_types: Vec<IndexedAssociatedType>,
-        trait_path: syn::Path,
-    },
-}
-
-struct PendingMember {
-    kind: PendingMemberKind,
-    module_path: Vec<String>,
-    self_type: Type,
-}
-
 fn has_path_attribute(attributes: &[Attribute]) -> bool {
     attributes
         .iter()
@@ -80,7 +58,7 @@ fn scan_fields(fields: &Fields) -> Vec<ScannedField> {
         .enumerate()
         .map(|(position, field)| {
             let identifier = match &field.ident {
-                Some(name) => FieldIdentifier::Named(name.to_string()),
+                Some(identifier) => FieldIdentifier::Named(identifier.clone()),
                 None => FieldIdentifier::Positional(position),
             };
 
@@ -125,20 +103,49 @@ fn resolve_module_file(directory: &Path, identifier: &Ident) -> Result<PathBuf, 
     let file_module = directory.join(format!("{identifier}.rs"));
     let directory_module = directory.join(identifier.to_string()).join("mod.rs");
 
-    match (file_module.is_file(), directory_module.is_file()) {
-        (true, true) => Err(AttributeError::ModuleFileCollision {
+    let has_directory_module = directory_module.is_file();
+
+    if file_module.is_file() {
+        if has_directory_module {
+            Err(AttributeError::ModuleFileCollision {
+                module: identifier.to_string(),
+                file_module: file_module.display().to_string(),
+                directory_module: directory_module.display().to_string(),
+            })
+        } else {
+            Ok(file_module)
+        }
+    } else if has_directory_module {
+        Ok(directory_module)
+    } else {
+        Err(AttributeError::ModuleFileNotFound {
             module: identifier.to_string(),
             file_module: file_module.display().to_string(),
             directory_module: directory_module.display().to_string(),
-        }),
-        (true, false) => Ok(file_module),
-        (false, true) => Ok(directory_module),
-        (false, false) => Err(AttributeError::ModuleFileNotFound {
-            module: identifier.to_string(),
-            file_module: file_module.display().to_string(),
-            directory_module: directory_module.display().to_string(),
-        }),
+        })
     }
+}
+
+struct Recordable<'item> {
+    attributes: &'item [Attribute],
+    fields: Vec<ScannedField>,
+    identifier: &'item Ident,
+    kind: ItemKind,
+    variants: Vec<IndexedVariant>,
+}
+
+enum PendingMemberKind {
+    Method(ScannedMethod),
+    TraitImpl {
+        associated_types: Vec<IndexedAssociatedType>,
+        trait_path: syn::Path,
+    },
+}
+
+struct PendingMember {
+    kind: PendingMemberKind,
+    module_path: Vec<String>,
+    self_type: Type,
 }
 
 pub(crate) struct ModuleWalker {

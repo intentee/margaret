@@ -11,12 +11,14 @@ use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 use margaret_item_naming_argument::render_item_references::render_item_references;
+use margaret_item_naming_argument::render_positional_variant_references::render_positional_variant_references;
 
-const REQUEST_BINDING_MARKERS: [&str; 4] = [
+const REQUEST_BINDING_MARKERS: [&str; 5] = [
     "authenticated_user",
     "route_parameter",
     "form_request",
     "bearer_token",
+    "session",
 ];
 
 fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str]) {
@@ -32,10 +34,14 @@ fn argument_error(error: &AttributeArgumentsError) -> Error {
 }
 
 fn marker_item_naming_arguments(attribute: &Attribute) -> &'static [ItemNamingArgument] {
-    if attribute.path().is_ident("foreign_key") {
-        &[ItemNamingArgument::ForeignKeyReferences]
+    if attribute.path().is_ident("column") {
+        &[ItemNamingArgument::ColumnDefault]
+    } else if attribute.path().is_ident("foreign_key") {
+        &[ItemNamingArgument::OnDelete]
     } else if attribute.path().is_ident("form_request") {
         &[ItemNamingArgument::FormRequestSource]
+    } else if attribute.path().is_ident("has_many") || attribute.path().is_ident("has_one") {
+        &[ItemNamingArgument::RelationModel]
     } else {
         &[]
     }
@@ -46,12 +52,14 @@ fn render_marker_references(
 ) -> Result<Vec<proc_macro2::TokenStream>, Error> {
     attributes
         .iter()
-        .map(|attribute| (attribute, marker_item_naming_arguments(attribute)))
-        .filter(|(_, item_naming_arguments)| !item_naming_arguments.is_empty())
-        .map(|(attribute, item_naming_arguments)| {
-            AttributeArgs::from_attribute(attribute)
-                .map(|arguments| render_item_references(&arguments, item_naming_arguments))
-                .map_err(|error| argument_error(&error))
+        .filter_map(|attribute| {
+            let item_naming_arguments = marker_item_naming_arguments(attribute);
+
+            (!item_naming_arguments.is_empty()).then(|| {
+                AttributeArgs::from_attribute(attribute)
+                    .map(|arguments| render_item_references(&arguments, item_naming_arguments))
+                    .map_err(|error| argument_error(&error))
+            })
         })
         .collect()
 }
@@ -86,6 +94,38 @@ fn referencing_named_items_or_compile_error(
             })
             .map_err(|error| argument_error(&error)),
     )
+}
+
+fn referencing_positional_variant_or_compile_error(
+    attribute_path: &str,
+    attributes: proc_macro2::TokenStream,
+    item: &proc_macro2::TokenStream,
+    item_naming_arguments: &[ItemNamingArgument],
+) -> proc_macro2::TokenStream {
+    or_compile_error(
+        AttributeArgs::from_argument_tokens(attribute_path.to_string(), attributes)
+            .map(|arguments| {
+                let variants = render_positional_variant_references(&arguments);
+                let items = render_item_references(&arguments, item_naming_arguments);
+
+                quote!(#item #variants #items)
+            })
+            .map_err(|error| argument_error(&error)),
+    )
+}
+
+fn eager_load_or_compile_error(
+    attributes: proc_macro2::TokenStream,
+    item: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    or_compile_error(strip_struct(item, &["base", "relation"]).map(|stripped| {
+        referencing_named_items_or_compile_error(
+            "eager_load",
+            attributes,
+            &stripped,
+            &[ItemNamingArgument::RelationModel],
+        )
+    }))
 }
 
 fn or_compile_error(result: Result<proc_macro2::TokenStream, Error>) -> proc_macro2::TokenStream {
@@ -153,11 +193,12 @@ fn strip_struct(
     markers: &[&str],
 ) -> Result<proc_macro2::TokenStream, Error> {
     let mut item_struct: ItemStruct = syn::parse2(item)?;
-    let references = render_marker_references(&item_struct.attrs)?;
+    let mut references = render_marker_references(&item_struct.attrs)?;
 
     retain_non_marker_attributes(&mut item_struct.attrs, markers);
 
     for field in &mut item_struct.fields {
+        references.extend(render_marker_references(&field.attrs)?);
         retain_non_marker_attributes(&mut field.attrs, markers);
     }
 
@@ -205,8 +246,13 @@ pub fn process(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn responds_to_http(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
+pub fn responds_to_http(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "responds_to_http",
+        attributes,
+        item,
+        &[ItemNamingArgument::RouteMethod],
+    )
 }
 
 #[proc_macro_attribute]
@@ -215,10 +261,84 @@ pub fn renders_view(_attributes: TokenStream, item: TokenStream) -> TokenStream 
 }
 
 #[proc_macro_attribute]
+pub fn eager_load(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    eager_load_or_compile_error(attributes.into(), item.into()).into()
+}
+
+#[proc_macro_attribute]
 pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     strip_struct_markers(
         item,
-        &["column", "foreign_key", "index", "primary_key", "unique"],
+        &[
+            "column",
+            "foreign_key",
+            "has_many",
+            "has_one",
+            "index",
+            "primary_key",
+            "unique",
+        ],
+    )
+}
+
+#[proc_macro_attribute]
+pub fn oauth_client(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "oauth_client",
+        attributes,
+        item,
+        &[
+            ItemNamingArgument::ClientAuthentication,
+            ItemNamingArgument::Scopes,
+        ],
+    )
+}
+
+#[proc_macro_attribute]
+pub fn admits_oauth_client(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "admits_oauth_client",
+        attributes,
+        item,
+        &[
+            ItemNamingArgument::ClientAuthentication,
+            ItemNamingArgument::Keys,
+            ItemNamingArgument::Signing,
+            ItemNamingArgument::Consent,
+            ItemNamingArgument::IdTokenSigning,
+            ItemNamingArgument::RedirectRoutes,
+            ItemNamingArgument::Scopes,
+        ],
+    )
+}
+
+#[proc_macro_attribute]
+pub fn consumes_sessions(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn admits_sign_in(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn exchanges_tokens_from(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn issues_resource_tokens(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn issues_sessions(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "issues_sessions",
+        attributes,
+        item,
+        &[ItemNamingArgument::Cookies],
     )
 }
 
@@ -228,7 +348,17 @@ pub fn issues_tokens(_attributes: TokenStream, item: TokenStream) -> TokenStream
 }
 
 #[proc_macro_attribute]
-pub fn provides_jwks_endpoint(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn oauth_scope(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn postgres_database(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn provides_userinfo_claims(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
@@ -238,8 +368,46 @@ pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> 
 }
 
 #[proc_macro_attribute]
-pub fn trusts_oidc_issuer(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
+pub fn serves_oidc_endpoint(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_positional_variant_or_compile_error(
+        "serves_oidc_endpoint",
+        attributes.into(),
+        &item.into(),
+        &[ItemNamingArgument::View],
+    )
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn serves_session_endpoint(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_positional_variant_or_compile_error(
+        "serves_session_endpoint",
+        attributes.into(),
+        &item.into(),
+        &[ItemNamingArgument::LandingRoute],
+    )
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn serves_sign_in(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_positional_variant_or_compile_error(
+        "serves_sign_in",
+        attributes.into(),
+        &item.into(),
+        &[ItemNamingArgument::LandingRoute],
+    )
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn verifies_tokens_from_issuer(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "verifies_tokens_from_issuer",
+        attributes,
+        item,
+        &[ItemNamingArgument::Keys],
+    )
 }
 
 #[proc_macro_attribute]
@@ -283,8 +451,13 @@ pub fn websocket_session(_attributes: TokenStream, item: TokenStream) -> TokenSt
 }
 
 #[proc_macro_attribute]
-pub fn websocket_message(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
+pub fn websocket_message(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "websocket_message",
+        attributes,
+        item,
+        &[ItemNamingArgument::WebSocketResponse],
+    )
 }
 
 #[proc_macro_attribute]
@@ -298,7 +471,9 @@ mod tests {
 
     use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
+    use super::eager_load_or_compile_error;
     use super::referencing_named_items_or_compile_error;
+    use super::referencing_positional_variant_or_compile_error;
     use super::strip_or_compile_error;
     use super::strip_struct_or_compile_error;
 
@@ -505,34 +680,54 @@ mod tests {
     }
 
     #[test]
-    fn removes_foreign_key_markers_from_the_struct_itself() {
+    fn removes_relation_markers_from_the_struct_itself() {
         let stripped = strip_struct_or_compile_error(
             quote! {
-                #[foreign_key(columns = [partition, hash], references = crate::Metadata)]
+                #[has_many(name = "translations", model = crate::Translation, key = article)]
+                #[has_one(name = "cover", model = crate::Cover, key = article)]
                 #[derive(Clone)]
-                pub struct FragmentAssociation {
+                pub struct Article {
                     #[column(primary_key)]
-                    pub partition: Uuid,
+                    pub id: Uuid,
                 }
             },
-            &["column", "foreign_key", "index"],
+            &["column", "has_many", "has_one"],
         )
         .to_string();
 
-        assert!(!stripped.contains("foreign_key"));
+        assert!(!stripped.contains("has_many"));
+        assert!(!stripped.contains("has_one"));
         assert!(!stripped.contains("column"));
         assert!(stripped.contains("derive"));
-        assert!(stripped.contains("partition"));
+        assert!(stripped.contains("id"));
     }
 
     #[test]
-    fn references_the_model_named_by_a_struct_foreign_key() {
+    fn references_the_default_of_a_column() {
         let stripped: String = strip_struct_or_compile_error(
             quote! {
-                #[foreign_key(columns = [partition], references = Metadata)]
-                pub struct FragmentAssociation {
+                struct Article {
+                    #[column(primary_key, default = ColumnDefault::UuidV7)]
+                    id: Uuid,
+                }
+            },
+            &["column"],
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
+
+        assert!(stripped.contains("const_:()={let_=&ColumnDefault::UuidV7;};"));
+    }
+
+    #[test]
+    fn references_the_on_delete_action_of_a_field_foreign_key() {
+        let stripped: String = strip_struct_or_compile_error(
+            quote! {
+                struct Article {
                     #[column]
-                    pub partition: Uuid,
+                    #[foreign_key(on_delete = OnDelete::Cascade)]
+                    author: Author,
                 }
             },
             &["column", "foreign_key"],
@@ -541,15 +736,91 @@ mod tests {
         .split_whitespace()
         .collect();
 
-        assert!(stripped.contains("const_:()={let_:::core::marker::PhantomData<Metadata>"));
+        assert!(stripped.contains("const_:()={let_=&OnDelete::Cascade;};"));
     }
 
     #[test]
-    fn turns_malformed_foreign_key_arguments_into_a_compile_error() {
+    fn strips_shape_markers_and_references_the_shaped_model() {
+        let shaped: String = eager_load_or_compile_error(
+            quote!(model = ArticleWithAuthor),
+            quote! {
+                pub struct Loaded {
+                    #[base]
+                    pub article: Article,
+                    #[relation(author)]
+                    pub author: Author,
+                }
+            },
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
+
+        assert!(!shaped.contains("#[base]"));
+        assert!(!shaped.contains("#[relation"));
+        assert!(shaped.contains(
+            "const_:()={let_:::core::marker::PhantomData<ArticleWithAuthor>=::core::marker::PhantomData;};"
+        ));
+    }
+
+    #[test]
+    fn turns_malformed_shape_arguments_into_a_compile_error() {
+        assert!(
+            eager_load_or_compile_error(
+                quote!(model =),
+                quote! {
+                    pub struct Loaded {
+                        #[base]
+                        pub article: Article,
+                    }
+                },
+            )
+            .to_string()
+            .contains("compile_error")
+        );
+    }
+
+    #[test]
+    fn references_the_model_named_by_a_relation() {
+        let stripped: String = strip_struct_or_compile_error(
+            quote! {
+                #[has_many(name = "translations", model = Translation, key = article)]
+                pub struct Article {
+                    #[column]
+                    pub id: Uuid,
+                }
+            },
+            &["column", "has_many"],
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
+
+        assert!(stripped.contains("const_:()={let_:::core::marker::PhantomData<Translation>"));
+    }
+
+    #[test]
+    fn turns_malformed_relation_arguments_into_a_compile_error() {
         let output = strip_struct_or_compile_error(
             quote! {
-                #[foreign_key(= 5)]
-                pub struct FragmentAssociation;
+                #[has_one(= 5)]
+                pub struct Article;
+            },
+            &["has_one"],
+        )
+        .to_string();
+
+        assert!(output.contains("compile_error"));
+    }
+
+    #[test]
+    fn turns_malformed_field_foreign_key_arguments_into_a_compile_error() {
+        let output = strip_struct_or_compile_error(
+            quote! {
+                pub struct Article {
+                    #[foreign_key(= 5)]
+                    author: Author,
+                }
             },
             &["foreign_key"],
         )
@@ -574,6 +845,40 @@ mod tests {
 
         assert!(output.starts_with("structAccountProvider;"));
         assert!(output.contains("::core::marker::PhantomData<Account>"));
+    }
+
+    #[test]
+    fn references_the_positional_variant_and_the_items_it_names() {
+        let output: String = referencing_positional_variant_or_compile_error(
+            "serves_session_endpoint",
+            quote!(SessionEndpoint::SignOut(landing_route = GetWelcome)),
+            &quote!(
+                struct PostSignOut;
+            ),
+            &[ItemNamingArgument::LandingRoute],
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
+
+        assert!(output.starts_with("structPostSignOut;"));
+        assert!(output.contains("let_=&SessionEndpoint::SignOut;"));
+        assert!(output.contains("::core::marker::PhantomData<GetWelcome>"));
+    }
+
+    #[test]
+    fn turns_malformed_endpoint_arguments_into_a_compile_error() {
+        let output = referencing_positional_variant_or_compile_error(
+            "serves_oidc_endpoint",
+            quote!(= 5),
+            &quote!(
+                struct PostToken;
+            ),
+            &[ItemNamingArgument::View],
+        )
+        .to_string();
+
+        assert!(output.contains("compile_error"));
     }
 
     #[test]

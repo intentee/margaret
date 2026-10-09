@@ -1,5 +1,13 @@
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UrlSegment {
-    CatchAllParameter(String),
+    CatchAllParameter {
+        name: String,
+        prefix: String,
+    },
     Literal(String),
-    Parameter(String),
+    Parameter {
+        name: String,
+        prefix: String,
+        suffix: String,
+    },
 }

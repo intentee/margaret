@@ -9,7 +9,10 @@ use crate::serve_input::ServeInput;
 pub fn serve_input_registration(input: &ServeInput) -> TokenStream {
     match input {
         ServeInput::ConsoleArgument(argument) => console_argument_registration(argument),
-        ServeInput::EnvironmentVariable(_) | ServeInput::SpiffeHttpClient => quote! {},
+        ServeInput::EnvironmentVariable(_)
+        | ServeInput::RouteUrl(_)
+        | ServeInput::Routes
+        | ServeInput::SpiffeHttpClient => quote! {},
     }
 }
 

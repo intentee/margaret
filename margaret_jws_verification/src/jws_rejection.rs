@@ -3,11 +3,11 @@ use std::fmt::Formatter;
 use std::fmt::Result;
 
 use aws_lc_rs::error::Unspecified;
-use p256::ecdsa;
 
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 
 use crate::key_id::KeyId;
+use crate::key_selection::KeySelection;
 
 #[derive(Debug)]
 pub enum JwsRejection {
@@ -16,28 +16,33 @@ pub enum JwsRejection {
         token: JwsAlgorithm,
     },
     CriticalHeader,
-    EcdsaSignatureMalformed {
-        source: ecdsa::Error,
-    },
-    EcdsaSignatureMismatch {
-        source: ecdsa::Error,
-    },
     HeaderBase64 {
         source: base64ct::Error,
     },
     HeaderMalformed {
         source: serde_json::Error,
     },
-    MissingKeyId,
+    KeyIdRequired {
+        candidates: usize,
+    },
+    NoKeyForAlgorithm {
+        algorithm: JwsAlgorithm,
+    },
     NotCompactJws,
     PayloadBase64 {
         source: base64ct::Error,
     },
-    RsaSignatureMismatch {
-        source: Unspecified,
-    },
     SignatureBase64 {
         source: base64ct::Error,
+    },
+    SignatureLength {
+        expected: usize,
+        found: usize,
+    },
+    SignatureMismatch {
+        algorithm: JwsAlgorithm,
+        selection: KeySelection,
+        source: Unspecified,
     },
     UnknownKeyId {
         kid: KeyId,
@@ -58,14 +63,6 @@ impl Display for JwsRejection {
                 formatter,
                 "the token requires header extensions that are not understood"
             ),
-            Self::EcdsaSignatureMalformed { source } => write!(
-                formatter,
-                "the token signature is not a valid ecdsa signature encoding: {source}"
-            ),
-            Self::EcdsaSignatureMismatch { source } => write!(
-                formatter,
-                "the token ecdsa signature does not match its key: {source}"
-            ),
             Self::HeaderBase64 { source } => write!(
                 formatter,
                 "the token header segment is not valid base64url: {source}"
@@ -73,7 +70,14 @@ impl Display for JwsRejection {
             Self::HeaderMalformed { source } => {
                 write!(formatter, "the token header is not a jws header: {source}")
             }
-            Self::MissingKeyId => write!(formatter, "the token header names no key id"),
+            Self::KeyIdRequired { candidates } => write!(
+                formatter,
+                "the token header names no key id, and {candidates} keys of the set verify its algorithm instead of exactly one"
+            ),
+            Self::NoKeyForAlgorithm { algorithm } => write!(
+                formatter,
+                "the token header names no key id, and no key of the set verifies {algorithm}"
+            ),
             Self::NotCompactJws => {
                 write!(
                     formatter,
@@ -84,13 +88,19 @@ impl Display for JwsRejection {
                 formatter,
                 "the token payload segment is not valid base64url: {source}"
             ),
-            Self::RsaSignatureMismatch { source } => write!(
-                formatter,
-                "the token rsa signature does not match its key: {source}"
-            ),
             Self::SignatureBase64 { source } => write!(
                 formatter,
                 "the token signature segment is not valid base64url: {source}"
+            ),
+            Self::SignatureLength { expected, found } => write!(
+                formatter,
+                "the token signature has {found} octets where its key produces {expected}"
+            ),
+            Self::SignatureMismatch {
+                algorithm, source, ..
+            } => write!(
+                formatter,
+                "the token {algorithm} signature does not match its key: {source}"
             ),
             Self::UnknownKeyId { kid } => {
                 write!(formatter, "no key in the set carries the key id '{kid}'")
@@ -107,19 +117,15 @@ mod tests {
     use aws_lc_rs::error::Unspecified;
     use base64ct::Base64UrlUnpadded;
     use base64ct::Encoding;
-    use p256::ecdsa::Signature;
 
     use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 
     use super::JwsRejection;
     use crate::key_id::KeyId;
+    use crate::key_selection::KeySelection;
 
     fn base64_error() -> base64ct::Error {
         Base64UrlUnpadded::decode_vec("!!!").expect_err("the fixture is not base64url")
-    }
-
-    fn signature_error() -> p256::ecdsa::Error {
-        Signature::from_slice(&[0_u8; 3]).expect_err("the fixture is not a signature")
     }
 
     #[test]
@@ -136,7 +142,10 @@ mod tests {
             JwsRejection::HeaderMalformed {
                 source: serde_json::from_str::<u8>("x").expect_err("the fixture is not json"),
             },
-            JwsRejection::MissingKeyId,
+            JwsRejection::KeyIdRequired { candidates: 2 },
+            JwsRejection::NoKeyForAlgorithm {
+                algorithm: JwsAlgorithm::Es512,
+            },
             JwsRejection::NotCompactJws,
             JwsRejection::PayloadBase64 {
                 source: base64_error(),
@@ -144,13 +153,13 @@ mod tests {
             JwsRejection::SignatureBase64 {
                 source: base64_error(),
             },
-            JwsRejection::EcdsaSignatureMalformed {
-                source: signature_error(),
+            JwsRejection::SignatureLength {
+                expected: 64,
+                found: 3,
             },
-            JwsRejection::EcdsaSignatureMismatch {
-                source: signature_error(),
-            },
-            JwsRejection::RsaSignatureMismatch {
+            JwsRejection::SignatureMismatch {
+                algorithm: JwsAlgorithm::Ps256,
+                selection: KeySelection::ByKeyId,
                 source: Unspecified,
             },
             JwsRejection::UnknownKeyId {
@@ -169,16 +178,25 @@ mod tests {
         assert!(described[1].contains("header extensions"));
         assert!(described[2].contains("header segment is not valid base64url"));
         assert!(described[3].contains("header is not a jws header"));
-        assert_eq!(described[4], "the token header names no key id");
+        assert_eq!(
+            described[4],
+            "the token header names no key id, and 2 keys of the set verify its algorithm instead of exactly one"
+        );
         assert_eq!(
             described[5],
+            "the token header names no key id, and no key of the set verifies ES512"
+        );
+        assert_eq!(
+            described[6],
             "the token is not a compact jws of three segments"
         );
-        assert!(described[6].contains("payload segment is not valid base64url"));
-        assert!(described[7].contains("signature segment is not valid base64url"));
-        assert!(described[8].contains("not a valid ecdsa signature encoding"));
-        assert!(described[9].contains("ecdsa signature does not match its key"));
-        assert!(described[10].contains("rsa signature does not match its key"));
+        assert!(described[7].contains("payload segment is not valid base64url"));
+        assert!(described[8].contains("signature segment is not valid base64url"));
+        assert_eq!(
+            described[9],
+            "the token signature has 3 octets where its key produces 64"
+        );
+        assert!(described[10].starts_with("the token PS256 signature does not match its key: "));
         assert!(described[11].contains("'absent'"));
         assert!(described[12].contains("'none'"));
     }

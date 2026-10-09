@@ -13,7 +13,7 @@ use crate::svid_certified_key::SvidCertifiedKey;
 
 #[derive(Clone, Debug, Default)]
 pub struct SvidCertifiedKeyHolder {
-    inner: SyncHolder<Arc<SvidCertifiedKey>>,
+    inner: SyncHolder<Option<Arc<SvidCertifiedKey>>>,
 }
 
 impl SvidCertifiedKeyHolder {
@@ -27,7 +27,7 @@ impl SvidCertifiedKeyHolder {
     }
 
     #[must_use]
-    pub fn subscribe(&self) -> SyncHolderSubscription<Arc<SvidCertifiedKey>> {
+    pub fn subscribe(&self) -> SyncHolderSubscription<Option<Arc<SvidCertifiedKey>>> {
         self.inner.subscribe()
     }
 

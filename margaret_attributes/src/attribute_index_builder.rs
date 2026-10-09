@@ -44,8 +44,18 @@ impl AttributeIndexBuilder {
         )?;
 
         self.items.extend(items);
+        self.items
+            .sort_by(|left, right| left.canonical_path().cmp(right.canonical_path()));
         self.resolver.extend(resolver);
 
-        Ok(self)
+        match self.items.windows(2).find_map(|pair| match pair {
+            [left, right] if left.canonical_path() == right.canonical_path() => Some(left),
+            _ => None,
+        }) {
+            Some(duplicate) => Err(AttributeError::DuplicateCanonicalPath {
+                path: duplicate.canonical_path().to_string(),
+            }),
+            None => Ok(self),
+        }
     }
 }

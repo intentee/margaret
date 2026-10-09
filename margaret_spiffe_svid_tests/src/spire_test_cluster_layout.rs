@@ -1,3 +1,4 @@
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -89,7 +90,7 @@ impl SpireTestClusterLayout {
     ///
     /// Returns an error propagated from the work it performs.
     pub async fn register_workload_entry(&self, server_binary_path: &Path) -> Result<()> {
-        let uid = unsafe { libc::geteuid() };
+        let uid = fs::metadata(&self.server_data_dir).await?.uid();
 
         run_spire_command(
             server_binary_path,

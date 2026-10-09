@@ -6,24 +6,26 @@ publish = false
 autotests = false
 
 [dependencies]
-async-trait = { workspace = true }
+http = { workspace = true }
 margaret_bearer_token_verification = { workspace = true }
 margaret_http = { workspace = true }
-margaret_http_tests = { path = "../margaret_http_tests" }
-margaret_jose_parameters = { workspace = true }
-margaret_jws_verification = { workspace = true }
+margaret_issuer_key_set = { workspace = true }
+margaret_jwks_keygen = { workspace = true }
 margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
+margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
-margaret_key_set_poll = { workspace = true }
-reqwest = { workspace = true }
+margaret_token_trust = { workspace = true }
+margaret_trusted_issuer = { workspace = true }
 
 [dev-dependencies]
 margaret_identity_session = { workspace = true }
-margaret_jwks_keygen = { workspace = true }
+margaret_jose_parameters = { workspace = true }
+margaret_jwks_secret_store = { workspace = true }
+margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
 margaret_registered_claims = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt", "test-util", "time"] }
 uuid = { workspace = true }
 
 [[test]]

@@ -1,0 +1,23 @@
+name: conformance tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  openid-conformance:
+    name: openid conformance
+    runs-on: ovh-linux-x64-b3-16
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.137
+
+      - name: run the openid foundation conformance suite
+        run: make test.conformance

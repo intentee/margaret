@@ -7,9 +7,10 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/configured", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/configured", server = "public")]
 pub struct Configured {
     _label: String,
     _tenant: String,

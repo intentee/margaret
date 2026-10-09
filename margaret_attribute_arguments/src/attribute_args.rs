@@ -11,6 +11,42 @@ use crate::attribute_arguments_error::AttributeArgumentsError;
 use crate::attribute_arguments_reader::AttributeArgumentsReader;
 use crate::format_path::format_path;
 use crate::named_argument::NamedArgument;
+use crate::named_assignment::NamedAssignment;
+
+fn written_paths(value: &Expr) -> Vec<&Path> {
+    match value {
+        Expr::Path(expression) => vec![&expression.path],
+        Expr::Call(call) => match call.func.as_ref() {
+            Expr::Path(function) => vec![&function.path],
+            _ => Vec::new(),
+        },
+        Expr::Array(array) => array.elems.iter().flat_map(written_paths).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn collect_nested_paths<'arguments>(
+    expression: &'arguments Expr,
+    key: &str,
+    paths: &mut Vec<&'arguments Path>,
+) {
+    let Expr::Call(call) = expression else {
+        return;
+    };
+
+    for argument in &call.args {
+        match NamedAssignment::of(argument) {
+            Some(NamedAssignment { name, value }) => {
+                if name == key {
+                    paths.extend(written_paths(value));
+                }
+
+                collect_nested_paths(value, key, paths);
+            }
+            None => collect_nested_paths(argument, key, paths),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct AttributeArgs {
@@ -23,46 +59,23 @@ impl AttributeArgs {
     /// # Errors
     ///
     /// Returns `AttributeArgumentsError::Malformed` or `AttributeArgumentsError::DuplicateNamedArgument`.
-    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgumentsError> {
-        let attribute_path = format_path(attribute.path());
-
-        match &attribute.meta {
-            Meta::Path(_) => Ok(Self {
-                attribute_path,
-                named: Vec::new(),
-                positional: Vec::new(),
-            }),
-            Meta::NameValue(meta_name_value) => Ok(Self {
-                named: vec![NamedArgument {
-                    name: format_path(&meta_name_value.path),
-                    value: meta_name_value.value.clone(),
-                }],
-                attribute_path,
-                positional: Vec::new(),
-            }),
-            Meta::List(meta_list) => {
-                Self::from_argument_tokens(attribute_path, meta_list.tokens.clone())
-            }
-        }
-    }
-
-    /// # Errors
-    ///
-    /// Returns `AttributeArgumentsError::Malformed` or `AttributeArgumentsError::DuplicateNamedArgument`.
     pub fn from_argument_tokens(
         attribute_path: String,
         tokens: TokenStream,
     ) -> Result<Self, AttributeArgumentsError> {
-        let expressions = match Punctuated::<Expr, Token![,]>::parse_terminated.parse2(tokens) {
-            Ok(expressions) => expressions,
-            Err(source) => {
-                return Err(AttributeArgumentsError::Malformed {
-                    attribute_path,
-                    source,
-                });
-            }
-        };
+        match Punctuated::<Expr, Token![,]>::parse_terminated.parse2(tokens) {
+            Ok(expressions) => Self::from_expressions(attribute_path, expressions),
+            Err(source) => Err(AttributeArgumentsError::Malformed {
+                attribute_path,
+                source,
+            }),
+        }
+    }
 
+    pub(crate) fn from_expressions(
+        attribute_path: String,
+        expressions: impl IntoIterator<Item = Expr>,
+    ) -> Result<Self, AttributeArgumentsError> {
         let mut named: Vec<NamedArgument> = Vec::new();
         let mut positional = Vec::new();
 
@@ -87,6 +100,32 @@ impl AttributeArgs {
             named,
             positional,
         })
+    }
+
+    /// # Errors
+    ///
+    /// Returns `AttributeArgumentsError::Malformed` or `AttributeArgumentsError::DuplicateNamedArgument`.
+    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgumentsError> {
+        let attribute_path = format_path(attribute.path());
+
+        match &attribute.meta {
+            Meta::Path(_) => Ok(Self {
+                attribute_path,
+                named: Vec::new(),
+                positional: Vec::new(),
+            }),
+            Meta::NameValue(meta_name_value) => Ok(Self {
+                named: vec![NamedArgument {
+                    name: format_path(&meta_name_value.path),
+                    value: meta_name_value.value.clone(),
+                }],
+                attribute_path,
+                positional: Vec::new(),
+            }),
+            Meta::List(meta_list) => {
+                Self::from_argument_tokens(attribute_path, meta_list.tokens.clone())
+            }
+        }
     }
 
     /// # Errors
@@ -117,14 +156,27 @@ impl AttributeArgs {
     }
 
     #[must_use]
-    pub fn named_path(&self, key: &str) -> Option<&Path> {
-        self.named
-            .iter()
-            .find(|argument| argument.name == key)
-            .and_then(|argument| match &argument.value {
-                Expr::Path(expression) => Some(&expression.path),
-                _ => None,
-            })
+    pub fn named_paths(&self, key: &str) -> Vec<&Path> {
+        let mut paths = Vec::new();
+
+        for argument in &self.named {
+            if argument.name == key {
+                paths.extend(written_paths(&argument.value));
+            }
+
+            collect_nested_paths(&argument.value, key, &mut paths);
+        }
+
+        for expression in &self.positional {
+            collect_nested_paths(expression, key, &mut paths);
+        }
+
+        paths
+    }
+
+    #[must_use]
+    pub fn positional_paths(&self) -> Vec<&Path> {
+        self.positional.iter().flat_map(written_paths).collect()
     }
 }
 
@@ -279,7 +331,7 @@ mod tests {
     #[test]
     fn take_unsigned_integer_returns_none_when_the_argument_is_absent() {
         let value = parsed(&parse_quote!(#[column]))
-            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .interpret(|reader| reader.take_unsigned_integer::<u32>("precision"))
             .expect("an absent unsigned integer reads as none");
 
         assert_eq!(value, None);
@@ -288,7 +340,7 @@ mod tests {
     #[test]
     fn take_unsigned_integer_reads_an_integer_literal() {
         let value = parsed(&parse_quote!(#[column(precision = 12)]))
-            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .interpret(|reader| reader.take_unsigned_integer::<u32>("precision"))
             .expect("the unsigned integer reads");
 
         assert_eq!(value, Some(12));
@@ -297,7 +349,7 @@ mod tests {
     #[test]
     fn take_unsigned_integer_rejects_a_non_integer_literal() {
         let error = parsed(&parse_quote!(#[column(precision = "12")]))
-            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .interpret(|reader| reader.take_unsigned_integer::<u32>("precision"))
             .expect_err("a string is not an unsigned integer literal");
 
         assert!(matches!(
@@ -310,7 +362,7 @@ mod tests {
     #[test]
     fn take_unsigned_integer_rejects_a_negative_literal() {
         let error = parsed(&parse_quote!(#[column(precision = -12)]))
-            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .interpret(|reader| reader.take_unsigned_integer::<u32>("precision"))
             .expect_err("a negative literal is not an unsigned integer literal");
 
         assert!(matches!(
@@ -323,7 +375,7 @@ mod tests {
     #[test]
     fn take_unsigned_integer_rejects_a_literal_that_overflows() {
         let error = parsed(&parse_quote!(#[column(precision = 4294967296)]))
-            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .interpret(|reader| reader.take_unsigned_integer::<u32>("precision"))
             .expect_err("a literal above u32::MAX is rejected");
 
         assert!(matches!(
@@ -425,8 +477,12 @@ mod tests {
         .expect("the macro arguments parse");
 
         assert_eq!(
-            arguments.named_path("behavior").map(format_path).as_deref(),
-            Some("MissedTickBehavior::Delay")
+            arguments
+                .named_paths("behavior")
+                .into_iter()
+                .map(format_path)
+                .collect::<Vec<String>>(),
+            vec!["MissedTickBehavior::Delay".to_string()]
         );
     }
 
@@ -444,21 +500,431 @@ mod tests {
     }
 
     #[test]
-    fn named_path_ignores_an_argument_written_as_another_expression() {
-        assert!(
-            parsed(&parse_quote!(#[infers_authenticated_user(user_model = "User")]))
-                .named_path("user_model")
-                .is_none()
+    fn named_paths_reach_every_path_of_a_list_nested_in_a_group() {
+        assert_eq!(
+            parsed(&parse_quote!(
+                #[client(code(routes = [Callback, routes::Landing], uris = ["https://x"]))]
+            ))
+            .named_paths("routes")
+            .into_iter()
+            .map(format_path)
+            .collect::<Vec<String>>(),
+            vec!["Callback".to_string(), "routes::Landing".to_string()]
         );
     }
 
     #[test]
-    fn named_path_reports_no_path_for_an_absent_argument() {
+    fn named_paths_ignore_an_argument_written_as_another_expression() {
+        assert!(
+            parsed(&parse_quote!(#[infers_authenticated_user(user_model = "User")]))
+                .named_paths("user_model")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn named_paths_ignore_a_call_of_a_computed_function() {
+        assert!(
+            parsed(&parse_quote!(#[admits_oauth_client(authentication = (method)(keys))]))
+                .named_paths("authentication")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn named_paths_report_no_path_for_an_absent_argument() {
         assert!(
             parsed(&parse_quote!(#[infers_authenticated_user]))
-                .named_path("user_model")
-                .is_none()
+                .named_paths("user_model")
+                .is_empty()
         );
+    }
+
+    #[test]
+    fn named_paths_reach_the_variants_nested_in_groups_and_variant_calls() {
+        assert_eq!(
+            parsed(&parse_quote!(
+                #[client(
+                    authentication = Auth::Jwt(keys = Keys::Published(signing = Algorithm::Es256)),
+                    code(signing = Algorithm::Rs256, label = "signing"),
+                    signing = Algorithm::Es384(),
+                    other = (signing)(Algorithm::Ps256),
+                    flag
+                )]
+            ))
+            .named_paths("signing")
+            .into_iter()
+            .map(format_path)
+            .collect::<Vec<String>>(),
+            vec![
+                "Algorithm::Es256".to_string(),
+                "Algorithm::Es384".to_string(),
+                "Algorithm::Rs256".to_string(),
+            ]
+        );
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ReadGroup {
+        refresh: bool,
+        scopes: Option<Vec<String>>,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ReadVariant {
+        introspection: bool,
+        variant: String,
+    }
+
+    fn read_group(arguments: &AttributeArgs) -> Result<Option<ReadGroup>, AttributeArgumentsError> {
+        arguments.interpret(|reader| {
+            reader.take_group("authorization_code", |group| {
+                Ok(ReadGroup {
+                    refresh: group.take_flag("refresh_token"),
+                    scopes: group.take_string_array("scopes")?,
+                })
+            })
+        })
+    }
+
+    fn read_variant(
+        arguments: &AttributeArgs,
+    ) -> Result<Option<ReadVariant>, AttributeArgumentsError> {
+        arguments.interpret(|reader| {
+            reader.take_variant("authentication", |variant, arguments| {
+                Ok(ReadVariant {
+                    introspection: arguments.take_flag("introspection"),
+                    variant: format_path(variant),
+                })
+            })
+        })
+    }
+
+    fn read_positional_variant(
+        arguments: &AttributeArgs,
+    ) -> Result<Option<ReadVariant>, AttributeArgumentsError> {
+        arguments.interpret(|reader| {
+            reader.take_positional_variant(|variant, arguments| {
+                Ok(ReadVariant {
+                    introspection: arguments.take_flag("introspection"),
+                    variant: format_path(variant),
+                })
+            })
+        })
+    }
+
+    #[test]
+    fn reads_a_positional_variant_with_arguments() {
+        assert_eq!(
+            read_positional_variant(&parsed(
+                &parse_quote!(#[endpoint(Endpoint::Token(introspection))])
+            ))
+            .expect("the positional variant reads"),
+            Some(ReadVariant {
+                introspection: true,
+                variant: "Endpoint::Token".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn reads_a_positional_unit_variant() {
+        assert_eq!(
+            read_positional_variant(&parsed(&parse_quote!(#[endpoint(Endpoint::Jwks)])))
+                .expect("the positional variant reads"),
+            Some(ReadVariant {
+                introspection: false,
+                variant: "Endpoint::Jwks".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn finds_no_positional_variant_written_as_a_literal() {
+        assert!(matches!(
+            read_positional_variant(&parsed(&parse_quote!(#[endpoint("token")]))),
+            Err(AttributeArgumentsError::UnrecognizedArgument { argument, .. }) if argument == "\"token\""
+        ));
+    }
+
+    #[test]
+    fn finds_no_positional_variant_called_through_an_expression() {
+        assert!(matches!(
+            read_positional_variant(&parsed(
+                &parse_quote!(#[endpoint((Endpoint::Token)(introspection))])
+            )),
+            Err(AttributeArgumentsError::UnrecognizedArgument { argument, .. })
+                if argument == "(Endpoint :: Token) (introspection)"
+        ));
+    }
+
+    #[test]
+    fn reports_a_leftover_argument_of_a_positional_variant_under_its_path() {
+        assert!(matches!(
+            read_positional_variant(&parsed(&parse_quote!(#[endpoint(Endpoint::Token(scopes = ["openid"]))]))),
+            Err(AttributeArgumentsError::UnrecognizedArgument { attribute_path, argument })
+                if attribute_path == "endpoint::Endpoint::Token" && argument == "scopes"
+        ));
+    }
+
+    #[test]
+    fn positional_paths_reach_the_variant_of_every_positional_argument() {
+        assert_eq!(
+            parsed(&parse_quote!(#[endpoint(Endpoint::Consent(view = ConsentView), tag, client = blog)]))
+                .positional_paths()
+                .into_iter()
+                .map(format_path)
+                .collect::<Vec<String>>(),
+            vec!["Endpoint::Consent".to_string(), "tag".to_string()]
+        );
+    }
+
+    #[test]
+    fn reads_an_array_of_string_literals() {
+        assert_eq!(
+            parsed(&parse_quote!(#[client(scopes = ["openid", "profile"])]))
+                .interpret(|reader| reader.take_string_array("scopes"))
+                .expect("the array reads"),
+            Some(vec!["openid".to_string(), "profile".to_string()])
+        );
+    }
+
+    #[test]
+    fn an_absent_string_array_reads_as_none() {
+        assert_eq!(
+            parsed(&parse_quote!(#[client]))
+                .interpret(|reader| reader.take_string_array("scopes"))
+                .expect("the absent array reads"),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_a_string_array_argument_that_is_not_an_array() {
+        let error = parsed(&parse_quote!(#[client(scopes = "openid")]))
+            .interpret(|reader| reader.take_string_array("scopes"))
+            .expect_err("a string is not an array");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnexpectedArgument { expected, key, .. }
+                if expected == "array of string literals" && key == "scopes"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_string_array_element_that_is_not_a_literal() {
+        let error = parsed(&parse_quote!(#[client(scopes = ["openid", profile])]))
+            .interpret(|reader| reader.take_string_array("scopes"))
+            .expect_err("a path element is not a string literal");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnexpectedArgument { expected, .. }
+                if expected == "array of string literals"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_string_array_element_that_is_another_literal() {
+        let error = parsed(&parse_quote!(#[client(scopes = ["openid", 5])]))
+            .interpret(|reader| reader.take_string_array("scopes"))
+            .expect_err("an integer element is not a string literal");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnexpectedArgument { expected, .. }
+                if expected == "array of string literals"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_string_array_that_repeats_an_element() {
+        let error = parsed(&parse_quote!(#[client(scopes = ["openid", "openid"])]))
+            .interpret(|reader| reader.take_string_array("scopes"))
+            .expect_err("a repeated element is ambiguous");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::DuplicateArrayElement { attribute_path, element, key }
+                if attribute_path == "client" && element == "openid" && key == "scopes"
+        ));
+    }
+
+    #[test]
+    fn reads_a_group_with_its_own_arguments() {
+        assert_eq!(
+            read_group(&parsed(
+                &parse_quote!(#[client(authorization_code(refresh_token, scopes = ["openid"]))])
+            ))
+            .expect("the group reads"),
+            Some(ReadGroup {
+                refresh: true,
+                scopes: Some(vec!["openid".to_string()]),
+            })
+        );
+    }
+
+    #[test]
+    fn leaves_a_call_of_a_computed_function_out_of_a_group() {
+        assert!(matches!(
+            read_group(&parsed(&parse_quote!(#[client((authorization_code)())]))),
+            Err(AttributeArgumentsError::UnrecognizedArgument { argument, attribute_path })
+                if argument == "(authorization_code) ()" && attribute_path == "client"
+        ));
+    }
+
+    #[test]
+    fn an_absent_group_reads_as_none() {
+        assert_eq!(
+            read_group(&parsed(&parse_quote!(#[client]))).expect("the absent group reads"),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_a_group_given_twice() {
+        let error = read_group(&parsed(
+            &parse_quote!(#[client(authorization_code(), authorization_code())]),
+        ))
+        .expect_err("two groups are ambiguous");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::DuplicateGroup { attribute_path, group }
+                if attribute_path == "client" && group == "authorization_code"
+        ));
+    }
+
+    #[test]
+    fn reports_a_leftover_argument_of_a_group_under_its_path() {
+        let error = read_group(&parsed(
+            &parse_quote!(#[client(authorization_code(introspection))]),
+        ))
+        .expect_err("the group does not accept the argument");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnrecognizedArgument { argument, attribute_path }
+                if argument == "introspection" && attribute_path == "client::authorization_code"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_named_argument_repeated_inside_a_group() {
+        let error = read_group(&parsed(
+            &parse_quote!(#[client(authorization_code(scopes = ["openid"], scopes = ["profile"]))]),
+        ))
+        .expect_err("a repeated argument is ambiguous");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::DuplicateNamedArgument { attribute_path, key }
+                if attribute_path == "client::authorization_code" && key == "scopes"
+        ));
+    }
+
+    #[test]
+    fn reports_a_malformed_argument_inside_a_group() {
+        let error = read_group(&parsed(
+            &parse_quote!(#[client(authorization_code(scopes = "openid"))]),
+        ))
+        .expect_err("the scopes of the group are not an array");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnexpectedArgument { attribute_path, key, .. }
+                if attribute_path == "client::authorization_code" && key == "scopes"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_named_argument_repeated_inside_a_variant() {
+        let error = read_variant(&parsed(&parse_quote!(
+            #[client(authentication = Auth::PrivateKeyJwt(jwks_uri = "a", jwks_uri = "b"))]
+        )))
+        .expect_err("a repeated argument is ambiguous");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::DuplicateNamedArgument { attribute_path, key }
+                if attribute_path == "client::authentication" && key == "jwks_uri"
+        ));
+    }
+
+    #[test]
+    fn reads_a_unit_variant() {
+        assert_eq!(
+            read_variant(&parsed(
+                &parse_quote!(#[client(authentication = Auth::None)])
+            ))
+            .expect("the variant reads"),
+            Some(ReadVariant {
+                introspection: false,
+                variant: "Auth::None".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn reads_a_variant_with_arguments() {
+        assert_eq!(
+            read_variant(&parsed(
+                &parse_quote!(#[client(authentication = Auth::PrivateKeyJwt(introspection))])
+            ))
+            .expect("the variant reads"),
+            Some(ReadVariant {
+                introspection: true,
+                variant: "Auth::PrivateKeyJwt".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn an_absent_variant_reads_as_none() {
+        assert_eq!(
+            read_variant(&parsed(&parse_quote!(#[client]))).expect("the absent variant reads"),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_a_variant_call_of_an_expression() {
+        let error = read_variant(&parsed(
+            &parse_quote!(#[client(authentication = (Auth::PrivateKeyJwt)(introspection))]),
+        ))
+        .expect_err("a call of a parenthesized expression is not a variant");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnexpectedArgument { expected, key, .. }
+                if expected == "enum variant" && key == "authentication"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_variant_written_as_a_literal() {
+        let error = read_variant(&parsed(&parse_quote!(#[client(authentication = "none")])))
+            .expect_err("a string literal is not a variant");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnexpectedArgument { expected, .. } if expected == "enum variant"
+        ));
+    }
+
+    #[test]
+    fn reports_a_leftover_argument_of_a_variant_under_its_key() {
+        let error = read_variant(&parsed(
+            &parse_quote!(#[client(authentication = Auth::None(scopes = ["openid"]))]),
+        ))
+        .expect_err("the variant does not accept the argument");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnrecognizedArgument { argument, attribute_path }
+                if argument == "scopes" && attribute_path == "client::authentication"
+        ));
     }
 
     #[test]

@@ -13,11 +13,12 @@ use margaret_request_binding_codegen::binding_reads_request::binding_reads_reque
 use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
 use margaret_request_binding_codegen::captured_providers::CapturedProviders;
-use margaret_request_binding_codegen::extraction_context::ExtractionContext;
+use margaret_request_binding_codegen::head_extraction_context::HeadExtractionContext;
 use margaret_request_binding_codegen::render_authenticated_user_wrapper_construction::render_authenticated_user_wrapper_construction;
-use margaret_request_binding_codegen::render_bound_request_extractions::render_bound_request_extractions;
-use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
+use margaret_request_binding_codegen::render_head_extractions::render_head_extractions;
+use margaret_request_binding_codegen::render_session_user_inference::render_session_user_inference;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
+use margaret_request_binding_codegen::session_user_parameter::session_user_parameter;
 
 use crate::handler_binding::HandlerBinding;
 use crate::session_plan::SessionPlan;
@@ -40,12 +41,7 @@ fn captured_providers(session: &WebSocketSession) -> CapturedProviders {
     let mut allocator = NameAllocator::new();
 
     for parameter in &session.parameters {
-        if matches!(
-            parameter.binding,
-            RequestBinding::Injectable { .. } | RequestBinding::Routes
-        ) {
-            allocator.reserve(&parameter.holder.to_string());
-        }
+        allocator.reserve(&parameter.holder.to_string());
     }
 
     CapturedProviders::capture(&session.parameters, &mut allocator)
@@ -129,7 +125,7 @@ fn factory_initializers(
     quote! { #(#holders)* #(#initializers)* }
 }
 
-fn create_extractions(
+fn create_body(
     session: &WebSocketSession,
     handshake: &Ident,
     captured: &CapturedProviders,
@@ -141,13 +137,6 @@ fn create_extractions(
             ),
         )
     };
-    let response_return = quote! {
-        return ::std::result::Result::Ok(
-            margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
-                response.into(),
-            ),
-        )
-    };
     let error_return = quote! {
         return ::std::result::Result::Err(
             margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer(
@@ -155,42 +144,56 @@ fn create_extractions(
             ),
         )
     };
+
     let owner = quote! { self. };
-    let bound = render_bound_request_extractions(
-        &session.parameters,
-        captured,
-        &owner,
-        handshake,
-        &quote! { return ::std::result::Result::Err(error.into()) },
-        &quote! {
-            return ::std::result::Result::Ok(
-                margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
-                    margaret::framework::http::response_continuation::ResponseContinuation::from(
-                        margaret::framework::http::response::Response::not_found(),
-                    ),
-                ),
+    let extraction_context = HeadExtractionContext {
+        continuation_return: &continuation_return,
+        error_return: &error_return,
+        owner: &owner,
+        request_local: handshake,
+    };
+    let extractions = render_head_extractions(&session.parameters, captured, &extraction_context);
+    let session_path = path_tokens(&session.session_path);
+    let method_name = &session.method_name;
+    let arguments = build_arguments(session);
+    let creation = quote! {
+        #extractions
+
+        #session_path::#method_name(#arguments)
+            .map(|created| {
+                margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created(
+                    margaret::framework::websocket_session::created_web_socket_session::CreatedWebSocketSession {
+                        cookie_changes: margaret::framework::http::cookie_changes::CookieChanges {
+                            cookies: ::std::vec::Vec::new(),
+                        },
+                        session: ::std::sync::Arc::new(created),
+                    },
+                )
+            })
+            .map_err(
+                margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
             )
-        },
-    );
-    let extractions = session.parameters.iter().map(|parameter| {
-        let provider_access = captured.access(&parameter.binding, &owner);
+    };
 
-        render_request_extraction(
-            &parameter.binding,
-            &parameter.holder,
-            &ExtractionContext {
-                continuation_return: &continuation_return,
-                error_return: &error_return,
-                provider_access: &provider_access,
-                request_local: handshake,
-                response_return: &response_return,
-            },
-        )
-    });
+    match session_user_parameter(&session.parameters) {
+        Some(session_user) => {
+            let cookie_changes = format_ident!("changed_cookies");
+            let inference = render_session_user_inference(
+                session_user,
+                captured,
+                &cookie_changes,
+                &extraction_context,
+            );
 
-    quote! {
-        #bound
-        #(#extractions)*
+            quote! {
+                #inference
+
+                async { #creation }
+                    .await
+                    .map(|outcome| outcome.preceded_by(&#cookie_changes))
+            }
+        }
+        None => creation,
     }
 }
 
@@ -220,9 +223,7 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
     } else {
         format_ident!("_handshake")
     };
-    let extractions = create_extractions(session, &handshake, captured);
-    let arguments = build_arguments(session);
-    let method_name = &session.method_name;
+    let body = create_body(session, &handshake, captured);
     let create_too_many_lines = too_many_lines_allow();
 
     quote! {
@@ -242,14 +243,7 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
                 margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome<Self::Session>,
                 margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError,
             > {
-                #extractions
-
-                #session_path::#method_name(#arguments)
-                    .map(::std::sync::Arc::new)
-                    .map(margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created)
-                    .map_err(
-                        margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
-                    )
+                #body
             }
         }
     }

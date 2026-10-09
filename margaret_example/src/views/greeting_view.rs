@@ -64,7 +64,7 @@ mod tests {
         let view = GreetingView {
             card_layout: Arc::new(CardLayout),
         };
-        let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
+        let routes = Routes::from_origins("http://identity", "http://internal", "http://public");
 
         let markup = view
             .render(GreetingViewProps {

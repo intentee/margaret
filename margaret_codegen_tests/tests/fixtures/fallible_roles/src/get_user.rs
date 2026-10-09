@@ -5,12 +5,13 @@ use margaret::framework::macros::middleware;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use super::user::User;
 
 #[middleware(guarded)]
 #[singleton]
-#[responds_to_http(method = "get", path = "/users/{user}", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/users/{user}", server = "public")]
 pub struct GetUser;
 
 impl GetUser {

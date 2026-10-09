@@ -1,7 +1,6 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::framework_service::FrameworkService;
-use crate::framework_service_kind::FrameworkServiceKind;
 use crate::service_kind::ServiceKind;
 use crate::service_unit_origin::ServiceUnitOrigin;
 
@@ -22,7 +21,7 @@ impl ServiceUnit {
             concrete_path,
             field_name,
             is_async,
-            kind,
+            outcome,
             runner,
             takes_token,
             type_name,
@@ -32,14 +31,8 @@ impl ServiceUnit {
             concrete_path: concrete_path.clone(),
             field_name: field_name.clone(),
             is_async: *is_async,
-            kind: match kind {
-                FrameworkServiceKind::Service => ServiceKind::Service,
-                FrameworkServiceKind::Ticker { interval } => ServiceKind::Ticker {
-                    behavior: None,
-                    interval: interval.clone(),
-                },
-            },
-            origin: ServiceUnitOrigin::Framework,
+            kind: ServiceKind::Service,
+            origin: ServiceUnitOrigin::Framework { outcome: *outcome },
             runner: runner.clone(),
             takes_token: *takes_token,
             type_name: type_name.clone(),

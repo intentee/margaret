@@ -1,0 +1,20 @@
+error[E0599]: the method `ascending` exists for struct `Next<Article, String, margaret_active_record_tests::margaret::models::models_article_article::query::then::author::edge::title::Edge, Narrowed<Article>>`, but its trait bounds were not satisfied
+  --> compile_fail/orders_along_a_partial_path.rs:13:10
+   |
+ 9 |       let _ = Article::query()
+   |  _____________-
+10 | |         .author
+11 | |         .eq(Key::new(Uuid::nil()))
+12 | |         .title
+13 | |         .ascending()
+   | |         -^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
+   | |_________|
+   |
+   |
+  ::: src/../margaret/models/models_article_article/query/then/author/edge/title.rs
+   |
+   |   pub struct Edge;
+   |   --------------- doesn't satisfy `_: ScanOrder<Article>`
+   |
+   = note: the following trait bounds were not satisfied:
+           `margaret_active_record_tests::margaret::models::models_article_article::query::then::author::edge::title::Edge: ScanOrder<Article>`

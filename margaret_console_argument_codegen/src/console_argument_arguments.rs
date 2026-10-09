@@ -12,13 +12,13 @@ pub(crate) fn console_argument_arguments(
         let named = reader.take_string("from")?;
         let positional = reader.take_flag("positional");
 
-        match (named, positional) {
-            (Some(key), false) => Ok(ConsoleArgumentForm::Named { key }),
-            (None, true) => Ok(ConsoleArgumentForm::Positional),
-            (Some(_), true) => {
+        match named {
+            Some(_) if positional => {
                 Err(ConsoleArgumentCodegenError::NamedAndPositional { site: site.clone() })
             }
-            (None, false) => {
+            Some(key) => Ok(ConsoleArgumentForm::Named { key }),
+            None if positional => Ok(ConsoleArgumentForm::Positional),
+            None => {
                 Err(ConsoleArgumentCodegenError::NeitherNamedNorPositional { site: site.clone() })
             }
         }

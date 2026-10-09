@@ -1,0 +1,5 @@
+error[E0599]: no method named `delete` found for struct `margaret_active_record_tests::margaret::models::models_article_article::query::Step` in the current scope
+ --> compile_fail/deletes_the_whole_table.rs:6:30
+  |
+6 |     let _ = Article::query().delete(database).await;
+  |                              ^^^^^^ method not found in `margaret_active_record_tests::margaret::models::models_article_article::query::Step`

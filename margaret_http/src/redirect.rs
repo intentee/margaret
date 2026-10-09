@@ -8,28 +8,32 @@ pub struct Redirect {
 }
 
 impl Redirect {
-    pub(crate) fn permanent(location: String) -> Self {
+    #[must_use]
+    pub fn permanent(location: String) -> Self {
         Self {
             location,
             status: StatusCode::PERMANENT_REDIRECT,
         }
     }
 
-    pub(crate) fn see_other(location: String) -> Self {
+    #[must_use]
+    pub fn see_other(location: String) -> Self {
         Self {
             location,
             status: StatusCode::SEE_OTHER,
         }
     }
 
-    pub(crate) fn temporary(location: String) -> Self {
+    #[must_use]
+    pub fn temporary(location: String) -> Self {
         Self {
             location,
             status: StatusCode::TEMPORARY_REDIRECT,
         }
     }
 
-    pub(crate) fn into_response(self) -> Response {
+    #[must_use]
+    pub fn into_response(self) -> Response {
         Response::text(self.status.as_u16(), "").header("location", self.location)
     }
 }

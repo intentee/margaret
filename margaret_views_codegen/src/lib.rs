@@ -16,8 +16,10 @@ mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use crate::render_views::render_views;
     use crate::views_artifacts::ViewsArtifacts;
@@ -27,37 +29,34 @@ mod tests {
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
-            .expect("the container renders")
-            .bindings
-    }
-
-    fn empty_bindings() -> ContainerBindings {
-        bindings_for(&IndexedSource::new("").index)
+        render_container(
+            index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings
     }
 
     fn generated(lib_source: &str) -> ViewsArtifacts {
         let index = IndexedSource::new(lib_source).index;
         let bindings = bindings_for(&index);
 
-        let plan = ViewsPlan::build(&index, &bindings).expect("the views are planned");
+        let plan = ViewsPlan::build(&index).expect("the views are planned");
 
         render_views(plan, &bindings)
     }
 
     fn rejection_for(lib_source: &str) -> ViewsCodegenError {
-        ViewsPlan::build(&IndexedSource::new(lib_source).index, &empty_bindings())
+        ViewsPlan::build(&IndexedSource::new(lib_source).index)
             .map(drop)
             .expect_err("the invalid view is rejected")
     }
 
     fn rejection(lib_source: &str) -> String {
         rejection_for(lib_source).to_string()
-    }
-
-    #[test]
-    fn rejects_a_view_absent_from_the_container_plan() {
-        assert!(rejection(VALID_VIEW).contains("crate::CardLayout"));
     }
 
     fn formatted(modules: Vec<GeneratedModuleTokens>) -> String {
@@ -102,13 +101,16 @@ impl Banner {
 ";
 
     #[test]
-    fn records_a_view_serve_input_and_reads_the_preconstructed_view() {
+    fn retains_a_view_with_a_serve_input_and_reads_it_preconstructed() {
         let artifacts = generated(CONSOLE_ARGUMENT_VIEW);
+        let retained_roots: Vec<String> = artifacts
+            .retained_roots
+            .iter()
+            .map(ToString::to_string)
+            .collect();
         let source = formatted(artifacts.modules);
-        let slot = artifacts.serve_inputs.len();
 
-        assert_eq!(slot, 1);
-        assert_eq!(artifacts.serve_inputs[0].name(), "title");
+        assert_eq!(retained_roots, ["crate::Banner"]);
         assert!(source.contains("banner: container.banner()"));
         assert!(!source.contains("serve_input_"));
     }
@@ -132,11 +134,14 @@ impl Banner {
 
     #[test]
     fn rejects_a_struct_declaring_more_than_one_view() {
-        assert!(
-            rejection(
+        assert_eq!(
+            IndexedSource::try_new(
                 "#[renders_view(name = \"one\")]\n#[renders_view(name = \"two\")]\n#[singleton]\nstruct Bad;\n"
             )
-            .contains("is declared more than once")
+            .err()
+            .expect("the repeated view is rejected while indexing")
+            .to_string(),
+            "attribute 'renders_view' is repeated on 'crate::Bad' but a single occurrence was expected"
         );
     }
 

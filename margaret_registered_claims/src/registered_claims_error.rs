@@ -5,9 +5,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum RegisteredClaimsError {
-    #[error("the audience is empty")]
-    AudienceEmpty,
-
     #[error("the system clock reads a time before the unix epoch: {source}")]
     ClockBeforeUnixEpoch {
         #[source]

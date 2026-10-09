@@ -12,6 +12,7 @@ publish.workspace = true
 [dependencies]
 chrono = { workspace = true }
 margaret_registered_claims = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 
 [lints]
 workspace = true

@@ -6,13 +6,13 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::web_socket_server_requirements::WebSocketServerRequirements;
+use margaret_http_codegen::web_socket_session_route::WebSocketSessionRoute;
 use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::binding_roots::binding_roots;
 
 use crate::build_websocket_plan::build_websocket_plan;
 use crate::built_websocket_plan::BuiltWebSocketPlan;
-use crate::server_serve_inputs::server_serve_inputs;
 use crate::session_plan::SessionPlan;
 use crate::web_socket_codegen_error::WebSocketCodegenError;
 use crate::web_socket_message::WebSocketMessage;
@@ -90,17 +90,21 @@ impl WebSocketPlan {
                         ServerTransportPolicy::combined_with,
                     );
 
-                server_serve_inputs(&sessions, bindings).map(|serve_inputs| {
-                    (
-                        server.clone(),
-                        WebSocketServerRequirements {
-                            serve_inputs,
-                            transport_policy,
-                        },
-                    )
-                })
+                (
+                    server.clone(),
+                    WebSocketServerRequirements {
+                        sessions: sessions
+                            .iter()
+                            .map(|session_plan| WebSocketSessionRoute {
+                                path: session_plan.session.path.clone(),
+                                session: session_plan.session.session_path.clone(),
+                            })
+                            .collect(),
+                        transport_policy,
+                    },
+                )
             })
-            .collect::<Result<_, _>>()?;
+            .collect();
         let retained_roots = retained_roots(&sessions);
 
         Ok(Self {

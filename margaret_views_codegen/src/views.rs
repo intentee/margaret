@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
@@ -11,7 +10,6 @@ use crate::views_codegen_error::ViewsCodegenError;
 
 pub(crate) fn views(index: &AttributeIndex) -> Result<Vec<View>, ViewsCodegenError> {
     let mut resolved: Vec<View> = Vec::new();
-    let mut seen_views: HashSet<String> = HashSet::new();
     let mut seen_names: HashMap<String, String> = HashMap::new();
 
     for matched in index.select_framework_attribute(FrameworkAttribute::RendersView) {
@@ -21,10 +19,6 @@ pub(crate) fn views(index: &AttributeIndex) -> Result<Vec<View>, ViewsCodegenErr
         let Some(identifier) = index.struct_identifier(item.canonical_path()) else {
             return Err(ViewsCodegenError::ViewNotAStruct { view });
         };
-
-        if !seen_views.insert(view.clone()) {
-            return Err(ViewsCodegenError::DuplicateViewDeclaration { view });
-        }
 
         let ViewArguments { name } = ViewArguments::parse(matched.args()?, &view)?;
 

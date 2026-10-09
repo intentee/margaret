@@ -8,21 +8,23 @@ use std::time::UNIX_EPOCH;
 use chrono::DateTime;
 use chrono::Utc;
 use serde::Deserialize;
+use serde::Serialize;
 
 use crate::registered_claims_error::RegisteredClaimsError;
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
 pub struct NumericDate {
     seconds_since_epoch: i64,
 }
 
 impl NumericDate {
-    #[must_use]
-    pub fn new(seconds_since_epoch: i64) -> Self {
-        Self {
-            seconds_since_epoch,
-        }
+    fn from_duration_since_epoch(
+        duration: Duration,
+    ) -> std::result::Result<Self, RegisteredClaimsError> {
+        i64::try_from(duration.as_secs())
+            .map(Self::new)
+            .map_err(|source| RegisteredClaimsError::ClockBeyondNumericDate { source })
     }
 
     /// # Errors
@@ -36,16 +38,23 @@ impl NumericDate {
     }
 
     #[must_use]
-    pub fn seconds_since_epoch(self) -> i64 {
-        self.seconds_since_epoch
+    pub fn new(seconds_since_epoch: i64) -> Self {
+        Self {
+            seconds_since_epoch,
+        }
     }
 
-    fn from_duration_since_epoch(
-        duration: Duration,
-    ) -> std::result::Result<Self, RegisteredClaimsError> {
-        i64::try_from(duration.as_secs())
-            .map(Self::new)
-            .map_err(|source| RegisteredClaimsError::ClockBeyondNumericDate { source })
+    #[must_use]
+    pub fn after(self, lifetime: Duration) -> Self {
+        Self::new(
+            self.seconds_since_epoch
+                .saturating_add_unsigned(lifetime.as_secs()),
+        )
+    }
+
+    #[must_use]
+    pub fn seconds_since_epoch(self) -> i64 {
+        self.seconds_since_epoch
     }
 }
 

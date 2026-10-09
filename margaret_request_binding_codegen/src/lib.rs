@@ -3,37 +3,60 @@ pub mod authenticated_user_challenge;
 pub mod authenticated_user_provider;
 pub mod authenticated_user_providers;
 pub mod authenticated_user_requirement;
-mod bearer_token_verifier_field;
+mod bearer_token_marker;
+mod bearer_token_parameter;
 pub mod binding_context;
 pub mod binding_reads_request;
 pub mod binding_registries;
 pub mod binding_roots;
-pub mod binding_serve_inputs;
-pub mod binding_shadows_request;
+mod bound_arguments;
+mod bound_credentials;
 pub mod bound_parameter;
 pub mod captured_provider;
 pub mod captured_provider_kind;
 pub mod captured_providers;
 pub mod classify_parameters;
+pub mod content_binding;
+pub mod content_extraction_context;
+mod exclusive_bindings;
 pub mod extraction_context;
+mod extraction_phase;
 mod form_request_arguments;
 pub mod form_request_extraction;
+pub mod head_extraction_context;
+pub mod head_input_source;
+mod inference_channel;
 mod infers_authenticated_user_arguments;
 pub mod injects_peer_spiffe_id;
 pub mod injects_routes;
 pub mod injects_views;
+mod plain_type_resolution;
+mod render_authenticated_user_extraction;
 pub mod render_authenticated_user_wrapper_construction;
 pub mod render_authenticated_user_wrappers;
-pub mod render_bound_request_extractions;
+mod render_bound_request_extractions;
+pub mod render_content_extraction;
+pub mod render_head_extractions;
+mod render_model_extraction;
 pub mod render_request_extraction;
+pub mod render_session_user_inference;
 pub mod request_binding;
 pub mod request_binding_error;
 pub mod request_injectable;
 pub mod request_input_source;
+mod request_inputs;
+pub mod responder_content;
+pub mod route_database;
+pub mod route_model;
+pub mod route_model_key;
+pub mod route_model_resolution;
 mod route_parameter_arguments;
 pub mod route_parameter_binder;
+pub mod route_parameter_lookup;
 pub mod route_parameter_resolution;
 pub mod route_parameter_resolutions;
+mod session_marker;
+pub mod session_user_parameter;
 pub mod views_availability;
 
 #[cfg(test)]
@@ -43,34 +66,46 @@ mod tests {
 
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::canonical_path::CanonicalPath;
+    use margaret_attributes::name_allocator::NameAllocator;
     use margaret_attributes::tag::Tag;
     use margaret_attributes_tests::indexed_source::IndexedSource;
+    use margaret_container::constructor_outcome::ConstructorOutcome;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::framework_construction::FrameworkConstruction;
     use margaret_container::framework_dependency::FrameworkDependency;
     use margaret_container::framework_enablement::FrameworkEnablement;
     use margaret_container::framework_injection_role::FrameworkInjectionRole;
     use margaret_container::framework_provider::FrameworkProvider;
-    use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::database_canonical_path::database_canonical_path;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_injection_codegen::process_method::process_method;
     use margaret_route_parameter_codegen::route_path::RoutePath;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_tag_codegen::tag_pool::TagPool;
+    use margaret_sessions_codegen::sessions_item::SessionsItem;
+    use margaret_sessions_codegen::sessions_item_path::sessions_item_path;
+    use margaret_tag_codegen::session_source::SessionSource;
+    use margaret_tag_codegen_tests::collected_tags::collected_tags;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
-    use crate::authenticated_user_application::AuthenticatedUserApplication;
     use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
     use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
     use crate::binding_context::BindingContext;
     use crate::binding_registries::BindingRegistries;
-    use crate::binding_serve_inputs::binding_serve_inputs;
+    use crate::binding_roots::binding_roots;
     use crate::bound_parameter::BoundParameter;
+    use crate::captured_providers::CapturedProviders;
     use crate::classify_parameters::classify_parameters;
-    use crate::extraction_context::ExtractionContext;
+    use crate::head_extraction_context::HeadExtractionContext;
     use crate::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
-    use crate::render_request_extraction::render_request_extraction;
+    use crate::render_head_extractions::render_head_extractions;
+    use crate::render_session_user_inference::render_session_user_inference;
     use crate::request_binding::RequestBinding;
     use crate::request_binding_error::RequestBindingError;
+    use crate::route_model::RouteModel;
+    use crate::route_model_key::RouteModelKey;
+    use crate::route_parameter_lookup::RouteParameterLookup;
+    use crate::session_user_parameter::session_user_parameter;
     use crate::views_availability::ViewsAvailability;
 
     const PRELUDE: &str = "\
@@ -89,46 +124,85 @@ struct User;
         let index = IndexedSource::new("").index;
         let registry = scan(&index).expect("the empty console argument registry is scanned");
 
-        render_container(&index, &registry, &[])
-            .expect("the empty container is rendered")
-            .bindings
+        render_container(
+            &index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the empty container is rendered")
+        .bindings
     }
 
-    fn missing_path() -> CanonicalPath {
-        CanonicalPath::new(vec!["crate".to_string(), "Missing".to_string()])
-    }
-
-    fn token_issuer_client(tag: &str, provided: &[&str]) -> FrameworkProvider {
+    fn trusted_issuer_provider(tag: &str) -> FrameworkProvider {
         let path: Path = syn::parse_str(tag).expect("the tag path parses");
 
         FrameworkProvider {
             construction: FrameworkConstruction::Unit,
-            enablement: FrameworkEnablement::Always,
-            injection: FrameworkInjectionRole::TokenIssuerClient(
+            enablement: FrameworkEnablement::Declared,
+            injection: FrameworkInjectionRole::TrustedIssuer(
                 Tag::from_path(&path).expect("the tag is a plain name"),
             ),
-            provided: CanonicalPath::new(provided.iter().map(ToString::to_string).collect()),
+            provided: CanonicalPath::new(
+                ["crate", "margaret", "trusted_issuers", tag, "TrustedIssuer"]
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+            ),
         }
     }
 
-    fn oidc_client(issuer: &str) -> FrameworkProvider {
-        token_issuer_client(issuer, &["crate", "margaret", "oidc", issuer, "OidcClient"])
+    fn oauth_client_provider(tag: &str) -> FrameworkProvider {
+        let path: Path = syn::parse_str(tag).expect("the tag path parses");
+
+        FrameworkProvider {
+            construction: FrameworkConstruction::Unit,
+            enablement: FrameworkEnablement::Declared,
+            injection: FrameworkInjectionRole::OAuthClient(
+                Tag::from_path(&path).expect("the tag is a plain name"),
+            ),
+            provided: CanonicalPath::new(
+                [
+                    "crate",
+                    "margaret",
+                    "oauth_clients",
+                    tag,
+                    "AuthorizationServerClient",
+                ]
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
+            ),
+        }
     }
 
-    fn token_issuer_client_bindings() -> ContainerBindings {
+    fn sessions_provider(item: SessionsItem) -> FrameworkProvider {
+        FrameworkProvider {
+            construction: FrameworkConstruction::Unit,
+            enablement: FrameworkEnablement::Declared,
+            injection: FrameworkInjectionRole::Unmarked,
+            provided: sessions_item_path(item),
+        }
+    }
+
+    fn trusted_issuer_bindings() -> ContainerBindings {
         let index = IndexedSource::new("").index;
 
         render_container(
             &index,
             &scan(&index).expect("the serve inputs are scanned"),
             &[
-                oidc_client("partner"),
-                oidc_client("upstream"),
-                token_issuer_client(
-                    "auth",
-                    &["crate", "margaret", "jwks", "auth_endpoint", "JwksClient"],
-                ),
+                sessions_provider(SessionsItem::ConsumedSessions),
+                sessions_provider(SessionsItem::IssuedSessions),
+                trusted_issuer_provider("partner"),
+                trusted_issuer_provider("upstream"),
+                trusted_issuer_provider("auth"),
+                oauth_client_provider("partner_client"),
+                oauth_client_provider("second_client"),
             ],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")
         .bindings
@@ -141,8 +215,9 @@ struct User;
         BindingRegistries::collect(
             index,
             views,
-            &TagPool::collect(index).expect("the tags are collected"),
-            &token_issuer_client_bindings(),
+            &collected_tags(index),
+            &trusted_issuer_bindings(),
+            &[],
         )
     }
 
@@ -225,11 +300,14 @@ impl SessionUserProvider {
 
     #[test]
     fn rejects_a_repeated_provider_attribute() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            IndexedSource::try_new(&provider_source(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
-            )
-            .contains("is repeated on")
+            ))
+            .err()
+            .expect("the repeated provider attribute is rejected while indexing")
+            .to_string(),
+            "attribute 'infers_authenticated_user' is repeated on 'crate::Bad' but a single occurrence was expected"
         );
     }
 
@@ -377,7 +455,7 @@ impl SessionUserProvider {
         let registries = collect_registries(index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
         let item = indexed.item(identifier);
-        let route_path = RoutePath::parse("/{x}");
+        let route_path = RoutePath::parse("/{x}").expect("the route path is routable");
         let method = process_method(item).expect("the responder has a #[process] method");
 
         classify_parameters(
@@ -391,6 +469,93 @@ impl SessionUserProvider {
             },
             &registries,
         )
+    }
+
+    fn database_bindings() -> ContainerBindings {
+        let index = IndexedSource::new("").index;
+
+        render_container(
+            &index,
+            &scan(&index).expect("the serve inputs are scanned"),
+            &[FrameworkProvider {
+                construction: FrameworkConstruction::Unit,
+                enablement: FrameworkEnablement::Declared,
+                injection: FrameworkInjectionRole::Unmarked,
+                provided: database_canonical_path(),
+            }],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings
+    }
+
+    fn route_model_binding(
+        container_bindings: &ContainerBindings,
+        primary_key: RouteModelKey,
+    ) -> Result<Vec<BoundParameter>, RequestBindingError> {
+        let indexed = IndexedSource::new(
+            "struct Article;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] article: Article) -> anyhow::Result<Response> {}\n}\n",
+        );
+        let index = &indexed.index;
+        let registries = BindingRegistries::collect(
+            index,
+            ViewsAvailability::Available,
+            &collected_tags(index),
+            container_bindings,
+            &[RouteModel {
+                loaded: CanonicalPath::new(vec!["crate".to_string(), "Article".to_string()]),
+                primary_key,
+            }],
+        )
+        .expect("the binding registries are collected");
+        let item = indexed.item("Page");
+        let route_path = RoutePath::parse("/{x}").expect("the route path is routable");
+
+        classify_parameters(
+            index,
+            item,
+            process_method(item).expect("the responder has a #[process] method"),
+            &BindingContext::Responder {
+                route_path: &route_path,
+                server: "public",
+                subject: "responder 'Page'",
+            },
+            &registries,
+        )
+    }
+
+    #[test]
+    fn binds_a_single_keyed_model_route_parameter_through_the_database() {
+        let bound = route_model_binding(&database_bindings(), RouteModelKey::Single)
+            .expect("the route model binds");
+
+        assert!(matches!(
+            &bound[0].binding,
+            RequestBinding::BoundRouteParameter {
+                binder_provider,
+                lookup: RouteParameterLookup::PrimaryKey { loaded },
+                ..
+            } if *binder_provider == database_canonical_path() && loaded.to_string() == "crate::Article"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_composite_keyed_model_route_parameter() {
+        assert!(matches!(
+            route_model_binding(&database_bindings(), RouteModelKey::Composite),
+            Err(RequestBindingError::RouteModelWithCompositePrimaryKey { model, .. })
+                if model == "crate::Article"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_model_route_parameter_without_a_database() {
+        assert!(matches!(
+            route_model_binding(&empty_bindings(), RouteModelKey::Single),
+            Err(RequestBindingError::RouteModelWithoutDatabase { model, .. })
+                if model == "crate::Article"
+        ));
     }
 
     fn responder_rejection(declaration: &str) -> String {
@@ -609,9 +774,15 @@ impl SessionUserProvider {
     fn collects_the_console_arguments_a_binding_pulls_in() {
         let index = IndexedSource::new(&provider_source(CONSOLE_ARGUMENT_PROVIDER)).index;
         let registry = scan(&index).expect("the console arguments are scanned");
-        let bindings = render_container(&index, &registry, &[])
-            .expect("the container renders")
-            .bindings;
+        let bindings = render_container(
+            &index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings;
         let registries = collect_registries(&index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
         let providers = registries.providers();
@@ -619,60 +790,22 @@ impl SessionUserProvider {
             .first()
             .map(|provider| provider.application.clone())
             .expect("the provider is registered");
-        let names: Vec<String> = binding_serve_inputs(
-            &RequestBinding::AuthenticatedUser {
-                application,
-                requirement: AuthenticatedUserRequirement::Required,
-            },
-            &bindings,
-        )
-        .expect("the provider dependency has planned console arguments")
-        .iter()
-        .map(|argument| argument.name().to_string())
+        let roots: Vec<CanonicalPath> = binding_roots(&RequestBinding::AuthenticatedUser {
+            application,
+            requirement: AuthenticatedUserRequirement::Required,
+        })
+        .into_iter()
+        .cloned()
         .collect();
+        let names: Vec<String> = bindings
+            .serve_inputs(&roots)
+            .expect("the provider dependency has planned console arguments")
+            .iter()
+            .map(|argument| argument.input.name().to_string())
+            .collect();
 
         assert_eq!(names, vec!["realm".to_string()]);
-        assert!(
-            binding_serve_inputs(&RequestBinding::CurrentRequest, &bindings)
-                .expect("the current request has no container-backed arguments")
-                .is_empty()
-        );
-    }
-
-    #[test]
-    fn rejects_container_backed_bindings_absent_from_the_container_plan() {
-        let bindings = empty_bindings();
-        let authenticated_user = RequestBinding::AuthenticatedUser {
-            application: AuthenticatedUserApplication {
-                challenge: AuthenticatedUserChallenge::Unchallenged,
-                concrete: missing_path(),
-                field: "missing".to_string(),
-                injects_peer_spiffe_id: false,
-                injects_routes: false,
-                injects_views: false,
-                model: missing_path(),
-                wrapper: format_ident!("Missing"),
-            },
-            requirement: AuthenticatedUserRequirement::Required,
-        };
-        let bound = RequestBinding::BoundRouteParameter {
-            binder_field: "missing".to_string(),
-            binder_provider: missing_path(),
-            path_key: "id".to_string(),
-        };
-        let injectable = RequestBinding::Injectable {
-            dependency: InjectedDependency {
-                concrete: missing_path(),
-                field: "missing".to_string(),
-            },
-        };
-
-        for binding in [authenticated_user, bound, injectable] {
-            let error = binding_serve_inputs(&binding, &bindings)
-                .expect_err("the binding must belong to the same container plan");
-
-            assert!(error.to_string().contains("crate::Missing"));
-        }
+        assert!(binding_roots(&RequestBinding::CurrentRequest).is_empty());
     }
 
     #[test]
@@ -689,7 +822,8 @@ impl SessionUserProvider {
             "pubstructSessionUserProvider{pubinner:std::sync::Arc<crate::SessionUserProvider>,}"
         ));
         assert!(source.contains("typeUser=crate::User;"));
-        assert!(source.contains("self.inner.infer(request)"));
+        assert!(source.contains("letargument_1=request;"));
+        assert!(source.contains("self.inner.infer(argument_1)"));
     }
 
     #[test]
@@ -704,7 +838,7 @@ impl SessionUserProvider {
             .split_whitespace()
             .collect();
 
-        assert!(source.contains("self.inner.infer(request).await"));
+        assert!(source.contains("self.inner.infer(argument_1).await"));
     }
 
     #[test]
@@ -738,15 +872,15 @@ impl SessionUserProvider {
 
         assert!(source.contains("return::std::result::Result::Ok("));
         assert!(source.contains(
-            "margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response.into(),)"
+            "margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,)"
         ));
     }
 
     const PARTNER_ISSUER: &str = "\
+use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 
-#[singleton]
-#[trusts_oidc_issuer(partner)]
+#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]
 struct PartnerIssuer;
 
 struct Claims;
@@ -771,103 +905,212 @@ struct Claims;
             .collect()
     }
 
-    fn verifies_with(registries: &BindingRegistries, client: &str) -> bool {
+    fn verifies_with(registries: &BindingRegistries, trusted_issuer: &str) -> bool {
         matches!(
             &registries.providers()[0].application.challenge,
-            AuthenticatedUserChallenge::Bearer { issuer_client }
-                if issuer_client.concrete.to_string() == client
+            AuthenticatedUserChallenge::Bearer { trusted_issuers }
+                if matches!(
+                    trusted_issuers.as_slice(),
+                    [trusted] if trusted.concrete.to_string() == trusted_issuer
+                )
         )
     }
 
     const PARTNER_TOKEN: &str =
-        "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims>>";
+        "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>";
+
+    const PARTNER_CLIENTS: &str = "\
+use margaret::framework::token_introspection::introspected_token::IntrospectedToken;
+
+#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]
+struct PartnerClient;
+
+#[oauth_client(second_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"second\", issuer = partner)]
+struct SecondClient;
+";
+
+    const INTROSPECTED_TOKEN: &str =
+        "#[bearer_token(client = partner_client)] token: Option<IntrospectedToken<Claims>>";
+
+    fn introspecting_provider(parameters: &str) -> String {
+        format!("{PARTNER_CLIENTS}{}", bearer_provider(parameters))
+    }
+
+    fn introspection_rejection(parameters: &str) -> String {
+        rejection_for(&introspecting_provider(parameters))
+    }
 
     #[test]
-    fn binds_a_bearer_token_to_the_client_of_its_oidc_issuer() {
-        assert!(verifies_with(
-            &registries_for(&bearer_provider(PARTNER_TOKEN)),
-            "crate::margaret::oidc::partner::OidcClient"
+    fn binds_an_introspected_bearer_token_to_its_oauth_client() {
+        assert!(matches!(
+            &registries_for(&introspecting_provider(INTROSPECTED_TOKEN)).providers()[0]
+                .application
+                .challenge,
+            AuthenticatedUserChallenge::Introspection { authorization_server }
+                if authorization_server.concrete.to_string()
+                    == "crate::margaret::oauth_clients::partner_client::AuthorizationServerClient"
         ));
     }
 
     #[test]
-    fn binds_a_bearer_token_to_the_client_of_its_jwks_endpoint() {
-        assert!(verifies_with(
-            &registries_for(&format!(
-                "#[singleton]\n#[provides_jwks_endpoint(auth)]\nstruct AuthEndpoint;\n\n{}",
-                bearer_provider(
-                    "#[bearer_token(issuer = auth)] token: Option<VerifiedJwt<Claims>>"
-                )
-            )),
-            "crate::margaret::jwks::auth_endpoint::JwksClient"
+    fn renders_a_wrapper_that_introspects_the_bearer_token() {
+        let source = wrapper_source(&registries_for(&introspecting_provider(INTROSPECTED_TOKEN)));
+
+        assert!(source.contains(
+            "pubmargaret_oauth_clients_partner_client_authorization_server_client:std::sync::Arc<margaret::framework::authorization_server_client::authorization_server_client::AuthorizationServerClient>,"
         ));
+        assert!(source.contains(
+            "letargument_1=matchmargaret::framework::token_introspection::introspect_bearer_token::introspect_bearer_token::<crate::Claims>(request.inputs.server.authorization(),self.margaret_oauth_clients_partner_client_authorization_server_client.as_ref(),).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),};"
+        ));
+        assert!(!source.contains("route_bearer_token"));
     }
 
     #[test]
-    fn renders_no_bearer_token_verifier_for_a_provider_without_a_bearer_token() {
+    fn rejects_an_introspected_bearer_token_without_a_client() {
         assert!(
-            !wrapper_source(&registries_for(SESSION_PROVIDER)).contains("bearer_token_verifier")
+            introspection_rejection(
+                "#[bearer_token(issuer = partner)] token: Option<IntrospectedToken<Claims>>"
+            )
+            .ends_with("an IntrospectedToken names `client = <tag>`")
         );
     }
 
     #[test]
-    fn renders_a_wrapper_that_admits_the_bearer_token_with_the_verifier_of_its_issuer() {
+    fn rejects_an_introspected_bearer_token_without_its_claims() {
+        assert!(
+            introspection_rejection(
+                "#[bearer_token(client = partner_client)] token: Option<IntrospectedToken>"
+            )
+            .contains("taken by value")
+        );
+    }
+
+    #[test]
+    fn rejects_introspected_claims_that_are_not_a_named_type() {
+        assert!(
+            introspection_rejection(
+                "#[bearer_token(client = partner_client)] token: Option<IntrospectedToken<Vec<u8>>>"
+            )
+            .contains("which is not a named type without generic arguments")
+        );
+    }
+
+    #[test]
+    fn rejects_a_second_introspected_bearer_token() {
+        assert!(
+            introspection_rejection(&format!(
+                "{INTROSPECTED_TOKEN}, #[bearer_token(client = second_client)] second: Option<IntrospectedToken<Claims>>"
+            ))
+            .contains("introspects the bearer token more than once")
+        );
+    }
+
+    #[test]
+    fn rejects_verified_and_introspected_bearer_tokens_in_one_provider() {
+        assert!(
+            introspection_rejection(&format!("{PARTNER_TOKEN}, {INTROSPECTED_TOKEN}"))
+                .contains("both verifies and introspects the bearer token")
+        );
+        assert!(
+            introspection_rejection(&format!("{INTROSPECTED_TOKEN}, {PARTNER_TOKEN}"))
+                .contains("both verifies and introspects the bearer token")
+        );
+    }
+
+    #[test]
+    fn rejects_an_introspected_bearer_token_of_an_unplanned_oauth_client() {
+        let index = IndexedSource::new(&provider_source(&introspecting_provider(
+            INTROSPECTED_TOKEN,
+        )))
+        .index;
+
+        assert!(matches!(
+            BindingRegistries::collect(
+                &index,
+                ViewsAvailability::Available,
+                &collected_tags(&index),
+                &empty_bindings(), &[],
+            ),
+            Err(RequestBindingError::UnplannedOAuthClient { ref client, .. }) if client == "partner_client"
+        ));
+    }
+
+    #[test]
+    fn binds_a_bearer_token_to_the_trusted_issuer_of_its_oidc_issuer() {
+        assert!(verifies_with(
+            &registries_for(&bearer_provider(PARTNER_TOKEN)),
+            "crate::margaret::trusted_issuers::partner::TrustedIssuer"
+        ));
+    }
+
+    #[test]
+    fn binds_a_bearer_token_to_the_trusted_issuer_of_its_jwks_endpoint() {
+        assert!(verifies_with(
+            &registries_for(&format!(
+                "#[verifies_tokens_from_issuer(auth, audience = \"api\", issuer = \"https://auth.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://auth.example/jwks\"))]\nstruct AuthEndpoint;\n\n{}",
+                bearer_provider(
+                    "#[bearer_token(issuer = auth)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
+                )
+            )),
+            "crate::margaret::trusted_issuers::auth::TrustedIssuer"
+        ));
+    }
+
+    #[test]
+    fn routes_no_bearer_token_for_a_provider_without_a_bearer_token() {
+        assert!(!wrapper_source(&registries_for(SESSION_PROVIDER)).contains("route_bearer_token"));
+    }
+
+    #[test]
+    fn renders_a_wrapper_that_routes_the_bearer_token_and_admits_it_for_its_issuer() {
         let source = wrapper_source(&registries_for(&bearer_provider(&format!(
             "request: &Request, {PARTNER_TOKEN}"
         ))));
-
         assert!(source.contains(
-            "pubbearer_token_verifier:std::sync::Arc<margaret::framework::bearer_token_verification::bearer_token_verifier::BearerTokenVerifier>,"
+            "pubmargaret_trusted_issuers_partner_trusted_issuer:std::sync::Arc<margaret::framework::trusted_issuer::trusted_issuer::TrustedIssuer>,"
         ));
         assert!(source.contains(
-            "lettoken=matchmargaret::framework::bearer_token_verification::admit_bearer_token::admit_bearer_token::<crate::Claims>(&self.bearer_token_verifier,request.inputs.server.authorization(),).map_err(margaret::framework::anyhow::Error::from){::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Anonymous)=>::std::option::Option::None,::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Presented(token))=>::std::option::Option::Some(token),::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Refused(response))=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),::std::result::Result::Err(error)=>return::std::result::Result::Err(error),};"
+            "letbearer_token=matchmargaret::framework::bearer_token_verification::route_bearer_token::route_bearer_token(request.inputs.server.authorization(),&[self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()],).map_err(margaret::framework::anyhow::Error::from){::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Refused(response))=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Routed(routed))=>routed,::std::result::Result::Err(error)=>return::std::result::Result::Err(error),};"
         ));
-        assert!(source.contains("self.inner.infer(request,token)"));
+        assert!(source.contains(
+            "letargument_2=matchbearer_token.admit::<crate::Claims,::margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile>(self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),};"
+        ));
+        assert!(source.contains("self.inner.infer(argument_1,argument_2)"));
     }
 
     #[test]
     fn resolves_the_bearer_token_type_and_claims_through_use_statements() {
         let source = wrapper_source(&registries_for(
-            "use margaret::framework::jwt_verification::verified_jwt;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<verified_jwt::VerifiedJwt<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::jwt_verification::access_token_profile;\nuse margaret::framework::jwt_verification::verified_jwt;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<verified_jwt::VerifiedJwt<Claims, access_token_profile::AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         ));
 
-        assert!(source.contains("admit_bearer_token::<crate::ci::claims::Claims>("));
+        assert!(source.contains(
+            "admit::<crate::ci::claims::Claims,::margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile>("
+        ));
     }
 
     #[test]
-    fn rejects_a_bearer_token_without_an_issuer() {
-        assert!(
-            bearer_rejection("#[bearer_token] token: Option<VerifiedJwt<Claims>>")
-                .ends_with("must be `issuer = <tag>`")
-        );
+    fn resolves_the_introspected_token_type_and_claims_through_use_statements() {
+        let source = wrapper_source(&registries_for(
+            "use margaret::framework::token_introspection::introspected_token;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(client = partner_client)] token: Option<introspected_token::IntrospectedToken<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+        ));
+
+        assert!(source.contains(
+            "margaret::framework::token_introspection::introspect_bearer_token::introspect_bearer_token::<crate::ci::claims::Claims>("
+        ));
     }
 
     #[test]
-    fn propagates_malformed_bearer_token_arguments() {
-        assert!(
-            bearer_rejection("#[bearer_token(= 5)] token: Option<VerifiedJwt<Claims>>")
-                .contains("could not be parsed")
-        );
-    }
-
-    #[test]
-    fn rejects_a_bearer_token_of_an_undeclared_issuer() {
-        assert!(
-            bearer_rejection(
-                "#[bearer_token(issuer = undeclared)] token: Option<VerifiedJwt<Claims>>"
-            )
-            .ends_with("references the tag 'undeclared', which no token issuer declares")
-        );
-    }
-
-    #[test]
-    fn rejects_a_bearer_token_of_a_tag_that_names_no_token_issuer() {
+    fn rejects_a_verified_bearer_token_introspected_by_a_client() {
         assert!(
             rejection_for(&format!(
-                "#[singleton]\n#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n\n{}",
-                bearer_provider("#[bearer_token(issuer = logged)] token: Option<VerifiedJwt<Claims>>")
+                "{}{}",
+                bearer_provider(
+                    "#[bearer_token(client = partner_client)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
+                ),
+                "#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n"
             ))
-            .ends_with("references the tag 'logged', which is a middleware handler, not a token issuer")
+            .ends_with("a VerifiedJwt names `issuer = <tag>` or `resource = <tag>`, an IntrospectedToken names `client = <tag>`")
         );
     }
 
@@ -882,8 +1125,10 @@ struct Claims;
     #[test]
     fn rejects_a_bearer_token_that_is_not_optional() {
         assert!(
-            bearer_rejection("#[bearer_token(issuer = partner)] token: VerifiedJwt<Claims>")
-                .contains("carries #[bearer_token] on 'VerifiedJwt < Claims >'")
+            bearer_rejection(
+                "#[bearer_token(issuer = partner)] token: VerifiedJwt<Claims, AccessTokenProfile>"
+            )
+            .contains("carries #[bearer_token] on 'VerifiedJwt < Claims , AccessTokenProfile >'")
         );
     }
 
@@ -891,7 +1136,7 @@ struct Claims;
     fn rejects_a_bearer_token_taken_by_reference() {
         assert!(
             bearer_rejection(
-                "#[bearer_token(issuer = partner)] token: Option<&VerifiedJwt<Claims>>"
+                "#[bearer_token(issuer = partner)] token: Option<&VerifiedJwt<Claims, AccessTokenProfile>>"
             )
             .contains("taken by value")
         );
@@ -901,7 +1146,7 @@ struct Claims;
     fn rejects_bearer_token_claims_with_generic_arguments() {
         assert!(
             bearer_rejection(
-                "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Vec<Claims>>>"
+                "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Vec<Claims>, AccessTokenProfile>>"
             )
             .ends_with(
                 "into the claims 'Vec < Claims >', which is not a named type without generic arguments"
@@ -913,7 +1158,7 @@ struct Claims;
     fn rejects_bearer_token_claims_that_are_not_a_named_type() {
         assert!(
             bearer_rejection(
-                "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<(Claims, Claims)>>"
+                "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<(Claims, Claims), AccessTokenProfile>>"
             )
             .ends_with(
                 "into the claims '(Claims , Claims)', which is not a named type without generic arguments"
@@ -924,31 +1169,79 @@ struct Claims;
     #[test]
     fn rejects_bearer_token_claims_that_match_no_type() {
         assert!(
-            bearer_rejection("#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Ghost>>")
+            bearer_rejection("#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Ghost, AccessTokenProfile>>")
                 .ends_with("into the claims 'Ghost', which matches no type in scope")
         );
     }
 
     #[test]
-    fn rejects_a_provider_that_reads_the_bearer_token_twice() {
+    fn rejects_a_bearer_token_without_a_profile() {
         assert!(
-            rejection_for(&format!(
-                "#[singleton]\n#[trusts_oidc_issuer(upstream)]\nstruct UpstreamIssuer;\n\n{}",
-                bearer_provider(&format!(
-                    "{PARTNER_TOKEN}, #[bearer_token(issuer = upstream)] upstream: Option<VerifiedJwt<Claims>>"
-                ))
-            ))
+            bearer_rejection("#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims>>")
+                .contains("it must be Option<margaret::framework::jwt_verification::verified_jwt::VerifiedJwt<Claims, Profile>> or Option<margaret::framework::token_introspection::introspected_token::IntrospectedToken<Claims>> taken by value")
+        );
+    }
+
+    #[test]
+    fn rejects_a_bearer_token_profile_with_generic_arguments() {
+        assert!(
+            bearer_rejection(
+                "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims, Vec<AccessTokenProfile>>>"
+            )
             .ends_with(
-                "reads the bearer token more than once; a request presents exactly one bearer token"
+                "under the profile 'Vec < AccessTokenProfile >', which is not a named type without generic arguments"
             )
         );
+    }
+
+    #[test]
+    fn rejects_a_bearer_token_profile_that_matches_no_type() {
+        assert!(
+            bearer_rejection(
+                "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims, Ghost>>"
+            )
+            .ends_with("under the profile 'Ghost', which matches no type in scope")
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_that_admits_the_tokens_of_one_issuer_twice() {
+        assert!(
+            bearer_rejection(&format!(
+                "{PARTNER_TOKEN}, #[bearer_token(issuer = partner)] again: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
+            ))
+            .ends_with(
+                "verifies bearer tokens of the trusted issuer 'partner' more than once; each trusted issuer admits the bearer token into exactly one argument"
+            )
+        );
+    }
+
+    #[test]
+    fn routes_the_bearer_token_among_the_trusted_issuers_of_one_provider() {
+        let source = wrapper_source(&registries_for(&format!(
+            "#[verifies_tokens_from_issuer(upstream, audience = \"api\", issuer = \"https://upstream.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct UpstreamIssuer;\n\n{}",
+            bearer_provider(&format!(
+                "{PARTNER_TOKEN}, #[bearer_token(issuer = upstream)] upstream: Option<VerifiedJwt<Claims, IdTokenProfile>>"
+            ))
+            .replace(
+                "use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;",
+                "use margaret::framework::jwt_verification::id_token_profile::IdTokenProfile;\nuse margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;",
+            )
+        )));
+
+        assert!(source.contains(
+            "&[self.margaret_trusted_issuers_partner_trusted_issuer.as_ref(),self.margaret_trusted_issuers_upstream_trusted_issuer.as_ref()],"
+        ));
+        assert!(source.contains(
+            "letargument_2=matchbearer_token.admit::<crate::Claims,::margaret::framework::jwt_verification::id_token_profile::IdTokenProfile>(self.margaret_trusted_issuers_upstream_trusted_issuer.as_ref())"
+        ));
     }
 
     #[test]
     fn rejects_a_bearer_token_that_also_carries_a_form_request() {
         assert!(
             bearer_rejection(
-                "#[bearer_token(issuer = partner)] #[form_request(from = RequestInput::Query)] token: Option<VerifiedJwt<Claims>>"
+                "#[bearer_token(issuer = partner)] #[form_request(from = RequestInput::Query)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
             )
             .contains("carries #[bearer_token] together with")
         );
@@ -975,20 +1268,21 @@ struct Claims;
     }
 
     #[test]
-    fn rejects_a_bearer_token_whose_client_the_container_does_not_plan() {
+    fn rejects_a_bearer_token_whose_trusted_issuer_the_container_does_not_plan() {
         let index = IndexedSource::new(&provider_source(&bearer_provider(PARTNER_TOKEN))).index;
         let rejection = BindingRegistries::collect(
             &index,
             ViewsAvailability::Available,
-            &TagPool::collect(&index).expect("the tags are collected"),
+            &collected_tags(&index),
             &empty_bindings(),
+            &[],
         )
         .err()
         .expect("the binding registries are rejected")
         .to_string();
 
         assert!(rejection.ends_with(
-            "verifies the bearer token of the token issuer 'partner', whose client the container does not plan"
+            "verifies the bearer token of the trusted issuer 'partner', which the container does not plan"
         ));
     }
 
@@ -1001,7 +1295,7 @@ struct Claims;
         let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
         let item = indexed.item("Page");
-        let route_path = RoutePath::parse("/");
+        let route_path = RoutePath::parse("/").expect("the route path is routable");
         let parameters = classify_parameters(
             &indexed.index,
             item,
@@ -1014,25 +1308,19 @@ struct Claims;
             &registries,
         )
         .expect("the responder binds");
-        let extraction: String = parameters
-            .iter()
-            .map(|parameter| {
-                render_request_extraction(
-                    &parameter.binding,
-                    &parameter.holder,
-                    &ExtractionContext {
-                        continuation_return: &quote::quote! { return response },
-                        error_return: &quote::quote! { return error },
-                        provider_access: &quote::quote! { provider },
-                        request_local: &format_ident!("request"),
-                        response_return: &quote::quote! { return response },
-                    },
-                )
-                .to_string()
-            })
-            .collect::<String>()
-            .split_whitespace()
-            .collect();
+        let extraction: String = render_head_extractions(
+            &parameters,
+            &CapturedProviders::capture(&parameters, &mut NameAllocator::new()),
+            &HeadExtractionContext {
+                continuation_return: &quote::quote! { return response },
+                error_return: &quote::quote! { return error },
+                owner: &proc_macro2::TokenStream::new(),
+                request_local: &format_ident!("request"),
+            },
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
 
         assert!(extraction.contains(
             "margaret::framework::identity::require_bearer_authenticated_user::require_bearer_authenticated_user(outcome)"
@@ -1040,13 +1328,42 @@ struct Claims;
     }
 
     #[test]
-    fn refuses_to_inject_a_token_issuer_client_into_a_handshake() {
+    fn binds_a_parameter_to_a_local_named_after_its_position() {
+        let indexed = IndexedSource::new(&provider_source(&format!(
+            "{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] _caller: User) -> anyhow::Result<Response> {{}}\n}}\n",
+            bearer_provider(PARTNER_TOKEN)
+        )));
+        let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
+            .expect("the binding registries are collected");
+        let item = indexed.item("Page");
+        let route_path = RoutePath::parse("/").expect("the route path is routable");
+        let holders: Vec<String> = classify_parameters(
+            &indexed.index,
+            item,
+            process_method(item).expect("the responder has a #[process] method"),
+            &BindingContext::Responder {
+                route_path: &route_path,
+                server: "public",
+                subject: "responder 'Page'",
+            },
+            &registries,
+        )
+        .expect("the responder binds")
+        .iter()
+        .map(|parameter| parameter.holder.to_string())
+        .collect();
+
+        assert_eq!(holders, ["argument_1"]);
+    }
+
+    #[test]
+    fn refuses_to_inject_a_trusted_issuer_into_a_handshake() {
         let indexed = IndexedSource::new(
-            "struct Room;\n\nimpl Room {\n    #[process]\n    fn build(client: std::sync::Arc<crate::margaret::oidc::partner::OidcClient>) -> anyhow::Result<Self> {}\n}\n",
+            "struct Room;\n\nimpl Room {\n    #[process]\n    fn build(trusted_issuer: std::sync::Arc<crate::margaret::trusted_issuers::partner::TrustedIssuer>) -> anyhow::Result<Self> {}\n}\n",
         );
         let item = indexed.item("Room");
-        let route_path = RoutePath::parse("/room");
-        let bindings = token_issuer_client_bindings();
+        let route_path = RoutePath::parse("/room").expect("the route path is routable");
+        let bindings = trusted_issuer_bindings();
         let rejection = classify_parameters(
             &indexed.index,
             item,
@@ -1074,7 +1391,7 @@ struct Claims;
     fn rejects_a_site_that_infers_two_users_from_the_bearer_token() {
         assert_eq!(
             responder_rejection(&format!(
-                "{}\nstruct Runner;\n\nstruct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct AdminProvider;\n\nimpl AdminProvider {{\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {{}}\n}}\n\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: Runner, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {{}}\n}}\n",
+                "{}\nstruct Runner;\n\nstruct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct AdminProvider;\n\nimpl AdminProvider {{\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {{}}\n}}\n\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: Runner, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {{}}\n}}\n",
                 bearer_provider(PARTNER_TOKEN).replace("User", "Runner")
             )),
             "responder 'Page' infers more than one authenticated user from the bearer token; a request presents one bearer credential, so exactly one #[infers_authenticated_user] provider verifies it"
@@ -1082,76 +1399,352 @@ struct Claims;
     }
 
     #[test]
-    fn collects_the_console_arguments_of_the_issuer_a_bearer_provider_verifies() {
+    fn collects_the_console_arguments_of_the_trusted_issuer_a_bearer_provider_verifies() {
         let index = IndexedSource::new(&provider_source(&format!(
-            "use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\nuse margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;\n\nstruct Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\nimpl DeclaresTokenTrust for PartnerIssuer {{}}\n\nimpl PartnerIssuer {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+            "use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;\nuse margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\n\nstruct Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[singleton]\nstruct PartnerSettings;\n\nimpl PartnerSettings {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )))
         .index;
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = collected_tags(&index);
         let bindings = render_container(
             &index,
             &scan(&index).expect("the console arguments are scanned"),
             &[FrameworkProvider {
                 construction: FrameworkConstruction::Constructor {
                     dependencies: vec![FrameworkDependency::SingletonView(CanonicalPath::new(
-                        vec!["crate".to_string(), "PartnerIssuer".to_string()],
+                        vec!["crate".to_string(), "PartnerSettings".to_string()],
                     ))],
                     is_async: false,
                     method: "create".to_string(),
+                    outcome: ConstructorOutcome::Infallible,
                 },
-                ..oidc_client("partner")
+                ..trusted_issuer_provider("partner")
             }],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")
         .bindings;
         let registries =
-            BindingRegistries::collect(&index, ViewsAvailability::Available, &tags, &bindings)
+            BindingRegistries::collect(&index, ViewsAvailability::Available, &tags, &bindings, &[])
                 .expect("the binding registries are collected");
-        let names: Vec<String> = binding_serve_inputs(
-            &RequestBinding::AuthenticatedUser {
-                application: registries.providers()[0].application.clone(),
-                requirement: AuthenticatedUserRequirement::Required,
-            },
-            &bindings,
-        )
-        .expect("the token issuer client has planned console arguments")
-        .iter()
-        .map(|argument| argument.name().to_string())
+        let roots: Vec<CanonicalPath> = binding_roots(&RequestBinding::AuthenticatedUser {
+            application: registries.providers()[0].application.clone(),
+            requirement: AuthenticatedUserRequirement::Required,
+        })
+        .into_iter()
+        .cloned()
         .collect();
+        let names: Vec<String> = bindings
+            .serve_inputs(&roots)
+            .expect("the trusted issuer has planned console arguments")
+            .iter()
+            .map(|argument| argument.input.name().to_string())
+            .collect();
 
         assert_eq!(names, vec!["audience".to_string()]);
     }
 
     #[test]
-    fn rejects_a_token_issuer_client_absent_from_the_container_plan() {
-        let index = IndexedSource::new(&provider_source(SESSION_PROVIDER)).index;
-        let bindings = render_container(
-            &index,
-            &scan(&index).expect("the console arguments are scanned"),
-            &[],
-        )
-        .expect("the container renders")
-        .bindings;
-        let mut application = registries_for(SESSION_PROVIDER).providers()[0]
-            .application
-            .clone();
+    fn rejects_a_provider_that_reads_the_request_body() {
+        assert!(
+            rejection_for(
+                "use margaret::framework::http_uploaded_file::uploaded_files::UploadedFiles;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, files: UploadedFiles) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+            )
+            .contains("which only an HTTP responder receives")
+        );
+    }
 
-        application.challenge = AuthenticatedUserChallenge::Bearer {
-            issuer_client: InjectedDependency {
-                concrete: missing_path(),
-                field: "missing".to_string(),
+    const ISSUED_SESSIONS: &str = "\
+use margaret::framework::sessions::session::Session;
+
+#[issues_tokens(provider, issuer = \"https://issuer.example\")]
+struct ProviderIssuance;
+
+#[issues_sessions(issuer = provider, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]
+struct BrowserSessions;
+";
+
+    const CONSUMED_SESSIONS: &str = "\
+use margaret::framework::sessions::session::Session;
+
+#[consumes_sessions(issuer = partner, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]
+struct PartnerSessions;
+";
+
+    const ISSUED_SESSION: &str = "#[session(issuer = provider)] session: Option<Session>";
+
+    fn reader_provider(declarations: &str, parameters: &str) -> String {
+        format!(
+            "{declarations}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct ReaderProvider;\n\nimpl ReaderProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameters}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+        )
+    }
+
+    #[test]
+    fn challenges_a_user_read_from_issued_sessions_through_them() {
+        assert!(matches!(
+            registries_for(&reader_provider(ISSUED_SESSIONS, ISSUED_SESSION)).providers()[0]
+                .application
+                .challenge,
+            AuthenticatedUserChallenge::Session { source, .. } if source == SessionSource::Issued
+        ));
+    }
+
+    #[test]
+    fn challenges_a_user_read_from_consumed_sessions_through_them() {
+        assert!(matches!(
+            registries_for(&reader_provider(
+                &format!("{PARTNER_ISSUER}{CONSUMED_SESSIONS}"),
+                "#[session(issuer = partner)] session: Option<Session>",
+            ))
+            .providers()[0]
+                .application
+                .challenge,
+            AuthenticatedUserChallenge::Session { source, .. } if source == SessionSource::Consumed
+        ));
+    }
+
+    #[test]
+    fn renders_a_wrapper_that_resolves_issued_sessions_before_inferring_the_user() {
+        let source = wrapper_source(&registries_for(&reader_provider(
+            ISSUED_SESSIONS,
+            ISSUED_SESSION,
+        )));
+
+        assert!(source.contains(
+            "implmargaret::framework::identity::infers_session_user::InfersSessionUserforReaderProvider"
+        ));
+        assert!(source.contains(
+            "letmargaret::framework::sessions::resolved_session::ResolvedSession{cookie_changes:changed_cookies,session:argument_1,}=self.margaret_sessions_issued_sessions.resolve(request).await?;"
+        ));
+        assert!(source.contains(
+            "self.inner.infer(argument_1).map(|outcome|{margaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:changed_cookies,outcome,}})"
+        ));
+    }
+
+    #[test]
+    fn renders_a_wrapper_that_interrupts_on_unavailable_consumed_sessions() {
+        let source = wrapper_source(&registries_for(&reader_provider(
+            &format!("{PARTNER_ISSUER}{CONSUMED_SESSIONS}"),
+            "#[session(issuer = partner)] session: Option<Session>",
+        )));
+
+        assert!(source.contains(
+            "margaret::framework::sessions::session_resolution::SessionResolution::Unavailable(unavailability)=>{return::std::result::Result::Ok(margaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:margaret::framework::http::cookie_changes::CookieChanges{cookies:::std::vec::Vec::new(),},outcome:margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(margaret::framework::http::response_continuation::ResponseContinuation::from(unavailability),),},);}"
+        ));
+    }
+
+    #[test]
+    fn renders_a_wrapper_that_keeps_the_session_cookie_changes_on_an_interruption() {
+        let source = wrapper_source(&registries_for(&reader_provider(
+            ISSUED_SESSIONS,
+            &format!(
+                "{ISSUED_SESSION}, #[form_request(from = margaret::framework::http_validation::request_input::RequestInput::Query)] filter: Filter"
+            ),
+        )));
+
+        assert!(source.contains(
+            "return::std::result::Result::Ok(margaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:changed_cookies,outcome:margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),},)"
+        ));
+    }
+
+    #[test]
+    fn renders_the_session_user_of_a_responder_with_its_cookie_changes() {
+        let indexed = IndexedSource::new(&provider_source(&format!(
+            "{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] reader: User) -> anyhow::Result<Response> {{}}\n}}\n",
+            reader_provider(ISSUED_SESSIONS, ISSUED_SESSION)
+        )));
+        let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
+            .expect("the binding registries are collected");
+        let item = indexed.item("Page");
+        let route_path = RoutePath::parse("/").expect("the route path is routable");
+        let parameters = classify_parameters(
+            &indexed.index,
+            item,
+            process_method(item).expect("the responder has a #[process] method"),
+            &BindingContext::Responder {
+                route_path: &route_path,
+                server: "public",
+                subject: "responder 'Page'",
             },
+            &registries,
+        )
+        .expect("the responder binds");
+        let captured = CapturedProviders::capture(&parameters, &mut NameAllocator::new());
+        let context = HeadExtractionContext {
+            continuation_return: &quote::quote! { return response },
+            error_return: &quote::quote! { return error },
+            owner: &proc_macro2::TokenStream::new(),
+            request_local: &format_ident!("request"),
         };
-
-        let error = binding_serve_inputs(
-            &RequestBinding::AuthenticatedUser {
-                application,
-                requirement: AuthenticatedUserRequirement::Required,
-            },
-            &bindings,
+        let inference: String = render_session_user_inference(
+            session_user_parameter(&parameters).expect("the responder reads a session user"),
+            &captured,
+            &format_ident!("changed_cookies"),
+            &context,
         )
-        .expect_err("the token issuer client must belong to the same container plan");
+        .to_string()
+        .split_whitespace()
+        .collect();
+        let extraction: String = render_head_extractions(&parameters, &captured, &context)
+            .to_string()
+            .split_whitespace()
+            .collect();
 
-        assert!(error.to_string().contains("crate::Missing"));
+        assert!(inference.contains(
+            "letmargaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:changed_cookies,outcome:argument_1,}=matchmargaret::framework::identity::infers_session_user::InfersSessionUser::infer("
+        ));
+        assert!(!extraction.contains("SessionUserInference"));
+        assert!(extraction.contains(
+            "margaret::framework::http::requirement::Requirement::Unmet(response)=>returnresponse"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_session_outside_an_inference_method() {
+        assert!(
+            responder_rejection(&format!(
+                "{ISSUED_SESSIONS}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, {ISSUED_SESSION}) -> anyhow::Result<Response> {{}}\n}}\n"
+            ))
+            .ends_with("carries #[session], which is only available in an #[infer_from_request] method of an #[infers_authenticated_user] provider")
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_of_another_type() {
+        assert!(
+            rejection_for(&reader_provider(
+                ISSUED_SESSIONS,
+                "#[session(issuer = provider)] session: Session"
+            ))
+            .ends_with("carries #[session] on 'Session'; it must be Option<margaret::framework::sessions::session::Session> taken by value")
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_with_another_marker() {
+        assert!(
+            rejection_for(&reader_provider(
+                ISSUED_SESSIONS,
+                "#[session(issuer = provider)] #[form_request(from = margaret::framework::http_validation::request_input::RequestInput::Query)] session: Option<Session>"
+            ))
+            .ends_with("carries #[session] together with another argument marker; an argument may use at most one")
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_on_the_peer_spiffe_id() {
+        assert!(
+            rejection_for(&reader_provider(
+                ISSUED_SESSIONS,
+                "#[session(issuer = provider)] peer: &spiffe::spiffe_id::SpiffeId"
+            ))
+            .contains("is the peer SPIFFE id and must not also carry")
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_read_twice() {
+        assert!(
+            rejection_for(&reader_provider(
+                ISSUED_SESSIONS,
+                &format!("{ISSUED_SESSION}, #[session(issuer = provider)] again: Option<Session>")
+            ))
+            .ends_with(
+                "reads the session more than once; exactly one argument may carry #[session]"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_read_after_a_bearer_token() {
+        assert!(
+            rejection_for(&reader_provider(
+                &format!("{PARTNER_ISSUER}{ISSUED_SESSIONS}"),
+                &format!("{PARTNER_TOKEN}, {ISSUED_SESSION}")
+            ))
+            .ends_with("reads both a session and a bearer token; a provider infers its user either from the session cookies or from a bearer credential")
+        );
+    }
+
+    #[test]
+    fn rejects_a_bearer_token_verified_after_a_session() {
+        assert!(
+            rejection_for(&reader_provider(
+                &format!("{PARTNER_ISSUER}{ISSUED_SESSIONS}"),
+                &format!("{ISSUED_SESSION}, {PARTNER_TOKEN}")
+            ))
+            .ends_with("reads both a session and a bearer token; a provider infers its user either from the session cookies or from a bearer credential")
+        );
+    }
+
+    #[test]
+    fn rejects_a_bearer_token_introspected_after_a_session() {
+        assert!(
+            rejection_for(&reader_provider(
+                &format!("{PARTNER_ISSUER}{PARTNER_CLIENTS}{ISSUED_SESSIONS}"),
+                &format!("{ISSUED_SESSION}, {INTROSPECTED_TOKEN}")
+            ))
+            .ends_with("reads both a session and a bearer token; a provider infers its user either from the session cookies or from a bearer credential")
+        );
+    }
+
+    #[test]
+    fn rejects_sessions_the_container_does_not_plan() {
+        let index = IndexedSource::new(&provider_source(&reader_provider(
+            ISSUED_SESSIONS,
+            ISSUED_SESSION,
+        )))
+        .index;
+
+        assert!(
+            BindingRegistries::collect(
+                &index,
+                ViewsAvailability::Available,
+                &collected_tags(&index),
+                &empty_bindings(),
+                &[],
+            )
+            .err()
+            .expect("the unplanned sessions are rejected")
+            .to_string()
+            .ends_with("reads a session, but the dependency container plans no 'crate::margaret::sessions::IssuedSessions'")
+        );
+    }
+
+    #[test]
+    fn rejects_two_session_users_of_one_responder() {
+        let second = "#[singleton]\n#[infers_authenticated_user(user_model = Editor)]\nstruct EditorProvider;\n\nimpl EditorProvider {\n    #[infer_from_request]\n    fn infer(&self, #[session(issuer = provider)] session: Option<Session>) -> anyhow::Result<AuthenticatedUserOutcome<Editor>> {}\n}\nstruct Editor;\n";
+        let index = IndexedSource::new(&provider_source(&format!(
+            "{}{second}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] reader: User, #[authenticated_user] editor: Editor) -> anyhow::Result<Response> {{}}\n}}\n",
+            reader_provider(ISSUED_SESSIONS, ISSUED_SESSION)
+        )))
+        .index;
+        let registries = collect_registries(&index, ViewsAvailability::Available)
+            .expect("the binding registries are collected");
+        let route_path = RoutePath::parse("/").expect("the route path is routable");
+        let item = index
+            .item(&CanonicalPath::new(vec![
+                "crate".to_string(),
+                "Page".to_string(),
+            ]))
+            .expect("the responder is indexed");
+
+        assert!(
+            classify_parameters(
+                &index,
+                item,
+                process_method(item).expect("the responder has a #[process] method"),
+                &BindingContext::Responder {
+                    route_path: &route_path,
+                    server: "public",
+                    subject: "responder 'Page'",
+                },
+                &registries,
+            )
+            .err()
+            .expect("the second session user is rejected")
+            .to_string()
+            .ends_with("infers more than one authenticated user from the session; a request resolves its session once, so exactly one #[infers_authenticated_user] provider reads it")
+        );
     }
 }

@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use margaret::framework::http::response::Response;
 use margaret::framework::http::response_continuation::ResponseContinuation;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::jwt_verification::id_token_profile::IdTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::infer_from_request;
@@ -14,7 +17,7 @@ use crate::models::ci_runner::CiRunner;
 #[singleton]
 #[infers_authenticated_user(user_model = CiRunner)]
 pub struct CiRunnerProvider {
-    trusted_workflow: TrustedWorkflow,
+    trusted_workflow: Arc<TrustedWorkflow>,
 }
 
 impl CiRunnerProvider {
@@ -22,21 +25,8 @@ impl CiRunnerProvider {
     ///
     /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub fn create(
-        #[console_argument(from = "github-actions-ref")] git_ref: String,
-        #[console_argument(from = "github-actions-repository-id")] repository_id: String,
-        #[console_argument(from = "github-actions-repository-owner-id")]
-        repository_owner_id: String,
-        #[console_argument(from = "github-actions-workflow-ref")] workflow_ref: String,
-    ) -> anyhow::Result<Self> {
-        Ok(Self {
-            trusted_workflow: TrustedWorkflow {
-                git_ref,
-                repository_id,
-                repository_owner_id,
-                workflow_ref,
-            },
-        })
+    pub fn create(trusted_workflow: Arc<TrustedWorkflow>) -> anyhow::Result<Self> {
+        Ok(Self { trusted_workflow })
     }
 
     /// # Errors
@@ -45,7 +35,9 @@ impl CiRunnerProvider {
     #[infer_from_request]
     pub fn infer_ci_runner(
         &self,
-        #[bearer_token(issuer = github_actions)] token: Option<VerifiedJwt<GithubActionsClaims>>,
+        #[bearer_token(issuer = github_actions)] token: Option<
+            VerifiedJwt<GithubActionsClaims, IdTokenProfile>,
+        >,
     ) -> anyhow::Result<AuthenticatedUserOutcome<CiRunner>> {
         let Some(verified) = token else {
             return Ok(AuthenticatedUserOutcome::Anonymous);

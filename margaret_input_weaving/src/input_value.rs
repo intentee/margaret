@@ -181,7 +181,7 @@ mod tests {
     fn a_required_field_is_the_qualified_value_type() {
         let value = from_declared(&parse_quote!(std::path::PathBuf)).expect("the type resolves");
 
-        assert_eq!(collapsed(&value.field_type()), "std::path::PathBuf");
+        assert_eq!(collapsed(&value.field_type()), "::std::path::PathBuf");
     }
 
     #[test]
@@ -219,7 +219,7 @@ mod tests {
 
         assert_eq!(
             collapsed(&value.parameter_referent()),
-            "::std::option::Option<std::string::String>"
+            "::std::option::Option<::std::string::String>"
         );
     }
 }

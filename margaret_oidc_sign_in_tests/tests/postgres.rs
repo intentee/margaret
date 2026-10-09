@@ -1,0 +1,7 @@
+mod admits_a_signed_in_identity_into_a_session;
+mod answers_a_callback_awaiting_the_signing_keys_as_unavailable;
+mod answers_a_callback_of_an_undiscovered_provider_as_unavailable;
+mod refuses_a_callback_without_its_transaction;
+mod refuses_a_signed_in_identity_the_application_does_not_admit;
+mod reports_a_session_that_cannot_start;
+mod reports_an_admission_that_fails;

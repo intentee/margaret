@@ -1,0 +1,27 @@
+[package]
+name = "margaret_oauth_vocabulary_codegen"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Reads the OAuth 2.0 vocabulary that Margaret attributes name as typed framework paths."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+margaret_attribute_arguments = { workspace = true }
+margaret_attributes = { workspace = true }
+margaret_codegen_tokens = { workspace = true }
+margaret_declaration_anchor = { workspace = true }
+margaret_generated_module = { workspace = true }
+margaret_oauth_vocabulary = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+margaret_attributes_tests = { path = "../margaret_attributes_tests" }
+
+[lints]
+workspace = true

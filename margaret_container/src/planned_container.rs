@@ -1,9 +1,13 @@
+use std::collections::BTreeSet;
+
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
+use crate::construction_flow::construction_flow;
 use crate::container_bindings::ContainerBindings;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
+use crate::provider_requirement::ProviderRequirement;
 use crate::render::render;
 use crate::render_build::render_build;
 use crate::rendered_container::RenderedContainer;
@@ -25,18 +29,15 @@ impl PlannedContainer {
 
     /// # Errors
     ///
-    /// Returns `ContainerError` propagated from the work it performs.
+    /// Returns `ContainerError::UnconsumedSingleton` for a singleton and
+    /// `ContainerError::UnconsumedDeclaration` for a declared framework provider that no root
+    /// reaches.
     pub fn render(
         self,
-        construction_roots: &[CanonicalPath],
-        retained_roots: &[CanonicalPath],
+        served_roots: &[CanonicalPath],
         builder_roots: &[CanonicalPath],
     ) -> Result<RenderedContainer, ContainerError> {
-        let construction_roots = construction_roots
-            .iter()
-            .map(|root| self.plan.planned_entry(root))
-            .collect::<Result<Vec<_>, _>>()?;
-        let retained_roots = retained_roots
+        let served_roots = served_roots
             .iter()
             .map(|root| self.plan.planned_entry(root))
             .collect::<Result<Vec<_>, _>>()?;
@@ -44,16 +45,47 @@ impl PlannedContainer {
             .iter()
             .map(|root| self.plan.planned_entry(root))
             .collect::<Result<Vec<_>, _>>()?;
-        let mut modules = vec![GeneratedModuleTokens::new(
-            "container",
-            render(&construction_roots, &retained_roots),
-        )];
-        modules.extend(render_build(
-            &self.plan,
-            &construction_roots,
-            &retained_roots,
-            &builder_roots,
-        ));
+        let consumed: BTreeSet<&CanonicalPath> = construction_flow(&self.plan, &served_roots)
+            .into_iter()
+            .chain(
+                builder_roots
+                    .iter()
+                    .flat_map(|root| construction_flow(&self.plan, &[*root])),
+            )
+            .map(|entry| &entry.key)
+            .collect();
+
+        for entry in self.plan.planned_entries() {
+            if consumed.contains(&entry.key) {
+                continue;
+            }
+
+            match entry.provider.requirement {
+                ProviderRequirement::Declared => {
+                    return Err(ContainerError::UnconsumedDeclaration {
+                        path: entry.key.to_string(),
+                    });
+                }
+                ProviderRequirement::Singleton => {
+                    return Err(ContainerError::UnconsumedSingleton {
+                        path: entry.key.to_string(),
+                    });
+                }
+                ProviderRequirement::Optional => {}
+            }
+        }
+
+        let modules = if served_roots.is_empty() && builder_roots.is_empty() {
+            Vec::new()
+        } else {
+            let mut modules = vec![GeneratedModuleTokens::new(
+                "container",
+                render(&served_roots),
+            )];
+
+            modules.extend(render_build(&self.plan, &served_roots, &builder_roots));
+            modules
+        };
 
         Ok(RenderedContainer {
             bindings: self.bindings,

@@ -1,8 +1,11 @@
+use std::marker::PhantomData;
+
 use margaret_jws_verification::key_id::KeyId;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 
-pub struct VerifiedJwt<TClaims> {
+pub struct VerifiedJwt<TClaims, TProfile> {
     pub claims: TClaims,
-    pub kid: KeyId,
+    pub kid: Option<KeyId>,
     pub registered: RegisteredClaims,
+    pub(crate) profile: PhantomData<TProfile>,
 }

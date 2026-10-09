@@ -1,0 +1,27 @@
+[package]
+name = "margaret_issuer_key_set_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+margaret_issuer_key_set = { workspace = true }
+margaret_jose_parameters = { workspace = true }
+margaret_jws_verification = { workspace = true }
+margaret_jws_verification_tests = { path = "../margaret_jws_verification_tests" }
+margaret_jwt_verification = { workspace = true }
+margaret_registered_claims = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "sync"] }
+
+[dev-dependencies]
+futures-util = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "test-util", "time"] }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

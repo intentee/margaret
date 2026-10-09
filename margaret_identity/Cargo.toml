@@ -12,10 +12,12 @@ publish.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+margaret_handler_error = { workspace = true }
 margaret_http = { workspace = true }
 
 [dev-dependencies]
 margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_route_method = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 

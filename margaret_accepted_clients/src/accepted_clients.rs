@@ -1,0 +1,221 @@
+use std::collections::HashMap;
+use std::ops::ControlFlow;
+use std::sync::Arc;
+
+use margaret_client_assertions::assertion_memory::AssertionMemory;
+use margaret_client_assertions::client_assertion::ClientAssertion;
+use margaret_http::request_authorization::RequestAuthorization;
+use margaret_issuer_key_set::issuer_verification::IssuerVerification;
+use margaret_jwt_verification::client_assertion_profile::ClientAssertionProfile;
+use margaret_jwt_verification::expected_audience::ExpectedAudience;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
+use margaret_jwt_verification::jwt_presentation::JwtPresentation;
+use margaret_jwt_verification::presented_jwt::PresentedJwt;
+use margaret_jwt_verification::verified_jwt::VerifiedJwt;
+use margaret_oauth_vocabulary::jwt_bearer_client_assertion_type::JWT_BEARER_CLIENT_ASSERTION_TYPE;
+use margaret_registered_claims::numeric_date::NumericDate;
+use margaret_token_digest::token_digest::TokenDigest;
+use margaret_token_issuance::token_issuance::TokenIssuance;
+
+use crate::accepted_clients_error::AcceptedClientsError;
+use crate::assertion_subject::AssertionSubject;
+use crate::client_assertion_max_lifetime::CLIENT_ASSERTION_MAX_LIFETIME;
+use crate::client_authentication_outcome::ClientAuthenticationOutcome;
+use crate::client_authentication_parameters::ClientAuthenticationParameters;
+use crate::client_refusal::ClientRefusal;
+use crate::registered_authentication::RegisteredAuthentication;
+use crate::registered_client::RegisteredClient;
+
+pub struct AcceptedClients {
+    clients: HashMap<&'static str, Arc<RegisteredClient>>,
+    issuer: &'static str,
+}
+
+impl AcceptedClients {
+    #[must_use]
+    pub fn create(clients: Vec<Arc<RegisteredClient>>, issuance: TokenIssuance) -> Self {
+        Self {
+            clients: clients
+                .into_iter()
+                .map(|registered| (registered.client.client_id, registered))
+                .collect(),
+            issuer: issuance.issuer,
+        }
+    }
+
+    /// # Errors
+    ///
+    /// Returns `AcceptedClientsError::RememberClientAssertion` when the application cannot remember
+    /// the client assertion.
+    pub async fn authenticate(
+        &self,
+        authorization: &RequestAuthorization,
+        ClientAuthenticationParameters {
+            client_assertion,
+            client_assertion_type,
+            client_id,
+        }: &ClientAuthenticationParameters,
+        now: NumericDate,
+    ) -> Result<ClientAuthenticationOutcome<'_>, AcceptedClientsError> {
+        if !matches!(authorization, RequestAuthorization::Absent) {
+            return Ok(ClientAuthenticationOutcome::Refused(
+                ClientRefusal::HeaderAuthentication,
+            ));
+        }
+
+        match client_assertion {
+            None => match client_assertion_type {
+                None => Ok(self.public_client(client_id.as_deref())),
+                Some(_) => Ok(ClientAuthenticationOutcome::Refused(
+                    ClientRefusal::AssertionMissing,
+                )),
+            },
+            Some(assertion) => match client_assertion_type {
+                None => Ok(ClientAuthenticationOutcome::Refused(
+                    ClientRefusal::AssertionTypeMissing,
+                )),
+                Some(assertion_type) if assertion_type != JWT_BEARER_CLIENT_ASSERTION_TYPE => Ok(
+                    ClientAuthenticationOutcome::Refused(ClientRefusal::UnsupportedAssertionType),
+                ),
+                Some(_) => {
+                    self.asserted_client(assertion, client_id.as_deref(), now)
+                        .await
+                }
+            },
+        }
+    }
+
+    #[must_use]
+    pub fn find(&self, client_id: &str) -> Option<&RegisteredClient> {
+        self.clients.get(client_id).map(AsRef::as_ref)
+    }
+
+    async fn asserted_client(
+        &self,
+        assertion: &str,
+        form_client_id: Option<&str>,
+        now: NumericDate,
+    ) -> Result<ClientAuthenticationOutcome<'_>, AcceptedClientsError> {
+        let presented = match PresentedJwt::present(assertion) {
+            JwtPresentation::Presented(presented) => presented,
+            JwtPresentation::Rejected(rejection) => {
+                return Ok(ClientAuthenticationOutcome::Refused(
+                    ClientRefusal::AssertionRejected(rejection),
+                ));
+            }
+        };
+
+        if form_client_id.is_some_and(|form_client_id| form_client_id != presented.claimed_issuer())
+        {
+            return Ok(ClientAuthenticationOutcome::Refused(
+                ClientRefusal::ConflictingClientIds,
+            ));
+        }
+
+        let Some(registered) = self.find(presented.claimed_issuer()) else {
+            return Ok(ClientAuthenticationOutcome::Refused(
+                ClientRefusal::UnknownClient,
+            ));
+        };
+        let RegisteredClient {
+            authentication: RegisteredAuthentication::PrivateKeyJwt { database, keys, .. },
+            client,
+            ..
+        } = registered
+        else {
+            return Ok(ClientAuthenticationOutcome::Refused(
+                ClientRefusal::PublicClientAssertion,
+            ));
+        };
+        let attributed = match presented.attribute_to(&JwtExpectation {
+            audience: ExpectedAudience::Sole(self.issuer),
+            issuer: client.client_id,
+        }) {
+            ControlFlow::Continue(attributed) => attributed,
+            ControlFlow::Break(rejection) => {
+                return Ok(ClientAuthenticationOutcome::Refused(
+                    ClientRefusal::AssertionRejected(rejection),
+                ));
+            }
+        };
+        let VerifiedJwt {
+            claims: AssertionSubject { sub },
+            registered: claims,
+            ..
+        } = match keys
+            .verify::<AssertionSubject, ClientAssertionProfile>(&attributed, now)
+            .await
+        {
+            IssuerVerification::KeysAwaited => {
+                return Ok(ClientAuthenticationOutcome::KeysAwaited);
+            }
+            IssuerVerification::Rejected(rejection) => {
+                return Ok(ClientAuthenticationOutcome::Refused(
+                    ClientRefusal::AssertionRejected(rejection),
+                ));
+            }
+            IssuerVerification::Verified(verified) => verified,
+        };
+
+        if sub != client.client_id {
+            return Ok(ClientAuthenticationOutcome::Refused(
+                ClientRefusal::SubjectMismatch { found: sub },
+            ));
+        }
+
+        let limit = now.after(CLIENT_ASSERTION_MAX_LIFETIME);
+
+        if claims.exp > limit {
+            return Ok(ClientAuthenticationOutcome::Refused(
+                ClientRefusal::AssertionOutlivesLimit {
+                    exp: claims.exp,
+                    limit,
+                },
+            ));
+        }
+
+        let Some(jti) = claims.jti else {
+            return Ok(ClientAuthenticationOutcome::Refused(
+                ClientRefusal::AssertionIdentifierMissing,
+            ));
+        };
+
+        match ClientAssertion::remember(
+            database,
+            client.client_id,
+            TokenDigest::of(&jti),
+            claims.exp,
+            now,
+        )
+        .await
+        .map_err(|source| AcceptedClientsError::RememberClientAssertion {
+            client_id: client.client_id,
+            source,
+        })? {
+            AssertionMemory::First => Ok(ClientAuthenticationOutcome::Authenticated(registered)),
+            AssertionMemory::Seen => Ok(ClientAuthenticationOutcome::Refused(
+                ClientRefusal::AssertionReplayed,
+            )),
+        }
+    }
+
+    fn public_client(&self, client_id: Option<&str>) -> ClientAuthenticationOutcome<'_> {
+        let Some(client_id) = client_id else {
+            return ClientAuthenticationOutcome::Refused(ClientRefusal::MissingCredentials);
+        };
+
+        match self.find(client_id) {
+            Some(
+                registered @ RegisteredClient {
+                    authentication: RegisteredAuthentication::None,
+                    ..
+                },
+            ) => ClientAuthenticationOutcome::Authenticated(registered),
+            Some(RegisteredClient {
+                authentication: RegisteredAuthentication::PrivateKeyJwt { .. },
+                ..
+            }) => ClientAuthenticationOutcome::Refused(ClientRefusal::AssertionRequired),
+            None => ClientAuthenticationOutcome::Refused(ClientRefusal::UnknownClient),
+        }
+    }
+}

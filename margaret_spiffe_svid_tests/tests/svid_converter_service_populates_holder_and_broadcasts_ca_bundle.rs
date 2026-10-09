@@ -5,12 +5,9 @@ use trzcina::Service;
 use margaret_spiffe_svid::svid_certified_key_holder::SvidCertifiedKeyHolder;
 use margaret_spiffe_svid::svid_converter_service::SvidConverterService;
 use margaret_spiffe_svid_tests::build_workload_x509_context::build_workload_x509_context;
-use margaret_spiffe_svid_tests::install_crypto_provider::install_crypto_provider;
 
 #[tokio::test]
 async fn populates_holder_and_broadcasts_ca_bundle() {
-    install_crypto_provider();
-
     let (ca_bundle_tx, mut ca_bundle_rx) = broadcast::channel(1);
     let (x509_context_tx, x509_context_rx) = broadcast::channel(1);
     let svid_certified_key_holder = SvidCertifiedKeyHolder::default();

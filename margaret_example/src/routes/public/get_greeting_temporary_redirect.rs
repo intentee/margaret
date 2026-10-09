@@ -2,11 +2,12 @@ use margaret::framework::http::redirect::Redirect;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::margaret::routes::Routes;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/greeting/temporary", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/greeting/temporary", server = "public")]
 pub struct GetGreetingTemporaryRedirect;
 
 impl GetGreetingTemporaryRedirect {

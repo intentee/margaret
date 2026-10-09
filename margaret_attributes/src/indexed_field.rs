@@ -4,6 +4,7 @@ use syn::Type;
 use syn::Attribute;
 
 use crate::field_identifier::FieldIdentifier;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 
 pub struct IndexedField {
@@ -43,6 +44,13 @@ impl IndexedField {
     }
 
     #[must_use]
+    pub fn framework_attribute(&self, attribute: FrameworkAttribute) -> Option<&IndexedAttribute> {
+        self.attributes
+            .iter()
+            .find(|indexed| indexed.framework_attribute() == Some(attribute))
+    }
+
+    #[must_use]
     pub fn identifier(&self) -> &FieldIdentifier {
         &self.identifier
     }
@@ -65,14 +73,14 @@ mod tests {
     fn exposes_the_identifier_type_and_attributes() {
         let expected_type: Type = parse_quote!(String);
         let field = IndexedField::new(
-            FieldIdentifier::Named("title".to_string()),
+            FieldIdentifier::Named(parse_quote!(title)),
             expected_type.clone(),
             vec![parse_quote!(#[column(name = "title")])],
         );
 
         assert_eq!(
             field.identifier(),
-            &FieldIdentifier::Named("title".to_string())
+            &FieldIdentifier::Named(parse_quote!(title))
         );
         assert_eq!(field.ty(), &expected_type);
         assert_eq!(field.attributes().len(), 1);

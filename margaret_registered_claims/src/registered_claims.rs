@@ -6,10 +6,10 @@ use serde_json::Value;
 use crate::audience_claim::AudienceClaim;
 use crate::numeric_date::NumericDate;
 
-fn present<'wire, Source: Deserializer<'wire>>(
+fn present<'wire, TValue: Deserialize<'wire>, Source: Deserializer<'wire>>(
     deserializer: Source,
-) -> Result<Option<NumericDate>, Source::Error> {
-    NumericDate::deserialize(deserializer).map(Some)
+) -> Result<Option<TValue>, Source::Error> {
+    TValue::deserialize(deserializer).map(Some)
 }
 
 fn numeric_date_member(date: NumericDate) -> Value {
@@ -20,8 +20,11 @@ fn numeric_date_member(date: NumericDate) -> Value {
 pub struct RegisteredClaims {
     pub aud: AudienceClaim,
     pub exp: NumericDate,
-    pub iat: NumericDate,
+    #[serde(default, deserialize_with = "present")]
+    pub iat: Option<NumericDate>,
     pub iss: String,
+    #[serde(default, deserialize_with = "present")]
+    pub jti: Option<String>,
     #[serde(default, deserialize_with = "present")]
     pub nbf: Option<NumericDate>,
 }
@@ -33,8 +36,15 @@ impl RegisteredClaims {
 
         members.insert("aud".to_string(), self.aud.to_json());
         members.insert("exp".to_string(), numeric_date_member(self.exp));
-        members.insert("iat".to_string(), numeric_date_member(self.iat));
+        if let Some(iat) = self.iat {
+            members.insert("iat".to_string(), numeric_date_member(iat));
+        }
+
         members.insert("iss".to_string(), Value::String(self.iss.clone()));
+
+        if let Some(jti) = &self.jti {
+            members.insert("jti".to_string(), Value::String(jti.clone()));
+        }
 
         if let Some(nbf) = self.nbf {
             members.insert("nbf".to_string(), numeric_date_member(nbf));

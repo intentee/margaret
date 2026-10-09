@@ -5,11 +5,12 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::metrics::Metrics;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/metrics", server = "internal")]
+#[responds_to_http(method = RouteMethod::Get, path = "/metrics", server = "internal")]
 pub struct GetMetrics {
     metrics: Arc<Metrics>,
 }

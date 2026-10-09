@@ -65,8 +65,8 @@ pub fn authenticated_user_providers(
     let mut registry: HashMap<CanonicalPath, AuthenticatedUserProvider> = HashMap::new();
 
     for item in index.items() {
-        let Some(matched) = AttributeQuery::new(item)
-            .find_framework(FrameworkAttribute::InfersAuthenticatedUser)?
+        let Some(matched) =
+            AttributeQuery::new(item).find_framework(FrameworkAttribute::InfersAuthenticatedUser)
         else {
             continue;
         };

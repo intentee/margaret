@@ -1,0 +1,19 @@
+error[E0080]: evaluation panicked: assertion failed: LIMIT > 0 && LIMIT as u64 <= MAXIMUM_LIMIT
+ --> $WORKSPACE/margaret_active_record/src/scan.rs
+  |
+  |             assert!(LIMIT > 0 && LIMIT as u64 <= MAXIMUM_LIMIT);
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `margaret_model_facade::framework::margaret_active_record::scan::Scan::<margaret_active_record_tests::models::message::Message, margaret_active_record_tests::margaret::models::models_message_message::query::edge::posted_at::Edge, margaret_model_facade::framework::margaret_active_record::ascending::Ascending>::limit::<9223372036854775807>::{constant#0}` failed here
+
+note: erroneous constant encountered
+ --> $WORKSPACE/margaret_active_record/src/scan.rs
+  |
+  | /         const {
+  | |             assert!(LIMIT > 0 && LIMIT as u64 <= MAXIMUM_LIMIT);
+  | |         }
+  | |_________^
+
+note: the above error was encountered while instantiating `fn margaret_model_facade::framework::margaret_active_record::scan::Scan::<Message, margaret_active_record_tests::margaret::models::models_message_message::query::edge::posted_at::Edge, Ascending>::limit::<9223372036854775807>`
+ --> compile_fail/limits_a_scan_beyond_the_maximum.rs:5:10
+  |
+5 |     drop(Message::query().posted_at.ascending().limit::<9_223_372_036_854_775_807>());
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

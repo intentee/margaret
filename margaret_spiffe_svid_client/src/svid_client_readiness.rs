@@ -9,13 +9,15 @@ use crate::svid_server_cert_verifier::SvidServerCertVerifier;
 
 #[derive(Clone)]
 pub struct SvidClientReadiness {
-    server_cert_verifier_subscription: SyncHolderSubscription<Arc<SvidServerCertVerifier>>,
+    server_cert_verifier_subscription: SyncHolderSubscription<Option<Arc<SvidServerCertVerifier>>>,
 }
 
 impl SvidClientReadiness {
     #[must_use]
     pub fn new(
-        server_cert_verifier_subscription: SyncHolderSubscription<Arc<SvidServerCertVerifier>>,
+        server_cert_verifier_subscription: SyncHolderSubscription<
+            Option<Arc<SvidServerCertVerifier>>,
+        >,
     ) -> Self {
         Self {
             server_cert_verifier_subscription,

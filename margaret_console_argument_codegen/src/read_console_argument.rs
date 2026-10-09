@@ -35,15 +35,15 @@ pub fn read_console_argument(
     let form = console_argument_arguments(arguments, site)?;
     let value = InputValue::from_declared(index, item, declared, site)?;
 
-    match (form, is_flag(&value)) {
-        (ConsoleArgumentForm::Named { key }, true) => Ok(ConsoleArgument::Flag { name: key }),
-        (ConsoleArgumentForm::Positional, true) => {
+    let flag = is_flag(&value);
+
+    match form {
+        ConsoleArgumentForm::Named { key } if flag => Ok(ConsoleArgument::Flag { name: key }),
+        ConsoleArgumentForm::Named { key } => Ok(ConsoleArgument::Named { name: key, value }),
+        ConsoleArgumentForm::Positional if flag => {
             Err(ConsoleArgumentCodegenError::BooleanPositional { site: site.clone() })
         }
-        (ConsoleArgumentForm::Named { key }, false) => {
-            Ok(ConsoleArgument::Named { name: key, value })
-        }
-        (ConsoleArgumentForm::Positional, false) => match scope {
+        ConsoleArgumentForm::Positional => match scope {
             ConsoleArgumentScope::ConsoleCommand => Ok(ConsoleArgument::Positional {
                 id: site.parameter.clone(),
                 value,

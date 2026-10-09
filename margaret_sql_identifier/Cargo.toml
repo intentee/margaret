@@ -1,0 +1,13 @@
+[package]
+name = "margaret_sql_identifier"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Quotes and qualifies the Postgres identifiers of a Margaret schema."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

@@ -101,7 +101,7 @@ mod tests {
                 value: value(true, WeavingKind::BorrowedStr, &["std", "string", "String"]),
             })
             .contains(
-                "matches.get_one::<std::string::String>(\"label\"){Some(value)=>value.clone()"
+                "matches.get_one::<::std::string::String>(\"label\"){Some(value)=>value.clone()"
             )
         );
     }
@@ -113,7 +113,7 @@ mod tests {
                 name: "note".to_string(),
                 value: value(false, WeavingKind::Cloned, &["std", "string", "String"]),
             }),
-            r#"matches.get_one::<std::string::String>("note").cloned()"#
+            r#"matches.get_one::<::std::string::String>("note").cloned()"#
         );
     }
 

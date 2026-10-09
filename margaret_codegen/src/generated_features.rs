@@ -27,10 +27,6 @@ impl GeneratedFeatures {
             index.has_framework_attribute(FrameworkAttribute::HandlesMiddlewareAttribute),
         );
         features.enable_if(
-            GeneratedFeature::Models,
-            index.has_framework_attribute(FrameworkAttribute::Model),
-        );
-        features.enable_if(
             GeneratedFeature::Websockets,
             index.has_framework_attribute(FrameworkAttribute::WebsocketSession),
         );
@@ -52,10 +48,8 @@ impl GeneratedFeatures {
         features.enable_if(
             GeneratedFeature::Console,
             index.has_framework_attribute(FrameworkAttribute::ConsoleCommand)
-                || features.contains(GeneratedFeature::Serves)
-                || features.contains(GeneratedFeature::Models),
+                || features.contains(GeneratedFeature::Serves),
         );
-
         features
     }
 

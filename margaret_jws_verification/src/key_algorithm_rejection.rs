@@ -10,6 +10,9 @@ pub enum KeyAlgorithmRejection {
         declared: JwsAlgorithm,
         implied: JwsAlgorithm,
     },
+    NotAnRsaAlgorithm {
+        declared: JwsAlgorithm,
+    },
     UnsupportedAlgorithm {
         alg: String,
     },
@@ -21,6 +24,10 @@ impl Display for KeyAlgorithmRejection {
             Self::AlgorithmMismatch { declared, implied } => write!(
                 formatter,
                 "the key declares the algorithm {declared}, but its key material verifies {implied}"
+            ),
+            Self::NotAnRsaAlgorithm { declared } => write!(
+                formatter,
+                "the rsa key declares the algorithm {declared}, which is not an rsa signature algorithm"
             ),
             Self::UnsupportedAlgorithm { alg } => {
                 write!(
@@ -45,6 +52,9 @@ mod tests {
                 declared: JwsAlgorithm::Es384,
                 implied: JwsAlgorithm::Es256,
             },
+            KeyAlgorithmRejection::NotAnRsaAlgorithm {
+                declared: JwsAlgorithm::EdDsa,
+            },
             KeyAlgorithmRejection::UnsupportedAlgorithm {
                 alg: "RSA-OAEP".to_string(),
             },
@@ -57,6 +67,10 @@ mod tests {
         );
         assert_eq!(
             described[1],
+            "the rsa key declares the algorithm EdDSA, which is not an rsa signature algorithm"
+        );
+        assert_eq!(
+            described[2],
             "the key declares the unsupported algorithm 'RSA-OAEP'"
         );
     }

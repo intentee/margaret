@@ -11,26 +11,35 @@ publish.workspace = true
 autotests = false
 
 [dependencies]
-anyhow = { workspace = true }
 async-trait = { workspace = true }
 bytes = { workspace = true }
+chrono = { workspace = true }
+margaret_database = { workspace = true }
+margaret_deadline = { workspace = true }
+margaret_handler_error = { workspace = true }
 margaret_http = { workspace = true }
-margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwks_roller = { workspace = true }
+margaret_registered_claims = { workspace = true }
 margaret_sync_holder = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
 tokio-util = { workspace = true }
-trzcina = { workspace = true }
 
 [dev-dependencies]
 http = { workspace = true }
-margaret_identity_session = { workspace = true }
-margaret_jwks_file_secret_storage = { workspace = true }
+margaret_database_tests = { path = "../margaret_database_tests" }
+margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller_tests = { path = "../margaret_jwks_roller_tests" }
-tempfile = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
+margaret_signing_keys = { workspace = true }
+margaret_signing_keys_tests = { path = "../margaret_signing_keys_tests" }
+margaret_sql_identifier = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "test-util", "time"] }
+
+[features]
+tests_that_use_postgres = []
 
 [[test]]
 name = "main"

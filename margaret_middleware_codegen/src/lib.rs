@@ -20,10 +20,13 @@ mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+    use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_tag_codegen::tag_pool::TagPool;
+    use margaret_tag_codegen_tests::collected_tags::collected_tags;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use crate::fold_layers::fold_layers;
     use crate::layer_application::LayerApplication;
@@ -36,9 +39,15 @@ mod tests {
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
-            .expect("the container renders")
-            .bindings
+        render_container(
+            index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings
     }
 
     fn empty_bindings() -> ContainerBindings {
@@ -49,15 +58,16 @@ mod tests {
         BindingRegistries::collect(
             index,
             ViewsAvailability::Available,
-            &TagPool::collect(index).expect("the tags are collected"),
+            &collected_tags(index),
             &empty_bindings(),
+            &[],
         )
         .expect("the binding registries are collected")
     }
 
     fn wrappers_for(lib_source: &str) -> String {
         let index = IndexedSource::new(lib_source).index;
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = collected_tags(&index);
         let plans = MiddlewarePlans::collect(&index, &registries_for(&index), &tags)
             .expect("the middleware plans are collected");
 
@@ -72,13 +82,9 @@ mod tests {
     fn plans_rejection_for(lib_source: &str) -> MiddlewareCodegenError {
         let index = IndexedSource::new(lib_source).index;
 
-        MiddlewarePlans::collect(
-            &index,
-            &registries_for(&index),
-            &TagPool::collect(&index).expect("the tags are collected"),
-        )
-        .err()
-        .expect("the middleware plans fail to collect")
+        MiddlewarePlans::collect(&index, &registries_for(&index), &collected_tags(&index))
+            .err()
+            .expect("the middleware plans fail to collect")
     }
 
     fn plans_error_for(lib_source: &str) -> String {
@@ -87,7 +93,7 @@ mod tests {
 
     fn layers_for(lib_source: &str) -> Result<Vec<LayerApplication>, MiddlewareCodegenError> {
         let index = IndexedSource::new(lib_source).index;
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = collected_tags(&index);
         let plans = MiddlewarePlans::collect(&index, &registries_for(&index), &tags)
             .expect("the middleware plans are collected");
         let selected = index.select_framework_attribute(FrameworkAttribute::Middleware);
@@ -109,9 +115,9 @@ mod tests {
     fn rejects_a_middleware_reference_that_names_a_jwks_endpoint() {
         assert!(
             layers_error_for(
-                "#[singleton]\n#[provides_jwks_endpoint(auth)]\nstruct Endpoint;\n\n#[middleware(auth)]\nstruct Site;\n"
+                "#[verifies_tokens_from_issuer(auth, audience = \"api\", issuer = \"https://auth.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://auth.example/jwks\"))]\nstruct Endpoint;\n\n#[middleware(auth)]\nstruct Site;\n"
             )
-            .contains("which is a jwks endpoint provider, not a middleware handler")
+            .contains("which is a trusted issuer with published keys, not a middleware handler")
         );
     }
 
@@ -137,7 +143,8 @@ impl Guard {
             source
                 .contains("implmargaret::framework::http::http_middleware::HttpMiddlewareforGuard")
         );
-        assert!(source.contains("self.inner.process(request,next)"));
+        assert!(source.contains("letargument_1=request;"));
+        assert!(source.contains("self.inner.process(argument_1,next)"));
     }
 
     #[test]
@@ -157,7 +164,7 @@ impl Guard {
 ",
         );
 
-        assert!(source.contains("self.inner.process(request,next).await"));
+        assert!(source.contains("self.inner.process(argument_1,next).await"));
     }
 
     #[test]
@@ -169,7 +176,7 @@ impl Guard {
         assert!(source.contains(
             "pubstructTracer{pubinner:std::sync::Arc<crate::Tracer>,pubroutes:std::sync::Arc<super::super::routes::Routes>,}"
         ));
-        assert!(source.contains("self.inner.process(request,next,&self.routes)"));
+        assert!(source.contains("self.inner.process(argument_1,next,&self.routes)"));
     }
 
     #[test]
@@ -193,7 +200,7 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(request)"));
+        assert!(source.contains("self.inner.process(argument_1)"));
     }
 
     #[test]
@@ -270,7 +277,7 @@ impl Guard {
         let index = IndexedSource::new(
             "#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\n#[middleware(guard)]\nstruct Site;\n",
         ).index;
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = collected_tags(&index);
         let site = index
             .select_framework_attribute(FrameworkAttribute::Middleware)
             .next()
@@ -424,23 +431,18 @@ struct Guard;
 
 impl Guard {
     #[process]
-    fn process(&self, #[form_request(from = RequestInput::Json)] data: ValidationResult<Data>, next: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process(&self, #[form_request(from = RequestInput::Query)] data: ValidationResult<Data>, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 ",
         );
 
         assert!(source.contains(
-            "margaret::framework::http_validation::validate_input::validate_input(request,"
+            "letargument_1=margaret::framework::validation::validate::validate(&request.inputs.query,);"
         ));
-        assert!(
-            source.contains(
-                "margaret::framework::http_validation::request_input::RequestInput::Json"
-            )
-        );
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(data,next)"));
+        assert!(source.contains("self.inner.process(argument_1,next)"));
     }
 
     #[test]
@@ -454,25 +456,23 @@ struct Guard;
 
 impl Guard {
     #[process]
-    fn process(&self, #[form_request(from = RequestInput::Form)] data: Data) -> anyhow::Result<ResponseContinuation> {}
+    fn process(&self, #[form_request(from = RequestInput::Cookie)] data: Data) -> anyhow::Result<ResponseContinuation> {}
 }
 ",
         );
 
         assert!(source.contains(
-            "margaret::framework::http_validation::require_input::require_input(request,"
+            "letargument_1=matchmargaret::framework::http_validation::require_input::require_input(margaret::framework::validation::validate::validate(&request.inputs.cookies,),)"
         ));
         assert!(
-            source.contains(
-                "margaret::framework::http_validation::request_input::RequestInput::Form"
-            )
+            source
+                .contains("margaret::framework::http::requirement::Requirement::Met(model)=>model")
         );
-        assert!(source.contains("Ok(model)=>model"));
-        assert!(source.contains("::std::result::Result::Ok(response.into())"));
+        assert!(source.contains("=>return::std::result::Result::Ok(response)"));
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(data)"));
+        assert!(source.contains("self.inner.process(argument_1)"));
     }
 
     #[test]
@@ -494,15 +494,13 @@ impl Guard {
 ",
         );
 
-        assert!(
-            source.contains(
-                "margaret::framework::http_validation::request_input::RequestInput::Query"
-            )
-        );
+        assert!(source.contains(
+            "letargument_2=matchmargaret::framework::http_validation::require_input::require_input(margaret::framework::validation::validate::validate(&request.inputs.query,),)"
+        ));
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(request,filters,next)"));
+        assert!(source.contains("self.inner.process(argument_1,argument_2,next)"));
     }
 
     #[test]
@@ -528,7 +526,7 @@ impl Tracer {
     }
 
     #[test]
-    fn disambiguates_wrapper_parameters_named_request_and_next() {
+    fn keeps_the_wrapper_bindings_clear_of_parameters_named_request_and_next() {
         let source = wrappers_for(
             r"use margaret::framework::http_validation::request_input::RequestInput;
 
@@ -541,19 +539,19 @@ struct Guard;
 
 impl Guard {
     #[process]
-    fn process(&self, next: &Request, #[form_request(from = RequestInput::Form)] request: Data, following: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process(&self, next: &Request, #[form_request(from = RequestInput::Query)] request: Data, following: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 ",
         );
 
         assert!(source.contains(
-            "asyncfnprocess(&self,request_2:&margaret::framework::http::request::Request,next_2:margaret::framework::http::next::Next,)"
+            "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("letnext=request_2;"));
+        assert!(source.contains("letargument_1=request;"));
         assert!(source.contains(
-            "margaret::framework::http_validation::require_input::require_input(request_2,"
+            "margaret::framework::validation::validate::validate(&request.inputs.query,)"
         ));
-        assert!(source.contains("self.inner.process(next,request,next_2)"));
+        assert!(source.contains("self.inner.process(argument_1,argument_2,next)"));
     }
 
     #[test]
@@ -574,5 +572,32 @@ impl Guard {
             )
             .contains("has no route path to bind from")
         );
+    }
+    #[test]
+    fn rejects_a_form_body_in_a_middleware() {
+        let rejection = plans_rejection_for(
+            "use margaret::framework::http_validation::request_input::RequestInput;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, #[form_request(from = RequestInput::Form)] data: Data) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+        );
+
+        assert!(matches!(
+            rejection,
+            MiddlewareCodegenError::Binding {
+                source: RequestBindingError::ContentOutsideResponder { ref subject, ref parameter }
+            } if subject == "middleware 'crate::Guard'" && parameter == "1"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_raw_body_stream_in_a_middleware() {
+        let rejection = plans_rejection_for(
+            "use margaret::framework::http::request_body_stream::RequestBodyStream;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, stream: RequestBodyStream) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+        );
+
+        assert!(matches!(
+            rejection,
+            MiddlewareCodegenError::Binding {
+                source: RequestBindingError::ContentOutsideResponder { ref subject, ref parameter }
+            } if subject == "middleware 'crate::Guard'" && parameter == "1"
+        ));
     }
 }

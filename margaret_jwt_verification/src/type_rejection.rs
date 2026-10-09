@@ -14,6 +14,10 @@ pub enum TypeRejection {
     Missing {
         expected: JwtType,
     },
+    Unaccepted {
+        accepted: &'static [JwtType],
+        found: HeaderType,
+    },
 }
 
 impl Display for TypeRejection {
@@ -26,6 +30,15 @@ impl Display for TypeRejection {
             Self::Missing { expected } => write!(
                 formatter,
                 "the token does not declare its type, and '{expected}' is expected"
+            ),
+            Self::Unaccepted { accepted, found } => write!(
+                formatter,
+                "the token declares the type '{found}' where no type or one of [{}] is expected",
+                accepted
+                    .iter()
+                    .map(|accepted| accepted.wire_name())
+                    .collect::<Vec<&str>>()
+                    .join(", ")
             ),
         }
     }
@@ -54,6 +67,14 @@ mod tests {
             }
             .to_string(),
             "the token does not declare its type, and 'JWT' is expected"
+        );
+        assert_eq!(
+            TypeRejection::Unaccepted {
+                accepted: &[JwtType::ClientAuthentication, JwtType::Jwt],
+                found: HeaderType::Supported(JwtType::AccessToken),
+            }
+            .to_string(),
+            "the token declares the type 'at+jwt' where no type or one of [client-authentication+jwt, JWT] is expected"
         );
     }
 }

@@ -1,0 +1,48 @@
+[package]
+name = "margaret_sessions_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+chrono = { workspace = true }
+cookie = { workspace = true }
+http = { workspace = true }
+margaret = { workspace = true, features = ["runtime"] }
+margaret_database_tests = { path = "../margaret_database_tests" }
+margaret_handler_error = { workspace = true }
+margaret_http = { workspace = true }
+margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_identity_session = { workspace = true }
+margaret_jwks_keygen = { workspace = true }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
+margaret_jwks_secret_store = { workspace = true }
+margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
+margaret_model = { workspace = true }
+margaret_peer_identity = { workspace = true }
+margaret_route_method = { workspace = true }
+margaret_sessions = { workspace = true }
+margaret_trusted_issuer = { workspace = true }
+spiffe = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+margaret_issuer_key_set = { workspace = true }
+margaret_issuer_request = { workspace = true }
+margaret_sql_identifier = { workspace = true }
+margaret_token_digest = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[features]
+tests_that_use_postgres = []
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

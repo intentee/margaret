@@ -1,0 +1,121 @@
+use std::sync::Arc;
+
+use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
+use margaret_issuer_directory_tests::polled_directory::PolledDirectory;
+use margaret_issuer_directory_tests::polled_fixture::PolledFixture;
+use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
+use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
+use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_secret_store_tests::fixture_secrets::fixture_secrets;
+use margaret_oauth_vocabulary::client_secret::ClientSecret;
+use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
+use margaret_token_trust::token_trust::TokenTrust;
+use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
+
+use crate::issuer_location::IssuerLocation;
+use crate::provider_fixture::ProviderFixture;
+
+const PORTAL_CLIENT_ID: &str = "portal";
+
+pub struct MargaretClient {
+    pub directory: PolledDirectory,
+    pub secrets: Arc<JwksSecretHolder>,
+    pub server: Arc<AuthorizationServerClient>,
+}
+
+impl MargaretClient {
+    pub async fn of_portal(fixture: &ProviderFixture) -> Self {
+        let secrets = Arc::clone(&fixture.clients.asserting(PORTAL_CLIENT_ID).secrets);
+
+        Self::discovering(
+            || fixture.issuer_request_client(),
+            &fixture.issuer.location,
+            "artifacts",
+            Arc::clone(&secrets),
+            |request_client, metadata, trusted_issuer| {
+                AuthorizationServerClient::with_private_key_jwt(
+                    request_client,
+                    metadata,
+                    trusted_issuer,
+                    PORTAL_CLIENT_ID,
+                    secrets,
+                )
+            },
+        )
+        .await
+    }
+
+    pub async fn signing_in(
+        request_client: impl Fn() -> IssuerRequestClient,
+        issuer: &'static IssuerLocation,
+        client_id: &'static str,
+        client_secret: ClientSecret,
+    ) -> Self {
+        Self::discovering(
+            request_client,
+            issuer,
+            client_id,
+            fixture_secrets(),
+            |request_client, metadata, trusted_issuer| {
+                AuthorizationServerClient::with_client_secret_basic(
+                    request_client,
+                    metadata,
+                    trusted_issuer,
+                    client_id,
+                    client_secret,
+                )
+            },
+        )
+        .await
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the callback is not a url.
+    #[must_use]
+    pub fn sign_in_flow(&self, callback: &str, scopes: &[&str]) -> SignInFlow {
+        SignInFlow::create(
+            Arc::clone(&self.server),
+            Arc::clone(&self.secrets),
+            callback.to_string(),
+            scopes,
+        )
+        .expect("the callback is a url")
+    }
+
+    pub async fn stop(self) {
+        self.directory.stop().await;
+    }
+
+    async fn discovering(
+        request_client: impl Fn() -> IssuerRequestClient,
+        issuer: &'static IssuerLocation,
+        audience: &'static str,
+        secrets: Arc<JwksSecretHolder>,
+        server: impl FnOnce(
+            Arc<IssuerRequestClient>,
+            Arc<IssuerMetadata>,
+            Arc<TrustedIssuer>,
+        ) -> AuthorizationServerClient,
+    ) -> Self {
+        let metadata = Arc::new(IssuerMetadata::awaiting());
+        let polled = PolledFixture::discovered(issuer.discovered(), Arc::clone(&metadata));
+        let snapshot = polled.key_set.snapshot();
+        let directory = PolledDirectory::start(vec![Arc::clone(&polled.polled)], request_client());
+
+        polled.key_set.request_refresh_after(&snapshot).await;
+
+        Self {
+            directory,
+            secrets,
+            server: Arc::new(server(
+                Arc::new(request_client()),
+                metadata,
+                Arc::new(polled.trusted(TokenTrust {
+                    audience,
+                    issuer: issuer.issuer.as_str(),
+                })),
+            )),
+        }
+    }
+}

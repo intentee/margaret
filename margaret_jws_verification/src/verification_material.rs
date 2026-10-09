@@ -1,46 +1,47 @@
+use std::convert::identity;
 use std::ops::ControlFlow;
 
 use aws_lc_rs::encoding::AsDer;
+use aws_lc_rs::encoding::PublicKeyX509Der;
+use aws_lc_rs::error::KeyRejected;
+use aws_lc_rs::signature::ED25519_PUBLIC_KEY_LEN;
 use aws_lc_rs::signature::ParsedPublicKey;
-use aws_lc_rs::signature::RSA_PKCS1_2048_8192_SHA256;
 use aws_lc_rs::signature::RsaPublicKeyComponents;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
-use p256::ecdsa::signature::Verifier;
-use p256::pkcs8::DecodePublicKey;
 
 use margaret_jose_parameters::curve::Curve;
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
+use margaret_jose_parameters::octet_key_pair_curve::OctetKeyPairCurve;
 
 use crate::certificate_rejection::CertificateRejection;
 use crate::key_material_rejection::KeyMaterialRejection;
-use crate::rs256_public_key::Rs256PublicKey;
+use crate::rsa_signature_scheme::RsaSignatureScheme;
 use crate::signature_check::SignatureCheck;
+use crate::signature_scheme::SignatureScheme;
 
 const SEC1_UNCOMPRESSED_POINT_TAG: u8 = 0x04;
+const ED25519_SIGNATURE_OCTETS: usize = 64;
 
-fn coordinate_length(curve: Curve) -> usize {
-    match curve {
-        Curve::P256 => p256::FieldBytes::default().len(),
-        Curve::P384 => p384::FieldBytes::default().len(),
+fn flow<TValue, TFailure, TRejection>(
+    result: Result<TValue, TFailure>,
+    rejection: fn(TFailure) -> TRejection,
+) -> ControlFlow<TRejection, TValue> {
+    match result {
+        Ok(value) => ControlFlow::Continue(value),
+        Err(failure) => ControlFlow::Break(rejection(failure)),
     }
 }
 
 fn decoded(
     encoded: &str,
-    rejection: impl FnOnce(base64ct::Error) -> KeyMaterialRejection,
+    rejection: fn(base64ct::Error) -> KeyMaterialRejection,
 ) -> ControlFlow<KeyMaterialRejection, Vec<u8>> {
-    match Base64UrlUnpadded::decode_vec(encoded) {
-        Ok(bytes) => ControlFlow::Continue(bytes),
-        Err(source) => ControlFlow::Break(rejection(source)),
-    }
+    flow(Base64UrlUnpadded::decode_vec(encoded), rejection)
 }
 
-fn coordinate(curve: Curve, encoded: &str) -> ControlFlow<KeyMaterialRejection, Vec<u8>> {
-    let bytes = decoded(encoded, |source| KeyMaterialRejection::CoordinateBase64 {
-        source,
-    })?;
-    let expected = coordinate_length(curve);
+fn coordinate(encoded: &str, expected: usize) -> ControlFlow<KeyMaterialRejection, Vec<u8>> {
+    let bytes = decoded(encoded, KeyMaterialRejection::CoordinateBase64)?;
 
     if bytes.len() != expected {
         return ControlFlow::Break(KeyMaterialRejection::CoordinateLength {
@@ -50,6 +51,17 @@ fn coordinate(curve: Curve, encoded: &str) -> ControlFlow<KeyMaterialRejection, 
     }
 
     ControlFlow::Continue(bytes)
+}
+
+fn identical_keys(
+    published: &PublicKeyX509Der<'static>,
+    certified: &PublicKeyX509Der<'static>,
+) -> Result<(), CertificateRejection> {
+    if published.as_ref() == certified.as_ref() {
+        Ok(())
+    } else {
+        Err(CertificateRejection::KeyMismatch)
+    }
 }
 
 fn significant_bits(big_endian: &[u8]) -> u64 {
@@ -62,38 +74,11 @@ fn significant_bits(big_endian: &[u8]) -> u64 {
     })
 }
 
-fn ecdsa_verification<Signature, Key: Verifier<Signature>>(
-    key: &Key,
-    message: &[u8],
-    signature: Result<Signature, p256::ecdsa::Error>,
-) -> SignatureCheck {
-    match signature {
-        Ok(signature) => match key.verify(message, &signature) {
-            Ok(()) => SignatureCheck::Matches,
-            Err(source) => SignatureCheck::EcdsaMismatch(source),
-        },
-        Err(source) => SignatureCheck::EcdsaMalformed(source),
-    }
-}
-
-fn certified_ec_key<TVerifyingKey: DecodePublicKey + PartialEq>(
-    key: &TVerifyingKey,
-    subject_public_key_info: &[u8],
-) -> ControlFlow<CertificateRejection> {
-    match TVerifyingKey::from_public_key_der(subject_public_key_info) {
-        Ok(certified) if certified == *key => ControlFlow::Continue(()),
-        Ok(_) => ControlFlow::Break(CertificateRejection::KeyMismatch),
-        Err(source) => {
-            ControlFlow::Break(CertificateRejection::CertificateKeyUnreadable { source })
-        }
-    }
-}
-
 #[derive(Clone)]
-pub enum VerificationMaterial {
-    P256(p256::ecdsa::VerifyingKey),
-    P384(p384::ecdsa::VerifyingKey),
-    Rs256(Rs256PublicKey),
+pub struct VerificationMaterial {
+    key: ParsedPublicKey,
+    scheme: SignatureScheme,
+    signature_octets: usize,
 }
 
 impl VerificationMaterial {
@@ -102,103 +87,161 @@ impl VerificationMaterial {
         x: &str,
         y: &str,
     ) -> ControlFlow<KeyMaterialRejection, Self> {
-        let x = coordinate(curve, x)?;
-        let y = coordinate(curve, y)?;
-        let mut sec1 = vec![SEC1_UNCOMPRESSED_POINT_TAG];
+        let x = coordinate(x, curve.coordinate_octets())?;
+        let y = coordinate(y, curve.coordinate_octets())?;
+        let mut point = vec![SEC1_UNCOMPRESSED_POINT_TAG];
 
-        sec1.extend_from_slice(&x);
-        sec1.extend_from_slice(&y);
+        point.extend_from_slice(&x);
+        point.extend_from_slice(&y);
 
-        let material = match curve {
-            Curve::P256 => p256::ecdsa::VerifyingKey::from_sec1_bytes(&sec1).map(Self::P256),
-            Curve::P384 => p384::ecdsa::VerifyingKey::from_sec1_bytes(&sec1).map(Self::P384),
-        };
+        Self::from_ec_point(curve, &point).map_break(KeyMaterialRejection::InvalidPoint)
+    }
 
-        match material {
-            Ok(material) => ControlFlow::Continue(material),
-            Err(source) => ControlFlow::Break(KeyMaterialRejection::InvalidPoint { source }),
+    pub fn from_ec_point(
+        curve: Curve,
+        uncompressed_point: &[u8],
+    ) -> ControlFlow<KeyRejected, Self> {
+        Self::parse(
+            SignatureScheme::Ecdsa(curve),
+            uncompressed_point,
+            2 * curve.coordinate_octets(),
+        )
+    }
+
+    pub(crate) fn from_octet_key_pair(
+        curve: OctetKeyPairCurve,
+        x: &str,
+    ) -> ControlFlow<KeyMaterialRejection, Self> {
+        match curve {
+            OctetKeyPairCurve::Ed25519 => Self::parse(
+                SignatureScheme::Ed25519,
+                &coordinate(x, ED25519_PUBLIC_KEY_LEN)?,
+                ED25519_SIGNATURE_OCTETS,
+            )
+            .map_break(KeyMaterialRejection::InvalidOctetKeyPair),
         }
     }
 
-    pub(crate) fn from_rsa_components(n: &str, e: &str) -> ControlFlow<KeyMaterialRejection, Self> {
-        let modulus = decoded(n, |source| KeyMaterialRejection::ModulusBase64 { source })?;
-        let exponent = decoded(e, |source| KeyMaterialRejection::ExponentBase64 { source })?;
-        let bits = significant_bits(&modulus);
+    pub fn from_rs256_components(
+        modulus: &[u8],
+        exponent: &[u8],
+    ) -> ControlFlow<KeyMaterialRejection, Self> {
+        Self::from_rsa_integers(modulus, exponent, RsaSignatureScheme::Pkcs1Sha256)
+    }
 
-        if bits < u64::from(RSA_PKCS1_2048_8192_SHA256.min_modulus_len())
-            || bits > u64::from(RSA_PKCS1_2048_8192_SHA256.max_modulus_len())
+    pub(crate) fn from_rsa_components(
+        n: &str,
+        e: &str,
+        scheme: RsaSignatureScheme,
+    ) -> ControlFlow<KeyMaterialRejection, Self> {
+        let modulus = decoded(n, KeyMaterialRejection::ModulusBase64)?;
+        let exponent = decoded(e, KeyMaterialRejection::ExponentBase64)?;
+
+        Self::from_rsa_integers(&modulus, &exponent, scheme)
+    }
+
+    fn from_rsa_integers(
+        modulus: &[u8],
+        exponent: &[u8],
+        scheme: RsaSignatureScheme,
+    ) -> ControlFlow<KeyMaterialRejection, Self> {
+        let bits = significant_bits(modulus);
+        let parameters = scheme.parameters();
+
+        if bits < u64::from(parameters.min_modulus_len())
+            || bits > u64::from(parameters.max_modulus_len())
         {
             return ControlFlow::Break(KeyMaterialRejection::ModulusSize { bits });
         }
 
-        let components = RsaPublicKeyComponents {
-            n: modulus.as_slice(),
-            e: exponent.as_slice(),
-        };
-        let public_key = match components.as_der() {
-            Ok(public_key) => public_key,
-            Err(source) => {
-                return ControlFlow::Break(KeyMaterialRejection::RsaComponentsNotMinimal {
-                    source,
-                });
+        let public_key = flow(
+            RsaPublicKeyComponents {
+                n: modulus,
+                e: exponent,
             }
-        };
+            .as_der(),
+            KeyMaterialRejection::RsaComponentsNotMinimal,
+        )?;
 
-        match ParsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, public_key.as_ref()) {
-            Ok(key) => ControlFlow::Continue(Self::Rs256(Rs256PublicKey { key })),
-            Err(source) => ControlFlow::Break(KeyMaterialRejection::InvalidRsaKey { source }),
+        Self::parse(
+            SignatureScheme::Rsa(scheme),
+            public_key.as_ref(),
+            modulus.len(),
+        )
+        .map_break(KeyMaterialRejection::InvalidRsaKey)
+    }
+
+    fn parse(
+        scheme: SignatureScheme,
+        public_key: &[u8],
+        signature_octets: usize,
+    ) -> ControlFlow<KeyRejected, Self> {
+        match ParsedPublicKey::new(scheme.verification_algorithm(), public_key) {
+            Ok(key) => ControlFlow::Continue(Self {
+                key,
+                scheme,
+                signature_octets,
+            }),
+            Err(rejection) => ControlFlow::Break(rejection),
         }
     }
 
+    pub(crate) fn admits(&self, algorithm: JwsAlgorithm) -> bool {
+        SignatureScheme::of(algorithm) == self.scheme
+    }
+
     pub(crate) fn algorithm(&self) -> JwsAlgorithm {
-        match self {
-            Self::P256(_) => Curve::P256.algorithm(),
-            Self::P384(_) => Curve::P384.algorithm(),
-            Self::Rs256(_) => JwsAlgorithm::Rs256,
-        }
+        self.scheme.algorithm()
     }
 
     pub(crate) fn attested_by(
         &self,
         subject_public_key_info: &[u8],
     ) -> ControlFlow<CertificateRejection> {
-        match self {
-            Self::P256(key) => certified_ec_key(key, subject_public_key_info),
-            Self::P384(key) => certified_ec_key(key, subject_public_key_info),
-            Self::Rs256(Rs256PublicKey { key }) => {
-                if key.as_ref() == subject_public_key_info {
-                    ControlFlow::Continue(())
-                } else {
-                    ControlFlow::Break(CertificateRejection::KeyMismatch)
-                }
-            }
-        }
+        let certified = flow(
+            ParsedPublicKey::new(self.key.algorithm(), subject_public_key_info),
+            CertificateRejection::CertificateKeyUnreadable,
+        )?;
+        flow(
+            self.key
+                .as_der()
+                .map_err(CertificateRejection::PublishedKeyUnencodable)
+                .and_then(|published| {
+                    certified
+                        .as_der()
+                        .map_err(CertificateRejection::CertificateKeyUnencodable)
+                        .and_then(|certified| identical_keys(&published, &certified))
+                }),
+            identity,
+        )
     }
 
     pub(crate) fn check(&self, message: &[u8], signature: &[u8]) -> SignatureCheck {
-        match self {
-            Self::P256(key) => {
-                ecdsa_verification(key, message, p256::ecdsa::Signature::from_slice(signature))
-            }
-            Self::P384(key) => {
-                ecdsa_verification(key, message, p384::ecdsa::Signature::from_slice(signature))
-            }
-            Self::Rs256(Rs256PublicKey { key }) => match key.verify_sig(message, signature) {
-                Ok(()) => SignatureCheck::Matches,
-                Err(source) => SignatureCheck::RsaMismatch(source),
-            },
+        if signature.len() != self.signature_octets {
+            return SignatureCheck::LengthMismatch {
+                expected: self.signature_octets,
+                found: signature.len(),
+            };
+        }
+
+        match self.key.verify_sig(message, signature) {
+            Ok(()) => SignatureCheck::Matches,
+            Err(source) => SignatureCheck::Mismatch(source),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use aws_lc_rs::error::Unspecified;
     use base64ct::Base64UrlUnpadded;
     use base64ct::Encoding;
 
     use margaret_jose_parameters::curve::Curve;
+    use margaret_jose_parameters::octet_key_pair_curve::OctetKeyPairCurve;
 
     use super::VerificationMaterial;
+    use crate::rsa_signature_scheme::RsaSignatureScheme;
     use crate::signature_check::SignatureCheck;
 
     const RFC_7515_A2_N: &str = "ofgWCuLjybRlzo0tZWJjNiuSfb4p4fAkd_wWJcyQoTbji9k0l8W26mPddxHmfHQp-Vaw-4qPCJrcS2mJPMEzP1Pt0Bm4d4QlL-yRT-SFd2lZS-pCgNMsD1W_YpRPEwOWvG6b32690r2jZ47soMZo9wGzjb_7OMg0LOL-bSf63kpaSHSXndS5z5rexMdbBYUsLA9e-KXBdQOS-UTo7WTBEMa2R2CapHg665xsmtdVMTBQY4uDZlxvb3qCo5ZwKh9kG4LT6_I5IhlJH7aGhyxXFvUK-DWNmoudF8NAco9_h9iaGNj8q2ethFkMLs91kzk2PAcDTW9gb54h4FRWyuXpoQ";
@@ -210,6 +253,11 @@ mod tests {
     const RFC_7515_A3_SIGNING_INPUT: &str = "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ";
     const RFC_7515_A3_SIGNATURE: &str =
         "DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q";
+    const RFC_8037_A4_X: &str = "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo";
+    const RFC_8037_A4_SIGNING_INPUT: &str =
+        "eyJhbGciOiJFZERTQSJ9.RXhhbXBsZSBvZiBFZDI1NTE5IHNpZ25pbmc";
+    const RFC_8037_A4_SIGNATURE: &str =
+        "hgyY0il_MGCjP0JzlnLWG1PPOt7-09PGcvMg3AIbQR6dWbhijcNR4ki4iylGjg5BhVsPt9g7sVvpAr_MuM0KAg";
 
     fn rfc_7515_a3_key() -> VerificationMaterial {
         VerificationMaterial::from_coordinates(Curve::P256, RFC_7515_A3_X, RFC_7515_A3_Y)
@@ -217,68 +265,74 @@ mod tests {
             .expect("the RFC 7515 A.3 key is accepted")
     }
 
-    fn outcome(key: &VerificationMaterial, signing_input: &str, signature: &[u8]) -> &'static str {
-        match key.check(signing_input.as_bytes(), signature) {
-            SignatureCheck::EcdsaMalformed(_) => "malformed",
-            SignatureCheck::EcdsaMismatch(_) | SignatureCheck::RsaMismatch(_) => "mismatch",
-            SignatureCheck::Matches => "matches",
-        }
-    }
-
-    fn rfc_7515_a3_signature() -> Vec<u8> {
-        Base64UrlUnpadded::decode_vec(RFC_7515_A3_SIGNATURE).expect("the RFC signature decodes")
+    fn decoded(encoded: &str) -> Vec<u8> {
+        Base64UrlUnpadded::decode_vec(encoded).expect("the RFC signature decodes")
     }
 
     #[test]
     fn verifies_the_rfc_7515_a2_example() {
-        let key = VerificationMaterial::from_rsa_components(RFC_7515_A2_N, RFC_7515_A2_E)
-            .continue_value()
-            .expect("the RFC 7515 A.2 key is accepted");
-        let signature = Base64UrlUnpadded::decode_vec(RFC_7515_A2_SIGNATURE)
-            .expect("the RFC signature decodes");
+        let key = VerificationMaterial::from_rsa_components(
+            RFC_7515_A2_N,
+            RFC_7515_A2_E,
+            RsaSignatureScheme::Pkcs1Sha256,
+        )
+        .continue_value()
+        .expect("the RFC 7515 A.2 key is accepted");
 
         assert_eq!(
-            outcome(&key, RFC_7515_A2_SIGNING_INPUT, &signature),
-            "matches"
+            key.check(
+                RFC_7515_A2_SIGNING_INPUT.as_bytes(),
+                &decoded(RFC_7515_A2_SIGNATURE)
+            ),
+            SignatureCheck::Matches
         );
     }
 
     #[test]
     fn verifies_the_rfc_7515_a3_example() {
         assert_eq!(
-            outcome(
-                &rfc_7515_a3_key(),
-                RFC_7515_A3_SIGNING_INPUT,
-                &rfc_7515_a3_signature()
+            rfc_7515_a3_key().check(
+                RFC_7515_A3_SIGNING_INPUT.as_bytes(),
+                &decoded(RFC_7515_A3_SIGNATURE)
             ),
-            "matches"
+            SignatureCheck::Matches
+        );
+    }
+
+    #[test]
+    fn verifies_the_rfc_8037_a4_example() {
+        let key =
+            VerificationMaterial::from_octet_key_pair(OctetKeyPairCurve::Ed25519, RFC_8037_A4_X)
+                .continue_value()
+                .expect("the RFC 8037 A.4 key is accepted");
+
+        assert_eq!(
+            key.check(
+                RFC_8037_A4_SIGNING_INPUT.as_bytes(),
+                &decoded(RFC_8037_A4_SIGNATURE)
+            ),
+            SignatureCheck::Matches
         );
     }
 
     #[test]
     fn reports_the_rfc_7515_a3_signature_over_another_input_as_a_mismatch() {
         assert_eq!(
-            outcome(
-                &rfc_7515_a3_key(),
-                "eyJhbGciOiJFUzI1NiJ9.e30",
-                &rfc_7515_a3_signature()
-            ),
-            "mismatch"
+            rfc_7515_a3_key().check(b"eyJhbGciOiJFUzI1NiJ9.e30", &decoded(RFC_7515_A3_SIGNATURE)),
+            SignatureCheck::Mismatch(Unspecified)
         );
     }
 
     #[test]
-    fn reports_a_truncated_signature_as_malformed() {
+    fn reports_a_truncated_signature_by_its_length() {
+        let signature = decoded(RFC_7515_A3_SIGNATURE);
+
         assert_eq!(
-            outcome(
-                &rfc_7515_a3_key(),
-                RFC_7515_A3_SIGNING_INPUT,
-                rfc_7515_a3_signature()
-                    .split_last()
-                    .expect("the signature has bytes")
-                    .1
-            ),
-            "malformed"
+            rfc_7515_a3_key().check(RFC_7515_A3_SIGNING_INPUT.as_bytes(), &signature[1..]),
+            SignatureCheck::LengthMismatch {
+                expected: 64,
+                found: 63
+            }
         );
     }
 }

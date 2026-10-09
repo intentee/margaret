@@ -1,5 +1,7 @@
 use syn::Expr;
 
+use crate::named_assignment::NamedAssignment;
+
 #[derive(Clone, Debug)]
 pub(crate) struct NamedArgument {
     pub(crate) name: String,
@@ -8,17 +10,9 @@ pub(crate) struct NamedArgument {
 
 impl NamedArgument {
     pub(crate) fn from_expression(expression: &Expr) -> Option<Self> {
-        let Expr::Assign(assign) = expression else {
-            return None;
-        };
-        let Expr::Path(left) = assign.left.as_ref() else {
-            return None;
-        };
-        let name = left.path.get_ident()?;
-
-        Some(Self {
+        NamedAssignment::of(expression).map(|NamedAssignment { name, value }| Self {
             name: name.to_string(),
-            value: assign.right.as_ref().clone(),
+            value: value.clone(),
         })
     }
 }

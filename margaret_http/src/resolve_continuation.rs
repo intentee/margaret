@@ -1,8 +1,10 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use margaret_handler_error::handler_error::HandlerError;
+
+use crate::cookie_changes::CookieChanges;
 use crate::forward_targets::ForwardTargets;
-use crate::handler_error::HandlerError;
 use crate::request::Request;
 use crate::response::Response;
 use crate::response_continuation::ResponseContinuation;
@@ -30,8 +32,12 @@ pub(crate) async fn resolve_continuation(
                     return Err(HandlerError::UnknownForwardTarget { responder: name });
                 };
 
+                let carried = CookieChanges {
+                    cookies: forward.carried_cookies().to_vec(),
+                };
+
                 request = request.with_path_params(forward.into_path_params());
-                outcome = target.handle(&request).await?;
+                outcome = carried.precede(target.handle(&request).await?);
             }
             ResponseContinuation::Redirect(redirect) => return Ok(redirect.into_response()),
         }

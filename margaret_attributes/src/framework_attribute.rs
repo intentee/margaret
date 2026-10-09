@@ -1,82 +1,224 @@
+use syn::Path;
+
 use crate::canonical_path::CanonicalPath;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FrameworkAttribute {
+    AdmitsOAuthClient,
+    AdmitsSignIn,
     AuthenticatedUser,
+    Base,
     BearerToken,
     BuildForSession,
     Column,
     ConsoleArgument,
     ConsoleCommand,
     Constructor,
+    ConsumesSessions,
+    EagerLoad,
     EnvironmentVariable,
+    ExchangesTokensFrom,
     ForeignKey,
     FormRequest,
     HandlesMiddlewareAttribute,
+    HasMany,
+    HasOne,
     Index,
     InferFromRequest,
     InfersAuthenticatedUser,
+    IssuesResourceTokens,
+    IssuesSessions,
     IssuesTokens,
     Middleware,
     Model,
+    OAuthClient,
+    OAuthScope,
+    PostgresDatabase,
     PrimaryKey,
     Process,
-    ProvidesJwksEndpoint,
     ProvidesRouteParameter,
+    ProvidesUserinfoClaims,
+    Relation,
     RendersView,
     RespondsToHttp,
     RouteParameter,
     RouteParameterValue,
     ScheduledWithTickTimer,
+    ServesOidcEndpoint,
+    ServesSessionEndpoint,
+    ServesSignIn,
     Service,
+    Session,
     Singleton,
     SpiffeHttpClient,
-    TrustsOidcIssuer,
     Unique,
+    VerifiesTokensFromIssuer,
     WebsocketMessage,
     WebsocketSession,
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 33] = [
+    pub const ALL: [Self; 51] = [
+        Self::AdmitsOAuthClient,
+        Self::AdmitsSignIn,
         Self::AuthenticatedUser,
+        Self::Base,
         Self::BearerToken,
         Self::BuildForSession,
         Self::Column,
         Self::ConsoleArgument,
         Self::ConsoleCommand,
         Self::Constructor,
+        Self::ConsumesSessions,
+        Self::EagerLoad,
         Self::EnvironmentVariable,
+        Self::ExchangesTokensFrom,
         Self::ForeignKey,
         Self::FormRequest,
         Self::HandlesMiddlewareAttribute,
+        Self::HasMany,
+        Self::HasOne,
         Self::Index,
         Self::InferFromRequest,
         Self::InfersAuthenticatedUser,
+        Self::IssuesResourceTokens,
+        Self::IssuesSessions,
         Self::IssuesTokens,
         Self::Middleware,
         Self::Model,
+        Self::OAuthClient,
+        Self::OAuthScope,
+        Self::PostgresDatabase,
         Self::PrimaryKey,
         Self::Process,
-        Self::ProvidesJwksEndpoint,
         Self::ProvidesRouteParameter,
+        Self::ProvidesUserinfoClaims,
+        Self::Relation,
         Self::RendersView,
         Self::RespondsToHttp,
         Self::RouteParameter,
         Self::RouteParameterValue,
         Self::ScheduledWithTickTimer,
+        Self::ServesOidcEndpoint,
+        Self::ServesSessionEndpoint,
+        Self::ServesSignIn,
         Self::Service,
+        Self::Session,
         Self::Singleton,
         Self::SpiffeHttpClient,
-        Self::TrustsOidcIssuer,
         Self::Unique,
+        Self::VerifiesTokensFromIssuer,
         Self::WebsocketMessage,
         Self::WebsocketSession,
     ];
 
     #[must_use]
-    pub fn from_canonical_path(path: &CanonicalPath) -> Option<Self> {
-        let name = match path.segments() {
+    pub fn recognize(written: &Path, canonical: &CanonicalPath) -> Option<Self> {
+        written
+            .get_ident()
+            .and_then(|identifier| {
+                Self::ALL
+                    .into_iter()
+                    .find(|attribute| attribute.is_marker() && identifier == attribute.name())
+            })
+            .or_else(|| Self::macro_at(canonical))
+    }
+
+    #[must_use]
+    pub const fn is_marker(self) -> bool {
+        matches!(
+            self,
+            Self::AuthenticatedUser
+                | Self::Base
+                | Self::BearerToken
+                | Self::Column
+                | Self::ConsoleArgument
+                | Self::EnvironmentVariable
+                | Self::ForeignKey
+                | Self::FormRequest
+                | Self::HasMany
+                | Self::HasOne
+                | Self::Index
+                | Self::PrimaryKey
+                | Self::Relation
+                | Self::RouteParameter
+                | Self::Session
+                | Self::SpiffeHttpClient
+                | Self::Unique
+        )
+    }
+
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::AdmitsOAuthClient => "admits_oauth_client",
+            Self::AdmitsSignIn => "admits_sign_in",
+            Self::AuthenticatedUser => "authenticated_user",
+            Self::Base => "base",
+            Self::BearerToken => "bearer_token",
+            Self::BuildForSession => "build_for_session",
+            Self::Column => "column",
+            Self::ConsoleArgument => "console_argument",
+            Self::ConsoleCommand => "console_command",
+            Self::Constructor => "constructor",
+            Self::ConsumesSessions => "consumes_sessions",
+            Self::EagerLoad => "eager_load",
+            Self::EnvironmentVariable => "environment_variable",
+            Self::ExchangesTokensFrom => "exchanges_tokens_from",
+            Self::ForeignKey => "foreign_key",
+            Self::FormRequest => "form_request",
+            Self::HandlesMiddlewareAttribute => "handles_middleware_attribute",
+            Self::HasMany => "has_many",
+            Self::HasOne => "has_one",
+            Self::Index => "index",
+            Self::InferFromRequest => "infer_from_request",
+            Self::InfersAuthenticatedUser => "infers_authenticated_user",
+            Self::IssuesResourceTokens => "issues_resource_tokens",
+            Self::IssuesSessions => "issues_sessions",
+            Self::IssuesTokens => "issues_tokens",
+            Self::Middleware => "middleware",
+            Self::Model => "model",
+            Self::OAuthClient => "oauth_client",
+            Self::OAuthScope => "oauth_scope",
+            Self::PostgresDatabase => "postgres_database",
+            Self::PrimaryKey => "primary_key",
+            Self::Process => "process",
+            Self::ProvidesRouteParameter => "provides_route_parameter",
+            Self::ProvidesUserinfoClaims => "provides_userinfo_claims",
+            Self::Relation => "relation",
+            Self::RendersView => "renders_view",
+            Self::RespondsToHttp => "responds_to_http",
+            Self::RouteParameter => "route_parameter",
+            Self::RouteParameterValue => "route_parameter_value",
+            Self::ScheduledWithTickTimer => "scheduled_with_tick_timer",
+            Self::ServesOidcEndpoint => "serves_oidc_endpoint",
+            Self::ServesSessionEndpoint => "serves_session_endpoint",
+            Self::ServesSignIn => "serves_sign_in",
+            Self::Service => "service",
+            Self::Session => "session",
+            Self::Singleton => "singleton",
+            Self::SpiffeHttpClient => "spiffe_http_client",
+            Self::Unique => "unique",
+            Self::VerifiesTokensFromIssuer => "verifies_tokens_from_issuer",
+            Self::WebsocketMessage => "websocket_message",
+            Self::WebsocketSession => "websocket_session",
+        }
+    }
+
+    pub(crate) const fn repeats_on_items(self) -> bool {
+        matches!(
+            self,
+            Self::ForeignKey
+                | Self::HasMany
+                | Self::HasOne
+                | Self::Index
+                | Self::Middleware
+                | Self::Unique
+        )
+    }
+
+    fn macro_at(canonical: &CanonicalPath) -> Option<Self> {
+        let name = match canonical.segments() {
             [name] => name.as_str(),
             [crate_name, name] if crate_name == "margaret_macros" => name.as_str(),
             [crate_name, framework, macros, name]
@@ -87,86 +229,17 @@ impl FrameworkAttribute {
             _ => return None,
         };
 
-        match name {
-            "authenticated_user" => Some(Self::AuthenticatedUser),
-            "bearer_token" => Some(Self::BearerToken),
-            "build_for_session" => Some(Self::BuildForSession),
-            "column" => Some(Self::Column),
-            "console_argument" => Some(Self::ConsoleArgument),
-            "console_command" => Some(Self::ConsoleCommand),
-            "constructor" => Some(Self::Constructor),
-            "environment_variable" => Some(Self::EnvironmentVariable),
-            "foreign_key" => Some(Self::ForeignKey),
-            "form_request" => Some(Self::FormRequest),
-            "handles_middleware_attribute" => Some(Self::HandlesMiddlewareAttribute),
-            "index" => Some(Self::Index),
-            "infer_from_request" => Some(Self::InferFromRequest),
-            "infers_authenticated_user" => Some(Self::InfersAuthenticatedUser),
-            "issues_tokens" => Some(Self::IssuesTokens),
-            "middleware" => Some(Self::Middleware),
-            "model" => Some(Self::Model),
-            "primary_key" => Some(Self::PrimaryKey),
-            "process" => Some(Self::Process),
-            "provides_jwks_endpoint" => Some(Self::ProvidesJwksEndpoint),
-            "provides_route_parameter" => Some(Self::ProvidesRouteParameter),
-            "renders_view" => Some(Self::RendersView),
-            "responds_to_http" => Some(Self::RespondsToHttp),
-            "route_parameter" => Some(Self::RouteParameter),
-            "route_parameter_value" => Some(Self::RouteParameterValue),
-            "scheduled_with_tick_timer" => Some(Self::ScheduledWithTickTimer),
-            "service" => Some(Self::Service),
-            "singleton" => Some(Self::Singleton),
-            "spiffe_http_client" => Some(Self::SpiffeHttpClient),
-            "trusts_oidc_issuer" => Some(Self::TrustsOidcIssuer),
-            "unique" => Some(Self::Unique),
-            "websocket_message" => Some(Self::WebsocketMessage),
-            "websocket_session" => Some(Self::WebsocketSession),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::AuthenticatedUser => "authenticated_user",
-            Self::BearerToken => "bearer_token",
-            Self::BuildForSession => "build_for_session",
-            Self::Column => "column",
-            Self::ConsoleArgument => "console_argument",
-            Self::ConsoleCommand => "console_command",
-            Self::Constructor => "constructor",
-            Self::EnvironmentVariable => "environment_variable",
-            Self::ForeignKey => "foreign_key",
-            Self::FormRequest => "form_request",
-            Self::HandlesMiddlewareAttribute => "handles_middleware_attribute",
-            Self::Index => "index",
-            Self::InferFromRequest => "infer_from_request",
-            Self::InfersAuthenticatedUser => "infers_authenticated_user",
-            Self::IssuesTokens => "issues_tokens",
-            Self::Middleware => "middleware",
-            Self::Model => "model",
-            Self::PrimaryKey => "primary_key",
-            Self::Process => "process",
-            Self::ProvidesJwksEndpoint => "provides_jwks_endpoint",
-            Self::ProvidesRouteParameter => "provides_route_parameter",
-            Self::RendersView => "renders_view",
-            Self::RespondsToHttp => "responds_to_http",
-            Self::RouteParameter => "route_parameter",
-            Self::RouteParameterValue => "route_parameter_value",
-            Self::ScheduledWithTickTimer => "scheduled_with_tick_timer",
-            Self::Service => "service",
-            Self::Singleton => "singleton",
-            Self::SpiffeHttpClient => "spiffe_http_client",
-            Self::TrustsOidcIssuer => "trusts_oidc_issuer",
-            Self::Unique => "unique",
-            Self::WebsocketMessage => "websocket_message",
-            Self::WebsocketSession => "websocket_session",
-        }
+        Self::ALL
+            .into_iter()
+            .find(|attribute| !attribute.is_marker() && attribute.name() == name)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use syn::Path;
+    use syn::parse_str;
+
     use super::FrameworkAttribute;
     use crate::canonical_path::CanonicalPath;
 
@@ -174,41 +247,75 @@ mod tests {
         CanonicalPath::new(segments.iter().map(ToString::to_string).collect())
     }
 
+    fn written(source: &str) -> Path {
+        parse_str(source).expect("the attribute path parses")
+    }
+
+    fn shadowing_item() -> CanonicalPath {
+        path(&["crate", "models", "shadowing_item"])
+    }
+
     #[test]
-    fn recognizes_every_supported_attribute_through_each_canonical_macro_path() {
-        for attribute in FrameworkAttribute::ALL {
+    fn recognizes_every_macro_through_each_canonical_macro_path() {
+        for attribute in FrameworkAttribute::ALL
+            .into_iter()
+            .filter(|attribute| !attribute.is_marker())
+        {
             let name = attribute.name();
 
+            for canonical in [
+                path(&[name]),
+                path(&["margaret_macros", name]),
+                path(&["margaret", "framework", "macros", name]),
+            ] {
+                assert_eq!(
+                    FrameworkAttribute::recognize(&written(name), &canonical),
+                    Some(attribute)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn recognizes_every_marker_by_its_written_name_whatever_it_resolves_to() {
+        for attribute in FrameworkAttribute::ALL
+            .into_iter()
+            .filter(|attribute| attribute.is_marker())
+        {
             assert_eq!(
-                FrameworkAttribute::from_canonical_path(&path(&[name])),
-                Some(attribute)
-            );
-            assert_eq!(
-                FrameworkAttribute::from_canonical_path(&path(&["margaret_macros", name])),
-                Some(attribute)
-            );
-            assert_eq!(
-                FrameworkAttribute::from_canonical_path(&path(&[
-                    "margaret",
-                    "framework",
-                    "macros",
-                    name,
-                ])),
+                FrameworkAttribute::recognize(&written(attribute.name()), &shadowing_item()),
                 Some(attribute)
             );
         }
     }
 
     #[test]
-    fn rejects_paths_that_do_not_identify_a_supported_framework_attribute() {
+    fn ignores_a_marker_spelled_as_a_macro_path() {
         assert_eq!(
-            FrameworkAttribute::from_canonical_path(&path(&["other", "singleton"])),
+            FrameworkAttribute::recognize(
+                &written("margaret::framework::macros::column"),
+                &path(&["margaret", "framework", "macros", "column"]),
+            ),
             None
         );
+    }
+
+    #[test]
+    fn ignores_a_macro_name_that_resolves_to_another_item() {
         assert_eq!(
-            FrameworkAttribute::from_canonical_path(&path(&["unknown"])),
+            FrameworkAttribute::recognize(&written("singleton"), &shadowing_item()),
             None
         );
-        assert_eq!(FrameworkAttribute::from_canonical_path(&path(&[])), None);
+    }
+
+    #[test]
+    fn ignores_a_path_that_names_no_framework_attribute() {
+        assert_eq!(
+            FrameworkAttribute::recognize(
+                &written("other::singleton"),
+                &path(&["other", "singleton"])
+            ),
+            None
+        );
     }
 }

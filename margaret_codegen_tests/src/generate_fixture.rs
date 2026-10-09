@@ -4,6 +4,7 @@ use margaret_attributes::crate_root::CrateRoot;
 use margaret_codegen::build::build;
 use margaret_codegen::codegen_error::CodegenError;
 use margaret_codegen::generated_code::GeneratedCode;
+use margaret_sql_identifier::table_namespace::TableNamespace;
 
 /// # Errors
 ///
@@ -19,6 +20,6 @@ pub fn generate_fixture(name: &str) -> Result<GeneratedCode, CodegenError> {
         &CrateRoot::new("crate", source_directory),
         None,
         &assets_directory,
-        ".",
+        TableNamespace::Application,
     )
 }

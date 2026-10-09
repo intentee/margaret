@@ -1,87 +1,87 @@
+use margaret_container::constructor_outcome::ConstructorOutcome;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
-use margaret_tag_codegen::segmented_tag_binding::SegmentedTagBinding;
+use margaret_jwks_codegen::public_jwks_handler_canonical_path::public_jwks_handler_canonical_path;
+use margaret_oidc_provider_codegen::declared_endpoint_routes::DeclaredEndpointRoutes;
+use margaret_oidc_provider_codegen::provider_endpoint::ProviderEndpoint;
 
-use crate::jwks_client_canonical_path::jwks_client_canonical_path;
 use crate::jwks_roller_canonical_path::jwks_roller_canonical_path;
-use crate::jwks_secret_storage_canonical_path::jwks_secret_storage_canonical_path;
-use crate::mint_access_token_handler_canonical_path::mint_access_token_handler_canonical_path;
-use crate::polling_client_provider::polling_client_provider;
-use crate::public_jwks_handler_canonical_path::public_jwks_handler_canonical_path;
+use crate::jwks_secret_holder_canonical_path::jwks_secret_holder_canonical_path;
+use crate::rsa_signing_keys_canonical_path::rsa_signing_keys_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
+use crate::signing_keys_tables_canonical_path::signing_keys_tables_canonical_path;
 
-fn client_provider(binding: &SegmentedTagBinding) -> FrameworkProvider {
-    polling_client_provider(
-        jwks_client_canonical_path(&binding.module_segment),
-        vec![
-            FrameworkDependency::SingletonView(binding.declaring.clone()),
-            FrameworkDependency::SingletonView(binding.declaring.clone()),
-        ],
-        FrameworkInjectionRole::TokenIssuerClient(binding.tag.clone()),
-    )
-}
-
-fn server_providers() -> [FrameworkProvider; 4] {
+pub(crate) fn jwks_framework_providers(
+    endpoint_routes: &DeclaredEndpointRoutes,
+) -> Vec<FrameworkProvider> {
     let roller = jwks_roller_canonical_path();
+    let jwks_secret_holder = jwks_secret_holder_canonical_path();
+    let rsa_signing_keys = rsa_signing_keys_canonical_path();
     let server_secret_store = server_secret_store_canonical_path();
-
-    [
+    let mut providers = vec![
         FrameworkProvider {
-            construction: FrameworkConstruction::Constructor {
-                dependencies: vec![FrameworkDependency::Provider(
-                    jwks_secret_storage_canonical_path(),
-                )],
-                is_async: false,
-                method: "create".to_string(),
-            },
+            construction: FrameworkConstruction::Unit,
             enablement: FrameworkEnablement::Dependency,
             injection: FrameworkInjectionRole::Unmarked,
-            provided: roller.clone(),
-        },
-        FrameworkProvider {
-            construction: FrameworkConstruction::Accessor {
-                accessor: "public_jwks_handler".to_string(),
-                source: roller.clone(),
-            },
-            enablement: FrameworkEnablement::WhenReferenced,
-            injection: FrameworkInjectionRole::Unmarked,
-            provided: public_jwks_handler_canonical_path(),
+            provided: rsa_signing_keys.clone(),
         },
         FrameworkProvider {
             construction: FrameworkConstruction::Constructor {
                 dependencies: vec![
-                    FrameworkDependency::Provider(roller),
+                    FrameworkDependency::Database {
+                        framework_tables: vec![signing_keys_tables_canonical_path()],
+                    },
+                    FrameworkDependency::Provider(rsa_signing_keys),
+                ],
+                is_async: true,
+                method: "create".to_string(),
+                outcome: ConstructorOutcome::Fallible,
+            },
+            enablement: FrameworkEnablement::Dependency,
+            injection: FrameworkInjectionRole::Runner,
+            provided: roller.clone(),
+        },
+        FrameworkProvider {
+            construction: FrameworkConstruction::Accessor {
+                accessor: "jwks_secret_holder".to_string(),
+                source: roller.clone(),
+            },
+            enablement: FrameworkEnablement::Dependency,
+            injection: FrameworkInjectionRole::FrameworkState,
+            provided: jwks_secret_holder.clone(),
+        },
+        FrameworkProvider {
+            construction: FrameworkConstruction::Constructor {
+                dependencies: vec![
+                    FrameworkDependency::Provider(jwks_secret_holder),
                     FrameworkDependency::TokenIssuance,
                 ],
                 is_async: false,
                 method: "create".to_string(),
+                outcome: ConstructorOutcome::Infallible,
             },
             enablement: FrameworkEnablement::WhenReferenced,
             injection: FrameworkInjectionRole::Unmarked,
-            provided: server_secret_store.clone(),
+            provided: server_secret_store,
         },
-        FrameworkProvider {
-            construction: FrameworkConstruction::Constructor {
-                dependencies: vec![FrameworkDependency::Provider(server_secret_store)],
-                is_async: false,
-                method: "create".to_string(),
-            },
-            enablement: FrameworkEnablement::WhenReferenced,
-            injection: FrameworkInjectionRole::Unmarked,
-            provided: mint_access_token_handler_canonical_path(),
-        },
-    ]
-}
+    ];
 
-pub(crate) fn jwks_framework_providers(
-    client_bindings: &[SegmentedTagBinding],
-) -> Vec<FrameworkProvider> {
-    let mut providers = Vec::from(server_providers());
-
-    providers.extend(client_bindings.iter().map(client_provider));
+    providers.extend(
+        endpoint_routes
+            .serves(ProviderEndpoint::Jwks)
+            .then(|| FrameworkProvider {
+                construction: FrameworkConstruction::Accessor {
+                    accessor: "public_jwks_handler".to_string(),
+                    source: roller,
+                },
+                enablement: FrameworkEnablement::Declared,
+                injection: FrameworkInjectionRole::FrameworkState,
+                provided: public_jwks_handler_canonical_path(),
+            }),
+    );
 
     providers
 }

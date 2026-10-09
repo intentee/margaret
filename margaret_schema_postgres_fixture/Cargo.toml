@@ -1,0 +1,17 @@
+[package]
+name = "margaret_schema_postgres_fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+chrono = { workspace = true }
+margaret = { workspace = true, features = ["runtime"] }
+rust_decimal = { workspace = true }
+uuid = { workspace = true }
+
+[build-dependencies]
+margaret = { workspace = true, default-features = false, features = ["codegen"] }
+
+[lints]
+workspace = true

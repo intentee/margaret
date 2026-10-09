@@ -1,9 +1,4 @@
-mod memory_storage_load_is_always_absent;
-mod memory_storage_persist_succeeds_without_writing;
-mod roll_loads_the_persisted_secret_when_the_holder_is_empty;
-mod roll_persists_the_secret_it_publishes;
-mod roll_reports_a_load_error_when_the_backend_is_unreachable;
-mod roll_reports_a_persist_error_when_the_backend_is_unreachable;
-mod roll_rotates_the_current_secret_when_the_holder_is_seeded;
-mod roll_seeds_a_fresh_secret_when_storage_is_absent;
+#[cfg(feature = "tests_that_use_postgres")]
+mod postgres;
 mod roller_error_key_generation_reports_its_source;
+mod signing_key_retention_outlasts_every_signed_token_lifetime;

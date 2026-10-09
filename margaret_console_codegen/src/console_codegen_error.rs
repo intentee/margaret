@@ -64,6 +64,11 @@ pub enum ConsoleCodegenError {
     ConsoleCommandInjectsSpiffeHttpClient { command: String },
 
     #[error(
+        "console command '{command}' depends on the url of a route, which is composed only while serving; a console command cannot use it"
+    )]
+    ConsoleCommandDependsOnRouteUrl { command: String },
+
+    #[error(
         "command '{command}' registers the console command name '{name}', which is already registered by command '{existing_command}'"
     )]
     DuplicateCommandName {

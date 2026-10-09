@@ -13,7 +13,6 @@ pub enum IgnoredKeyReason {
     Certificate(CertificateRejection),
     Malformed { source: serde_json::Error },
     Material(KeyMaterialRejection),
-    MissingKeyId,
     UnsupportedKeyType { kty: String },
     Usage(KeyUsageRejection),
 }
@@ -27,7 +26,6 @@ impl Display for IgnoredKeyReason {
                 write!(formatter, "the key is not a well-formed jwk: {source}")
             }
             Self::Material(rejection) => rejection.fmt(formatter),
-            Self::MissingKeyId => write!(formatter, "the key has no key id"),
             Self::UnsupportedKeyType { kty } => {
                 write!(formatter, "the key is of the unsupported type '{kty}'")
             }
@@ -55,7 +53,6 @@ mod tests {
                 source: serde_json::from_str::<u8>("x").expect_err("not json"),
             },
             IgnoredKeyReason::Material(KeyMaterialRejection::ModulusSize { bits: 1024 }),
-            IgnoredKeyReason::MissingKeyId,
             IgnoredKeyReason::UnsupportedKeyType {
                 kty: "OKP".to_string(),
             },
@@ -70,8 +67,7 @@ mod tests {
         assert_eq!(described[1], "the key's certificate chain is empty");
         assert!(described[2].starts_with("the key is not a well-formed jwk: "));
         assert!(described[3].contains("1024 bits"));
-        assert_eq!(described[4], "the key has no key id");
-        assert_eq!(described[5], "the key is of the unsupported type 'OKP'");
-        assert_eq!(described[6], "the key is meant for encryption");
+        assert_eq!(described[4], "the key is of the unsupported type 'OKP'");
+        assert_eq!(described[5], "the key is meant for encryption");
     }
 }

@@ -19,7 +19,7 @@ where
     pub(crate) fn from_value(value: &Value) -> Self {
         match Model::deserialize(value) {
             Ok(model) => Self::from_model(model),
-            Err(_) => Self::Malformed(Malformation::Unreadable),
+            Err(source) => Self::Malformed(Malformation::Unreadable { source }),
         }
     }
 }

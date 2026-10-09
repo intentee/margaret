@@ -8,7 +8,7 @@ use crate::message_cardinality::MessageCardinality;
 use crate::message_kind::MessageKind;
 use crate::web_socket_message::WebSocketMessage;
 
-fn render_request_message(path: &CanonicalPath, cardinality: &MessageCardinality) -> TokenStream {
+fn render_request_message(path: &CanonicalPath, cardinality: MessageCardinality) -> TokenStream {
     let message = path_tokens(path);
     let envelope = match cardinality {
         MessageCardinality::Single => {
@@ -54,7 +54,7 @@ fn render_response_message(path: &CanonicalPath, method: &str) -> TokenStream {
 pub(crate) fn render_messages(messages: &[WebSocketMessage]) -> TokenStream {
     let implementations = messages.iter().filter_map(|message| match &message.kind {
         MessageKind::Request { cardinality, .. } => {
-            Some(render_request_message(&message.path, cardinality))
+            Some(render_request_message(&message.path, *cardinality))
         }
         MessageKind::Response { method } => Some(render_response_message(&message.path, method)),
         MessageKind::Notification { .. } => None,

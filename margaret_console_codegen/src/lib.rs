@@ -11,13 +11,24 @@ pub mod render_console;
 mod tests {
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
+    use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes_tests::indexed_source::IndexedSource;
+    use margaret_container::constructor_outcome::ConstructorOutcome;
     use margaret_container::container_bindings::ContainerBindings;
+    use margaret_container::framework_construction::FrameworkConstruction;
+    use margaret_container::framework_dependency::FrameworkDependency;
+    use margaret_container::framework_enablement::FrameworkEnablement;
+    use margaret_container::framework_injection_role::FrameworkInjectionRole;
+    use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
+    use margaret_container::slotted_serve_input::SlottedServeInput;
+    use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
+    use margaret_http_codegen::server_uploads::ServerUploads;
+    use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_serve_input_codegen::serve_input::ServeInput;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use crate::console_artifacts::ConsoleArtifacts;
     use crate::console_codegen_error::ConsoleCodegenError;
@@ -70,9 +81,15 @@ impl Farewell {
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
-            .expect("the container renders")
-            .bindings
+        render_container(
+            index,
+            &registry,
+            &[],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings
     }
 
     fn render_planned_console(
@@ -80,7 +97,7 @@ impl Farewell {
         serves: bool,
         has_models: bool,
         http_servers: &[HttpServer],
-        serve_inputs: &[ServeInput],
+        serve_inputs: &[SlottedServeInput],
         bindings: &ContainerBindings,
     ) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
         let plan = ConsolePlan::build(index, bindings)?;
@@ -101,6 +118,7 @@ impl Farewell {
             vec![HttpServer::new(
                 "public".to_string(),
                 ServerTransportPolicy::Negotiable,
+                ServerUploads::Refused,
             )]
         } else {
             Vec::new()
@@ -163,12 +181,12 @@ impl Farewell {
                 r#"clap::Arg::new("loud").long("loud").action(clap::ArgAction::SetTrue)"#
             )
         );
-        assert!(source.contains("clap::value_parser!(std::string::String)"));
+        assert!(source.contains("clap::value_parser!(::std::string::String)"));
 
         assert!(source.contains("super::container::build::construct_demo("));
-        assert!(source.contains(r#"matches.get_one::<std::string::String>("name")"#));
+        assert!(source.contains(r#"matches.get_one::<::std::string::String>("name")"#));
         assert!(
-            source.contains(r#"matches.get_one::<std::string::String>("salutation").cloned()"#)
+            source.contains(r#"matches.get_one::<::std::string::String>("salutation").cloned()"#)
         );
         assert!(source.contains(r#"matches.get_flag("loud")"#));
 
@@ -215,14 +233,44 @@ impl Farewell {
         assert!(
             source.contains(r#"clap::Arg::new("public-url").long("public-url").required(true)"#)
         );
-        assert!(source.contains(
-            r#"clap::Arg::new("public-uploads").long("public-uploads").action(clap::ArgAction::SetTrue)"#
-        ));
-        assert!(source.contains(
-            r#"clap::Arg::new("public-upload-dir").long("public-upload-dir").required(false).requires("public-uploads")"#
-        ));
+        assert!(!source.contains("public-upload-dir"));
         assert!(source.contains(
             "margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|super::serve::serve(matches,cancellation_token,),)"
+        ));
+    }
+
+    #[test]
+    fn requires_the_upload_directory_of_a_server_that_accepts_uploads() {
+        let index = IndexedSource::new("struct App;\n").index;
+        let bindings = bindings(&index);
+        let source: String = render_planned_console(
+            &index,
+            true,
+            false,
+            &[HttpServer::new(
+                "public".to_string(),
+                ServerTransportPolicy::Negotiable,
+                ServerUploads::Accepted,
+            )],
+            &[],
+            &bindings,
+        )
+        .expect("the console renders")
+        .modules
+        .into_iter()
+        .map(|module| {
+            module
+                .format()
+                .expect("the module formats")
+                .source()
+                .to_string()
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect();
+
+        assert!(source.contains(
+            r#"clap::Arg::new("public-upload-dir").long("public-upload-dir").required(true).value_parser(clap::value_parser!(::std::path::PathBuf))"#
         ));
     }
 
@@ -237,8 +285,13 @@ impl Farewell {
                 HttpServer::new(
                     "internal".to_string(),
                     ServerTransportPolicy::PinnedSpiffeMtls,
+                    ServerUploads::Refused,
                 ),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerTransportPolicy::Negotiable,
+                    ServerUploads::Refused,
+                ),
             ],
             &[],
             &bindings(&index),
@@ -258,10 +311,10 @@ impl Farewell {
         .collect();
 
         assert!(source.contains(
-            r#"clap::Arg::new("internal-transport").long("internal-transport").required(true).value_parser(["spiffe_mtls"])"#
+            r#"clap::Arg::new("internal-transport").long("internal-transport").required(true).value_parser(margaret::framework::service::transport_choice::TransportChoice::pinned_to_spiffe_mtls()"#
         ));
         assert!(source.contains(
-            r#"clap::Arg::new("public-transport").long("public-transport").required(true).value_parser(["plain","spiffe_mtls"])"#
+            r#"clap::Arg::new("public-transport").long("public-transport").required(true).value_parser(clap::value_parser!(margaret::framework::service::transport_choice::TransportChoice)"#
         ));
         assert!(source.contains(
             r#"clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true)"#
@@ -287,8 +340,16 @@ impl Farewell {
             true,
             false,
             &[
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerTransportPolicy::Negotiable,
+                    ServerUploads::Refused,
+                ),
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerTransportPolicy::Negotiable,
+                    ServerUploads::Refused,
+                ),
             ],
             &[],
             &bindings(&index),
@@ -362,7 +423,7 @@ impl Farewell {
 
         assert!(source.contains(r#"clap::Command::new("schema")"#));
         assert!(source.contains(r#"Some(("schema",_matches))=>{"#));
-        assert!(source.contains("render_postgres(&super::schema::schema())"));
+        assert!(source.contains("render_postgres(&super::schema::SCHEMA)"));
         assert!(source.contains("CommandOutcome::Succeeded"));
         assert!(source.contains("run<Arguments,Argument>(args:Arguments,)"));
     }
@@ -479,6 +540,55 @@ impl Farewell {
         );
 
         assert!(message.contains("injects the #[spiffe_http_client]"));
+    }
+
+    #[test]
+    fn rejects_a_console_command_that_depends_on_the_url_of_a_route() {
+        let index = IndexedSource::new(
+            "#[singleton]\n#[console_command(name = \"sign\")]\nstruct Sign {\n    flow: std::sync::Arc<margaret::framework::oidc_sign_in::sign_in_flow::SignInFlow>,\n}\n\nimpl Sign {\n    #[constructor]\n    fn create(flow: std::sync::Arc<margaret::framework::oidc_sign_in::sign_in_flow::SignInFlow>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        )
+        .index;
+        let registry = scan(&index).expect("the console arguments are scanned");
+        let bindings = render_container(
+            &index,
+            &registry,
+            &[FrameworkProvider {
+                construction: FrameworkConstruction::Constructor {
+                    dependencies: vec![FrameworkDependency::RouteUrl(RouteUrlInput {
+                        path: "/sign-in/callback".to_string(),
+                        server: "public".to_string(),
+                    })],
+                    is_async: false,
+                    method: "create".to_string(),
+                    outcome: ConstructorOutcome::Infallible,
+                },
+                enablement: FrameworkEnablement::WhenReferenced,
+                injection: FrameworkInjectionRole::Unmarked,
+                provided: CanonicalPath::new(
+                    [
+                        "margaret",
+                        "framework",
+                        "oidc_sign_in",
+                        "sign_in_flow",
+                        "SignInFlow",
+                    ]
+                    .map(str::to_string)
+                    .to_vec(),
+                ),
+            }],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings;
+
+        assert_eq!(
+            ConsolePlan::build(&index, &bindings)
+                .err()
+                .expect("the command is rejected")
+                .to_string(),
+            "console command 'crate::Sign' depends on the url of a route, which is composed only while serving; a console command cannot use it"
+        );
     }
 
     #[test]

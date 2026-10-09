@@ -1,23 +1,26 @@
-use std::collections::HashSet;
+use margaret_attributes::canonical_path::CanonicalPath;
 
-use crate::deferred_foreign_key::DeferredForeignKey;
-use crate::deferred_model_foreign_key::DeferredModelForeignKey;
-use crate::model_index_arguments::ModelIndexArguments;
-use crate::model_unique_arguments::ModelUniqueArguments;
-use crate::resolved_column::ResolvedColumn;
-use crate::resolved_index::ResolvedIndex;
-use crate::resolved_unique_constraint::ResolvedUniqueConstraint;
+use crate::collected_field::CollectedField;
+use crate::declared_index::DeclaredIndex;
+use crate::declared_relation::DeclaredRelation;
+use crate::primary_key_part::PrimaryKeyPart;
 
 pub(crate) struct CollectedModel {
-    pub(crate) deferred_foreign_keys: Vec<DeferredForeignKey>,
-    pub(crate) deferred_model_foreign_keys: Vec<DeferredModelForeignKey>,
-    pub(crate) deferred_model_indexes: Vec<ModelIndexArguments>,
-    pub(crate) deferred_model_unique_constraints: Vec<ModelUniqueArguments>,
-    pub(crate) indexes: Vec<ResolvedIndex>,
-    pub(crate) model: String,
-    pub(crate) primary_key: Vec<String>,
-    pub(crate) scalar_columns: Vec<ResolvedColumn>,
-    pub(crate) seen_columns: HashSet<String>,
+    pub(crate) fields: Vec<CollectedField>,
+    pub(crate) indexes: Vec<DeclaredIndex>,
+    pub(crate) module: String,
+    pub(crate) path: CanonicalPath,
+    pub(crate) primary_key: Vec<PrimaryKeyPart>,
+    pub(crate) relations: Vec<DeclaredRelation>,
     pub(crate) table: String,
-    pub(crate) unique_constraints: Vec<ResolvedUniqueConstraint>,
+    pub(crate) uniques: Vec<Vec<String>>,
+}
+
+impl CollectedModel {
+    pub(crate) fn primary_key_fields(&self) -> Vec<String> {
+        self.primary_key
+            .iter()
+            .map(|part| part.field.clone())
+            .collect()
+    }
 }

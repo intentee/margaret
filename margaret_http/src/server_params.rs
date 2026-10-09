@@ -14,10 +14,6 @@ use crate::request_outcome::RequestOutcome;
 use crate::request_path::RequestPath;
 use crate::request_rejection::RequestRejection;
 
-fn unspecified_addr() -> SocketAddr {
-    SocketAddr::from(([0, 0, 0, 0], 0))
-}
-
 fn requires_host(version: Version) -> bool {
     version != Version::HTTP_09 && version != Version::HTTP_10
 }
@@ -37,14 +33,14 @@ fn reconcile_authority(
         None => None,
     };
 
-    match (target_authority, host) {
-        (Some(target), Some(host)) if *target != host => {
+    match host {
+        Some(host) if target_authority.is_some_and(|target| *target != host) => {
             RequestOutcome::Rejected(RequestRejection::AuthorityMismatch)
         }
-        (None, None) if requires_host(version) => {
+        None if target_authority.is_none() && requires_host(version) => {
             RequestOutcome::Rejected(RequestRejection::MissingHost)
         }
-        _ => RequestOutcome::Parsed(()),
+        Some(_) | None => RequestOutcome::Parsed(()),
     }
 }
 
@@ -94,17 +90,6 @@ impl ServerParams {
         })
     }
 
-    pub(crate) fn synthetic(method: Method, path: String) -> Self {
-        Self {
-            authorization: RequestAuthorization::Absent,
-            headers: RequestHeaders::empty(),
-            method,
-            path: RequestPath::from_decoded(path),
-            query_string: String::new(),
-            remote_addr: unspecified_addr(),
-        }
-    }
-
     #[must_use]
     pub fn authorization(&self) -> &RequestAuthorization {
         &self.authorization
@@ -116,8 +101,8 @@ impl ServerParams {
     }
 
     #[must_use]
-    pub fn method(&self) -> &str {
-        self.method.as_str()
+    pub fn method(&self) -> &Method {
+        &self.method
     }
 
     #[must_use]
@@ -139,6 +124,7 @@ impl ServerParams {
 #[cfg(test)]
 mod tests {
     use std::mem::discriminant;
+    use std::net::SocketAddr;
 
     use http::HeaderValue;
     use http::Method;
@@ -151,7 +137,6 @@ mod tests {
     use http::uri::Authority;
 
     use super::ServerParams;
-    use super::unspecified_addr;
     use crate::bearer_token::BearerToken;
     use crate::request_authorization::RequestAuthorization;
     use crate::request_outcome::RequestOutcome;
@@ -173,8 +158,12 @@ mod tests {
             .0
     }
 
+    fn peer_addr() -> SocketAddr {
+        SocketAddr::from(([192, 0, 2, 7], 4321))
+    }
+
     fn outcome_of(parts: Parts) -> Result<ServerParams, RequestRejection> {
-        match ServerParams::from_parts(parts, unspecified_addr()) {
+        match ServerParams::from_parts(parts, peer_addr()) {
             RequestOutcome::Parsed(server) => Ok(server),
             RequestOutcome::Rejected(rejection) => Err(rejection),
         }
@@ -216,10 +205,10 @@ mod tests {
     fn exposes_the_decoded_path_and_the_raw_query() {
         let server = parse(Version::HTTP_11, "/files/a%20b?page=2", Some("localhost"));
 
-        assert_eq!(server.method(), "GET");
+        assert_eq!(server.method(), Method::GET);
         assert_eq!(server.path(), "/files/a b");
         assert_eq!(server.query_string(), "page=2");
-        assert_eq!(server.remote_addr(), unspecified_addr());
+        assert_eq!(server.remote_addr(), peer_addr());
     }
 
     #[test]
@@ -334,16 +323,5 @@ mod tests {
                 header: SingletonRequestHeader::Host,
             })
         );
-    }
-
-    #[test]
-    fn carries_a_synthetic_request_without_headers() {
-        let server = ServerParams::synthetic(Method::POST, "/articles".to_string());
-
-        assert_eq!(server.method(), "POST");
-        assert_eq!(server.path(), "/articles");
-        assert_eq!(server.query_string(), "");
-        assert_eq!(server.header(&HOST), None);
-        assert_eq!(server.remote_addr(), unspecified_addr());
     }
 }

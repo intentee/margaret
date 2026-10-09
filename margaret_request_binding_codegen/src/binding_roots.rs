@@ -1,30 +1,42 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 
-use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::request_binding::RequestBinding;
 
 #[must_use]
 pub fn binding_roots(binding: &RequestBinding) -> Vec<&CanonicalPath> {
     match binding {
-        RequestBinding::AuthenticatedUser { application, .. } => match &application.challenge {
-            AuthenticatedUserChallenge::Bearer { issuer_client } => {
-                vec![&application.concrete, &issuer_client.concrete]
-            }
-            AuthenticatedUserChallenge::Unchallenged => vec![&application.concrete],
-        },
+        RequestBinding::AuthenticatedUser { application, .. } => {
+            let mut roots = vec![&application.concrete];
+
+            roots.extend(
+                application
+                    .challenge
+                    .dependencies()
+                    .into_iter()
+                    .map(|dependency| &dependency.concrete),
+            );
+
+            roots
+        }
         RequestBinding::BoundRouteParameter {
             binder_provider, ..
         } => vec![binder_provider],
         RequestBinding::Injectable { dependency } => vec![&dependency.concrete],
         RequestBinding::AssetBag
         | RequestBinding::CurrentRequest
+        | RequestBinding::FormContent { .. }
         | RequestBinding::FormRequest { .. }
         | RequestBinding::Forwarder
+        | RequestBinding::JsonContent { .. }
         | RequestBinding::Next
         | RequestBinding::BearerToken { .. }
+        | RequestBinding::IntrospectedBearerToken { .. }
         | RequestBinding::PeerSpiffeId
+        | RequestBinding::RequestBodyStream
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
+        | RequestBinding::Session { .. }
+        | RequestBinding::UploadedFiles
         | RequestBinding::Views => Vec::new(),
     }
 }
@@ -41,6 +53,7 @@ mod tests {
     use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
     use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
     use crate::request_binding::RequestBinding;
+    use crate::route_parameter_lookup::RouteParameterLookup;
 
     fn path(name: &str) -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
@@ -53,6 +66,7 @@ mod tests {
         let binding = RequestBinding::BoundRouteParameter {
             binder_field: "user_binder".to_string(),
             binder_provider: binder_provider.clone(),
+            lookup: RouteParameterLookup::Binder,
             path_key: "user".to_string(),
         };
 
@@ -73,14 +87,20 @@ mod tests {
     }
 
     #[test]
-    fn retains_the_token_issuer_client_an_authenticated_user_provider_verifies_with() {
+    fn retains_every_trusted_issuer_an_authenticated_user_provider_admits_tokens_of() {
         let binding = RequestBinding::AuthenticatedUser {
             application: AuthenticatedUserApplication {
                 challenge: AuthenticatedUserChallenge::Bearer {
-                    issuer_client: InjectedDependency {
-                        concrete: path("Client"),
-                        field: "client".to_string(),
-                    },
+                    trusted_issuers: vec![
+                        InjectedDependency {
+                            concrete: path("Partner"),
+                            field: "partner".to_string(),
+                        },
+                        InjectedDependency {
+                            concrete: path("Upstream"),
+                            field: "upstream".to_string(),
+                        },
+                    ],
                 },
                 concrete: path("RunnerProvider"),
                 field: "runner_provider".to_string(),
@@ -95,7 +115,7 @@ mod tests {
 
         assert_eq!(
             binding_roots(&binding),
-            vec![&path("RunnerProvider"), &path("Client")]
+            vec![&path("RunnerProvider"), &path("Partner"), &path("Upstream")]
         );
     }
 }

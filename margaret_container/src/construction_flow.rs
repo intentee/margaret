@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::container_plan::ContainerPlan;
-use crate::dependency_kind::DependencyKind;
 use crate::planned_provider::PlannedProvider;
 
 pub(crate) fn construction_flow<'plan>(
@@ -19,9 +18,7 @@ pub(crate) fn construction_flow<'plan>(
         }
 
         for dependency in entry.provider.dependencies() {
-            if let DependencyKind::Single { provider_key } = dependency {
-                selected.insert(provider_key.clone());
-            }
+            selected.extend(dependency.provider_keys().iter().cloned());
         }
     }
 
@@ -41,8 +38,8 @@ mod tests {
     use crate::dependency_kind::DependencyKind;
     use crate::direct_construction::DirectConstruction;
     use crate::framework_injection_role::FrameworkInjectionRole;
-    use crate::provided_type::ProvidedType;
     use crate::provider::Provider;
+    use crate::provider_requirement::ProviderRequirement;
 
     fn path(name: &str) -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
@@ -65,7 +62,7 @@ mod tests {
             },
             field_name: name.to_lowercase(),
             injection: FrameworkInjectionRole::Unmarked,
-            provided: ProvidedType::Concrete(concrete_path),
+            requirement: ProviderRequirement::Singleton,
             type_name: name.to_string(),
         }
     }

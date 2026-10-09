@@ -1,0 +1,6 @@
+mod client_assertions_are_first_again_once_expired;
+mod client_assertions_are_remembered_per_client;
+mod concurrent_client_assertions_are_first_once;
+mod remembering_an_expired_assertion_again_stores_its_new_expiry;
+mod reports_a_remembrance_in_a_database_without_its_table;
+mod reports_a_remembrance_the_database_refuses;

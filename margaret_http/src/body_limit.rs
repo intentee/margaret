@@ -1,22 +1,17 @@
-const DEFAULT_MAX_BODY_SIZE: usize = 8 * 1024 * 1024;
-
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BodyLimit {
     max_bytes: usize,
 }
 
-impl Default for BodyLimit {
-    fn default() -> Self {
-        Self {
-            max_bytes: DEFAULT_MAX_BODY_SIZE,
-        }
-    }
-}
-
 impl BodyLimit {
     #[must_use]
-    pub fn new(max_bytes: usize) -> Self {
+    pub const fn new(max_bytes: usize) -> Self {
         Self { max_bytes }
+    }
+
+    #[must_use]
+    pub fn admits(&self, declared_bytes: u64) -> bool {
+        usize::try_from(declared_bytes).is_ok_and(|declared_bytes| declared_bytes <= self.max_bytes)
     }
 
     #[must_use]
@@ -28,11 +23,15 @@ impl BodyLimit {
 #[cfg(test)]
 mod tests {
     use super::BodyLimit;
-    use super::DEFAULT_MAX_BODY_SIZE;
 
     #[test]
-    fn defaults_to_the_framework_body_size() {
-        assert_eq!(BodyLimit::default().max_bytes(), DEFAULT_MAX_BODY_SIZE);
+    fn admits_a_body_up_to_its_limit() {
+        assert!(BodyLimit::new(16).admits(16));
+    }
+
+    #[test]
+    fn refuses_a_body_over_its_limit() {
+        assert!(!BodyLimit::new(16).admits(17));
     }
 
     #[test]

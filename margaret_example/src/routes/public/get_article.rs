@@ -2,13 +2,15 @@ use margaret::framework::http::response::Response;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::models::article::Article;
+use crate::models::article_with_author::ArticleWithAuthor;
 use crate::models::author::Author;
 
 #[singleton]
 #[responds_to_http(
-    method = "get",
+    method = RouteMethod::Get,
     name = "get_article",
     path = "/articles/{article}",
     server = "public"
@@ -22,22 +24,24 @@ impl GetArticle {
     #[process]
     pub fn respond(
         &self,
-        #[route_parameter(from = "article")] Article {
-            title,
-            body,
-            price,
-            reading_minutes,
-            created_at,
-            author,
-            ..
-        }: Article,
+        #[route_parameter(from = "article")] ArticleWithAuthor {
+            article:
+                Article {
+                    title,
+                    body,
+                    price,
+                    reading_minutes,
+                    created_at,
+                    ..
+                },
+            author:
+                Author {
+                    name: author_name,
+                    reputation,
+                    ..
+                },
+        }: ArticleWithAuthor,
     ) -> anyhow::Result<Response> {
-        let Author {
-            name: author_name,
-            reputation,
-            ..
-        } = author;
-
         Ok(Response::text(
             200,
             format!(
