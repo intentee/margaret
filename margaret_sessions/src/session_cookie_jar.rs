@@ -79,7 +79,7 @@ impl SessionCookieJar {
         let builder = Cookie::build((name, value))
             .http_only(true)
             .path("/")
-            .same_site(SameSite::Strict)
+            .same_site(SameSite::Lax)
             .secure(true);
 
         match self {

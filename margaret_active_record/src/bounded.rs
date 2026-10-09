@@ -24,6 +24,7 @@ use crate::join_context::JoinContext;
 use crate::joined_source::JoinedSource;
 use crate::keyset_position::KeysetPosition;
 use crate::loaded_records::loaded_records;
+use crate::ordering_columns::ordering_columns;
 use crate::page::Page;
 use crate::page_cursor::PageCursor;
 use crate::page_rows::next_page;
@@ -31,6 +32,7 @@ use crate::read_record::read_record;
 use crate::record::Record;
 use crate::record_columns::record_columns;
 use crate::scan::Scan;
+use crate::scan_order::ScanOrder;
 use crate::select_builder::SelectBuilder;
 use crate::select_filter::select_filter;
 use crate::shape::Shape;
@@ -44,15 +46,17 @@ fn from_position(direction: Direction) -> Comparison {
     }
 }
 
-pub struct Bounded<Modeled, const LIMIT: usize> {
-    position: KeysetPosition<Modeled>,
-    scan: Scan<Modeled>,
+pub struct Bounded<Modeled, Ordering, const LIMIT: usize> {
+    position: KeysetPosition<Modeled, Ordering>,
+    scan: Scan<Modeled, Ordering>,
 }
 
-impl<Modeled: Record, const LIMIT: usize> Bounded<Modeled, LIMIT> {
+impl<Modeled: Record, Ordering: ScanOrder<Modeled>, const LIMIT: usize>
+    Bounded<Modeled, Ordering, LIMIT>
+{
     const FETCHED_ROWS: u64 = LIMIT as u64 + 1;
 
-    pub(crate) fn new(scan: Scan<Modeled>) -> Self {
+    pub(crate) fn new(scan: Scan<Modeled, Ordering>) -> Self {
         Self {
             position: KeysetPosition::Start,
             scan,
@@ -65,9 +69,14 @@ impl<Modeled: Record, const LIMIT: usize> Bounded<Modeled, LIMIT> {
     pub async fn fetch<Executing: Executor>(
         self,
         executor: &Executing,
-    ) -> Result<Page<Modeled, Modeled>, ActiveRecordError> {
-        let cursor_width = self.scan.order.len();
-        let statement = self.selected(record_columns(Modeled::TABLE, BASE_ALIAS), Vec::new());
+    ) -> Result<Page<Modeled, Modeled, Ordering>, ActiveRecordError> {
+        let order = ordering_columns(Modeled::TABLE, Ordering::SPANS);
+        let cursor_width = order.len();
+        let statement = self.selected(
+            order,
+            record_columns(Modeled::TABLE, BASE_ALIAS),
+            Vec::new(),
+        );
 
         executed_rows(statement, StatementKind::Select, Modeled::TABLE, executor)
             .await
@@ -95,7 +104,7 @@ impl<Modeled: Record, const LIMIT: usize> Bounded<Modeled, LIMIT> {
     pub async fn load<Loaded: Shape<Root = Modeled>, Executing: Executor>(
         self,
         executor: &Executing,
-    ) -> Result<Page<Loaded, Modeled>, ActiveRecordError> {
+    ) -> Result<Page<Loaded, Modeled, Ordering>, ActiveRecordError> {
         let mut builder = SelectBuilder::new(BASE_ALIAS);
 
         Loaded::select(
@@ -107,8 +116,9 @@ impl<Modeled: Record, const LIMIT: usize> Bounded<Modeled, LIMIT> {
         );
 
         let SelectBuilder { columns, joins, .. } = builder;
-        let cursor_width = self.scan.order.len();
-        let statement = self.selected(columns, joins);
+        let order = ordering_columns(Modeled::TABLE, Ordering::SPANS);
+        let cursor_width = order.len();
+        let statement = self.selected(order, columns, joins);
 
         executed_rows(statement, StatementKind::Select, Modeled::TABLE, executor)
             .and_then(|rows| async move {
@@ -129,7 +139,7 @@ impl<Modeled: Record, const LIMIT: usize> Bounded<Modeled, LIMIT> {
     }
 
     #[must_use]
-    pub fn resume(self, cursor: PageCursor<Modeled>) -> Self {
+    pub fn resume(self, cursor: PageCursor<Modeled, Ordering>) -> Self {
         Self {
             position: KeysetPosition::From(cursor),
             scan: self.scan,
@@ -138,23 +148,15 @@ impl<Modeled: Record, const LIMIT: usize> Bounded<Modeled, LIMIT> {
 
     fn selected(
         self,
+        order: Vec<&'static str>,
         columns: Vec<Expression>,
         joins: Vec<Join>,
     ) -> Result<Statement, ActiveRecordError> {
         let Scan {
             direction,
-            order,
             selection,
             ..
         } = self.scan;
-        let positioned = match self.position {
-            KeysetPosition::From(cursor) => selection.and(Clause::Compare {
-                columns: order.clone(),
-                comparison: from_position(direction),
-                value: Arc::new(cursor),
-            }),
-            KeysetPosition::Start => selection,
-        };
         let ordering: Vec<Expression> = order
             .iter()
             .map(|column| Expression::Column {
@@ -162,6 +164,14 @@ impl<Modeled: Record, const LIMIT: usize> Bounded<Modeled, LIMIT> {
                 column,
             })
             .collect();
+        let positioned = match self.position {
+            KeysetPosition::From(cursor) => selection.and(Clause::Compare {
+                columns: order,
+                comparison: from_position(direction),
+                value: Arc::new(cursor),
+            }),
+            KeysetPosition::Start => selection,
+        };
 
         select_filter(positioned, Modeled::TABLE).map(|filter| {
             render_select(&Select {
@@ -186,7 +196,7 @@ impl<Modeled: Record, const LIMIT: usize> Bounded<Modeled, LIMIT> {
     }
 }
 
-impl<Modeled, const LIMIT: usize> Clone for Bounded<Modeled, LIMIT> {
+impl<Modeled, Ordering, const LIMIT: usize> Clone for Bounded<Modeled, Ordering, LIMIT> {
     fn clone(&self) -> Self {
         Self {
             position: self.position.clone(),

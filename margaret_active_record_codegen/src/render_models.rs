@@ -209,9 +209,9 @@ mod tests {
     fn walks_the_leading_fields_of_every_index_from_the_query_root() {
         let query = module(ARTICLE, "models/article/query");
 
-        assert!(query.contains("pubmodthen;"));
-        assert!(query.contains("pubid:margaret::framework::active_record::next::Next<crate::Article,uuid::Uuid,margaret::framework::active_record::unique::Unique<crate::Article,margaret::framework::active_record::unguarded::Unguarded,>,margaret::framework::active_record::root::Root>"));
-        assert!(query.contains("pubauthor:margaret::framework::active_record::next::Next<crate::Article,margaret::framework::active_record::key::Key<crate::Author>,crate::margaret::models::article::query::then::author::Step,margaret::framework::active_record::root::Root>"));
+        assert!(query.contains("pubmodedge;pubmodthen;"));
+        assert!(query.contains("pubid:margaret::framework::active_record::next::Next<crate::Article,uuid::Uuid,crate::margaret::models::article::query::edge::id::Edge,margaret::framework::active_record::root::Root>"));
+        assert!(query.contains("pubauthor:margaret::framework::active_record::next::Next<crate::Article,margaret::framework::active_record::key::Key<crate::Author>,crate::margaret::models::article::query::edge::author::Edge,margaret::framework::active_record::root::Root>"));
         assert!(query.contains("id:margaret::framework::active_record::next::Next::new(margaret::framework::active_record::root::Root,0usize)"));
     }
 
@@ -219,9 +219,11 @@ mod tests {
     fn narrows_a_branch_into_each_of_its_indexes() {
         let branch = module(ARTICLE, "models/article/query/then/author");
 
-        assert!(branch.contains("margaret::framework::active_record::unique::Unique<crate::Article,margaret::framework::active_record::unguarded::Unguarded,>"));
+        assert!(module(ARTICLE, "models/article/query/then/author/edge/id").contains("typeContinued=margaret::framework::active_record::unique::Unique<crate::Article,margaret::framework::active_record::unguarded::Unguarded,>;"));
         assert!(
-            branch.contains("margaret::framework::active_record::prefix::Prefix<crate::Article>")
+            module(ARTICLE, "models/article/query/then/author/edge/title").contains(
+                "typeContinued=margaret::framework::active_record::prefix::Prefix<crate::Article>;"
+            )
         );
         assert!(branch.contains("title:margaret::framework::active_record::next::Next::new(::std::clone::Clone::clone(&narrowed),1usize,)"));
         assert!(
@@ -235,17 +237,24 @@ mod tests {
 
     #[test]
     fn leaves_a_branch_with_several_continuations_unordered() {
-        assert!(!module(ARTICLE, "models/article/query/then/author").contains("ScanOrder"));
+        assert!(!module(ARTICLE, "models/article/query/edge/author").contains("ScanOrder"));
     }
 
     #[test]
-    fn orders_a_branch_by_the_rest_of_a_unique_path() {
+    fn orders_a_unique_field_by_itself() {
+        assert!(module(ARTICLE, "models/article/query/edge/id").contains(
+            "implmargaret::framework::active_record::scan_order::ScanOrder<crate::Article>forEdge{constSPANS:&'static[margaret::framework::active_record::field_span::FieldSpan]=&[margaret::framework::active_record::field_span::FieldSpan{start:0usize,width:1usize,}];}"
+        ));
+    }
+
+    #[test]
+    fn orders_a_field_by_itself_and_the_rest_of_its_unique_path() {
         let source = format!(
             "{KEY}#[model(table = \"authors\")]\nstruct Author {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n\n#[model(table = \"articles\")]\n#[index(name = \"articles_by_author\", fields = [author, id])]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    author: Key<Author>,\n}}\n"
         );
 
-        assert!(module(&source, "models/article/query/then/author").contains(
-            "implmargaret::framework::active_record::scan_order::ScanOrder<crate::Article>forStep{constREST:&'static[margaret::framework::active_record::field_span::FieldSpan]=&[margaret::framework::active_record::field_span::FieldSpan{start:0usize,width:1usize,}];}"
+        assert!(module(&source, "models/article/query/edge/author").contains(
+            "constSPANS:&'static[margaret::framework::active_record::field_span::FieldSpan]=&[margaret::framework::active_record::field_span::FieldSpan{start:1usize,width:1usize,},margaret::framework::active_record::field_span::FieldSpan{start:0usize,width:1usize,}];"
         ));
     }
 
@@ -255,14 +264,14 @@ mod tests {
             "{KEY}#[model(table = \"nodes\")]\n#[index(name = \"nodes_by_label\", fields = [label, parent, id])]\nstruct Node {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    label: String,\n    #[column]\n    #[index]\n    parent: Option<Key<Node>>,\n}}\n"
         );
 
-        assert!(!module(&source, "models/node/query/then/label").contains("ScanOrder"));
+        assert!(!module(&source, "models/node/query/edge/label").contains("ScanOrder"));
     }
 
     #[test]
     fn leaves_a_branch_ending_in_a_plain_index_unordered() {
         let source = "#[model(table = \"events\")]\n#[index(name = \"events_by_kind\", fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
 
-        assert!(!module(source, "models/event/query/then/kind").contains("ScanOrder"));
+        assert!(!module(source, "models/event/query/edge/kind").contains("ScanOrder"));
     }
 
     #[test]

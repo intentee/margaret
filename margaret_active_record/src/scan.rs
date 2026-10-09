@@ -14,36 +14,31 @@ use crate::bounded::Bounded;
 use crate::next_page::NextPage;
 use crate::page::Page;
 use crate::record::Record;
+use crate::scan_order::ScanOrder;
 use crate::selection::Selection;
 
-enum Streaming<Modeled, const BATCH: usize> {
+enum Streaming<Modeled, Ordering, const BATCH: usize> {
     Finished,
-    Pending(Bounded<Modeled, BATCH>),
+    Pending(Bounded<Modeled, Ordering, BATCH>),
 }
 
-pub struct Scan<Modeled> {
+pub struct Scan<Modeled, Ordering> {
     pub(crate) direction: Direction,
-    model: PhantomData<fn() -> Modeled>,
-    pub(crate) order: Vec<&'static str>,
+    ordering: PhantomData<fn(Modeled) -> Ordering>,
     pub(crate) selection: Selection,
 }
 
-impl<Modeled: Record> Scan<Modeled> {
-    pub(crate) fn new(
-        selection: Selection,
-        order: Vec<&'static str>,
-        direction: Direction,
-    ) -> Self {
+impl<Modeled: Record, Ordering: ScanOrder<Modeled>> Scan<Modeled, Ordering> {
+    pub(crate) fn new(selection: Selection, direction: Direction) -> Self {
         Self {
             direction,
-            model: PhantomData,
-            order,
+            ordering: PhantomData,
             selection,
         }
     }
 
     #[must_use]
-    pub fn limit<const LIMIT: usize>(self) -> Bounded<Modeled, LIMIT> {
+    pub fn limit<const LIMIT: usize>(self) -> Bounded<Modeled, Ordering, LIMIT> {
         const {
             assert!(LIMIT > 0 && LIMIT as u64 <= MAXIMUM_LIMIT);
         }
@@ -85,12 +80,11 @@ impl<Modeled: Record> Scan<Modeled> {
     }
 }
 
-impl<Modeled> Clone for Scan<Modeled> {
+impl<Modeled, Ordering> Clone for Scan<Modeled, Ordering> {
     fn clone(&self) -> Self {
         Self {
             direction: self.direction,
-            model: PhantomData,
-            order: self.order.clone(),
+            ordering: PhantomData,
             selection: self.selection.clone(),
         }
     }

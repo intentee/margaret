@@ -25,6 +25,21 @@ impl NodeLocation {
         location
     }
 
+    pub(crate) fn edge(&self) -> Self {
+        let mut segments = self.segments.clone();
+
+        segments.push("edge".to_string());
+
+        Self { segments }
+    }
+
+    pub(crate) fn edge_of(&self, field: &str) -> Self {
+        let mut location = self.edge();
+
+        location.segments.push(field.to_string());
+        location
+    }
+
     pub(crate) fn module(&self, model: &Model) -> String {
         generated_model_module(model, &self.segments.join("/"))
     }

@@ -5,7 +5,7 @@ error[E0599]: no method named `find` found for struct `margaret_active_record_te
    |   _____________-
    |  |_____________|
 10 | ||         .author
-   | ||_______________- method `find` is available on `Next<Article, Key<Author>, margaret_active_record_tests::margaret::models::models_article_article::query::then::author::Step, Root>`
+   | ||_______________- method `find` is available on `Next<Article, Key<Author>, margaret_active_record_tests::margaret::models::models_article_article::query::edge::author::Edge, Root>`
 11 | |          .eq(Key::new(Uuid::nil()))
 12 | |          .find(database)
    | |          -^^^^ method not found in `margaret_active_record_tests::margaret::models::models_article_article::query::then::author::Step`

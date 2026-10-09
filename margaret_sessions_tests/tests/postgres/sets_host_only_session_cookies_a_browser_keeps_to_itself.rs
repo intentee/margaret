@@ -31,7 +31,7 @@ async fn sets_host_only_session_cookies_a_browser_keeps_to_itself() {
         cookie.domain().is_none()
             && cookie.http_only() == Some(true)
             && cookie.path() == Some("/")
-            && cookie.same_site() == Some(SameSite::Strict)
+            && cookie.same_site() == Some(SameSite::Lax)
             && cookie.secure() == Some(true)
     }));
 }

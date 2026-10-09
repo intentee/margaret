@@ -55,7 +55,8 @@ async fn concurrent_code_redemptions_admit_one() {
             .iter()
             .filter(|raced| raced.redemption
                 == CodeRedemption::AlreadyRedeemed {
-                    family: winners[0].family
+                    family: winners[0].family,
+                    grant: Box::new(issued.grant.clone()),
                 })
             .count(),
         RACING_INSTANCES - 1

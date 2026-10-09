@@ -34,9 +34,13 @@ async fn earlier_redemption<Decided>(
         .await
         .map(|lookup| match lookup {
             Lookup::Found(AuthorizationCodeRecord {
+                grant,
                 redeemed_by: Some(family),
                 ..
-            }) => CodeRedemption::AlreadyRedeemed { family },
+            }) => CodeRedemption::AlreadyRedeemed {
+                family,
+                grant: Box::new(grant.into_payload()),
+            },
             Lookup::Found(_) | Lookup::Missing => CodeRedemption::Unknown,
         })
 }

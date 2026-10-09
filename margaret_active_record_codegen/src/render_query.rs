@@ -24,7 +24,6 @@ fn branches<'tree, 'model>(edges: &[&'tree QueryEdge<'model>]) -> Vec<BranchEdge
             QueryNode::Branch(edges) => Some(BranchEdge {
                 edges,
                 field: edge.field,
-                node: &edge.node,
             }),
             QueryNode::Leaf(_) => None,
         })
@@ -52,6 +51,57 @@ fn continued_tokens(edge: &QueryEdge, location: &NodeLocation, model: &Model) ->
     }
 }
 
+fn edge_modules(
+    edges: &[&QueryEdge],
+    location: &NodeLocation,
+    model: &Model,
+) -> Vec<GeneratedModuleTokens> {
+    let record = path_tokens(&model.path);
+    let declarations = edges.iter().map(|edge| {
+        let identifier = field_identifier(edge.field);
+
+        quote! { pub mod #identifier; }
+    });
+    let mut modules = vec![GeneratedModuleTokens::new(
+        location.edge().module(model),
+        quote! { #(#declarations)* },
+    )];
+
+    modules.extend(edges.iter().map(|edge| {
+        let continued = continued_tokens(edge, location, model);
+        let scan_order = match edge.node.ordering() {
+            NodeOrdering::Total(rest) => {
+                let spans = [edge.field]
+                    .into_iter()
+                    .chain(rest)
+                    .map(field_span_tokens);
+
+                quote! {
+                    impl margaret::framework::active_record::scan_order::ScanOrder<#record> for Edge {
+                        const SPANS: &'static [margaret::framework::active_record::field_span::FieldSpan] =
+                            &[#(#spans),*];
+                    }
+                }
+            }
+            NodeOrdering::Partial => quote! {},
+        };
+
+        GeneratedModuleTokens::new(
+            location.edge_of(&edge.field.name).module(model),
+            quote! {
+                pub struct Edge;
+
+                impl margaret::framework::active_record::query_edge::QueryEdge<#record> for Edge {
+                    type Continued = #continued;
+                }
+
+                #scan_order
+            },
+        )
+    }));
+    modules
+}
+
 fn step_declaration(
     edges: &[&QueryEdge],
     location: &NodeLocation,
@@ -67,14 +117,15 @@ fn step_declaration(
     let fields = edges.iter().map(|edge| {
         let identifier = field_identifier(edge.field);
         let field_type = field_type_tokens(edge.field);
-        let continued = continued_tokens(edge, location, model);
+        let edge_path = location.edge_of(&edge.field.name).path(model);
 
         quote! {
-            pub #identifier: margaret::framework::active_record::next::Next<#record, #field_type, #continued, #state>
+            pub #identifier: margaret::framework::active_record::next::Next<#record, #field_type, #edge_path::Edge, #state>
         }
     });
 
     quote! {
+        pub mod edge;
         #then
 
         pub struct Step {
@@ -141,19 +192,6 @@ fn render_branch(
             )
         }
     });
-    let scan_order = match branch.node.ordering() {
-        NodeOrdering::Total(rest_fields) => {
-            let spans = rest_fields.into_iter().map(field_span_tokens);
-
-            quote! {
-                impl margaret::framework::active_record::scan_order::ScanOrder<#record> for Step {
-                    const REST: &'static [margaret::framework::active_record::field_span::FieldSpan] =
-                        &[#(#spans),*];
-                }
-            }
-        }
-        NodeOrdering::Partial => quote! {},
-    };
     let update_impl = node_update_tokens(model, &first);
     let mut modules = vec![GeneratedModuleTokens::new(
         location.module(model),
@@ -190,10 +228,10 @@ fn render_branch(
                 }
             }
 
-            #scan_order
         },
     )];
 
+    modules.extend(edge_modules(&edges, location, model));
     modules.extend(branch_modules(&edges, location, model));
     modules
 }
@@ -225,6 +263,7 @@ pub(crate) fn render_query(model: &Model) -> Vec<GeneratedModuleTokens> {
         },
     )];
 
+    modules.extend(edge_modules(&edges, &location, model));
     modules.extend(branch_modules(&edges, &location, model));
     modules
 }

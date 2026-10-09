@@ -1,4 +1,4 @@
-error[E0599]: the method `ascending` exists for struct `Next<Article, String, margaret_model_facade::framework::margaret_active_record::prefix::Prefix<Article>, Narrowed<Article>>`, but its trait bounds were not satisfied
+error[E0599]: the method `ascending` exists for struct `Next<Article, String, margaret_active_record_tests::margaret::models::models_article_article::query::then::author::edge::title::Edge, Narrowed<Article>>`, but its trait bounds were not satisfied
   --> compile_fail/orders_along_a_partial_path.rs:13:10
    |
  9 |       let _ = Article::query()
@@ -11,10 +11,10 @@ error[E0599]: the method `ascending` exists for struct `Next<Article, String, ma
    | |_________|
    |
    |
-  ::: $WORKSPACE/margaret_active_record/src/prefix.rs
+  ::: src/../margaret/models/models_article_article/query/then/author/edge/title.rs
    |
-   |   pub struct Prefix<Modeled> {
-   |   -------------------------- doesn't satisfy `_: ScanOrder<Article>`
+   |   pub struct Edge;
+   |   --------------- doesn't satisfy `_: ScanOrder<Article>`
    |
    = note: the following trait bounds were not satisfied:
-           `margaret_model_facade::framework::margaret_active_record::prefix::Prefix<Article>: ScanOrder<Article>`
+           `margaret_active_record_tests::margaret::models::models_article_article::query::then::author::edge::title::Edge: ScanOrder<Article>`

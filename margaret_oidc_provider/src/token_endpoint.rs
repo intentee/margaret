@@ -336,11 +336,14 @@ impl TokenEndpoint {
         {
             CodeRedemption::Redeemed(answer) => answer,
             CodeRedemption::Unknown => Ok(unknown_code()),
-            CodeRedemption::AlreadyRedeemed { family } => {
-                RefreshFamilyRecord::revoke(database, family)
-                    .await
-                    .map_err(ProviderError::AuthorizationGrants)
-                    .map(|()| replayed_code())
+            CodeRedemption::AlreadyRedeemed { family, grant } => {
+                match admission.admission(&grant) {
+                    ControlFlow::Break(refusal) => Ok(invalid_grant(refusal.description())),
+                    ControlFlow::Continue(()) => RefreshFamilyRecord::revoke(database, family)
+                        .await
+                        .map_err(ProviderError::AuthorizationGrants)
+                        .map(|()| replayed_code()),
+                }
             }
         }
     }

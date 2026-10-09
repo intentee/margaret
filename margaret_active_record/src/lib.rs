@@ -78,6 +78,7 @@ mod primary_key_clause;
 mod primary_key_columns;
 mod primary_key_parameters;
 pub mod primary_key_width;
+pub mod query_edge;
 pub mod ranged;
 mod raw_column;
 mod read_record;

@@ -1,5 +1,6 @@
 use chrono::Utc;
 use cookie::Cookie;
+use cookie::SameSite;
 use uuid::Uuid;
 
 use margaret_jwt_verification_tests::fixture_audience::FIXTURE_AUDIENCE;
@@ -40,6 +41,7 @@ async fn shares_session_cookies_with_the_declared_domain() {
             .cookie_changes
             .cookies
             .iter()
-            .all(|cookie| cookie.domain() == Some("intentee.ai"))
+            .all(|cookie| cookie.domain() == Some("intentee.ai")
+                && cookie.same_site() == Some(SameSite::Lax))
     );
 }

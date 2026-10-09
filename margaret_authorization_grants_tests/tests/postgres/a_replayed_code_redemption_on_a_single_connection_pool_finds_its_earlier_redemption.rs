@@ -21,15 +21,11 @@ async fn a_replayed_code_redemption_on_a_single_connection_pool_finds_its_earlie
         .await;
     let code = contract_token();
     let first_family = Uuid::new_v4();
+    let issued = contract_issued_code();
 
-    AuthorizationCodeRecord::issue(
-        database.as_ref(),
-        code,
-        contract_issued_code(),
-        contract_instant(),
-    )
-    .await
-    .expect("the database issues the code");
+    AuthorizationCodeRecord::issue(database.as_ref(), code, issued.clone(), contract_instant())
+        .await
+        .expect("the database issues the code");
     AuthorizationCodeRecord::redeem(
         database.as_ref(),
         code,
@@ -51,7 +47,8 @@ async fn a_replayed_code_redemption_on_a_single_connection_pool_finds_its_earlie
         .await
         .expect("the database reports the earlier redemption"),
         CodeRedemption::AlreadyRedeemed {
-            family: first_family
+            family: first_family,
+            grant: Box::new(issued.grant),
         }
     );
 }

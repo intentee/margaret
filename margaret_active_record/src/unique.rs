@@ -29,7 +29,6 @@ use crate::continuation::Continuation;
 use crate::executed_optional_row::executed_optional_row;
 use crate::executed_rows::executed_rows;
 use crate::field_set::FieldSet;
-use crate::field_span::FieldSpan;
 use crate::join_context::JoinContext;
 use crate::joined_source::JoinedSource;
 use crate::loadable::Loadable;
@@ -43,7 +42,6 @@ use crate::record::Record;
 use crate::record_columns::record_columns;
 use crate::removal::Removal;
 use crate::row_guard::RowGuard;
-use crate::scan_order::ScanOrder;
 use crate::select_builder::SelectBuilder;
 use crate::shape::Shape;
 use crate::statement_kind::StatementKind;
@@ -250,8 +248,4 @@ impl<Modeled: Record> Continuation<Modeled> for Unique<Modeled, Unguarded> {
             narrowed,
         }
     }
-}
-
-impl<Modeled: Record> ScanOrder<Modeled> for Unique<Modeled, Unguarded> {
-    const REST: &'static [FieldSpan] = &[];
 }

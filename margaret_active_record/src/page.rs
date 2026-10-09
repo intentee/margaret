@@ -1,6 +1,6 @@
 use crate::next_page::NextPage;
 
-pub struct Page<Item, Modeled> {
-    pub next: NextPage<Modeled>,
+pub struct Page<Item, Modeled, Ordering> {
+    pub next: NextPage<Modeled, Ordering>,
     pub records: Vec<Item>,
 }

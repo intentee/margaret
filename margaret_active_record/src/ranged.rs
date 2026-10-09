@@ -12,29 +12,26 @@ use crate::bulk_update::bulk_update;
 use crate::field_set::FieldSet;
 use crate::model::Model;
 use crate::narrowed::Narrowed;
-use crate::ordering_columns::ordering_columns;
 use crate::record::Record;
 use crate::scan::Scan;
 use crate::scan_order::ScanOrder;
 use crate::selection::Selection;
 
-pub struct Ranged<Modeled, Continued> {
-    continued: PhantomData<fn() -> Continued>,
-    head: Vec<&'static str>,
+pub struct Ranged<Modeled, Ordering> {
     narrowed: Narrowed<Modeled>,
+    ordering: PhantomData<fn() -> Ordering>,
 }
 
-impl<Modeled: Record, Continued> Ranged<Modeled, Continued> {
-    pub(crate) fn new(narrowed: Narrowed<Modeled>, head: Vec<&'static str>) -> Self {
+impl<Modeled: Record, Ordering> Ranged<Modeled, Ordering> {
+    pub(crate) fn new(narrowed: Narrowed<Modeled>) -> Self {
         Self {
-            continued: PhantomData,
-            head,
             narrowed,
+            ordering: PhantomData,
         }
     }
 }
 
-impl<Modeled: Model, Continued> Ranged<Modeled, Continued> {
+impl<Modeled: Model, Ordering> Ranged<Modeled, Ordering> {
     /// # Errors
     ///
     /// Returns `ActiveRecordError` when the rows cannot be deleted.
@@ -46,7 +43,7 @@ impl<Modeled: Model, Continued> Ranged<Modeled, Continued> {
     }
 }
 
-impl<Modeled: Assignable, Continued> Ranged<Modeled, Continued> {
+impl<Modeled: Assignable, Ordering> Ranged<Modeled, Ordering> {
     /// # Errors
     ///
     /// Returns `ActiveRecordError` when the rows cannot be updated.
@@ -65,22 +62,18 @@ impl<Modeled: Assignable, Continued> Ranged<Modeled, Continued> {
     }
 }
 
-impl<Modeled: Record, Continued: ScanOrder<Modeled>> Ranged<Modeled, Continued> {
+impl<Modeled: Record, Ordering: ScanOrder<Modeled>> Ranged<Modeled, Ordering> {
     #[must_use]
-    pub fn ascending(self) -> Scan<Modeled> {
+    pub fn ascending(self) -> Scan<Modeled, Ordering> {
         self.scanned(Direction::Ascending)
     }
 
     #[must_use]
-    pub fn descending(self) -> Scan<Modeled> {
+    pub fn descending(self) -> Scan<Modeled, Ordering> {
         self.scanned(Direction::Descending)
     }
 
-    fn scanned(self, direction: Direction) -> Scan<Modeled> {
-        Scan::new(
-            Selection::Matching(self.narrowed.clause),
-            ordering_columns(Modeled::TABLE, self.head, Continued::REST),
-            direction,
-        )
+    fn scanned(self, direction: Direction) -> Scan<Modeled, Ordering> {
+        Scan::new(Selection::Matching(self.narrowed.clause), direction)
     }
 }
