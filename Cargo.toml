@@ -41,6 +41,7 @@ members = [
     "margaret_codegen_tests/tests/fixtures/oidc_bearer_identity",
     "margaret_codegen_tests/tests/fixtures/oidc_issuers",
     "margaret_codegen_tests/tests/fixtures/oidc_provider",
+    "margaret_codegen_tests/tests/fixtures/raw_identifier_model",
     "margaret_codegen_tests/tests/fixtures/route_parameter_values",
     "margaret_codegen_tests/tests/fixtures/self_referential_model",
     "margaret_codegen_tests/tests/fixtures/sessions",

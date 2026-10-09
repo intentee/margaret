@@ -1,0 +1,15 @@
+error[E0308]: mismatched types
+  --> compile_fail/resumes_a_cursor_of_the_opposite_direction.rs:22:21
+   |
+22 |             .resume(cursor)
+   |              ------ ^^^^^^ expected `PageCursor<Message, Edge, Descending>`, found `PageCursor<Message, Edge, Ascending>`
+   |              |
+   |              arguments to this method are incorrect
+   |
+   = note: expected struct `PageCursor<Message, margaret_active_record_tests::margaret::models::models_message_message::query::edge::id::Edge, Descending>`
+              found struct `PageCursor<Message, margaret_active_record_tests::margaret::models::models_message_message::query::edge::id::Edge, Ascending>`
+note: method defined here
+  --> $WORKSPACE/margaret_active_record/src/bounded.rs
+   |
+   |     pub fn resume(self, cursor: PageCursor<Modeled, Ordering, Toward>) -> Self {
+   |            ^^^^^^

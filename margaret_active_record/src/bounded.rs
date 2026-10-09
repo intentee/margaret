@@ -4,8 +4,6 @@ use std::sync::Arc;
 use futures_util::TryFutureExt as _;
 
 use margaret_database::executor::Executor;
-use margaret_sql::comparison::Comparison;
-use margaret_sql::direction::Direction;
 use margaret_sql::expression::Expression;
 use margaret_sql::from_item::FromItem;
 use margaret_sql::join::Join;
@@ -32,6 +30,7 @@ use crate::read_record::read_record;
 use crate::record::Record;
 use crate::record_columns::record_columns;
 use crate::scan::Scan;
+use crate::scan_direction::ScanDirection;
 use crate::scan_order::ScanOrder;
 use crate::select_builder::SelectBuilder;
 use crate::select_filter::select_filter;
@@ -39,24 +38,20 @@ use crate::shape::Shape;
 use crate::statement_kind::StatementKind;
 use crate::table_source::table_source;
 
-fn from_position(direction: Direction) -> Comparison {
-    match direction {
-        Direction::Ascending => Comparison::GreaterOrEqual,
-        Direction::Descending => Comparison::LessOrEqual,
-    }
+pub struct Bounded<Modeled, Ordering, Toward, const LIMIT: usize> {
+    position: KeysetPosition<Modeled, Ordering, Toward>,
+    scan: Scan<Modeled, Ordering, Toward>,
 }
 
-pub struct Bounded<Modeled, Ordering, const LIMIT: usize> {
-    position: KeysetPosition<Modeled, Ordering>,
-    scan: Scan<Modeled, Ordering>,
-}
-
-impl<Modeled: Record, Ordering: ScanOrder<Modeled>, const LIMIT: usize>
-    Bounded<Modeled, Ordering, LIMIT>
+impl<Modeled, Ordering, Toward, const LIMIT: usize> Bounded<Modeled, Ordering, Toward, LIMIT>
+where
+    Modeled: Record,
+    Ordering: ScanOrder<Modeled>,
+    Toward: ScanDirection,
 {
     const FETCHED_ROWS: u64 = LIMIT as u64 + 1;
 
-    pub(crate) fn new(scan: Scan<Modeled, Ordering>) -> Self {
+    pub(crate) fn new(scan: Scan<Modeled, Ordering, Toward>) -> Self {
         Self {
             position: KeysetPosition::Start,
             scan,
@@ -69,7 +64,7 @@ impl<Modeled: Record, Ordering: ScanOrder<Modeled>, const LIMIT: usize>
     pub async fn fetch<Executing: Executor>(
         self,
         executor: &Executing,
-    ) -> Result<Page<Modeled, Modeled, Ordering>, ActiveRecordError> {
+    ) -> Result<Page<Modeled, Modeled, Ordering, Toward>, ActiveRecordError> {
         let order = ordering_columns(Modeled::TABLE, Ordering::SPANS);
         let cursor_width = order.len();
         let statement = self.selected(
@@ -104,7 +99,7 @@ impl<Modeled: Record, Ordering: ScanOrder<Modeled>, const LIMIT: usize>
     pub async fn load<Loaded: Shape<Root = Modeled>, Executing: Executor>(
         self,
         executor: &Executing,
-    ) -> Result<Page<Loaded, Modeled, Ordering>, ActiveRecordError> {
+    ) -> Result<Page<Loaded, Modeled, Ordering, Toward>, ActiveRecordError> {
         let mut builder = SelectBuilder::new(BASE_ALIAS);
 
         Loaded::select(
@@ -139,7 +134,7 @@ impl<Modeled: Record, Ordering: ScanOrder<Modeled>, const LIMIT: usize>
     }
 
     #[must_use]
-    pub fn resume(self, cursor: PageCursor<Modeled, Ordering>) -> Self {
+    pub fn resume(self, cursor: PageCursor<Modeled, Ordering, Toward>) -> Self {
         Self {
             position: KeysetPosition::From(cursor),
             scan: self.scan,
@@ -152,11 +147,7 @@ impl<Modeled: Record, Ordering: ScanOrder<Modeled>, const LIMIT: usize>
         columns: Vec<Expression>,
         joins: Vec<Join>,
     ) -> Result<Statement, ActiveRecordError> {
-        let Scan {
-            direction,
-            selection,
-            ..
-        } = self.scan;
+        let Scan { selection, .. } = self.scan;
         let ordering: Vec<Expression> = order
             .iter()
             .map(|column| Expression::Column {
@@ -167,7 +158,7 @@ impl<Modeled: Record, Ordering: ScanOrder<Modeled>, const LIMIT: usize>
         let positioned = match self.position {
             KeysetPosition::From(cursor) => selection.and(Clause::Compare {
                 columns: order,
-                comparison: from_position(direction),
+                comparison: Toward::CURSOR_COMPARISON,
                 value: Arc::new(cursor),
             }),
             KeysetPosition::Start => selection,
@@ -187,7 +178,7 @@ impl<Modeled: Record, Ordering: ScanOrder<Modeled>, const LIMIT: usize>
                 ordering: ordering
                     .into_iter()
                     .map(|expression| OrderTerm {
-                        direction,
+                        direction: Toward::DIRECTION,
                         expression,
                     })
                     .collect(),
@@ -196,7 +187,9 @@ impl<Modeled: Record, Ordering: ScanOrder<Modeled>, const LIMIT: usize>
     }
 }
 
-impl<Modeled, Ordering, const LIMIT: usize> Clone for Bounded<Modeled, Ordering, LIMIT> {
+impl<Modeled, Ordering, Toward, const LIMIT: usize> Clone
+    for Bounded<Modeled, Ordering, Toward, LIMIT>
+{
     fn clone(&self) -> Self {
         Self {
             position: self.position.clone(),

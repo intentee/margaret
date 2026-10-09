@@ -259,6 +259,19 @@ mod tests {
     }
 
     #[test]
+    fn names_the_module_of_a_raw_identifier_field_after_its_identifier() {
+        let source = "#[model(table = \"tokens\")]\n#[index(name = \"tokens_by_type\", fields = [r#type, id])]\nstruct Token {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(name = \"kind\")]\n    r#type: i64,\n}\n";
+        let modules = rendered(source);
+
+        assert!(modules["models/token/query/edge"].contains("pubmodr#type;"));
+        assert!(modules.contains_key("models/token/query/edge/type"));
+        assert!(modules.contains_key("models/token/query/then/type"));
+        assert!(modules["models/token/query"].contains(
+            "pubr#type:margaret::framework::active_record::next::Next<crate::Token,i64,crate::margaret::models::token::query::edge::r#type::Edge,"
+        ));
+    }
+
+    #[test]
     fn leaves_a_branch_through_a_nullable_field_unordered() {
         let source = format!(
             "{KEY}#[model(table = \"nodes\")]\n#[index(name = \"nodes_by_label\", fields = [label, parent, id])]\nstruct Node {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    label: String,\n    #[column]\n    #[index]\n    parent: Option<Key<Node>>,\n}}\n"

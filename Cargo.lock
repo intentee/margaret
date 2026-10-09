@@ -3549,6 +3549,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_raw_identifier_model_fixture"
+version = "0.1.0"
+dependencies = [
+ "margaret",
+]
+
+[[package]]
 name = "margaret_registered_claims"
 version = "0.1.0"
 dependencies = [

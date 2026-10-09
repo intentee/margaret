@@ -8,25 +8,25 @@ use crate::page_cursor::PageCursor;
 use crate::raw_column::RawColumn;
 use crate::row_column::row_column;
 
-fn cursor_of<Modeled, Ordering>(
+fn cursor_of<Modeled, Ordering, Toward>(
     row: &Row,
     offset: usize,
     width: usize,
     table: &'static Table,
-) -> Result<PageCursor<Modeled, Ordering>, ActiveRecordError> {
+) -> Result<PageCursor<Modeled, Ordering, Toward>, ActiveRecordError> {
     (offset..offset + width)
         .map(|position| row_column::<RawColumn>(row, position, table))
         .collect::<Result<Vec<RawColumn>, ActiveRecordError>>()
         .map(PageCursor::new)
 }
 
-pub(crate) fn next_page<Modeled, Ordering>(
+pub(crate) fn next_page<Modeled, Ordering, Toward>(
     rows: &[Row],
     limit: usize,
     cursor_offset: usize,
     cursor_width: usize,
     table: &'static Table,
-) -> Result<NextPage<Modeled, Ordering>, ActiveRecordError> {
+) -> Result<NextPage<Modeled, Ordering, Toward>, ActiveRecordError> {
     match rows.get(limit) {
         Some(overflow) => {
             cursor_of(overflow, cursor_offset, cursor_width, table).map(NextPage::Continues)

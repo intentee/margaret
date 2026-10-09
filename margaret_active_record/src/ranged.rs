@@ -1,19 +1,21 @@
 use std::marker::PhantomData;
 
 use margaret_database::executor::Executor;
-use margaret_sql::direction::Direction;
 
 use crate::active_record_error::ActiveRecordError;
+use crate::ascending::Ascending;
 use crate::assignable::Assignable;
 use crate::assigned::Assigned;
 use crate::assigning::Assigning;
 use crate::bulk_delete::bulk_delete;
 use crate::bulk_update::bulk_update;
+use crate::descending::Descending;
 use crate::field_set::FieldSet;
 use crate::model::Model;
 use crate::narrowed::Narrowed;
 use crate::record::Record;
 use crate::scan::Scan;
+use crate::scan_direction::ScanDirection;
 use crate::scan_order::ScanOrder;
 use crate::selection::Selection;
 
@@ -64,16 +66,16 @@ impl<Modeled: Assignable, Ordering> Ranged<Modeled, Ordering> {
 
 impl<Modeled: Record, Ordering: ScanOrder<Modeled>> Ranged<Modeled, Ordering> {
     #[must_use]
-    pub fn ascending(self) -> Scan<Modeled, Ordering> {
-        self.scanned(Direction::Ascending)
+    pub fn ascending(self) -> Scan<Modeled, Ordering, Ascending> {
+        self.scanned()
     }
 
     #[must_use]
-    pub fn descending(self) -> Scan<Modeled, Ordering> {
-        self.scanned(Direction::Descending)
+    pub fn descending(self) -> Scan<Modeled, Ordering, Descending> {
+        self.scanned()
     }
 
-    fn scanned(self, direction: Direction) -> Scan<Modeled, Ordering> {
-        Scan::new(Selection::Matching(self.narrowed.clause), direction)
+    fn scanned<Toward: ScanDirection>(self) -> Scan<Modeled, Ordering, Toward> {
+        Scan::new(Selection::Matching(self.narrowed.clause))
     }
 }

@@ -166,6 +166,7 @@ GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_websocket_peer_identity_fixture \
 	-p margaret_composite_foreign_key_model_fixture \
 	-p margaret_example \
+	-p margaret_raw_identifier_model_fixture \
 	-p margaret_schema_postgres_fixture \
 	-p margaret_self_referential_model_fixture \
 	-p margaret_spiffe_http_client_fixture

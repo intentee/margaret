@@ -2,10 +2,11 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use margaret_sql::comparison::Comparison;
-use margaret_sql::direction::Direction;
 
+use crate::ascending::Ascending;
 use crate::clause::Clause;
 use crate::continuation::Continuation as _;
+use crate::descending::Descending;
 use crate::field::Field;
 use crate::field_columns::field_columns;
 use crate::narrowed::Narrowed;
@@ -15,6 +16,7 @@ use crate::query_edge::QueryEdge;
 use crate::ranged::Ranged;
 use crate::record::Record;
 use crate::scan::Scan;
+use crate::scan_direction::ScanDirection;
 use crate::scan_order::ScanOrder;
 use crate::value::Value;
 
@@ -111,16 +113,16 @@ where
     Edge: ScanOrder<Modeled>,
 {
     #[must_use]
-    pub fn ascending(self) -> Scan<Modeled, Edge> {
-        self.scanned(Direction::Ascending)
+    pub fn ascending(self) -> Scan<Modeled, Edge, Ascending> {
+        self.scanned()
     }
 
     #[must_use]
-    pub fn descending(self) -> Scan<Modeled, Edge> {
-        self.scanned(Direction::Descending)
+    pub fn descending(self) -> Scan<Modeled, Edge, Descending> {
+        self.scanned()
     }
 
-    fn scanned(self, direction: Direction) -> Scan<Modeled, Edge> {
-        Scan::new(self.state.selection(), direction)
+    fn scanned<Toward: ScanDirection>(self) -> Scan<Modeled, Edge, Toward> {
+        Scan::new(self.state.selection())
     }
 }

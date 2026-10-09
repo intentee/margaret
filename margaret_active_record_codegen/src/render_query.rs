@@ -35,7 +35,7 @@ fn continued_tokens(edge: &QueryEdge, location: &NodeLocation, model: &Model) ->
 
     match &edge.node {
         QueryNode::Branch(_) => {
-            let path = location.child(&edge.field.name).path(model);
+            let path = location.child(edge.field).path(model);
 
             quote! { #path::Step }
         }
@@ -87,7 +87,7 @@ fn edge_modules(
         };
 
         GeneratedModuleTokens::new(
-            location.edge_of(&edge.field.name).module(model),
+            location.edge_of(edge.field).module(model),
             quote! {
                 pub struct Edge;
 
@@ -117,7 +117,7 @@ fn step_declaration(
     let fields = edges.iter().map(|edge| {
         let identifier = field_identifier(edge.field);
         let field_type = field_type_tokens(edge.field);
-        let edge_path = location.edge_of(&edge.field.name).path(model);
+        let edge_path = location.edge_of(edge.field).path(model);
 
         quote! {
             pub #identifier: margaret::framework::active_record::next::Next<#record, #field_type, #edge_path::Edge, #state>
@@ -156,11 +156,7 @@ fn branch_modules(
     )];
 
     for branch in &branches {
-        modules.extend(render_branch(
-            branch,
-            &location.child(&branch.field.name),
-            model,
-        ));
+        modules.extend(render_branch(branch, &location.child(branch.field), model));
     }
 
     modules
