@@ -7,6 +7,7 @@ use quote::quote;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
@@ -133,8 +134,9 @@ pub fn render_middleware_wrappers(plans: &[MiddlewarePlan]) -> Vec<GeneratedModu
 
         quote! { pub use #module::#wrapper; }
     });
+    let middleware = ModulePath::root("middleware");
     let mut generated = vec![GeneratedModuleTokens::new(
-        "middleware",
+        middleware.clone(),
         quote! {
             #(mod #modules;)*
             #(#exports)*
@@ -145,7 +147,7 @@ pub fn render_middleware_wrappers(plans: &[MiddlewarePlan]) -> Vec<GeneratedModu
         let wrapper = &plan.wrapper;
         let module = wrapper.to_string().to_snake_case();
 
-        GeneratedModuleTokens::new(format!("middleware/{module}"), middleware_wrapper(plan))
+        GeneratedModuleTokens::new(middleware.child(module), middleware_wrapper(plan))
     }));
 
     generated

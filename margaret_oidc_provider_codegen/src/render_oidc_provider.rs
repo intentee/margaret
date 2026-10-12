@@ -6,6 +6,7 @@ use syn::ext::IdentExt;
 use margaret_attributes::tag::Tag;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_umbrella_path::routes_path::routes_path;
 
 use crate::authorization_handler_module_name::AUTHORIZATION_HANDLER_MODULE_NAME;
@@ -27,7 +28,7 @@ fn authorization_handler_module(
     let routes = path_tokens(&routes_path());
 
     GeneratedModuleTokens::new(
-        format!("{OIDC_PROVIDER_MODULE_NAME}/{AUTHORIZATION_HANDLER_MODULE_NAME}"),
+        ModulePath::root(OIDC_PROVIDER_MODULE_NAME).child(AUTHORIZATION_HANDLER_MODULE_NAME),
         quote! {
             pub type AuthorizationHandler =
                 margaret::framework::oidc_provider::authorization_handler::AuthorizationHandler<#view, #routes>;
@@ -68,7 +69,7 @@ pub fn render_oidc_provider(
         DerivedAuthorization::Unserved => TokenStream::new(),
     };
     let mut modules = vec![GeneratedModuleTokens::new(
-        OIDC_PROVIDER_MODULE_NAME,
+        ModulePath::root(OIDC_PROVIDER_MODULE_NAME),
         quote! { #authorization_handler #provider_endpoints #exchangers #(#exports)* },
     )];
 
@@ -83,16 +84,16 @@ pub fn render_oidc_provider(
             quote! { pub mod #module; }
         });
 
+        let exchangers_module =
+            ModulePath::root(OIDC_PROVIDER_MODULE_NAME).child(SUBJECT_TOKEN_EXCHANGERS_MODULE_NAME);
+
         modules.push(GeneratedModuleTokens::new(
-            format!("{OIDC_PROVIDER_MODULE_NAME}/{SUBJECT_TOKEN_EXCHANGERS_MODULE_NAME}"),
+            exchangers_module.clone(),
             quote! { #(#submodules)* },
         ));
         modules.extend(exchanger_issuers.iter().map(|issuer| {
             GeneratedModuleTokens::new(
-                format!(
-                    "{OIDC_PROVIDER_MODULE_NAME}/{SUBJECT_TOKEN_EXCHANGERS_MODULE_NAME}/{}",
-                    issuer.ident().unraw()
-                ),
+                exchangers_module.child(issuer.ident().unraw().to_string()),
                 quote! {
                     pub use margaret::framework::subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
                 },
@@ -125,7 +126,7 @@ mod tests {
             .map(|module| {
                 let module = module.format().expect("the module formats");
 
-                format!("{}:\n{}", module.name(), module.source())
+                format!("{}:\n{}", module.path(), module.source())
             })
             .collect()
     }

@@ -5,6 +5,7 @@ use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_model_codegen::field_value::FieldValue;
 use margaret_model_codegen::model::Model;
 use margaret_schema_codegen::models_module_name::MODELS_MODULE_NAME;
@@ -28,7 +29,7 @@ pub fn render_models(models: &[Model]) -> Vec<GeneratedModuleTokens> {
         quote! { pub mod #module; }
     });
     let mut modules = vec![GeneratedModuleTokens::new(
-        MODELS_MODULE_NAME,
+        ModulePath::root(MODELS_MODULE_NAME),
         quote! { #(#declarations)* },
     )];
 
@@ -64,7 +65,7 @@ mod tests {
         .into_iter()
         .map(|module| {
             (
-                module.name().to_string(),
+                module.path().to_string(),
                 module.to_source().split_whitespace().collect(),
             )
         })

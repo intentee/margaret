@@ -7,6 +7,7 @@ use syn::ext::IdentExt;
 
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_oauth_vocabulary::resource_scope::ResourceScope;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_token_issuance_codegen::resource_audience_path::resource_audience_path;
@@ -22,7 +23,10 @@ use crate::resources_module_name::RESOURCES_MODULE_NAME;
 use crate::sign_in_callback_handler_module_name::SIGN_IN_CALLBACK_HANDLER_MODULE_NAME;
 use crate::sign_in_scopes_module_name::SIGN_IN_SCOPES_MODULE_NAME;
 
-fn sign_in_modules(client_module: &str, sign_in: &ModuleSignIn) -> Vec<GeneratedModuleTokens> {
+fn sign_in_modules(
+    client_module: &ModulePath,
+    sign_in: &ModuleSignIn,
+) -> Vec<GeneratedModuleTokens> {
     match sign_in {
         ModuleSignIn::Available { admission, scopes } => {
             let admission = path_tokens(admission);
@@ -30,14 +34,14 @@ fn sign_in_modules(client_module: &str, sign_in: &ModuleSignIn) -> Vec<Generated
 
             vec![
                 GeneratedModuleTokens::new(
-                    format!("{client_module}/{SIGN_IN_CALLBACK_HANDLER_MODULE_NAME}"),
+                    client_module.child(SIGN_IN_CALLBACK_HANDLER_MODULE_NAME),
                     quote! {
                         pub type SignInCallbackHandler =
                             margaret::framework::oidc_sign_in::sign_in_callback_handler::SignInCallbackHandler<#admission>;
                     },
                 ),
                 GeneratedModuleTokens::new(
-                    format!("{client_module}/{SIGN_IN_SCOPES_MODULE_NAME}"),
+                    client_module.child(SIGN_IN_SCOPES_MODULE_NAME),
                     quote! { pub const SIGN_IN_SCOPES: &[&str] = &[#(#scopes),*]; },
                 ),
             ]
@@ -59,13 +63,13 @@ fn sign_in_declarations(sign_in: &ModuleSignIn) -> TokenStream {
 }
 
 fn resource_modules(
-    client_module: &str,
+    client_module: &ModulePath,
     credentials: &OAuthClientCredentials,
 ) -> Vec<GeneratedModuleTokens> {
     let OAuthClientCredentials::PerResource { resources, scopes } = credentials else {
         return Vec::new();
     };
-    let parent_module = format!("{client_module}/{RESOURCES_MODULE_NAME}");
+    let parent_module = client_module.child(RESOURCES_MODULE_NAME);
     let submodules = resources.iter().map(|resource| {
         let module = resource.ident();
 
@@ -82,7 +86,7 @@ fn resource_modules(
         quote! { #(#submodules)* },
     ))
     .chain(resources.iter().flat_map(|resource| {
-        let resource_module = format!("{parent_module}/{}", resource.ident().unraw());
+        let resource_module = parent_module.child(resource.ident().unraw().to_string());
         let audience = path_tokens(&resource_audience_path(resource));
 
         [
@@ -94,7 +98,7 @@ fn resource_modules(
                 },
             ),
             GeneratedModuleTokens::new(
-                format!("{resource_module}/{RESOURCE_GRANT_MODULE_NAME}"),
+                resource_module.child(RESOURCE_GRANT_MODULE_NAME),
                 quote! {
                     pub const RESOURCE_GRANT: margaret::framework::client_credentials::resource_grant::ResourceGrant =
                         margaret::framework::client_credentials::resource_grant::ResourceGrant {
@@ -127,7 +131,8 @@ fn client_modules(
         tag,
     }: &OAuthClientModule,
 ) -> Vec<GeneratedModuleTokens> {
-    let client_module = format!("{OAUTH_CLIENTS_MODULE_NAME}/{}", tag.ident().unraw());
+    let client_module =
+        ModulePath::root(OAUTH_CLIENTS_MODULE_NAME).child(tag.ident().unraw().to_string());
     let client_id_module = format_ident!("{CLIENT_ID_MODULE_NAME}");
     let client_id = client_id.as_str();
     let sign_in_declarations = sign_in_declarations(sign_in);
@@ -143,7 +148,7 @@ fn client_modules(
 
     [
         GeneratedModuleTokens::new(
-            format!("{client_module}/{CLIENT_ID_MODULE_NAME}"),
+            client_module.child(CLIENT_ID_MODULE_NAME),
             quote! { pub const CLIENT_ID: &str = #client_id; },
         ),
         GeneratedModuleTokens::new(
@@ -165,7 +170,7 @@ pub fn render_oauth_clients(clients: &[OAuthClientModule]) -> Vec<GeneratedModul
         quote! { pub mod #module; }
     });
     let mut modules = vec![GeneratedModuleTokens::new(
-        OAUTH_CLIENTS_MODULE_NAME,
+        ModulePath::root(OAUTH_CLIENTS_MODULE_NAME),
         quote! { #(#submodules)* },
     )];
 
@@ -233,7 +238,7 @@ mod tests {
     fn module_source(modules: Vec<GeneratedModuleTokens>, name: &str) -> String {
         modules
             .into_iter()
-            .find(|module| module.name() == name)
+            .find(|module| module.path().to_string() == name)
             .expect("the module is generated")
             .format()
             .expect("the module formats")
@@ -303,7 +308,7 @@ mod tests {
         assert!(
             modules
                 .iter()
-                .any(|module| module.name() == "oauth_clients/async/client_id")
+                .any(|module| module.path().to_string() == "oauth_clients/async/client_id")
         );
         assert_eq!(
             module_source(modules, "oauth_clients"),

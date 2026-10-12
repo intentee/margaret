@@ -2,6 +2,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::render_shape::render_shape;
 use crate::shape_declaration::ShapeDeclaration;
@@ -20,7 +21,7 @@ pub fn render_shapes(shapes: &[ShapeDeclaration]) -> Vec<GeneratedModuleTokens> 
     });
 
     [GeneratedModuleTokens::new(
-        SHAPES_MODULE_NAME,
+        ModulePath::root(SHAPES_MODULE_NAME),
         quote! { #(#declarations)* },
     )]
     .into_iter()
@@ -54,7 +55,7 @@ mod tests {
                 .into_iter()
                 .map(|module| {
                     (
-                        module.name().to_string(),
+                        module.path().to_string(),
                         module.to_source().split_whitespace().collect(),
                     )
                 })

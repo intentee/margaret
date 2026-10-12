@@ -10,6 +10,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::asset_bag_codegen_error::AssetBagCodegenError;
 use crate::asset_bag_generation::AssetBagGeneration;
@@ -105,7 +106,7 @@ fn asset_responder(
     Ok(AssetResponder {
         declaration: quote! { pub mod #responder_module_identifier; },
         module: GeneratedModuleTokens::new(
-            format!("{root_module}/{responder_module}"),
+            ModulePath::root(root_module).child(responder_module),
             render_asset_responder(&served, assets_directory_name, responder_type),
         ),
     })
@@ -162,6 +163,7 @@ pub fn render_asset_bag(
     }
 
     let [root_module, ..] = asset_macro_canonical_suffix();
+    let root_module = ModulePath::root(root_module);
 
     let asset_macro = match generation {
         AssetBagGeneration::Macro | AssetBagGeneration::MacroAndResponder(_) => {
@@ -231,7 +233,7 @@ mod tests {
 
         modules
             .into_iter()
-            .find(|module| module.name() == name)
+            .find(|module| module.path().to_string() == name)
             .expect("the requested module is generated")
             .format()
             .expect("the generated tokens form a valid Rust file")
@@ -288,7 +290,7 @@ mod tests {
             .expect("the asset bag module is generated");
 
         assert_eq!(modules.len(), 1);
-        assert_eq!(modules[0].name(), "asset_bag");
+        assert_eq!(modules[0].path().to_string(), "asset_bag");
 
         let root = formatted(FULL_METAFILE, &AssetBagGeneration::Macro, "asset_bag");
 
@@ -301,11 +303,15 @@ mod tests {
             .expect("the asset bag module is generated");
 
         assert_eq!(modules.len(), 2);
-        assert!(modules.iter().any(|module| module.name() == "asset_bag"));
         assert!(
             modules
                 .iter()
-                .any(|module| module.name() == "asset_bag/asset_responder")
+                .any(|module| module.path().to_string() == "asset_bag")
+        );
+        assert!(
+            modules
+                .iter()
+                .any(|module| module.path().to_string() == "asset_bag/asset_responder")
         );
 
         let root = formatted(FULL_METAFILE, &emit(FULL_METAFILE_TAILS), "asset_bag");

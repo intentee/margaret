@@ -13,7 +13,7 @@ use margaret_model_codegen::resolved_column::ResolvedColumn;
 
 use crate::column_check_tokens::column_check_tokens;
 use crate::column_type_tokens::column_type_tokens;
-use crate::models_module_name::MODELS_MODULE_NAME;
+use crate::model_module_path::model_module_path;
 use crate::string_slice_tokens::string_slice_tokens;
 use crate::table_module_name::TABLE_MODULE_NAME;
 use crate::table_namespace_tokens::table_namespace_tokens;
@@ -88,7 +88,7 @@ pub fn render_table(model: &Model) -> GeneratedModuleTokens {
         .map(unique_constraint_tokens);
 
     GeneratedModuleTokens::new(
-        format!("{MODELS_MODULE_NAME}/{}/{TABLE_MODULE_NAME}", model.module),
+        model_module_path(model).child(TABLE_MODULE_NAME),
         quote! {
             pub const TABLE: margaret::framework::model::table::Table =
                 margaret::framework::model::table::Table {
@@ -167,7 +167,8 @@ mod tests {
                 &models(&indexed.index, TableNamespace::Application).expect("the models resolve")
                     [0]
             )
-            .name(),
+            .path()
+            .to_string(),
             "models/blog_post/table"
         );
     }

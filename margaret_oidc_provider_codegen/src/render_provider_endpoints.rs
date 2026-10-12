@@ -3,6 +3,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::authorization_endpoint_url_module_name::AUTHORIZATION_ENDPOINT_URL_MODULE_NAME;
 use crate::derived_authorization::DerivedAuthorization;
@@ -38,7 +39,7 @@ pub fn render_provider_endpoints(
         ..
     }: &DerivedProviderEndpoints,
 ) -> Vec<GeneratedModuleTokens> {
-    let module = format!("{OIDC_PROVIDER_MODULE_NAME}/{PROVIDER_ENDPOINTS_MODULE_NAME}");
+    let module = ModulePath::root(OIDC_PROVIDER_MODULE_NAME).child(PROVIDER_ENDPOINTS_MODULE_NAME);
     let introspection = derived(introspection);
     let revocation = derived(revocation);
     let userinfo = derived(userinfo);
@@ -72,7 +73,7 @@ pub fn render_provider_endpoints(
                     quote! { pub mod #url_module; },
                 ),
                 GeneratedModuleTokens::new(
-                    format!("{module}/{AUTHORIZATION_ENDPOINT_URL_MODULE_NAME}"),
+                    module.child(AUTHORIZATION_ENDPOINT_URL_MODULE_NAME),
                     quote! { pub const AUTHORIZATION_ENDPOINT_URL: &str = #url; },
                 ),
             ]
@@ -103,7 +104,7 @@ mod tests {
             .map(|module| {
                 let module = module.format().expect("the module formats");
 
-                format!("{}:\n{}", module.name(), module.source())
+                format!("{}:\n{}", module.path(), module.source())
             })
             .collect()
     }

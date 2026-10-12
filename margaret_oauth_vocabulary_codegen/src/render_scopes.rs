@@ -2,6 +2,7 @@ use quote::quote;
 
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::declared_scope_item::DeclaredScopeItem;
 use crate::declared_scopes::DeclaredScopes;
@@ -25,7 +26,7 @@ pub fn render_scopes(DeclaredScopes { scopes }: &DeclaredScopes) -> Vec<Generate
     });
 
     vec![GeneratedModuleTokens::new(
-        SCOPES_MODULE_NAME,
+        ModulePath::root(SCOPES_MODULE_NAME),
         quote! { #(#implementations)* },
     )]
 }

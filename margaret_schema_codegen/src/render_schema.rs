@@ -3,13 +3,14 @@ use quote::quote;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 #[must_use]
 pub fn render_schema(table_sets: &[CanonicalPath]) -> GeneratedModuleTokens {
     let table_sets = table_sets.iter().map(path_tokens);
 
     GeneratedModuleTokens::new(
-        "schema",
+        ModulePath::root("schema"),
         quote! {
             pub const SCHEMA: margaret::framework::model::schema::Schema =
                 margaret::framework::model::schema::Schema {
@@ -47,7 +48,7 @@ mod tests {
             ),
         ]);
 
-        assert_eq!(schema.name(), "schema");
+        assert_eq!(schema.path().to_string(), "schema");
         assert_eq!(
             schema.to_source().split_whitespace().collect::<String>(),
             "pubconstSCHEMA:margaret::framework::model::schema::Schema=margaret::framework::model::schema::Schema{table_sets:&[::margaret::framework::grants::margaret::tables::TABLES,crate::margaret::tables::TABLES],};"

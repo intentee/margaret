@@ -9,6 +9,7 @@ use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
@@ -29,6 +30,10 @@ use crate::planned_url::PlannedUrl;
 use crate::reverse_serve_input_weaver::ReverseServeInputWeaver;
 use crate::slotted_serve_input::SlottedServeInput;
 use crate::unify_serve_inputs::unify_serve_inputs;
+
+fn build_module() -> ModulePath {
+    ModulePath::root("container").child("build")
+}
 
 fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream {
     match shape {
@@ -228,7 +233,7 @@ fn arguments_module(
     });
 
     Some(GeneratedModuleTokens::new(
-        format!("container/build/{}", bootstrap_arguments_module(function)),
+        build_module().child(bootstrap_arguments_module(function).to_string()),
         quote! {
             pub struct #arguments_type {
                 #(#fields)*
@@ -392,8 +397,9 @@ pub(crate) fn render_build(
         .as_ref()
         .map(|_| bootstrap_arguments_module(&serve_function))
         .map(|module| quote! { pub mod #module; });
+    let build = build_module();
     let mut modules = vec![GeneratedModuleTokens::new(
-        "container/build",
+        build.clone(),
         quote! {
             #(#builder_module_declarations)*
             #serve_arguments_declaration
@@ -407,13 +413,13 @@ pub(crate) fn render_build(
     for builder in root_builders {
         modules.extend(builder.arguments);
         modules.push(GeneratedModuleTokens::new(
-            format!("container/build/{}", builder.function),
+            build.child(builder.function.to_string()),
             builder.tokens,
         ));
     }
 
     modules.extend(serve_arguments_module);
-    modules.push(GeneratedModuleTokens::new("container/build/serve", serve));
+    modules.push(GeneratedModuleTokens::new(build.child("serve"), serve));
 
     modules
 }

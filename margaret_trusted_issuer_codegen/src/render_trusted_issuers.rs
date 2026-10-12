@@ -5,6 +5,7 @@ use syn::ext::IdentExt;
 
 use margaret_attributes::tag::Tag;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::declared_trusts::DeclaredTrusts;
 use crate::own_trust::OwnTrust;
@@ -13,8 +14,8 @@ use crate::trusted_issuer_group::TrustedIssuerGroup;
 use crate::trusted_issuer_item::TrustedIssuerItem;
 use crate::trusted_issuers_module_name::TRUSTED_ISSUERS_MODULE_NAME;
 
-fn trust_module_name(tag: &Tag) -> String {
-    format!("{TRUSTED_ISSUERS_MODULE_NAME}/{}", tag.ident().unraw())
+fn trust_module_path(tag: &Tag) -> ModulePath {
+    ModulePath::root(TRUSTED_ISSUERS_MODULE_NAME).child(tag.ident().unraw().to_string())
 }
 
 fn trust_module(
@@ -33,7 +34,7 @@ fn trust_module(
         quote! { pub use #framework_path; }
     });
 
-    GeneratedModuleTokens::new(trust_module_name(tag), quote! { #(#modules)* #(#exports)* })
+    GeneratedModuleTokens::new(trust_module_path(tag), quote! { #(#modules)* #(#exports)* })
 }
 
 fn constant_module(
@@ -45,7 +46,7 @@ fn constant_module(
     let name = format_ident!("{}", constant.constant_name());
 
     GeneratedModuleTokens::new(
-        format!("{}/{}", trust_module_name(tag), constant.module_name()),
+        trust_module_path(tag).child(constant.module_name()),
         quote! { pub const #name: #framework_path = #framework_path { #fields }; },
     )
 }
@@ -171,7 +172,7 @@ pub fn render_trusted_issuers(
         quote! { pub mod #module; }
     });
     let mut modules = vec![GeneratedModuleTokens::new(
-        TRUSTED_ISSUERS_MODULE_NAME,
+        ModulePath::root(TRUSTED_ISSUERS_MODULE_NAME),
         quote! { #(#submodules)* },
     )];
 
@@ -208,7 +209,7 @@ mod tests {
 
         render_trusted_issuers(&trusts, own_trusts)
             .into_iter()
-            .find(|module: &GeneratedModuleTokens| module.name() == name)
+            .find(|module: &GeneratedModuleTokens| module.path().to_string() == name)
             .expect("the module is generated")
             .format()
             .expect("the module formats")

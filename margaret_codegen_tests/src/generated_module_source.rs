@@ -8,6 +8,6 @@ pub fn generated_module_source<'code>(
 ) -> Option<&'code str> {
     code.modules()
         .iter()
-        .find(|module| module.name() == name)
+        .find(|module| module.path().to_string() == name)
         .map(GeneratedModule::source)
 }

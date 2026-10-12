@@ -5,6 +5,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;
 use margaret_oauth_vocabulary::grant_type::GrantType;
 use margaret_oauth_vocabulary_codegen::client_authentication_methods::CLIENT_AUTHENTICATION_METHODS;
@@ -44,11 +45,10 @@ fn grant_type_tokens(grant_type: GrantType) -> TokenStream {
     }
 }
 
-fn client_module_name(client: &AcceptedClientDeclaration) -> String {
-    format!(
-        "{ACCEPTED_CLIENTS_MODULE_NAME}/{CLIENTS_MODULE_NAME}/{}",
-        client.anchor.identifier.field()
-    )
+fn client_module_path(client: &AcceptedClientDeclaration) -> ModulePath {
+    ModulePath::root(ACCEPTED_CLIENTS_MODULE_NAME)
+        .child(CLIENTS_MODULE_NAME)
+        .child(client.anchor.identifier.field())
 }
 
 fn constant_module(
@@ -60,7 +60,7 @@ fn constant_module(
     let name = format_ident!("{}", constant.constant_name());
 
     GeneratedModuleTokens::new(
-        format!("{}/{}", client_module_name(client), constant.module_name()),
+        client_module_path(client).child(constant.module_name()),
         quote! { pub const #name: #framework_path = #value; },
     )
 }
@@ -258,7 +258,7 @@ fn client_modules(client: &AcceptedClientDeclaration) -> Vec<GeneratedModuleToke
     });
     let mut modules = vec![
         GeneratedModuleTokens::new(
-            client_module_name(client),
+            client_module_path(client),
             quote! { #(#submodules)* #(#exports)* },
         ),
         accepted_client_module(client),
@@ -420,7 +420,7 @@ fn aggregate_module(
     };
 
     GeneratedModuleTokens::new(
-        format!("{ACCEPTED_CLIENTS_MODULE_NAME}/{}", aggregate.module_name()),
+        ModulePath::root(ACCEPTED_CLIENTS_MODULE_NAME).child(aggregate.module_name()),
         constant,
     )
 }
@@ -445,7 +445,7 @@ pub fn render_accepted_clients(
         quote! { pub mod #module; }
     });
     let mut modules = vec![GeneratedModuleTokens::new(
-        ACCEPTED_CLIENTS_MODULE_NAME,
+        ModulePath::root(ACCEPTED_CLIENTS_MODULE_NAME),
         quote! { #(#aggregate_submodules)* #clients_submodule },
     )];
 
@@ -463,7 +463,7 @@ pub fn render_accepted_clients(
         });
 
         modules.push(GeneratedModuleTokens::new(
-            format!("{ACCEPTED_CLIENTS_MODULE_NAME}/{CLIENTS_MODULE_NAME}"),
+            ModulePath::root(ACCEPTED_CLIENTS_MODULE_NAME).child(CLIENTS_MODULE_NAME),
             quote! { #(#client_submodules)* },
         ));
         modules.extend(accepted.clients.iter().flat_map(client_modules));
@@ -506,7 +506,7 @@ mod tests {
     fn named_source(modules: Vec<GeneratedModuleTokens>, name: &str) -> String {
         modules
             .into_iter()
-            .find(|module| module.name() == name)
+            .find(|module| module.path().to_string() == name)
             .expect("the module is generated")
             .format()
             .expect("the module formats")
@@ -693,7 +693,7 @@ mod tests {
         .expect("the clients are read");
         let source = render_accepted_clients(&accepted, &[ProviderAggregate::ProviderSupport])
             .into_iter()
-            .find(|module| module.name() == "accepted_clients/provider_support")
+            .find(|module| module.path().to_string() == "accepted_clients/provider_support")
             .expect("the provider support is rendered")
             .format()
             .expect("the module formats")

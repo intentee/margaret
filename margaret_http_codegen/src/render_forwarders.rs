@@ -5,6 +5,7 @@ use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 use margaret_route_method::route_method::RouteMethod;
 
@@ -102,21 +103,24 @@ pub(crate) fn render_forwarders(
         }
     });
 
+    let forwarders = ModulePath::root("forwarders");
     let mut modules = vec![GeneratedModuleTokens::new(
-        "forwarders",
+        forwarders.clone(),
         quote! { #(#server_declarations)* },
     )];
 
     for layout in layouts {
+        let server = forwarders.child(layout.field.to_string());
+
         modules.push(GeneratedModuleTokens::new(
-            format!("forwarders/{}", layout.field),
+            server.clone(),
             quote! {
                 mod forwarder;
                 pub use forwarder::Forwarder;
             },
         ));
         modules.push(GeneratedModuleTokens::new(
-            format!("forwarders/{}/forwarder", layout.field),
+            server.child("forwarder"),
             server_forwarder(table, layout),
         ));
     }

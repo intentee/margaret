@@ -14,6 +14,7 @@ use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_origin_source::ServerOriginSource;
 use margaret_http_codegen::server_uploads::ServerUploads;
@@ -572,5 +573,5 @@ pub fn render_services(
         }
     };
 
-    GeneratedModuleTokens::new("serve", tokens)
+    GeneratedModuleTokens::new(ModulePath::root("serve"), tokens)
 }

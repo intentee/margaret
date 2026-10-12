@@ -1,6 +1,7 @@
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::slotted_serve_input::SlottedServeInput;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_http_codegen::http_server::HttpServer;
 
 use crate::console_artifacts::ConsoleArtifacts;
@@ -26,7 +27,7 @@ pub fn render_console(
     );
 
     ConsoleArtifacts {
-        modules: vec![GeneratedModuleTokens::new("run", run)],
+        modules: vec![GeneratedModuleTokens::new(ModulePath::root("run"), run)],
         construction_roots: plan.construction_roots().to_vec(),
     }
 }

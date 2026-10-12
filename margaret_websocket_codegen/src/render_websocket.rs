@@ -3,6 +3,7 @@ use quote::quote;
 
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::render_messages::render_messages;
 use crate::render_server_routes::render_server_routes;
@@ -35,14 +36,14 @@ pub fn render_websocket(plan: WebSocketPlan, bindings: &ContainerBindings) -> We
             .collect::<Vec<_>>();
 
         GeneratedModuleTokens::new(
-            format!("websocket/{server}_routes"),
+            ModulePath::root("websocket").child(format!("{server}_routes")),
             render_server_routes(server, &sessions, bindings),
         )
     });
     let message_implementations = render_messages(&plan.messages);
 
     let mut modules = vec![GeneratedModuleTokens::new(
-        "websocket",
+        ModulePath::root("websocket"),
         quote! {
             #(#module_declarations)*
             #(#route_declarations)*

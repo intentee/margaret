@@ -12,6 +12,7 @@ use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_middleware_codegen::fold_layers::fold_layers;
 use margaret_request_binding_codegen::authenticated_user_application::AuthenticatedUserApplication;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
@@ -637,13 +638,14 @@ pub(crate) fn render(
         #(#server_declarations)*
     };
 
-    let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];
+    let http = ModulePath::root("http");
+    let mut modules = vec![GeneratedModuleTokens::new(http.clone(), http_tokens)];
     for layout in layouts {
         let websocket_session_count = websocket_paths
             .get(layout.server.name())
             .map_or(0, Vec::len);
         modules.push(GeneratedModuleTokens::new(
-            format!("http/{}", layout.server.function_name()),
+            http.child(layout.server.function_name().to_string()),
             server_module(table, layout, has_views, websocket_session_count, bindings),
         ));
     }

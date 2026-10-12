@@ -1,6 +1,7 @@
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::jwks_module_name::JWKS_MODULE_NAME;
 use crate::jwks_server_module::JwksServerModule;
@@ -24,7 +25,10 @@ pub fn render_jwks(server: &JwksServerModule) -> GeneratedModuleTokens {
         }
     });
 
-    GeneratedModuleTokens::new(JWKS_MODULE_NAME, quote! { #roller #handler #secret_store })
+    GeneratedModuleTokens::new(
+        ModulePath::root(JWKS_MODULE_NAME),
+        quote! { #roller #handler #secret_store },
+    )
 }
 
 #[cfg(test)]

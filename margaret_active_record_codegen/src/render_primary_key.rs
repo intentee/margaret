@@ -3,13 +3,13 @@ use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_model_codegen::model::Model;
+use margaret_schema_codegen::model_module_path::model_module_path;
 
 use crate::bound_read::BoundRead;
 use crate::chained_construction::chained_construction;
 use crate::chained_writes::chained_writes;
 use crate::field_identifier::field_identifier;
 use crate::field_type_tokens::field_type_tokens;
-use crate::generated_model_module::generated_model_module;
 use crate::key_field_parameter::key_field_parameter;
 use crate::key_targeting::KeyTargeting;
 use crate::value_identifier::value_identifier;
@@ -92,7 +92,7 @@ pub(crate) fn render_primary_key(
     };
 
     GeneratedModuleTokens::new(
-        generated_model_module(model, "primary_key"),
+        model_module_path(model).child("primary_key"),
         quote! {
             #[derive(Clone, Debug, Eq, PartialEq)]
             pub struct PrimaryKey<#(#parameters),*> {

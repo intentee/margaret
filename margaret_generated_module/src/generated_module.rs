@@ -3,23 +3,25 @@ use std::io::ErrorKind;
 use std::io::Result;
 use std::path::Path;
 
+use crate::module_path::ModulePath;
+
 #[derive(Clone, Debug)]
 pub struct GeneratedModule {
-    name: String,
+    path: ModulePath,
     source: String,
 }
 
 impl GeneratedModule {
-    pub fn new(name: impl Into<String>, source: impl Into<String>) -> Self {
+    pub fn new(path: ModulePath, source: impl Into<String>) -> Self {
         Self {
-            name: name.into(),
+            path,
             source: source.into(),
         }
     }
 
     #[must_use]
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn path(&self) -> &ModulePath {
+        &self.path
     }
 
     #[must_use]
@@ -56,12 +58,13 @@ mod tests {
     use tempfile::tempdir;
 
     use super::GeneratedModule;
+    use crate::module_path::ModulePath;
 
     #[test]
     fn writes_a_module_whose_file_is_absent_so_the_generated_source_exists() {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("container.rs");
-        let wrote = GeneratedModule::new("container", "first")
+        let wrote = GeneratedModule::new(ModulePath::root("container"), "first")
             .write_if_changed(&path)
             .expect("the write succeeds");
 
@@ -76,7 +79,7 @@ mod tests {
     fn skips_writing_matching_content_so_unchanged_files_keep_their_timestamps() {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("container.rs");
-        let generated = GeneratedModule::new("container", "same");
+        let generated = GeneratedModule::new(ModulePath::root("container"), "same");
         generated
             .write_if_changed(&path)
             .expect("the first write succeeds");
@@ -92,11 +95,11 @@ mod tests {
     fn rewrites_a_file_whose_content_differs_so_stale_generated_code_is_replaced() {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("container.rs");
-        GeneratedModule::new("container", "old")
+        GeneratedModule::new(ModulePath::root("container"), "old")
             .write_if_changed(&path)
             .expect("the first write succeeds");
 
-        let wrote = GeneratedModule::new("container", "new")
+        let wrote = GeneratedModule::new(ModulePath::root("container"), "new")
             .write_if_changed(&path)
             .expect("the second write succeeds");
 
@@ -111,8 +114,8 @@ mod tests {
     fn propagates_a_read_failure_other_than_absence_instead_of_overwriting_the_path() {
         let directory = tempdir().expect("a temporary directory");
 
-        let result =
-            GeneratedModule::new("container", "content").write_if_changed(directory.path());
+        let result = GeneratedModule::new(ModulePath::root("container"), "content")
+            .write_if_changed(directory.path());
 
         assert!(result.is_err());
     }
@@ -122,7 +125,8 @@ mod tests {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("missing").join("container.rs");
 
-        let result = GeneratedModule::new("container", "content").write_if_changed(&path);
+        let result =
+            GeneratedModule::new(ModulePath::root("container"), "content").write_if_changed(&path);
 
         assert!(result.is_err());
     }

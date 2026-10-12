@@ -7,11 +7,10 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_model_codegen::field_value::FieldValue;
 use margaret_model_codegen::model::Model;
-use margaret_schema_codegen::models_module_name::MODELS_MODULE_NAME;
+use margaret_schema_codegen::model_module_path::model_module_path;
 use margaret_schema_codegen::table_module_name::TABLE_MODULE_NAME;
 
 use crate::assignable_fields::assignable_fields;
-use crate::generated_model_module::generated_model_module;
 use crate::is_defaulted::is_defaulted;
 use crate::key_targeting::KeyTargeting;
 use crate::render_columns::render_columns;
@@ -70,7 +69,7 @@ pub(crate) fn render_model_module(
     if !enum_columns.is_empty() {
         declarations.push(quote! { mod enum_columns; });
         modules.push(GeneratedModuleTokens::new(
-            generated_model_module(model, "enum_columns"),
+            model_module_path(model).child("enum_columns"),
             quote! { #(#enum_columns)* },
         ));
     }
@@ -88,7 +87,7 @@ pub(crate) fn render_model_module(
     modules.push(render_record(model, key_targeting));
     modules.extend(render_query(model));
     modules.push(GeneratedModuleTokens::new(
-        format!("{MODELS_MODULE_NAME}/{}", model.module),
+        model_module_path(model),
         quote! { #(#declarations)* },
     ));
 

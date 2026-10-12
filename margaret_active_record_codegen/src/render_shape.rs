@@ -5,6 +5,7 @@ use quote::quote;
 
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::bound_read::BoundRead;
 use crate::chained_construction::chained_construction;
@@ -118,11 +119,11 @@ pub(crate) fn render_shape(shape: &ShapeDeclaration) -> [GeneratedModuleTokens; 
         quote! { #base_width #key_width },
     );
     let read = shape_read(&base, read_base, reads);
-    let shape_module = format!("{SHAPES_MODULE_NAME}/{}", shape.module);
+    let shape_module = ModulePath::root(SHAPES_MODULE_NAME).child(shape.module.as_str());
 
     [
         GeneratedModuleTokens::new(
-            format!("{shape_module}/preloaded"),
+            shape_module.child("preloaded"),
             quote! {
                 pub struct Preloaded {
                     #(#preloaded_fields),*

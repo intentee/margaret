@@ -9,6 +9,7 @@ use quote::quote;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_route_method::route_method::RouteMethod;
 use margaret_route_parameter_codegen::route_url_template::RouteUrlTemplate;
 use margaret_route_parameter_codegen::url_segment::UrlSegment;
@@ -278,14 +279,16 @@ pub(crate) fn render_routes(
         #(#server_declarations)*
     };
 
+    let routes = ModulePath::root("routes");
+    let servers = routes.child("servers");
     let mut modules = vec![
-        GeneratedModuleTokens::new("routes", routes_tokens),
-        GeneratedModuleTokens::new("routes/servers", servers_tokens),
+        GeneratedModuleTokens::new(routes, routes_tokens),
+        GeneratedModuleTokens::new(servers.clone(), servers_tokens),
     ];
 
     for layout in layouts {
         modules.push(GeneratedModuleTokens::new(
-            format!("routes/servers/{}", layout.field),
+            servers.child(layout.field.to_string()),
             server_struct(table, layout, websocket_paths),
         ));
     }

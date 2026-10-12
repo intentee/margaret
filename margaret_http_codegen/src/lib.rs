@@ -206,7 +206,9 @@ mod tests {
         )?
         .into_modules()
         .into_iter()
-        .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
+        .filter(|module| {
+            module.path().to_string() == "http" || module.path().to_string().starts_with("http/")
+        })
         .map(|module| {
             module
                 .format()
@@ -290,7 +292,9 @@ impl Tracer {
         )
         .into_modules()
         .into_iter()
-        .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
+        .filter(|module| {
+            module.path().to_string() == "http" || module.path().to_string().starts_with("http/")
+        })
         .map(|module| {
             module
                 .format()
@@ -424,7 +428,7 @@ impl PostNote {
         .expect("the routes render")
         .into_modules()
         .into_iter()
-        .filter(|module| module.name().starts_with("http/"))
+        .filter(|module| module.path().to_string().starts_with("http/"))
         .map(|module| module.to_source())
         .collect::<String>()
         .split_whitespace()
@@ -978,7 +982,7 @@ impl Health {
         .expect("the http source is generated")
         .into_modules()
         .into_iter()
-        .filter(|module| module.name().starts_with("http/"))
+        .filter(|module| module.path().to_string().starts_with("http/"))
         .map(|module| {
             module
                 .format()
@@ -1147,7 +1151,10 @@ impl GetWorkload {
         .expect("the http source is generated")
         .into_modules()
         .into_iter()
-        .filter(|module| module.name() == "routes" || module.name().starts_with("routes/"))
+        .filter(|module| {
+            module.path().to_string() == "routes"
+                || module.path().to_string().starts_with("routes/")
+        })
         .map(|module| {
             module
                 .format()

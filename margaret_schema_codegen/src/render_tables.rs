@@ -2,6 +2,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_model_codegen::model::Model;
 
 use crate::models_module_name::MODELS_MODULE_NAME;
@@ -18,7 +19,7 @@ pub fn render_tables(models: &[Model]) -> GeneratedModuleTokens {
     });
 
     GeneratedModuleTokens::new(
-        "tables",
+        ModulePath::root("tables"),
         quote! {
             pub const TABLES: &[&margaret::framework::model::table::Table] = &[#(#tables),*];
         },
@@ -42,7 +43,7 @@ mod tests {
             &models(&indexed.index, TableNamespace::Application).expect("the models resolve"),
         );
 
-        assert_eq!(tables.name(), "tables");
+        assert_eq!(tables.path().to_string(), "tables");
         assert_eq!(
             tables.to_source().split_whitespace().collect::<String>(),
             "pubconstTABLES:&[&margaret::framework::model::table::Table]=&[&crate::margaret::models::author::table::TABLE,&crate::margaret::models::article::table::TABLE];"

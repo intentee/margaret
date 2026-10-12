@@ -901,13 +901,15 @@ struct Room;
     fn module<'code>(code: &'code GeneratedCode, name: &str) -> &'code str {
         code.modules()
             .iter()
-            .find(|module| module.name() == name)
+            .find(|module| module.path().to_string() == name)
             .expect("the requested module is generated")
             .source()
     }
 
     fn has_module(code: &GeneratedCode, name: &str) -> bool {
-        code.modules().iter().any(|module| module.name() == name)
+        code.modules()
+            .iter()
+            .any(|module| module.path().to_string() == name)
     }
 
     fn concatenated(code: &GeneratedCode) -> String {

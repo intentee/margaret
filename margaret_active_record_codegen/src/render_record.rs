@@ -5,6 +5,7 @@ use quote::quote;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_model_codegen::model::Model;
+use margaret_schema_codegen::model_module_path::model_module_path;
 use margaret_schema_codegen::table_module_name::TABLE_MODULE_NAME;
 
 use crate::bound_read::BoundRead;
@@ -12,7 +13,6 @@ use crate::chained_construction::chained_construction;
 use crate::chained_writes::chained_writes;
 use crate::field_identifier::field_identifier;
 use crate::field_span_tokens::field_span_tokens;
-use crate::generated_model_module::generated_model_module;
 use crate::generated_model_path::generated_model_path;
 use crate::key_targeting::KeyTargeting;
 use crate::primary_key_type_tokens::primary_key_type_tokens;
@@ -89,7 +89,7 @@ pub(crate) fn render_record(model: &Model, key_targeting: KeyTargeting) -> Gener
     };
 
     GeneratedModuleTokens::new(
-        generated_model_module(model, "record"),
+        model_module_path(model).child("record"),
         quote! {
             impl margaret::framework::active_record::record::Record for #record {
                 type PrimaryKey = #primary_key_type;

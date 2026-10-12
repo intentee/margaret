@@ -9,7 +9,6 @@ pub mod collect_shapes;
 mod field_identifier;
 mod field_span_tokens;
 mod field_type_tokens;
-mod generated_model_module;
 mod generated_model_path;
 mod is_defaulted;
 mod key_block_tokens;

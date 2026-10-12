@@ -1,6 +1,7 @@
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::token_issuance_declaration::TokenIssuanceDeclaration;
 use crate::token_issuance_module_name::TOKEN_ISSUANCE_MODULE_NAME;
@@ -12,7 +13,7 @@ pub fn render_token_issuance(
     let issuer = issuer.as_str();
 
     GeneratedModuleTokens::new(
-        TOKEN_ISSUANCE_MODULE_NAME,
+        ModulePath::root(TOKEN_ISSUANCE_MODULE_NAME),
         quote! {
             pub const TOKEN_ISSUANCE: margaret::framework::token_issuance::token_issuance::TokenIssuance =
                 margaret::framework::token_issuance::token_issuance::TokenIssuance {
@@ -41,7 +42,7 @@ mod tests {
             &declared,
             DeclaredTokenIssuance::Declared(issuance)
                 if render_token_issuance(issuance).format().is_ok_and(|module| {
-                    module.name() == "token_issuance"
+                    module.path().to_string() == "token_issuance"
                         && module.source()
                             == "pub const TOKEN_ISSUANCE: margaret::framework::token_issuance::token_issuance::TokenIssuance = margaret::framework::token_issuance::token_issuance::TokenIssuance {\n    issuer: \"https://issuer.example\",\n};\n"
                 })

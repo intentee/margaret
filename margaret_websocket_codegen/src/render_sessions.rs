@@ -9,6 +9,7 @@ use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
 use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
@@ -475,18 +476,19 @@ pub(crate) fn render_sessions(
     sessions
         .iter()
         .flat_map(|plan| {
-            let module_name = &plan.session.module_name;
+            let session_module =
+                ModulePath::root("websocket").child(plan.session.module_name.as_str());
 
             [
                 GeneratedModuleTokens::new(
-                    format!("websocket/{module_name}"),
+                    session_module.clone(),
                     quote! {
                         mod upgrade_entry;
                         pub use upgrade_entry::upgrade_entry;
                     },
                 ),
                 GeneratedModuleTokens::new(
-                    format!("websocket/{module_name}/upgrade_entry"),
+                    session_module.child("upgrade_entry"),
                     render_session(plan, bindings),
                 ),
             ]

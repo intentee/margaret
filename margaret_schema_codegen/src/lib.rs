@@ -1,5 +1,6 @@
 mod column_check_tokens;
 mod column_type_tokens;
+pub mod model_module_path;
 pub mod models_module_name;
 pub mod render_schema;
 pub mod render_table;

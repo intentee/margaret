@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::construction_flow::construction_flow;
 use crate::container_bindings::ContainerBindings;
@@ -79,7 +80,7 @@ impl PlannedContainer {
             Vec::new()
         } else {
             let mut modules = vec![GeneratedModuleTokens::new(
-                "container",
+                ModulePath::root("container"),
                 render(&served_roots),
             )];
 

@@ -1,6 +1,7 @@
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::consumed_sessions_declaration::ConsumedSessionsDeclaration;
 use crate::declared_sessions::DeclaredSessions;
@@ -25,7 +26,7 @@ pub fn render_sessions(
             let consumed = SessionsItem::ConsumedSessions.framework_path();
 
             vec![GeneratedModuleTokens::new(
-                SESSIONS_MODULE_NAME,
+                ModulePath::root(SESSIONS_MODULE_NAME),
                 quote! {
                     pub use #consumed;
                     #(#endpoints)*
@@ -38,7 +39,7 @@ pub fn render_sessions(
 
             vec![
                 GeneratedModuleTokens::new(
-                    SESSIONS_MODULE_NAME,
+                    ModulePath::root(SESSIONS_MODULE_NAME),
                     quote! {
                         pub mod session_audience;
                         pub use #issued;
@@ -46,7 +47,7 @@ pub fn render_sessions(
                     },
                 ),
                 GeneratedModuleTokens::new(
-                    format!("{SESSIONS_MODULE_NAME}/session_audience"),
+                    ModulePath::root(SESSIONS_MODULE_NAME).child("session_audience"),
                     quote! { pub const SESSION_AUDIENCE: &str = #audience; },
                 ),
             ]
@@ -81,7 +82,7 @@ mod tests {
         .map(|module| {
             format!(
                 "{}:{}",
-                module.name(),
+                module.path(),
                 module.to_source().split_whitespace().collect::<String>()
             )
         })

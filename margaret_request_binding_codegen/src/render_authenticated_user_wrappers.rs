@@ -8,6 +8,7 @@ use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_tag_codegen::session_source::SessionSource;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
@@ -366,8 +367,9 @@ pub fn render_authenticated_user_wrappers(
 
         quote! { pub use #module::#wrapper; }
     });
+    let authenticated_users = ModulePath::root("authenticated_users");
     let mut generated = vec![GeneratedModuleTokens::new(
-        "authenticated_users",
+        authenticated_users.clone(),
         quote! {
             #(mod #modules;)*
             #(#exports)*
@@ -379,7 +381,7 @@ pub fn render_authenticated_user_wrappers(
         let module = wrapper.to_string().to_snake_case();
 
         GeneratedModuleTokens::new(
-            format!("authenticated_users/{module}"),
+            authenticated_users.child(module),
             provider_wrapper(provider),
         )
     }));

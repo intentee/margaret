@@ -1,4 +1,5 @@
 use margaret_generated_module::generated_module::GeneratedModule;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
@@ -96,7 +97,7 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
 
     source.push_str("#[rustfmt::skip]\npub use ::margaret::framework;\n");
 
-    GeneratedModule::new("mod", source)
+    GeneratedModule::new(ModulePath::root("mod"), source)
 }
 
 #[cfg(test)]

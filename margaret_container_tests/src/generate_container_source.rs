@@ -6,6 +6,7 @@ use margaret_container::container_error::ContainerError;
 use margaret_container::render_container::render_container;
 use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_generated_module::generated_module::GeneratedModule;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_serve_input_codegen::scan::scan;
 use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -33,5 +34,5 @@ pub fn generate_container_source(
         .modules,
     );
 
-    Ok(GeneratedModule::new("container", source))
+    Ok(GeneratedModule::new(ModulePath::root("container"), source))
 }

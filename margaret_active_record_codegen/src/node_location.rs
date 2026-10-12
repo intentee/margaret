@@ -4,11 +4,12 @@ use quote::format_ident;
 use quote::quote;
 use syn::ext::IdentExt as _;
 
+use margaret_generated_module::module_path::ModulePath;
 use margaret_model_codegen::model::Model;
 use margaret_model_codegen::model_field::ModelField;
+use margaret_schema_codegen::model_module_path::model_module_path;
 
 use crate::field_identifier::field_identifier;
-use crate::generated_model_module::generated_model_module;
 use crate::generated_model_path::generated_model_path;
 
 pub(crate) struct NodeLocation {
@@ -30,16 +31,12 @@ impl NodeLocation {
         self.nested(format_ident!("edge"))
     }
 
-    pub(crate) fn module(&self, model: &Model) -> String {
-        generated_model_module(
-            model,
-            &self
-                .segments
-                .iter()
-                .map(|segment| segment.unraw().to_string())
-                .collect::<Vec<String>>()
-                .join("/"),
-        )
+    pub(crate) fn module(&self, model: &Model) -> ModulePath {
+        self.segments
+            .iter()
+            .fold(model_module_path(model), |module, segment| {
+                module.child(segment.unraw().to_string())
+            })
     }
 
     pub(crate) fn path(&self, model: &Model) -> TokenStream {

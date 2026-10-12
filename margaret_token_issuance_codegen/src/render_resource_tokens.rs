@@ -4,6 +4,7 @@ use quote::quote;
 use syn::ext::IdentExt as _;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::declared_resource_issuances::DeclaredResourceIssuances;
 use crate::resource_audience_module_name::RESOURCE_AUDIENCE_MODULE_NAME;
@@ -14,12 +15,13 @@ fn resource_modules(
     ResourceIssuanceDeclaration { audience, tag, .. }: &ResourceIssuanceDeclaration,
 ) -> [GeneratedModuleTokens; 2] {
     let audience = audience.as_str();
-    let resource_module = format!("{RESOURCE_TOKENS_MODULE_NAME}/{}", tag.ident().unraw());
+    let resource_module =
+        ModulePath::root(RESOURCE_TOKENS_MODULE_NAME).child(tag.ident().unraw().to_string());
     let audience_module = format_ident!("{RESOURCE_AUDIENCE_MODULE_NAME}");
 
     [
         GeneratedModuleTokens::new(
-            format!("{resource_module}/{RESOURCE_AUDIENCE_MODULE_NAME}"),
+            resource_module.child(RESOURCE_AUDIENCE_MODULE_NAME),
             quote! { pub const AUDIENCE: &str = #audience; },
         ),
         GeneratedModuleTokens::new(resource_module, quote! { pub mod #audience_module; }),
@@ -39,7 +41,7 @@ pub fn render_resource_tokens(resources: &DeclaredResourceIssuances) -> Vec<Gene
     });
 
     [GeneratedModuleTokens::new(
-        RESOURCE_TOKENS_MODULE_NAME,
+        ModulePath::root(RESOURCE_TOKENS_MODULE_NAME),
         quote! { #(#submodules)* },
     )]
     .into_iter()
@@ -73,7 +75,7 @@ mod tests {
             .map(|module| {
                 let formatted = module.format().expect("the module formats");
 
-                format!("{}: {}", formatted.name(), formatted.source())
+                format!("{}: {}", formatted.path(), formatted.source())
             })
             .collect()
     }

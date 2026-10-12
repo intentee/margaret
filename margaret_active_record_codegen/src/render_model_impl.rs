@@ -4,8 +4,8 @@ use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_model_codegen::model::Model;
 use margaret_model_codegen::model_field::ModelField;
+use margaret_schema_codegen::model_module_path::model_module_path;
 
-use crate::generated_model_module::generated_model_module;
 use crate::generated_model_path::generated_model_path;
 use crate::is_defaulted::is_defaulted;
 use crate::node_location::NodeLocation;
@@ -37,7 +37,7 @@ pub(crate) fn render_model_impl(
     };
 
     GeneratedModuleTokens::new(
-        generated_model_module(model, "model"),
+        model_module_path(model).child("model"),
         quote! {
             impl margaret::framework::active_record::model::Model for #record {
                 type Conditions = #generated::conditions::Conditions;

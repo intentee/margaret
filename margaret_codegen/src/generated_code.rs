@@ -77,13 +77,16 @@ impl GeneratedCode {
         let mut written = BTreeSet::new();
 
         for module in &self.modules {
-            let path = directory.join(format!("{}.rs", module.name()));
-            let parent = path.parent().unwrap_or(directory);
+            let module_directory = module.path().directory_in(directory);
 
-            fs::create_dir_all(parent).map_err(|source| CodegenError::CreateDirectory {
-                path: parent.to_path_buf(),
-                source,
+            fs::create_dir_all(&module_directory).map_err(|source| {
+                CodegenError::CreateDirectory {
+                    path: module_directory.clone(),
+                    source,
+                }
             })?;
+
+            let path = module_directory.join(module.path().file_name());
 
             module
                 .write_if_changed(&path)
@@ -109,6 +112,7 @@ mod tests {
     use tempfile::tempdir;
 
     use margaret_generated_module::generated_module::GeneratedModule;
+    use margaret_generated_module::module_path::ModulePath;
 
     use super::GeneratedCode;
     use super::remove_stale_sources;
@@ -118,8 +122,8 @@ mod tests {
     fn writes_nested_modules_into_subdirectories_where_rust_looks_for_their_files() {
         let directory = tempdir().expect("a temporary directory");
         let code = GeneratedCode::new(vec![
-            GeneratedModule::new("container", "container"),
-            GeneratedModule::new("container/build", "build"),
+            GeneratedModule::new(ModulePath::root("container"), "container"),
+            GeneratedModule::new(ModulePath::root("container").child("build"), "build"),
         ]);
 
         code.write_to(directory.path())
@@ -141,7 +145,7 @@ mod tests {
         fs::write(directory.path().join("notes.md"), "notes").expect("the foreign file exists");
         fs::write(nested.join("server_public.rs"), "stale").expect("the nested source exists");
 
-        GeneratedCode::new(vec![GeneratedModule::new("kept", "kept")])
+        GeneratedCode::new(vec![GeneratedModule::new(ModulePath::root("kept"), "kept")])
             .write_to(directory.path())
             .expect("the fresh source is written");
 
@@ -161,7 +165,7 @@ mod tests {
         fs::write(emptied.join("trusted_issuer.rs"), "stale").expect("the stale source exists");
         fs::write(occupied.join("notes.md"), "notes").expect("the foreign file exists");
 
-        GeneratedCode::new(vec![GeneratedModule::new("kept", "kept")])
+        GeneratedCode::new(vec![GeneratedModule::new(ModulePath::root("kept"), "kept")])
             .write_to(directory.path())
             .expect("the fresh source is written");
 
@@ -195,9 +199,12 @@ mod tests {
         let blocker = directory.path().join("blocker");
         fs::write(&blocker, "not a directory").expect("the blocking file exists");
 
-        let error = GeneratedCode::new(vec![GeneratedModule::new("mod", "content")])
-            .write_to(&blocker)
-            .expect_err("writing beneath a file fails");
+        let error = GeneratedCode::new(vec![GeneratedModule::new(
+            ModulePath::root("mod"),
+            "content",
+        )])
+        .write_to(&blocker)
+        .expect_err("writing beneath a file fails");
 
         assert!(
             error
@@ -212,9 +219,12 @@ mod tests {
         fs::create_dir(directory.path().join("container.rs"))
             .expect("the blocking directory exists");
 
-        let error = GeneratedCode::new(vec![GeneratedModule::new("container", "content")])
-            .write_to(directory.path())
-            .expect_err("writing over a directory fails");
+        let error = GeneratedCode::new(vec![GeneratedModule::new(
+            ModulePath::root("container"),
+            "content",
+        )])
+        .write_to(directory.path())
+        .expect_err("writing over a directory fails");
 
         assert!(
             error

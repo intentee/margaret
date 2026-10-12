@@ -3,10 +3,10 @@ use quote::quote;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_model_codegen::model::Model;
+use margaret_schema_codegen::model_module_path::model_module_path;
 
 use crate::field_identifier::field_identifier;
 use crate::field_type_tokens::field_type_tokens;
-use crate::generated_model_module::generated_model_module;
 
 pub(crate) fn render_conditions(model: &Model) -> GeneratedModuleTokens {
     let record = path_tokens(&model.path);
@@ -31,7 +31,7 @@ pub(crate) fn render_conditions(model: &Model) -> GeneratedModuleTokens {
     });
 
     GeneratedModuleTokens::new(
-        generated_model_module(model, "conditions"),
+        model_module_path(model).child("conditions"),
         quote! {
             pub struct Conditions {
                 #(#declarations),*
