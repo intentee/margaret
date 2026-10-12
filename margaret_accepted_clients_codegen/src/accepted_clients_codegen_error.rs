@@ -20,6 +20,11 @@ pub enum AcceptedClientsCodegenError {
     #[error(transparent)]
     AttributeArguments(#[from] AttributeArgumentsError),
 
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' grants client_credentials, but declares `resources = []`, so no client credentials token could reach an audience"
+    )]
+    ClientCredentialsWithoutResources { anchor: String },
+
     #[error("the client '{client_id}' is accepted by both '{first}' and '{second}'")]
     DuplicateClientId {
         client_id: String,
@@ -39,11 +44,13 @@ pub enum AcceptedClientsCodegenError {
     #[error("#[admits_oauth_client] on '{anchor}' declares an empty list of redirect_uris")]
     EmptyRedirectUris { anchor: String },
 
-    #[error("#[admits_oauth_client] on '{anchor}' declares an empty list of resources")]
-    EmptyResources { anchor: String },
-
     #[error(transparent)]
     Index(#[from] AttributeError),
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' permits introspection, but declares `resources = []`, so no token could be addressed to the client"
+    )]
+    IntrospectionWithoutResources { anchor: String },
 
     #[error(
         "#[admits_oauth_client] on '{anchor}' redirects to '{redirect_uri}', which is neither https nor http to a loopback ip address"
@@ -134,6 +141,16 @@ pub enum AcceptedClientsCodegenError {
     #[error("#[admits_oauth_client] on '{anchor}' does not declare its resources")]
     MissingResources { anchor: String },
 
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' declares `resources = []` without an authorization_code grant, so the client could obtain no token"
+    )]
+    ResourcelessClientWithoutCodeGrant { anchor: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' declares `resources = []`, but its authorization_code scopes omit margaret::framework::oauth_vocabulary::openid_scope::OpenidScope, so its access tokens could reach no audience"
+    )]
+    ResourcelessCodeGrantWithoutOpenidScope { anchor: String },
+
     #[error("#[admits_oauth_client] on '{anchor}' redirects to '{written}', which names no item")]
     UnknownRedirectRoute { anchor: String, written: String },
 
@@ -201,6 +218,11 @@ pub enum AcceptedClientsCodegenError {
         "#[admits_oauth_client] on '{anchor}' grants token_exchange without declaring the scopes an exchange can grant"
     )]
     MissingTokenExchangeScopes { anchor: String },
+
+    #[error(
+        "#[admits_oauth_client] on '{anchor}' grants token_exchange, but declares `resources = []`, so no exchanged token could reach an audience"
+    )]
+    TokenExchangeWithoutResources { anchor: String },
 
     #[error(
         "#[admits_oauth_client] on '{anchor}' authenticates with '{written}', which is not a variant of margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod"

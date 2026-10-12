@@ -7,6 +7,7 @@ pub mod accepted_clients_codegen_error;
 pub mod accepted_clients_module_name;
 pub mod admitted_resource;
 mod client_key_sources;
+pub mod client_resources;
 mod client_signing_algorithms;
 mod clients_module_name;
 mod consent_policies;

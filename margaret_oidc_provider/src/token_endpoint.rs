@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -40,8 +41,6 @@ use margaret_http_validation::responded_to_form::responded_to_form;
 use margaret_identity_session::id_token_claims::IdTokenClaims;
 use margaret_identity_session::issued_access_token_claims::IssuedAccessTokenClaims;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
-use margaret_oauth_vocabulary::declared_scope::DeclaredScope;
-use margaret_oauth_vocabulary::openid_scope::OpenidScope;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_oauth_vocabulary::subject_token_type_parsing::SubjectTokenTypeParsing;
@@ -63,8 +62,11 @@ use crate::provider_error::ProviderError;
 use crate::provider_token_fields::ProviderTokenFields;
 use crate::refresh_token_issue::RefreshTokenIssue;
 use crate::requested_scope::RequestedScope;
+use crate::requested_target::requested_target;
+use crate::resource_target::ResourceTarget;
 use crate::target_resource::target_resource;
 use crate::temporarily_unavailable::temporarily_unavailable;
+use crate::token_audience::token_audience;
 use crate::token_grant::TokenGrant;
 use crate::token_issue::TokenIssue;
 use crate::token_request::TokenRequest;
@@ -129,24 +131,20 @@ async fn revoked_family(database: &Database, family: Uuid) -> Result<Response, P
 
 fn redeemed_issue(
     policy: &CodeGrantPolicy,
-    AuthorizationGrant {
-        scopes, subject, ..
-    }: &AuthorizationGrant,
-    resource: &'static str,
+    AuthorizationGrant { subject, .. }: &AuthorizationGrant,
+    audience: AudienceClaim,
+    scopes: BTreeSet<String>,
     id_token: Option<String>,
 ) -> TokenIssue {
     TokenIssue {
+        audience,
         id_token,
         issued_token_type: None,
         refresh: match policy.refresh {
             RefreshTokenGrant::Granted => RefreshTokenIssue::Issued(random_token()),
             RefreshTokenGrant::Withheld => RefreshTokenIssue::Withheld,
         },
-        resource,
-        scopes: scopes
-            .iter()
-            .map(|scope| scope.as_str().to_string())
-            .collect(),
+        scopes,
         subject: subject.to_string(),
     }
 }
@@ -207,9 +205,9 @@ impl TokenEndpoint {
         let Ok(redirect_uri) = Url::parse(redirect_uri) else {
             return Ok(invalid_grant("the redirect uri is not a url"));
         };
-        let resource = match target_resource(client.resources, resource) {
+        let target = match target_resource(client.resources, resource) {
             ControlFlow::Break(refusal) => return Ok(refusal),
-            ControlFlow::Continue(resource) => resource,
+            ControlFlow::Continue(target) => target,
         };
         let admission = CodeAdmission {
             client_id: client.client_id,
@@ -222,7 +220,7 @@ impl TokenEndpoint {
             TokenDigest::of(code),
             Uuid::new_v4(),
             NumericDate::from(now),
-            |grant| self.redemption_decision(client, policy, &admission, &grant, resource, now),
+            |grant| self.redemption_decision(client, policy, &admission, &grant, target, now),
         )
         .await
         .map_err(ProviderError::AuthorizationGrants)?
@@ -244,7 +242,8 @@ impl TokenEndpoint {
     fn client_credentials(
         &self,
         registered: &RegisteredClient,
-        resource: Option<&str>,
+        audience: Option<String>,
+        resource: Option<String>,
         scope: Option<&str>,
         now: DateTime<Utc>,
     ) -> Response {
@@ -268,18 +267,26 @@ impl TokenEndpoint {
             ControlFlow::Break(refusal) => return refusal,
             ControlFlow::Continue(scopes) => scopes,
         };
-        let resource = match target_resource(client.resources, resource) {
+        let requested = match requested_target(audience, resource) {
             ControlFlow::Break(refusal) => return refusal,
-            ControlFlow::Continue(resource) => resource,
+            ControlFlow::Continue(requested) => requested,
+        };
+        let target = match target_resource(client.resources, requested.as_deref()) {
+            ControlFlow::Break(refusal) => return refusal,
+            ControlFlow::Continue(target) => target,
+        };
+        let audience = match token_audience(self.issuance, target, &scopes) {
+            ControlFlow::Break(refusal) => return refusal,
+            ControlFlow::Continue(audience) => audience,
         };
 
         self.prepared_tokens(
             client,
             TokenIssue {
+                audience,
                 id_token: None,
                 issued_token_type: None,
                 refresh: RefreshTokenIssue::Withheld,
-                resource,
                 scopes,
                 subject: client.client_id.to_string(),
             },
@@ -322,20 +329,15 @@ impl TokenEndpoint {
         &self,
         client: &AcceptedClient,
         TokenIssue {
+            audience,
             id_token,
             issued_token_type,
             refresh,
-            resource,
             scopes,
             subject,
         }: TokenIssue,
         now: DateTime<Utc>,
     ) -> PreparedTokens {
-        let audience = if scopes.contains(OpenidScope::NAME) {
-            AudienceClaim::Multiple(vec![resource.to_string(), self.issuance.issuer.to_string()])
-        } else {
-            AudienceClaim::Single(resource.to_string())
-        };
         let claims = IssuedAccessTokenClaims {
             client_id: client.client_id,
             scopes,
@@ -359,17 +361,26 @@ impl TokenEndpoint {
         policy: &CodeGrantPolicy,
         admission: &CodeAdmission<'_>,
         grant: &AuthorizationGrant,
-        resource: &'static str,
+        target: ResourceTarget,
         now: DateTime<Utc>,
     ) -> RedemptionDecision<Result<Response, ProviderError>> {
         if let ControlFlow::Break(refusal) = admission.admission(grant) {
             return RedemptionDecision::Consume(Ok(invalid_grant(refusal.description())));
         }
 
+        let scopes: BTreeSet<String> = grant
+            .scopes
+            .iter()
+            .map(|scope| scope.as_str().to_string())
+            .collect();
+        let audience = match token_audience(self.issuance, target, &scopes) {
+            ControlFlow::Break(refusal) => return RedemptionDecision::Consume(Ok(refusal)),
+            ControlFlow::Continue(audience) => audience,
+        };
         let prepared = self.id_token(client, policy, grant, now).map(|id_token| {
             self.prepared_tokens(
                 client,
-                redeemed_issue(policy, grant, resource, id_token),
+                redeemed_issue(policy, grant, audience, scopes, id_token),
                 now,
             )
         });
@@ -422,9 +433,9 @@ impl TokenEndpoint {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(requested) => requested,
         };
-        let resource = match target_resource(client.resources, resource) {
+        let target = match target_resource(client.resources, resource) {
             ControlFlow::Break(refusal) => return Ok(refusal),
-            ControlFlow::Continue(resource) => resource,
+            ControlFlow::Continue(target) => target,
         };
         let instant = NumericDate::from(now);
         let presented = TokenDigest::of(refresh_token);
@@ -456,15 +467,19 @@ impl TokenEndpoint {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(scopes) => scopes,
         };
+        let audience = match token_audience(self.issuance, target, &scopes) {
+            ControlFlow::Break(refusal) => return Ok(refusal),
+            ControlFlow::Continue(audience) => audience,
+        };
         let next = random_token();
         let next_digest = TokenDigest::of(&next);
         let prepared = self.prepared_tokens(
             client,
             TokenIssue {
+                audience,
                 id_token: None,
                 issued_token_type: None,
                 refresh: RefreshTokenIssue::Issued(next),
-                resource,
                 scopes,
                 subject: subject.to_string(),
             },
@@ -534,9 +549,11 @@ impl TokenEndpoint {
                 )
                 .await
             }
-            TokenGrant::ClientCredentials { resource, scope } => {
-                Ok(self.client_credentials(registered, resource.as_deref(), scope.as_deref(), now))
-            }
+            TokenGrant::ClientCredentials {
+                audience,
+                resource,
+                scope,
+            } => Ok(self.client_credentials(registered, audience, resource, scope.as_deref(), now)),
             TokenGrant::RefreshToken {
                 refresh_token,
                 resource,
@@ -624,18 +641,21 @@ impl TokenEndpoint {
                 SubjectTokenType::parse(&requested)
                     != SubjectTokenTypeParsing::Accepted(SubjectTokenType::AccessToken)
             })
-            || (audience.is_some() && resource.is_some())
         {
             return Ok(oauth_error(
                 400,
                 BasicErrorResponseType::InvalidRequest,
-                "the token exchange asks for delegation, another token type or two targets",
+                "the token exchange asks for delegation or another token type",
             ));
         }
 
-        let resource = match target_resource(client.resources, audience.or(resource).as_deref()) {
+        let requested = match requested_target(audience, resource) {
             ControlFlow::Break(refusal) => return Ok(refusal),
-            ControlFlow::Continue(resource) => resource,
+            ControlFlow::Continue(requested) => requested,
+        };
+        let target = match target_resource(client.resources, requested.as_deref()) {
+            ControlFlow::Break(refusal) => return Ok(refusal),
+            ControlFlow::Continue(target) => target,
         };
 
         Ok(
@@ -661,20 +681,25 @@ impl TokenEndpoint {
                         &scopes.iter().map(Scope::as_str).collect(),
                     ) {
                         ControlFlow::Break(refusal) => refusal,
-                        ControlFlow::Continue(scopes) => self
-                            .prepared_tokens(
-                                client,
-                                TokenIssue {
-                                    id_token: None,
-                                    issued_token_type: Some(SubjectTokenType::AccessToken),
-                                    refresh: RefreshTokenIssue::Withheld,
-                                    resource,
-                                    scopes,
-                                    subject: subject.to_string(),
-                                },
-                                now,
-                            )
-                            .response(),
+                        ControlFlow::Continue(scopes) => {
+                            match token_audience(self.issuance, target, &scopes) {
+                                ControlFlow::Break(refusal) => refusal,
+                                ControlFlow::Continue(audience) => self
+                                    .prepared_tokens(
+                                        client,
+                                        TokenIssue {
+                                            audience,
+                                            id_token: None,
+                                            issued_token_type: Some(SubjectTokenType::AccessToken),
+                                            refresh: RefreshTokenIssue::Withheld,
+                                            scopes,
+                                            subject: subject.to_string(),
+                                        },
+                                        now,
+                                    )
+                                    .response(),
+                            }
+                        }
                     }
                 }
                 ExchangedSubject::Refused(refusal) => refused_subject_token(&refusal),

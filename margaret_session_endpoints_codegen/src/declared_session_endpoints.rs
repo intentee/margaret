@@ -7,12 +7,14 @@ use margaret_declaration_anchor::declaration_anchor::declaration_anchor;
 use margaret_http_codegen::declared_routes::DeclaredRoutes;
 use margaret_route_method::route_method::RouteMethod;
 use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
+use margaret_sessions_codegen::sign_out_endpoint_module::SignOutEndpointModule;
 
-use crate::declared_session_endpoint_route::DeclaredSessionEndpointRoute;
 use crate::served_session_endpoint::ServedSessionEndpoint;
 use crate::session_endpoint_variant::SessionEndpointVariant;
 use crate::session_endpoints::SESSION_ENDPOINTS;
 use crate::session_endpoints_codegen_error::SessionEndpointsCodegenError;
+use crate::session_refresh_route::SessionRefreshRoute;
+use crate::session_sign_out_route::SessionSignOutRoute;
 
 fn served_endpoint(
     index: &AttributeIndex,
@@ -46,7 +48,8 @@ fn served_endpoint(
 }
 
 pub struct DeclaredSessionEndpoints {
-    pub routes: Vec<DeclaredSessionEndpointRoute>,
+    pub refresh: SessionRefreshRoute,
+    pub sign_outs: Vec<SessionSignOutRoute>,
 }
 
 impl DeclaredSessionEndpoints {
@@ -54,19 +57,20 @@ impl DeclaredSessionEndpoints {
     ///
     /// Returns `SessionEndpointsCodegenError` when a `#[serves_session_endpoint]` declaration is not a
     /// plain routed struct, names no variant of the framework `SessionEndpoint`, answers another
-    /// method than POST, lands on a route a redirect cannot reach, serves an endpoint another
-    /// route serves, or serves sessions the crate does not issue.
+    /// method than POST, lands on a route a redirect cannot reach, serves the refresh endpoint
+    /// another route serves, or serves sessions the crate does not issue.
     pub fn read(
         index: &AttributeIndex,
         declared_routes: &DeclaredRoutes,
         sessions: &DeclaredSessions,
     ) -> Result<Self, SessionEndpointsCodegenError> {
-        let mut routes: Vec<DeclaredSessionEndpointRoute> = Vec::new();
+        let mut refresh = SessionRefreshRoute::Unserved;
+        let mut sign_outs: Vec<SessionSignOutRoute> = Vec::new();
 
         for matched in index.select_framework_attribute(FrameworkAttribute::ServesSessionEndpoint) {
-            let anchor =
-                declaration_anchor(index, &matched, FrameworkAttribute::ServesSessionEndpoint)?
-                    .item;
+            let declared_anchor =
+                declaration_anchor(index, &matched, FrameworkAttribute::ServesSessionEndpoint)?;
+            let anchor = declared_anchor.item;
             let route = anchor.canonical_path();
             let endpoint = matched.args()?.interpret(|reader| {
                 reader
@@ -113,29 +117,40 @@ impl DeclaredSessionEndpoints {
                 );
             }
 
-            if let Some(first) = routes
-                .iter()
-                .find(|served| served.endpoint.item() == endpoint.item())
-            {
-                return Err(SessionEndpointsCodegenError::AmbiguousSessionEndpoint {
-                    first: first.route.to_string(),
-                    second: route.to_string(),
-                });
+            match (endpoint, &refresh) {
+                (ServedSessionEndpoint::Refresh, SessionRefreshRoute::Unserved) => {
+                    refresh = SessionRefreshRoute::Served {
+                        route: route.clone(),
+                    };
+                }
+                (ServedSessionEndpoint::Refresh, SessionRefreshRoute::Served { route: first }) => {
+                    return Err(
+                        SessionEndpointsCodegenError::AmbiguousSessionRefreshEndpoint {
+                            first: first.to_string(),
+                            second: route.to_string(),
+                        },
+                    );
+                }
+                (ServedSessionEndpoint::SignOut { landing }, _) => {
+                    sign_outs.push(SessionSignOutRoute {
+                        handler: SignOutEndpointModule::new(
+                            declared_anchor.identifier.field().to_string(),
+                        ),
+                        landing,
+                        route: route.clone(),
+                    });
+                }
             }
-
-            routes.push(DeclaredSessionEndpointRoute {
-                endpoint,
-                method: declared.method,
-                route: route.clone(),
-            });
         }
 
-        Ok(Self { routes })
+        Ok(Self { refresh, sign_outs })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::mem::discriminant;
+
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_error::AttributeError;
     use margaret_attributes_tests::indexed_source::IndexedSource;
@@ -149,9 +164,9 @@ mod tests {
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use super::DeclaredSessionEndpoints;
-    use crate::declared_session_endpoint_route::DeclaredSessionEndpointRoute;
-    use crate::served_session_endpoint::ServedSessionEndpoint;
     use crate::session_endpoints_codegen_error::SessionEndpointsCodegenError;
+    use crate::session_refresh_route::SessionRefreshRoute;
+    use crate::session_sign_out_route::SessionSignOutRoute;
 
     const SESSIONS: &str = "use margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_session_endpoint;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::route_method::route_method::RouteMethod;\nuse margaret::framework::sessions::session_endpoint::SessionEndpoint;\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct ProviderIssuance;\n\n#[issues_sessions(issuer = provider, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n\n#[singleton]\n#[responds_to_http(method = RouteMethod::Get, path = \"/welcome\", server = \"public\")]\nstruct GetWelcome;\n";
 
@@ -191,14 +206,13 @@ mod tests {
         read(
             &format!("{SESSIONS}{}", served("SessionEndpoint::Refresh")),
             |read| {
+                let endpoints = read.expect("the endpoint is read");
+
                 assert!(matches!(
-                    read.expect("the endpoint is read").routes.as_slice(),
-                    [DeclaredSessionEndpointRoute {
-                        endpoint: ServedSessionEndpoint::Refresh,
-                        method: RouteMethod::Post,
-                        route,
-                    }] if route.to_string() == "crate::PostSessions"
+                    &endpoints.refresh,
+                    SessionRefreshRoute::Served { route } if route.to_string() == "crate::PostSessions"
                 ));
+                assert!(endpoints.sign_outs.is_empty());
             },
         );
     }
@@ -211,12 +225,43 @@ mod tests {
                 served("SessionEndpoint::SignOut(landing_route = GetWelcome)")
             ),
             |read| {
+                let endpoints = read.expect("the endpoint is read");
+
+                assert_eq!(
+                    discriminant(&endpoints.refresh),
+                    discriminant(&SessionRefreshRoute::Unserved)
+                );
                 assert!(matches!(
-                    read.expect("the endpoint is read").routes.as_slice(),
-                    [DeclaredSessionEndpointRoute {
-                        endpoint: ServedSessionEndpoint::SignOut { landing },
-                        ..
-                    }] if landing.path == "/welcome" && landing.server == "public"
+                    endpoints.sign_outs.as_slice(),
+                    [SessionSignOutRoute { landing, route, .. }]
+                        if landing.path == "/welcome" && landing.server == "public"
+                            && route.to_string() == "crate::PostSessions"
+                ));
+            },
+        );
+    }
+
+    #[test]
+    fn serves_each_sign_out_route_through_a_handler_of_its_own_landing_on_its_own_route() {
+        read(
+            &format!(
+                "{SESSIONS}{}#[singleton]\n#[responds_to_http(method = RouteMethod::Get, path = \"/back-office\", server = \"staff\")]\nstruct GetBackOffice;\n#[responds_to_http(method = RouteMethod::Post, path = \"/staff/sign-out\", server = \"staff\")]\n#[serves_session_endpoint(SessionEndpoint::SignOut(landing_route = GetBackOffice))]\nstruct PostStaffSignOut;\n",
+                served("SessionEndpoint::SignOut(landing_route = GetWelcome)")
+            ),
+            |read| {
+                assert!(matches!(
+                    read.expect("the endpoints are read").sign_outs.as_slice(),
+                    [
+                        SessionSignOutRoute { handler: public_handler, landing: public_landing, route: public_route },
+                        SessionSignOutRoute { handler: staff_handler, landing: staff_landing, route: staff_route },
+                    ] if public_route.to_string() == "crate::PostSessions"
+                        && public_landing.server == "public"
+                        && public_landing.path == "/welcome"
+                        && public_handler.handler_path().to_string() == "crate::margaret::sessions::sign_out_endpoints::post_sessions::session_sign_out_endpoint::SessionSignOutEndpoint"
+                        && staff_route.to_string() == "crate::PostStaffSignOut"
+                        && staff_landing.server == "staff"
+                        && staff_landing.path == "/back-office"
+                        && staff_handler.handler_path().to_string() == "crate::margaret::sessions::sign_out_endpoints::post_staff_sign_out::session_sign_out_endpoint::SessionSignOutEndpoint"
                 ));
             },
         );
@@ -303,13 +348,13 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_endpoint_served_by_two_routes_since_its_url_would_be_ambiguous() {
+    fn rejects_the_refresh_endpoint_served_by_two_routes_since_its_url_would_be_ambiguous() {
         assert!(matches!(
             rejection(&format!(
                 "{SESSIONS}{}#[responds_to_http(method = RouteMethod::Post, path = \"/again\", server = \"public\")]\n#[serves_session_endpoint(SessionEndpoint::Refresh)]\nstruct PostAgain;\n",
                 served("SessionEndpoint::Refresh")
             )),
-            SessionEndpointsCodegenError::AmbiguousSessionEndpoint { first, second }
+            SessionEndpointsCodegenError::AmbiguousSessionRefreshEndpoint { first, second }
                 if first == "crate::PostAgain" && second == "crate::PostSessions"
         ));
     }

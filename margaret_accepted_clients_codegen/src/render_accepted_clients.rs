@@ -101,6 +101,7 @@ fn accepted_client_module(client: &AcceptedClientDeclaration) -> GeneratedModule
     let client_id = client.client_id.as_str();
     let resources = client
         .resources
+        .admitted()
         .iter()
         .map(|resource| resource.audience.as_str());
     let token_exchange = match &client.token_exchange {
@@ -349,6 +350,7 @@ fn aggregate_module(
                 .flat_map(|client| {
                     client
                         .resources
+                        .admitted()
                         .iter()
                         .map(|resource| resource.audience.as_str())
                 })
@@ -587,6 +589,20 @@ mod tests {
         assert_eq!(
             module_source("accepted_clients/clients/spa/accepted_client"),
             "pub const ACCEPTED_CLIENT: margaret::framework::accepted_clients::accepted_client::AcceptedClient = margaret::framework::accepted_clients::accepted_client::AcceptedClient {\n    client_id: \"spa\",\n    resources: &[\"reports\", \"artifacts\"],\n    token_exchange: margaret::framework::accepted_clients::token_exchange_grant::TokenExchangeGrant::Withheld,\n};\n"
+        );
+    }
+
+    #[test]
+    fn renders_no_resources_for_a_client_declaring_none_so_its_tokens_name_no_resource_audience() {
+        assert_eq!(
+            named_source(
+                modules(
+                    "use margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::accepted_clients::consent_policy::ConsentPolicy;\nuse margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning;\nuse margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;\nuse margaret::framework::oauth_vocabulary::openid_scope::OpenidScope;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[admits_oauth_client(staff_app, authentication = ClientAuthenticationMethod::None, authorization_code(consent = ConsentPolicy::Implicit, id_token_signing = IdTokenSigning::Rsa, redirect_uris = [\"https://staff.example/callback\"], scopes = [OpenidScope]), client_id = \"staff\", resources = [])]\npub struct Staff;\n",
+                    &[],
+                ),
+                "accepted_clients/clients/staff/accepted_client",
+            ),
+            "pub const ACCEPTED_CLIENT: margaret::framework::accepted_clients::accepted_client::AcceptedClient = margaret::framework::accepted_clients::accepted_client::AcceptedClient {\n    client_id: \"staff\",\n    resources: &[],\n    token_exchange: margaret::framework::accepted_clients::token_exchange_grant::TokenExchangeGrant::Withheld,\n};\n"
         );
     }
 

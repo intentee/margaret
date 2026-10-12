@@ -5,9 +5,9 @@ use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
-use margaret_session_endpoints_codegen::declared_session_endpoint_route::DeclaredSessionEndpointRoute;
 use margaret_session_endpoints_codegen::declared_session_endpoints::DeclaredSessionEndpoints;
-use margaret_session_endpoints_codegen::served_session_endpoint::ServedSessionEndpoint;
+use margaret_session_endpoints_codegen::session_refresh_route::SessionRefreshRoute;
+use margaret_session_endpoints_codegen::session_sign_out_route::SessionSignOutRoute;
 use margaret_sessions_codegen::consumed_sessions_declaration::ConsumedSessionsDeclaration;
 use margaret_sessions_codegen::declared_session_cookies::DeclaredSessionCookies;
 use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
@@ -34,7 +34,7 @@ fn declared(
     dependencies: Vec<FrameworkDependency>,
     method: &str,
     injection: FrameworkInjectionRole,
-    item: SessionsItem,
+    provided: CanonicalPath,
 ) -> FrameworkProvider {
     FrameworkProvider {
         construction: FrameworkConstruction::Constructor {
@@ -45,7 +45,7 @@ fn declared(
         },
         enablement: FrameworkEnablement::Declared,
         injection,
-        provided: sessions_item_path(item),
+        provided,
     }
 }
 
@@ -75,7 +75,7 @@ fn sessions_providers(sessions: &DeclaredSessions) -> Vec<FrameworkProvider> {
             ],
             "create",
             FrameworkInjectionRole::Unmarked,
-            SessionsItem::ConsumedSessions,
+            sessions_item_path(SessionsItem::ConsumedSessions),
         )],
         DeclaredSessions::Issued(IssuedSessionsDeclaration { cookies, .. }) => {
             let mut dependencies = vec![
@@ -101,39 +101,51 @@ fn sessions_providers(sessions: &DeclaredSessions) -> Vec<FrameworkProvider> {
                 dependencies,
                 method,
                 FrameworkInjectionRole::Unmarked,
-                SessionsItem::IssuedSessions,
+                sessions_item_path(SessionsItem::IssuedSessions),
             )]
         }
     }
 }
 
-fn endpoint_provider(
-    DeclaredSessionEndpointRoute { endpoint, .. }: &DeclaredSessionEndpointRoute,
-) -> FrameworkProvider {
-    let issued = FrameworkDependency::Provider(sessions_item_path(SessionsItem::IssuedSessions));
+fn issued_sessions() -> FrameworkDependency {
+    FrameworkDependency::Provider(sessions_item_path(SessionsItem::IssuedSessions))
+}
 
-    match endpoint {
-        ServedSessionEndpoint::Refresh => declared(
-            vec![issued],
+fn refresh_providers(refresh: &SessionRefreshRoute) -> Vec<FrameworkProvider> {
+    match refresh {
+        SessionRefreshRoute::Served { .. } => vec![declared(
+            vec![issued_sessions()],
             "create",
             FrameworkInjectionRole::FrameworkState,
-            SessionsItem::SessionRefreshEndpoint,
-        ),
-        ServedSessionEndpoint::SignOut { landing } => declared(
-            vec![issued, FrameworkDependency::RouteUrl(landing.clone())],
-            "create",
-            FrameworkInjectionRole::FrameworkState,
-            SessionsItem::SessionSignOutEndpoint,
-        ),
+            sessions_item_path(SessionsItem::SessionRefreshEndpoint),
+        )],
+        SessionRefreshRoute::Unserved => Vec::new(),
     }
+}
+
+fn sign_out_provider(
+    SessionSignOutRoute {
+        handler, landing, ..
+    }: &SessionSignOutRoute,
+) -> FrameworkProvider {
+    declared(
+        vec![
+            issued_sessions(),
+            FrameworkDependency::RouteUrl(landing.clone()),
+        ],
+        "create",
+        FrameworkInjectionRole::FrameworkState,
+        handler.handler_path(),
+    )
 }
 
 pub(crate) fn sessions_framework_providers(
     sessions: &DeclaredSessions,
-    endpoints: &DeclaredSessionEndpoints,
+    DeclaredSessionEndpoints { refresh, sign_outs }: &DeclaredSessionEndpoints,
 ) -> Vec<FrameworkProvider> {
     sessions_providers(sessions)
         .into_iter()
-        .chain(endpoints.routes.iter().map(endpoint_provider))
+        .chain(refresh_providers(refresh))
+        .chain(sign_outs.iter().map(sign_out_provider))
         .collect()
 }

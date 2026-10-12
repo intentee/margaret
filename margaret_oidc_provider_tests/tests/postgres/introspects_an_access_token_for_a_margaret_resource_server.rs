@@ -18,7 +18,7 @@ use margaret_validation::validate::validate;
 #[tokio::test]
 async fn introspects_an_access_token_for_a_margaret_resource_server() {
     let fixture = ProviderFixture::start(Vec::new()).await;
-    let client = MargaretClient::of_portal(&fixture).await;
+    let client = MargaretClient::of_asserting(&fixture, "portal", "artifacts").await;
     let flow = client.sign_in_flow(PORTAL_CALLBACK, &["openid", "profile"]);
     let SignInBeginning::Redirected(beginning) = flow.begin().await else {
         panic!("the sign-in redirects to the provider");

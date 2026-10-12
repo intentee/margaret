@@ -6,7 +6,6 @@ pub enum SessionsItem {
     ConsumedSessions,
     IssuedSessions,
     SessionRefreshEndpoint,
-    SessionSignOutEndpoint,
 }
 
 impl SessionsItem {
@@ -22,9 +21,6 @@ impl SessionsItem {
             Self::SessionRefreshEndpoint => quote! {
                 margaret::framework::sessions::session_refresh_endpoint::SessionRefreshEndpoint
             },
-            Self::SessionSignOutEndpoint => quote! {
-                margaret::framework::sessions::session_sign_out_endpoint::SessionSignOutEndpoint
-            },
         }
     }
 
@@ -34,7 +30,6 @@ impl SessionsItem {
             Self::ConsumedSessions => "ConsumedSessions",
             Self::IssuedSessions => "IssuedSessions",
             Self::SessionRefreshEndpoint => "SessionRefreshEndpoint",
-            Self::SessionSignOutEndpoint => "SessionSignOutEndpoint",
         }
     }
 }

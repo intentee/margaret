@@ -20,7 +20,7 @@ use margaret_token_exchange_client::token_exchange::TokenExchange;
 async fn exchanges_a_subject_token_for_a_margaret_client() {
     let ci = CiIssuer::publishing_keys();
     let fixture = ProviderFixture::start(vec![ci.exchanger.clone()]).await;
-    let client = MargaretClient::of_portal(&fixture).await;
+    let client = MargaretClient::of_asserting(&fixture, "portal", "artifacts").await;
     let ExchangedToken::Exchanged(access_token) = TokenExchange::create(client.server.clone())
         .exchange(
             &SubjectToken {

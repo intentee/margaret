@@ -34,6 +34,7 @@ use margaret_token_issuance_codegen::token_issuance_declaration::TokenIssuanceDe
 use crate::accepted_clients_codegen_error::AcceptedClientsCodegenError;
 use crate::admitted_resource::AdmittedResource;
 use crate::client_key_sources::CLIENT_KEY_SOURCES;
+use crate::client_resources::ClientResources;
 use crate::client_signing_algorithms::CLIENT_SIGNING_ALGORITHMS;
 use crate::consent_policies::CONSENT_POLICIES;
 use crate::declared_accepted_authentication::DeclaredAcceptedAuthentication;
@@ -52,7 +53,7 @@ fn written(path: &Path) -> String {
 }
 
 fn scope_list(
-    context: &ScopeContext,
+    context: &DeclarationContext,
     reader: &mut AttributeArgumentsReader,
 ) -> Result<Option<Vec<Scope>>, AcceptedClientsCodegenError> {
     reader
@@ -80,12 +81,20 @@ fn scope_list(
 }
 
 fn client_credentials(
-    context: &ScopeContext,
+    context: &DeclarationContext,
     reader: &mut AttributeArgumentsReader,
     anchor: &str,
 ) -> Result<DeclaredClientCredentials, AcceptedClientsCodegenError> {
     Ok(reader
         .take_group("client_credentials", |group| {
+            if let ClientResources::Withheld = context.resources {
+                return Err(
+                    AcceptedClientsCodegenError::ClientCredentialsWithoutResources {
+                        anchor: anchor.to_string(),
+                    },
+                );
+            }
+
             scope_list(context, group)?
                 .ok_or_else(
                     || AcceptedClientsCodegenError::MissingClientCredentialsScopes {
@@ -175,11 +184,11 @@ fn client_keys(
 }
 
 fn declared_authentication(
-    context: &ScopeContext,
+    context: &DeclarationContext,
     variant: &Path,
     reader: &mut AttributeArgumentsReader,
 ) -> Result<DeclaredAcceptedAuthentication, AcceptedClientsCodegenError> {
-    let ScopeContext { index, item, .. } = *context;
+    let DeclarationContext { index, item, .. } = *context;
     let anchor = item.canonical_path().to_string();
     let method = index
         .resolve_item_path(item, variant)
@@ -201,7 +210,7 @@ fn declared_authentication(
         ClientAuthenticationMethod::PrivateKeyJwt => Ok(
             DeclaredAcceptedAuthentication::PrivateKeyJwt(DeclaredConfidentialClient {
                 client_credentials: client_credentials(context, reader, &anchor)?,
-                introspection: reader.take_flag("introspection"),
+                introspection: introspection(context, reader, &anchor)?,
                 keys: reader
                     .take_variant(ItemNamingArgument::Keys.key(), |keys, arguments| {
                         client_keys(index, item, keys, arguments)
@@ -212,6 +221,22 @@ fn declared_authentication(
             }),
         ),
     }
+}
+
+fn introspection(
+    context: &DeclarationContext,
+    reader: &mut AttributeArgumentsReader,
+    anchor: &str,
+) -> Result<bool, AcceptedClientsCodegenError> {
+    let introspection = reader.take_flag("introspection");
+
+    if introspection && let ClientResources::Withheld = context.resources {
+        return Err(AcceptedClientsCodegenError::IntrospectionWithoutResources {
+            anchor: anchor.to_string(),
+        });
+    }
+
+    Ok(introspection)
 }
 
 fn redirect_uris(
@@ -274,10 +299,10 @@ fn redirect_routes(
 }
 
 fn code_policy(
-    context: &ScopeContext,
+    context: &DeclarationContext,
     reader: &mut AttributeArgumentsReader,
 ) -> Result<DeclaredCodePolicy, AcceptedClientsCodegenError> {
-    let ScopeContext { index, item, .. } = *context;
+    let DeclarationContext { index, item, .. } = *context;
     let anchor = item.canonical_path().to_string();
     let anchor = anchor.as_str();
     let declared_consent = reader
@@ -315,18 +340,50 @@ fn code_policy(
         });
     }
 
+    let refresh_token = reader.take_flag("refresh_token");
+    let scopes = scope_list(context, reader)?.ok_or_else(|| {
+        AcceptedClientsCodegenError::MissingCodeScopes {
+            anchor: anchor.to_string(),
+        }
+    })?;
+
+    if let ClientResources::Withheld = context.resources
+        && !scopes.iter().any(Scope::is_openid)
+    {
+        return Err(
+            AcceptedClientsCodegenError::ResourcelessCodeGrantWithoutOpenidScope {
+                anchor: anchor.to_string(),
+            },
+        );
+    }
+
     Ok(DeclaredCodePolicy {
         consent,
         id_token_signing,
         redirect_routes,
         redirect_uris,
-        refresh_token: reader.take_flag("refresh_token"),
-        scopes: scope_list(context, reader)?.ok_or_else(|| {
-            AcceptedClientsCodegenError::MissingCodeScopes {
-                anchor: anchor.to_string(),
-            }
-        })?,
+        refresh_token,
+        scopes,
     })
+}
+
+fn authorization_code(
+    context: &DeclarationContext,
+    reader: &mut AttributeArgumentsReader,
+    anchor: &str,
+) -> Result<DeclaredCodeGrant, AcceptedClientsCodegenError> {
+    match (
+        reader.take_group("authorization_code", |group| code_policy(context, group))?,
+        context.resources,
+    ) {
+        (Some(policy), _) => Ok(DeclaredCodeGrant::Granted(policy)),
+        (None, ClientResources::Admitted(_)) => Ok(DeclaredCodeGrant::Withheld),
+        (None, ClientResources::Withheld) => Err(
+            AcceptedClientsCodegenError::ResourcelessClientWithoutCodeGrant {
+                anchor: anchor.to_string(),
+            },
+        ),
+    }
 }
 
 fn client_id(
@@ -361,7 +418,7 @@ fn resources(
     reader: &mut AttributeArgumentsReader,
     resources: &DeclaredResourceIssuances,
     anchor: &str,
-) -> Result<Vec<AdmittedResource>, AcceptedClientsCodegenError> {
+) -> Result<ClientResources, AcceptedClientsCodegenError> {
     let declared = reader.take_path_array("resources")?.ok_or_else(|| {
         AcceptedClientsCodegenError::MissingResources {
             anchor: anchor.to_string(),
@@ -369,9 +426,7 @@ fn resources(
     })?;
 
     if declared.is_empty() {
-        return Err(AcceptedClientsCodegenError::EmptyResources {
-            anchor: anchor.to_string(),
-        });
+        return Ok(ClientResources::Withheld);
     }
 
     let mut admitted: Vec<AdmittedResource> = Vec::with_capacity(declared.len());
@@ -403,16 +458,22 @@ fn resources(
         });
     }
 
-    Ok(admitted)
+    Ok(ClientResources::Admitted(admitted))
 }
 
 fn token_exchange(
-    context: &ScopeContext,
+    context: &DeclarationContext,
     reader: &mut AttributeArgumentsReader,
     anchor: &str,
 ) -> Result<DeclaredTokenExchange, AcceptedClientsCodegenError> {
     Ok(reader
         .take_group("token_exchange", |group| {
+            if let ClientResources::Withheld = context.resources {
+                return Err(AcceptedClientsCodegenError::TokenExchangeWithoutResources {
+                    anchor: anchor.to_string(),
+                });
+            }
+
             scope_list(context, group)?.ok_or_else(|| {
                 AcceptedClientsCodegenError::MissingTokenExchangeScopes {
                     anchor: anchor.to_string(),
@@ -425,9 +486,10 @@ fn token_exchange(
 }
 
 #[derive(Clone, Copy)]
-struct ScopeContext<'context> {
+struct DeclarationContext<'context> {
     index: &'context AttributeIndex,
     item: &'context IndexedItem,
+    resources: &'context ClientResources,
     scopes: &'context DeclaredScopes<'context>,
 }
 
@@ -436,7 +498,7 @@ pub struct AcceptedClientDeclaration<'index> {
     pub authentication: DeclaredAcceptedAuthentication,
     pub authorization_code: DeclaredCodeGrant,
     pub client_id: ClientId,
-    pub resources: Vec<AdmittedResource>,
+    pub resources: ClientResources,
     pub tag: Tag,
     pub token_exchange: DeclaredTokenExchange,
 }
@@ -451,13 +513,16 @@ impl<'index> AcceptedClientDeclaration<'index> {
         let anchor = declaration_anchor(index, matched, FrameworkAttribute::AdmitsOAuthClient)?;
         let item = anchor.item;
         let path = item.canonical_path().to_string();
-        let context = ScopeContext {
-            index,
-            item,
-            scopes,
-        };
 
         matched.args()?.interpret(|reader| {
+            let resources = resources(reader, declared_resources, &path)?;
+            let context = DeclarationContext {
+                index,
+                item,
+                resources: &resources,
+                scopes,
+            };
+
             Ok(Self {
                 tag: reader
                     .take_positional_path()
@@ -479,12 +544,10 @@ impl<'index> AcceptedClientDeclaration<'index> {
                     .ok_or_else(|| AcceptedClientsCodegenError::MissingAuthentication {
                         anchor: path.clone(),
                     })?,
-                authorization_code: reader
-                    .take_group("authorization_code", |group| code_policy(&context, group))?
-                    .map_or(DeclaredCodeGrant::Withheld, DeclaredCodeGrant::Granted),
+                authorization_code: authorization_code(&context, reader, &path)?,
                 client_id: client_id(reader, &path)?,
-                resources: resources(reader, declared_resources, &path)?,
                 token_exchange: token_exchange(&context, reader, &path)?,
+                resources,
                 anchor,
             })
         })
@@ -575,6 +638,7 @@ mod tests {
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use crate::accepted_clients_codegen_error::AcceptedClientsCodegenError;
+    use crate::client_resources::ClientResources;
     use crate::declared_accepted_authentication::DeclaredAcceptedAuthentication;
     use crate::declared_accepted_clients::DeclaredAcceptedClients;
     use crate::declared_client_credentials::DeclaredClientCredentials;
@@ -666,7 +730,7 @@ mod tests {
                             && policy.scopes.len() == 2
                 ));
                 assert_eq!(client.client_id.as_str(), "portal");
-                assert_eq!(client.resources.len(), 2);
+                assert_eq!(client.resources.admitted().len(), 2);
                 assert!(matches!(
                     &client.token_exchange,
                     DeclaredTokenExchange::Granted { scopes }
@@ -1282,12 +1346,82 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_empty_list_of_resources_since_every_token_grant_would_lack_a_target() {
+    fn reads_a_sign_in_client_declaring_no_resources_so_it_signs_in_without_a_resource_audience() {
+        read(
+            "authentication = ClientAuthenticationMethod::None, authorization_code(consent = ConsentPolicy::Implicit, id_token_signing = IdTokenSigning::Rsa, redirect_uris = [\"https://staff.example/callback\"], scopes = [OpenidScope]), client_id = \"staff\", resources = []",
+            |read| {
+                let accepted = read.expect("the client is accepted");
+                let client = accepted.clients.first().expect("the client is accepted");
+
+                assert_eq!(
+                    discriminant(&client.resources),
+                    discriminant(&ClientResources::Withheld)
+                );
+                assert!(matches!(
+                    &client.authorization_code,
+                    DeclaredCodeGrant::Granted(policy)
+                        if policy.scopes.iter().map(Scope::as_str).eq(["openid"])
+                ));
+            },
+        );
+    }
+
+    #[test]
+    fn rejects_a_client_declaring_no_resources_without_a_code_grant_since_it_could_obtain_no_token()
+    {
         assert!(matches!(
             rejection(
                 "authentication = ClientAuthenticationMethod::None, client_id = \"spa\", resources = []"
             ),
-            AcceptedClientsCodegenError::EmptyResources { anchor, .. }
+            AcceptedClientsCodegenError::ResourcelessClientWithoutCodeGrant { anchor }
+                if anchor == ANCHOR
+        ));
+    }
+
+    #[test]
+    fn rejects_a_code_grant_without_openid_of_a_client_declaring_no_resources_since_its_tokens_could_reach_no_audience()
+     {
+        assert!(matches!(
+            rejection(
+                "authentication = ClientAuthenticationMethod::None, authorization_code(consent = ConsentPolicy::Implicit, id_token_signing = IdTokenSigning::Rsa, redirect_uris = [\"https://staff.example/callback\"], scopes = [ProfileScope]), client_id = \"staff\", resources = []"
+            ),
+            AcceptedClientsCodegenError::ResourcelessCodeGrantWithoutOpenidScope { anchor }
+                if anchor == ANCHOR
+        ));
+    }
+
+    #[test]
+    fn rejects_client_credentials_of_a_client_declaring_no_resources_since_their_tokens_could_reach_no_audience()
+     {
+        assert!(matches!(
+            rejection(&format!(
+                "authentication = ClientAuthenticationMethod::PrivateKeyJwt(client_credentials(scopes = [ArtifactsReadScope]), keys = ClientKeys::Own), {AUTHORIZATION_CODE}, client_id = \"portal\", resources = []"
+            )),
+            AcceptedClientsCodegenError::ClientCredentialsWithoutResources { anchor }
+                if anchor == ANCHOR
+        ));
+    }
+
+    #[test]
+    fn rejects_introspection_by_a_client_declaring_no_resources_since_no_token_could_be_addressed_to_it()
+     {
+        assert!(matches!(
+            rejection(&format!(
+                "authentication = ClientAuthenticationMethod::PrivateKeyJwt(introspection, keys = ClientKeys::Own), {AUTHORIZATION_CODE}, client_id = \"portal\", resources = []"
+            )),
+            AcceptedClientsCodegenError::IntrospectionWithoutResources { anchor }
+                if anchor == ANCHOR
+        ));
+    }
+
+    #[test]
+    fn rejects_token_exchange_by_a_client_declaring_no_resources_since_exchanged_tokens_could_reach_no_audience()
+     {
+        assert!(matches!(
+            rejection(&format!(
+                "authentication = ClientAuthenticationMethod::None, {AUTHORIZATION_CODE}, client_id = \"ci\", resources = [], token_exchange(scopes = [DeployScope])"
+            )),
+            AcceptedClientsCodegenError::TokenExchangeWithoutResources { anchor }
                 if anchor == ANCHOR
         ));
     }

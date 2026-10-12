@@ -108,6 +108,15 @@ pub enum TagError {
     OwnClientOfPublishedKeys { admitted: String, site: String },
 
     #[error(
+        "the admitted client '{admitted}' signs in through the sign-in of margaret, which names no resource, yet it admits both '{first}' and '{second}', so its code exchange could not choose the audience of its access token; admit the sign-in through a client of at most one resource"
+    )]
+    OwnSignInAmongSeveralResources {
+        admitted: String,
+        first: String,
+        second: String,
+    },
+
+    #[error(
         "the resource '{tag}' declared by '{anchor}' is never used: no admitted client is granted it and no bearer token is addressed to it"
     )]
     UnconsumedResourceIssuance { anchor: String, tag: String },

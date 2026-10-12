@@ -20,6 +20,8 @@ pub enum TokenGrant {
     #[serde(rename = "client_credentials")]
     ClientCredentials {
         #[serde(default, deserialize_with = "optional_parameter")]
+        audience: Option<String>,
+        #[serde(default, deserialize_with = "optional_parameter")]
         resource: Option<String>,
         #[serde(default, deserialize_with = "optional_parameter")]
         scope: Option<String>,

@@ -21,14 +21,12 @@ mod tests {
                 SessionsItem::ConsumedSessions,
                 SessionsItem::IssuedSessions,
                 SessionsItem::SessionRefreshEndpoint,
-                SessionsItem::SessionSignOutEndpoint,
             ]
             .map(|item| sessions_item_path(item).to_string()),
             [
                 "crate::margaret::sessions::ConsumedSessions",
                 "crate::margaret::sessions::IssuedSessions",
                 "crate::margaret::sessions::SessionRefreshEndpoint",
-                "crate::margaret::sessions::SessionSignOutEndpoint",
             ]
         );
     }

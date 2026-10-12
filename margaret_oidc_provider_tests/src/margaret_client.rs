@@ -15,8 +15,6 @@ use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 use crate::issuer_location::IssuerLocation;
 use crate::provider_fixture::ProviderFixture;
 
-const PORTAL_CLIENT_ID: &str = "portal";
-
 pub struct MargaretClient {
     pub directory: PolledDirectory,
     pub secrets: Arc<JwksSecretHolder>,
@@ -56,20 +54,24 @@ impl MargaretClient {
         }
     }
 
-    pub async fn of_portal(fixture: &ProviderFixture) -> Self {
-        let secrets = Arc::clone(&fixture.clients.asserting(PORTAL_CLIENT_ID).secrets);
+    pub async fn of_asserting(
+        fixture: &ProviderFixture,
+        client_id: &'static str,
+        audience: &'static str,
+    ) -> Self {
+        let secrets = Arc::clone(&fixture.clients.asserting(client_id).secrets);
 
         Self::discovering(
             || fixture.issuer_request_client(),
             &fixture.issuer.location,
-            "artifacts",
+            audience,
             Arc::clone(&secrets),
             |request_client, metadata, trusted_issuer| {
                 AuthorizationServerClient::with_private_key_jwt(
                     request_client,
                     metadata,
                     trusted_issuer,
-                    PORTAL_CLIENT_ID,
+                    client_id,
                     secrets,
                 )
             },

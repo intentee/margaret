@@ -49,6 +49,8 @@ pub enum SessionEndpointsCodegenError {
     )]
     SessionEndpointWithoutIssuedSessions { anchor: String },
 
-    #[error("both '{first}' and '{second}' serve the same session endpoint")]
-    AmbiguousSessionEndpoint { first: String, second: String },
+    #[error(
+        "both '{first}' and '{second}' serve SessionEndpoint::Refresh, so its url would be ambiguous"
+    )]
+    AmbiguousSessionRefreshEndpoint { first: String, second: String },
 }

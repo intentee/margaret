@@ -16,6 +16,7 @@ pub mod post_profile_note;
 pub mod post_session_refresh;
 pub mod post_sign_in;
 pub mod post_sign_out;
+pub mod post_staff_sign_out;
 pub mod profile_note;
 pub mod profile_scope;
 pub mod provider_issuance;

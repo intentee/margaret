@@ -53,9 +53,11 @@ use margaret_service_codegen::framework_service::FrameworkService;
 use margaret_service_codegen::render_services::render_services;
 use margaret_service_codegen::service_plan::ServicePlan;
 use margaret_session_endpoints_codegen::declared_session_endpoints::DeclaredSessionEndpoints;
+use margaret_session_endpoints_codegen::session_refresh_route::SessionRefreshRoute;
 use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
 use margaret_sessions_codegen::render_sessions::render_sessions;
 use margaret_sessions_codegen::sessions_item::SessionsItem;
+use margaret_sessions_codegen::sign_out_endpoint_module::SignOutEndpointModule;
 use margaret_sign_in_endpoints_codegen::client_sign_ins::client_sign_ins;
 use margaret_sql_identifier::table_namespace::TableNamespace;
 use margaret_tag_codegen::subject_token_exchanger_binding::SubjectTokenExchangerBinding;
@@ -512,13 +514,18 @@ fn session_modules(
     endpoints: &DeclaredSessionEndpoints,
     features: &mut GeneratedFeatures,
 ) -> Vec<GeneratedModuleTokens> {
+    let refresh_endpoint = match endpoints.refresh {
+        SessionRefreshRoute::Served { .. } => vec![SessionsItem::SessionRefreshEndpoint],
+        SessionRefreshRoute::Unserved => Vec::new(),
+    };
     let modules = render_sessions(
         sessions,
+        &refresh_endpoint,
         &endpoints
-            .routes
+            .sign_outs
             .iter()
-            .map(|route| route.endpoint.item())
-            .collect::<Vec<SessionsItem>>(),
+            .map(|sign_out| &sign_out.handler)
+            .collect::<Vec<&SignOutEndpointModule>>(),
     );
 
     features.enable_if(GeneratedFeature::Sessions, !modules.is_empty());
@@ -3972,7 +3979,33 @@ struct PostSignOut;
             "margaret::framework::http::limited_content_handler::limited_content_handler(container.margaret_sessions_session_refresh_endpoint(),margaret::framework::http::body_limit::BodyLimit::new(4_096),)"
         ));
         assert!(source.contains(
-            "container.margaret_sessions_session_sign_out_endpoint()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>"
+            "container.margaret_sessions_sign_out_endpoints_post_sign_out_session_sign_out_endpoint_session_sign_out_endpoint()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>"
+        ));
+    }
+
+    #[test]
+    fn serves_each_sign_out_route_through_its_own_handler_landing_on_its_own_route() {
+        let code = generate(&format!(
+            "{ISSUED_SESSIONS_CRATE}\n#[singleton]\n#[responds_to_http(method = RouteMethod::Get, path = \"/back-office\", server = \"staff\")]\nstruct GetBackOffice;\n\nimpl GetBackOffice {{\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {{}}\n}}\n\n#[responds_to_http(method = RouteMethod::Post, path = \"/staff/sign-out\", server = \"staff\")]\n#[serves_session_endpoint(SessionEndpoint::SignOut(landing_route = GetBackOffice))]\nstruct PostStaffSignOut;\n"
+        ))
+        .expect("the build succeeds");
+        let source = collapsed(&concatenated(&code));
+
+        assert_eq!(
+            collapsed(module(&code, "sessions/sign_out_endpoints")),
+            "pubmodpost_sign_out;pubmodpost_staff_sign_out;"
+        );
+        assert!(source.contains(
+            "container.margaret_sessions_sign_out_endpoints_post_sign_out_session_sign_out_endpoint_session_sign_out_endpoint()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>"
+        ));
+        assert!(source.contains(
+            "container.margaret_sessions_sign_out_endpoints_post_staff_sign_out_session_sign_out_endpoint_session_sign_out_endpoint()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>"
+        ));
+        assert!(source.contains(
+            "margaret::framework::http::literal_url::literal_url(&origin_public,\"/welcome\",)"
+        ));
+        assert!(source.contains(
+            "margaret::framework::http::literal_url::literal_url(&origin_staff,\"/back-office\",)"
         ));
     }
 

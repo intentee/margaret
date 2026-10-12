@@ -12,12 +12,43 @@ use margaret_oauth_client_codegen::oauth_client_sign_in_callback_handler_path::o
 use margaret_oidc_provider_codegen::declared_consent::DeclaredConsent;
 use margaret_oidc_provider_codegen::declared_consent_route::DeclaredConsentRoute;
 use margaret_oidc_provider_codegen::provider_endpoint::ProviderEndpoint;
+use margaret_session_endpoints_codegen::declared_session_endpoints::DeclaredSessionEndpoints;
+use margaret_session_endpoints_codegen::session_refresh_route::SessionRefreshRoute;
+use margaret_session_endpoints_codegen::session_sign_out_route::SessionSignOutRoute;
+use margaret_sessions_codegen::sessions_item::SessionsItem;
+use margaret_sessions_codegen::sessions_item_path::sessions_item_path;
 use margaret_sign_in_endpoints_codegen::client_sign_in::ClientSignIn;
 use margaret_sign_in_endpoints_codegen::served_sign_in::ServedSignIn;
 use margaret_sign_in_endpoints_codegen::sign_in_service::SignInService;
 
 use crate::codegen_error::CodegenError;
 use crate::served_endpoints::ServedEndpoints;
+
+fn session_routes(
+    DeclaredSessionEndpoints { refresh, sign_outs }: &DeclaredSessionEndpoints,
+) -> Vec<HandledRoute> {
+    let refreshed = match refresh {
+        SessionRefreshRoute::Served { route } => vec![HandledRoute {
+            handler: sessions_item_path(SessionsItem::SessionRefreshEndpoint),
+            input: FrameworkInput::Content,
+            route: route.clone(),
+        }],
+        SessionRefreshRoute::Unserved => Vec::new(),
+    };
+
+    refreshed
+        .into_iter()
+        .chain(
+            sign_outs
+                .iter()
+                .map(|SessionSignOutRoute { handler, route, .. }| HandledRoute {
+                    handler: handler.handler_path(),
+                    input: FrameworkInput::Head,
+                    route: route.clone(),
+                }),
+        )
+        .collect()
+}
 
 fn handled_routes(
     ServedEndpoints {
@@ -43,11 +74,7 @@ fn handled_routes(
         });
     }
 
-    handled.extend(sessions.routes.iter().map(|route| HandledRoute {
-        handler: route.endpoint.handler_path(),
-        input: route.endpoint.input(),
-        route: route.route.clone(),
-    }));
+    handled.extend(session_routes(sessions));
 
     for ClientSignIn { binding, service } in client_sign_ins {
         if let SignInService::Served(ServedSignIn {

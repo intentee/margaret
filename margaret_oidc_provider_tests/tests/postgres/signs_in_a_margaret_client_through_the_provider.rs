@@ -23,7 +23,7 @@ struct NameClaims {
 #[tokio::test]
 async fn signs_in_a_margaret_client_through_the_provider() {
     let fixture = ProviderFixture::start(Vec::new()).await;
-    let client = MargaretClient::of_portal(&fixture).await;
+    let client = MargaretClient::of_asserting(&fixture, "portal", "artifacts").await;
     let flow = client.sign_in_flow(PORTAL_CALLBACK, &["openid", "profile"]);
     let SignInBeginning::Redirected(beginning) = flow.begin().await else {
         panic!("the sign-in redirects to the provider");

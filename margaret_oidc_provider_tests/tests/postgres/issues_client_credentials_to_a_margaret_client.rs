@@ -12,7 +12,7 @@ use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 #[tokio::test]
 async fn issues_client_credentials_to_a_margaret_client() {
     let fixture = ProviderFixture::start(Vec::new()).await;
-    let client = MargaretClient::of_portal(&fixture).await;
+    let client = MargaretClient::of_asserting(&fixture, "portal", "artifacts").await;
     let AcquiredToken::Acquired(access_token) = ClientCredentials::create(client.server.clone())
         .access_token(&TokenTarget {
             audience: TargetAudience::Unspecified,

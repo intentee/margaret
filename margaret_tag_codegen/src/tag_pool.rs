@@ -300,15 +300,26 @@ fn external_sign_in(sign_in: &DeclaredSignIn) -> BoundSignIn<'_> {
 
 fn own_sign_in<'declarations>(
     admitted: &'declarations AcceptedClientDeclaration<'_>,
-) -> BoundSignIn<'declarations> {
-    match &admitted.authorization_code {
-        DeclaredCodeGrant::Granted(policy) if !policy.redirect_routes.is_empty() => {
-            BoundSignIn::Available {
+) -> Result<BoundSignIn<'declarations>, TagError> {
+    match (&admitted.authorization_code, admitted.resources.admitted()) {
+        (DeclaredCodeGrant::Granted(policy), [] | [_]) if !policy.redirect_routes.is_empty() => {
+            Ok(BoundSignIn::Available {
                 callback_routes: SignInCallbackRoutes::Admitted(&policy.redirect_routes),
                 scopes: &policy.scopes,
-            }
+            })
         }
-        DeclaredCodeGrant::Granted(_) | DeclaredCodeGrant::Withheld => BoundSignIn::Unavailable,
+        (DeclaredCodeGrant::Granted(policy), [first, second, ..])
+            if !policy.redirect_routes.is_empty() =>
+        {
+            Err(TagError::OwnSignInAmongSeveralResources {
+                admitted: admitted.tag.to_string(),
+                first: first.tag.to_string(),
+                second: second.tag.to_string(),
+            })
+        }
+        (DeclaredCodeGrant::Granted(_) | DeclaredCodeGrant::Withheld, _) => {
+            Ok(BoundSignIn::Unavailable)
+        }
     }
 }
 
@@ -410,6 +421,7 @@ impl<'index> TagPool<'index> {
                 .any(|client| {
                     client
                         .resources
+                        .admitted()
                         .iter()
                         .any(|admitted| admitted.tag == resource.tag)
                 })
@@ -718,6 +730,7 @@ impl<'index> TagPool<'index> {
                         OAuthClientCredentials::PerResource {
                             resources: found
                                 .resources
+                                .admitted()
                                 .iter()
                                 .map(|resource| &resource.tag)
                                 .collect(),
@@ -730,7 +743,7 @@ impl<'index> TagPool<'index> {
                     admitted: found,
                     issuance,
                 },
-                sign_in: own_sign_in(found),
+                sign_in: own_sign_in(found)?,
             }),
         }
     }
@@ -887,10 +900,18 @@ mod tests {
         )
     }
 
-    fn own_provider_granting(redirects: &str) -> String {
+    fn own_provider_of_resources(redirects: &str, issuances: &str, resources: &str) -> String {
         format!(
-            "use margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\nmod routes {{\n    pub struct Callback;\n    pub struct Landing;\n}}\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Implicit, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::Rsa, {redirects}, scopes = [margaret::framework::oauth_vocabulary::openid_scope::OpenidScope, ProfileScope]), client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n{}",
+            "use margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\nmod routes {{\n    pub struct Callback;\n    pub struct Landing;\n}}\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n{issuances}#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Implicit, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::Rsa, {redirects}, scopes = [margaret::framework::oauth_vocabulary::openid_scope::OpenidScope, ProfileScope]), client_id = \"portal\", resources = {resources})]\nstruct Portal;\n{}",
             own_client("portal", "portal_app", "PortalClient")
+        )
+    }
+
+    fn own_provider_granting(redirects: &str) -> String {
+        own_provider_of_resources(
+            redirects,
+            "#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n",
+            "[artifacts]",
         )
     }
 
@@ -977,6 +998,38 @@ mod tests {
                         && scopes.iter().map(Scope::as_str).eq(["openid", "profile"])
                 )
             )
+        ));
+    }
+
+    #[test]
+    fn signs_an_own_client_in_through_an_admitted_client_declaring_no_resources() {
+        assert!(with_bindings(
+            &own_provider_of_resources("redirect_routes = [routes::Callback]", "", "[]"),
+            |bindings| matches!(
+                bindings.as_deref(),
+                Ok([binding]) if matches!(
+                    binding.sign_in,
+                    BoundSignIn::Available {
+                        callback_routes: SignInCallbackRoutes::Admitted(routes),
+                        scopes,
+                    } if routes.iter().map(ToString::to_string).eq(["crate::routes::Callback"])
+                        && scopes.iter().map(Scope::as_str).eq(["openid", "profile"])
+                )
+            )
+        ));
+    }
+
+    #[test]
+    fn rejects_an_own_sign_in_through_a_client_of_several_resources_since_its_code_exchange_names_none()
+     {
+        assert!(matches!(
+            oauth_client_rejection(&own_provider_of_resources(
+                "redirect_routes = [routes::Callback]",
+                "#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[issues_resource_tokens(reports, audience = \"reports\")]\nstruct Reports;\n",
+                "[artifacts, reports]",
+            )),
+            TagError::OwnSignInAmongSeveralResources { admitted, first, second }
+                if admitted == "portal_app" && first == "artifacts" && second == "reports"
         ));
     }
 
