@@ -7,7 +7,7 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
-use crate::metrics::Metrics;
+use crate::singletons::metrics::Metrics;
 
 #[singleton]
 #[responds_to_http(method = RouteMethod::Get, path = "/metrics", server = "internal")]

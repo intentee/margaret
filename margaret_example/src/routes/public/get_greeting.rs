@@ -7,7 +7,7 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
-use crate::english_greeter::EnglishGreeter;
+use crate::singletons::english_greeter::EnglishGreeter;
 
 #[singleton]
 #[responds_to_http(

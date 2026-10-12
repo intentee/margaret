@@ -5,18 +5,22 @@ use uuid::Uuid;
 
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::sessions::session::Session;
-use margaret_example::auth::session_user_provider::SessionUserProvider;
-use margaret_example::models::user::User;
+use margaret_example::auth::authenticated_users::user::User;
+use margaret_example::auth::user_providers::session_user_provider::SessionUserProvider;
+use margaret_example::repositories::user_account_repository::UserAccountRepository;
 use margaret_example_tests::seeded_blog::seeded_blog;
 
 async fn inferred(session: Option<Session>) -> AuthenticatedUserOutcome<User> {
     let blog = seeded_blog().await;
 
-    SessionUserProvider::create(Arc::clone(&blog.database))
-        .expect("the provider is constructed")
-        .infer_session_user(session)
-        .await
-        .expect("the session is read")
+    SessionUserProvider::create(Arc::new(
+        UserAccountRepository::create(Arc::clone(&blog.database))
+            .expect("the user account repository is constructed"),
+    ))
+    .expect("the provider is constructed")
+    .infer_session_user(session)
+    .await
+    .expect("the session is read")
 }
 
 fn session_of(subject: Uuid) -> Session {

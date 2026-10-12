@@ -6,8 +6,8 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
+use crate::auth::authenticated_users::attachment_uploader::AttachmentUploader;
 use crate::models::article::Article;
-use crate::models::attachment_uploader::AttachmentUploader;
 
 #[singleton]
 #[responds_to_http(

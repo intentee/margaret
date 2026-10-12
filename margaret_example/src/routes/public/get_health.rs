@@ -7,7 +7,7 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
-use crate::app_name::AppName;
+use crate::config::app_name::AppName;
 
 #[singleton]
 #[responds_to_http(method = RouteMethod::Get, path = "/health", server = "public")]

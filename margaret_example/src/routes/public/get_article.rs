@@ -5,8 +5,8 @@ use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::models::article::Article;
-use crate::models::article_with_author::ArticleWithAuthor;
 use crate::models::author::Author;
+use crate::shapes::article_with_author::ArticleWithAuthor;
 
 #[singleton]
 #[responds_to_http(

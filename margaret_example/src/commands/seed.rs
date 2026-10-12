@@ -16,13 +16,13 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::singleton;
 use margaret::framework::sessions::started_session::StartedSession;
 
-use crate::featured_article_id::FEATURED_ARTICLE_ID;
+use crate::constants::featured_article_id::FEATURED_ARTICLE_ID;
+use crate::enums::article_status::ArticleStatus;
 use crate::margaret::sessions::IssuedSessions;
 use crate::models::article::Article;
-use crate::models::article_status::ArticleStatus;
 use crate::models::author::Author;
 use crate::models::user_account::UserAccount;
-use crate::system_clock::SystemClock;
+use crate::singletons::system_clock::SystemClock;
 
 fn at_epoch_seconds(seconds: i64) -> DateTime<Utc> {
     DateTime::from_timestamp_nanos(seconds * 1_000_000_000)

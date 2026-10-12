@@ -1,4 +1,3 @@
-pub mod asset_path;
 pub mod delete_article;
 pub mod get_article;
 pub mod get_articles;
@@ -26,4 +25,3 @@ pub mod post_article_cover;
 pub mod post_article_import;
 pub mod post_sign_out;
 pub mod put_article_attachment;
-pub mod sessions;

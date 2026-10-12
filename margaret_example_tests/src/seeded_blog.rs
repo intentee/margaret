@@ -5,7 +5,7 @@ use margaret_database_tests::started_database::StartedDatabase;
 use margaret_example::commands::seed::Seed;
 use margaret_example::margaret::schema::SCHEMA;
 use margaret_example::margaret::sessions::session_audience::SESSION_AUDIENCE;
-use margaret_example::system_clock::SystemClock;
+use margaret_example::singletons::system_clock::SystemClock;
 use margaret_sessions_tests::session_store::session_store;
 
 /// # Panics

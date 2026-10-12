@@ -6,7 +6,7 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::singleton;
 
-use crate::english_greeter::EnglishGreeter;
+use crate::singletons::english_greeter::EnglishGreeter;
 
 #[singleton]
 #[console_command(name = "greet", description = "Greets a person by name")]

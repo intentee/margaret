@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use margaret::framework::active_record::lookup::Lookup;
 use margaret::framework::active_record::model::Model;
-use margaret_example::featured_article_id::FEATURED_ARTICLE_ID;
+use margaret_example::constants::featured_article_id::FEATURED_ARTICLE_ID;
 use margaret_example::models::article::Article;
 use margaret_example::routes::public::delete_article::DeleteArticle;
 use margaret_example_tests::seeded_blog::seeded_blog;

@@ -4,7 +4,7 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
-use crate::models::user::User;
+use crate::auth::authenticated_users::user::User;
 
 #[singleton]
 #[responds_to_http(

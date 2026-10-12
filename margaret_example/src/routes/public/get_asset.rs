@@ -7,8 +7,8 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
-use super::asset_path::AssetPath;
 use crate::margaret::asset_bag::asset_responder::AssetResponder;
+use crate::route_parameters::asset_path::AssetPath;
 
 #[singleton]
 #[responds_to_http(method = RouteMethod::Get, path = "/assets/{*asset_path}", server = "public")]

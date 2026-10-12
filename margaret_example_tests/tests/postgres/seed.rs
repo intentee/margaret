@@ -9,12 +9,12 @@ use margaret::framework::route_parameter_binding::route_parameter_binding_outcom
 use margaret::framework::sessions::issued_sessions::IssuedSessions;
 use margaret_database_tests::started_database::StartedDatabase;
 use margaret_example::commands::seed::Seed;
-use margaret_example::featured_article_id::FEATURED_ARTICLE_ID;
+use margaret_example::constants::featured_article_id::FEATURED_ARTICLE_ID;
 use margaret_example::margaret::schema::SCHEMA;
 use margaret_example::margaret::sessions::session_audience::SESSION_AUDIENCE;
-use margaret_example::models::article::Article;
-use margaret_example::models::article_with_author::ArticleWithAuthor;
-use margaret_example::system_clock::SystemClock;
+use margaret_example::repositories::article_repository::ArticleRepository;
+use margaret_example::shapes::article_with_author::ArticleWithAuthor;
+use margaret_example::singletons::system_clock::SystemClock;
 use margaret_example_tests::seeded_blog::seeded_blog;
 use margaret_sessions_tests::session_store::session_store;
 
@@ -55,7 +55,9 @@ async fn seeds_the_blog_again_without_duplicating_it() {
         CommandOutcome::Succeeded
     ));
     assert_eq!(
-        Article::listed(&blog.database, None)
+        ArticleRepository::create(Arc::clone(&blog.database))
+            .expect("the article repository is constructed")
+            .listed(None)
             .await
             .expect("the articles are listed")
             .len(),

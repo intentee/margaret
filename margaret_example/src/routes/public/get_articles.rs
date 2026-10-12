@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use margaret::framework::database::database::Database;
 use margaret::framework::http::response::Response;
 use margaret::framework::http::route_addressing::RouteAddressing;
 use margaret::framework::http::unaddressable_parameter::UnaddressableParameter;
@@ -13,12 +12,12 @@ use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::forms::get_articles_form::GetArticlesForm;
 use crate::margaret::routes::Routes;
-use crate::models::article::Article;
+use crate::repositories::article_repository::ArticleRepository;
 
 #[singleton]
 #[responds_to_http(method = RouteMethod::Get, path = "/articles", server = "public")]
 pub struct GetArticles {
-    database: Arc<Database>,
+    articles: Arc<ArticleRepository>,
 }
 
 impl GetArticles {
@@ -26,8 +25,8 @@ impl GetArticles {
     ///
     /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub fn create(database: Arc<Database>) -> anyhow::Result<Self> {
-        Ok(Self { database })
+    pub fn create(articles: Arc<ArticleRepository>) -> anyhow::Result<Self> {
+        Ok(Self { articles })
     }
 
     /// # Errors
@@ -40,7 +39,9 @@ impl GetArticles {
         #[form_request(from = RequestInput::Query)] GetArticlesForm { author }: GetArticlesForm,
     ) -> anyhow::Result<Response> {
         Ok({
-            let links = Article::listed(self.database.as_ref(), author)
+            let links = self
+                .articles
+                .listed(author)
                 .await?
                 .into_iter()
                 .map(
