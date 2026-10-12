@@ -56,7 +56,7 @@ mod tests {
     }
 
     #[test]
-    fn carries_no_content_on_get() {
+    fn carries_no_content_on_get_so_get_routes_never_read_a_request_body() {
         assert_eq!(ContentMethod::of(RouteMethod::Get), None);
     }
 }

@@ -7,7 +7,7 @@ use rustls::pki_types::UnixTime;
 use margaret_spiffe_svid_client::svid_server_cert_verifier_facade::SvidServerCertVerifierFacade;
 
 #[test]
-fn returns_error_when_not_ready() {
+fn returns_error_when_not_ready_so_no_server_is_trusted_without_a_bundle() {
     let facade = SvidServerCertVerifierFacade::default();
     let empty_cert = CertificateDer::from(vec![0u8]);
 

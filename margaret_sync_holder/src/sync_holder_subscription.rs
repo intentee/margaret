@@ -65,7 +65,7 @@ mod tests {
     use crate::sync_holder_presence::SyncHolderPresence;
 
     #[tokio::test]
-    async fn read_current_returns_set_value() {
+    async fn read_current_returns_a_value_set_before_subscribing_so_no_update_is_missed() {
         let holder: SyncHolder<Option<i32>> = SyncHolder::default();
 
         holder.set(Some(10));

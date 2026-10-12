@@ -54,7 +54,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_the_last_generation_as_exhausted() {
+    fn reports_the_last_generation_as_exhausted_instead_of_wrapping_around_to_zero() {
         assert_eq!(
             SigningKeysGeneration::new(u64::MAX)
                 .successor()

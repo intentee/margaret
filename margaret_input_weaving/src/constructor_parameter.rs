@@ -27,7 +27,7 @@ mod tests {
     use super::ConstructorParameter;
 
     #[test]
-    fn describes_the_parameter_and_its_owner() {
+    fn describes_the_parameter_and_its_owner_so_errors_pinpoint_the_declaration() {
         let site = ConstructorParameter {
             owner: CanonicalPath::new(vec!["crate".to_string(), "Config".to_string()]),
             parameter: "label".to_string(),

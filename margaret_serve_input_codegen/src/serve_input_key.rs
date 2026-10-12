@@ -7,4 +7,5 @@ pub enum ServeInputKey {
     RouteUrl(RouteUrlInput),
     Routes,
     SpiffeHttpClient,
+    SpiffeIssuerRequestClient,
 }

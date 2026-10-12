@@ -6,7 +6,7 @@ use margaret_spiffe_svid::svid_rotate_loop::svid_rotate_loop;
 use margaret_spiffe_svid_tests::build_workload_x509_context::build_workload_x509_context;
 
 #[tokio::test]
-async fn forwards_context_to_subscriber() {
+async fn broadcasts_each_received_x509_context_so_subscribers_rotate_to_the_new_svid() {
     let context = build_workload_x509_context().unwrap();
     let (x509_context_tx, mut x509_context_rx) = broadcast::channel(1);
 

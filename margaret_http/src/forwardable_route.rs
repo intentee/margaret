@@ -40,7 +40,7 @@ mod tests {
     }
 
     #[test]
-    fn sees_other_to_the_route_url() {
+    fn sees_other_to_the_route_url_with_303_so_the_client_follows_up_with_a_get() {
         let response = article_route().see_other().into_response().into_http();
 
         assert_eq!(response.status().as_u16(), 303);
@@ -54,7 +54,7 @@ mod tests {
     }
 
     #[test]
-    fn temporarily_redirects_to_the_route_url() {
+    fn temporarily_redirects_to_the_route_url_with_307_keeping_the_request_method() {
         let response = article_route()
             .temporary_redirect()
             .into_response()
@@ -71,7 +71,7 @@ mod tests {
     }
 
     #[test]
-    fn permanently_redirects_to_the_route_url() {
+    fn permanently_redirects_to_the_route_url_with_308_so_clients_cache_the_move() {
         let response = article_route()
             .permanent_redirect()
             .into_response()

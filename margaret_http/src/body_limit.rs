@@ -30,12 +30,12 @@ mod tests {
     }
 
     #[test]
-    fn refuses_a_body_over_its_limit() {
+    fn refuses_a_body_one_byte_over_its_limit_so_oversized_bodies_are_turned_away() {
         assert!(!BodyLimit::new(16).admits(17));
     }
 
     #[test]
-    fn reports_its_configured_max_bytes() {
+    fn reports_its_configured_max_bytes_so_body_reads_stop_at_that_size() {
         assert_eq!(BodyLimit::new(16).max_bytes(), 16);
     }
 }

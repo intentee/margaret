@@ -30,8 +30,8 @@ impl HeadHandler for EchoPeer {
 
 #[must_use]
 pub fn echo_peer_route() -> RouteEntry {
-    RouteEntry::new(
-        "/",
-        vec![MethodHandler::head(RouteMethod::Get, Arc::new(EchoPeer))],
-    )
+    RouteEntry::new(vec![MethodHandler::head(
+        RouteMethod::Get,
+        Arc::new(EchoPeer),
+    )])
 }

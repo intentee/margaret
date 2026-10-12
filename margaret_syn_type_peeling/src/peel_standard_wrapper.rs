@@ -49,7 +49,7 @@ mod tests {
     }
 
     #[test]
-    fn peels_the_prelude_option() {
+    fn peels_an_unimported_option_since_the_prelude_resolves_it_to_the_standard_option() {
         assert_eq!(
             peeled("", "Option<Node>", &[StandardLibraryItem::Option]).as_deref(),
             Some("Node")
@@ -87,7 +87,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_a_non_path_type() {
+    fn ignores_a_non_path_type_since_only_a_named_wrapper_can_be_peeled() {
         assert!(peeled("", "[u8; 4]", &[StandardLibraryItem::Option]).is_none());
     }
 

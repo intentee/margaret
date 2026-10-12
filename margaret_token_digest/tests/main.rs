@@ -1,3 +1,3 @@
-mod digests_a_token_with_sha256;
-mod generates_distinct_url_safe_random_tokens;
+mod digests_a_token_with_sha256_so_stored_digests_never_reveal_the_token;
+mod generates_distinct_url_safe_random_tokens_so_they_fit_urls_and_resist_guessing;
 mod matches_only_the_digest_of_the_same_token;

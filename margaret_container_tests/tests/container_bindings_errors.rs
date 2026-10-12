@@ -25,7 +25,7 @@ fn reports_a_serve_input_request_for_an_unplanned_component() {
 }
 
 #[test]
-fn reports_an_unplanned_serve_root() {
+fn reports_an_unplanned_serve_root_by_name_since_serving_cannot_construct_it() {
     let error = bindings()
         .serve_inputs(&[missing_path()])
         .expect_err("an unplanned root cannot participate in serve construction");

@@ -62,7 +62,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_malformed_server_url() {
+    fn rejects_a_relative_server_url_as_malformed_since_it_names_no_scheme_or_host() {
         assert_eq!(
             rejection("/relative"),
             "the server url is malformed: relative URL without a base"

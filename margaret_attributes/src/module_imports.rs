@@ -46,7 +46,7 @@ mod tests {
     }
 
     #[test]
-    fn returns_none_for_an_unknown_name() {
+    fn returns_none_for_an_unknown_name_so_unimported_names_stay_unbound() {
         let imports = ModuleImports::default();
 
         assert_eq!(imports.resolve("Routes"), None);

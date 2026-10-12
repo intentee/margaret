@@ -109,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_empty_path() {
+    fn recognises_no_variant_in_an_empty_path_since_it_names_no_enum_or_variant() {
         assert_eq!(WEATHER.variant(&path(&[])), None);
     }
 

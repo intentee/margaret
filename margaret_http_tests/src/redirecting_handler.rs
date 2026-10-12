@@ -7,14 +7,15 @@ use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 
 pub struct RedirectingHandler {
-    pub location: &'static str,
+    pub location: String,
+    pub status: u16,
 }
 
 #[async_trait]
 impl HeadHandler for RedirectingHandler {
     async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
         Ok(ResponseContinuation::Done(
-            Response::text(302, "redirected").header("location", self.location),
+            Response::text(self.status, "redirected").header("location", self.location.clone()),
         ))
     }
 }

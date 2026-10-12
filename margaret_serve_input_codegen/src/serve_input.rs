@@ -17,6 +17,7 @@ pub enum ServeInput {
     RouteUrl(RouteUrlInput),
     Routes,
     SpiffeHttpClient,
+    SpiffeIssuerRequestClient,
 }
 
 impl ServeInput {
@@ -32,6 +33,9 @@ impl ServeInput {
                 quote! { ::std::sync::Arc<#routes> }
             }
             ServeInput::SpiffeHttpClient => quote! { margaret::framework::reqwest::Client },
+            ServeInput::SpiffeIssuerRequestClient => quote! {
+                ::std::sync::Arc<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient>
+            },
         }
     }
 
@@ -42,7 +46,8 @@ impl ServeInput {
             ServeInput::EnvironmentVariable(_)
             | ServeInput::RouteUrl(_)
             | ServeInput::Routes
-            | ServeInput::SpiffeHttpClient => true,
+            | ServeInput::SpiffeHttpClient
+            | ServeInput::SpiffeIssuerRequestClient => true,
         }
     }
 
@@ -54,6 +59,7 @@ impl ServeInput {
             ServeInput::RouteUrl(route) => &route.path,
             ServeInput::Routes => "routes",
             ServeInput::SpiffeHttpClient => "spiffe_http_client",
+            ServeInput::SpiffeIssuerRequestClient => "spiffe_issuer_request_client",
         }
     }
 
@@ -69,7 +75,8 @@ impl ServeInput {
             ServeInput::EnvironmentVariable(_)
             | ServeInput::RouteUrl(_)
             | ServeInput::Routes
-            | ServeInput::SpiffeHttpClient => false,
+            | ServeInput::SpiffeHttpClient
+            | ServeInput::SpiffeIssuerRequestClient => false,
         }
     }
 
@@ -85,6 +92,7 @@ impl ServeInput {
             ServeInput::RouteUrl(route) => ServeInputKey::RouteUrl(route.clone()),
             ServeInput::Routes => ServeInputKey::Routes,
             ServeInput::SpiffeHttpClient => ServeInputKey::SpiffeHttpClient,
+            ServeInput::SpiffeIssuerRequestClient => ServeInputKey::SpiffeIssuerRequestClient,
         }
     }
 
@@ -93,9 +101,10 @@ impl ServeInput {
         match self {
             ServeInput::ConsoleArgument(argument) => argument.weaving(),
             ServeInput::EnvironmentVariable(variable) => variable.value.weaving.clone(),
-            ServeInput::RouteUrl(_) | ServeInput::Routes | ServeInput::SpiffeHttpClient => {
-                WeavingKind::Cloned
-            }
+            ServeInput::RouteUrl(_)
+            | ServeInput::Routes
+            | ServeInput::SpiffeHttpClient
+            | ServeInput::SpiffeIssuerRequestClient => WeavingKind::Cloned,
         }
     }
 }
@@ -207,6 +216,22 @@ mod tests {
         assert!(!input.reads_clap_matches());
         assert!(!input.reads_server_origins());
         assert_eq!(input.slot_key(), ServeInputKey::SpiffeHttpClient);
+    }
+
+    #[test]
+    fn a_spiffe_issuer_request_client_is_a_shared_handle_built_once_while_serving() {
+        let input = ServeInput::SpiffeIssuerRequestClient;
+
+        assert_eq!(
+            collapsed(&input.field_type()),
+            "::std::sync::Arc<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient>"
+        );
+        assert_eq!(input.name(), "spiffe_issuer_request_client");
+        assert_eq!(input.weaving(), WeavingKind::Cloned);
+        assert!(input.is_shareable());
+        assert!(!input.reads_clap_matches());
+        assert!(!input.reads_server_origins());
+        assert_eq!(input.slot_key(), ServeInputKey::SpiffeIssuerRequestClient);
     }
 
     #[test]

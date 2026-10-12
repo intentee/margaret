@@ -10,6 +10,7 @@ use margaret_http_codegen::web_socket_session_route::WebSocketSessionRoute;
 use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::binding_roots::binding_roots;
+use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
 
 use crate::build_websocket_plan::build_websocket_plan;
 use crate::built_websocket_plan::BuiltWebSocketPlan;
@@ -55,12 +56,13 @@ impl WebSocketPlan {
     /// Returns `WebSocketCodegenError` propagated from the work it performs.
     pub fn build(
         index: &AttributeIndex,
+        route_paths: &mut RoutePathRegistry,
         bindings: &ContainerBindings,
         middleware_plans: &MiddlewarePlans,
         registries: &BindingRegistries,
     ) -> Result<Self, WebSocketCodegenError> {
         let BuiltWebSocketPlan { messages, sessions } =
-            build_websocket_plan(index, bindings, middleware_plans, registries)?;
+            build_websocket_plan(index, route_paths, bindings, middleware_plans, registries)?;
         let mut sessions_by_server: BTreeMap<String, Vec<usize>> = BTreeMap::new();
 
         for (position, session_plan) in sessions.iter().enumerate() {

@@ -16,7 +16,7 @@ fn rejection(fixture: &str) -> AttributeError {
 }
 
 #[test]
-fn rejects_an_item_attribute_declared_twice() {
+fn rejects_an_item_attribute_declared_twice_as_which_one_applies_is_ambiguous() {
     assert!(matches!(
         rejection("repeated_item_attribute"),
         AttributeError::RepeatedAttribute { attribute_path, target }
@@ -25,7 +25,7 @@ fn rejects_an_item_attribute_declared_twice() {
 }
 
 #[test]
-fn rejects_a_field_marker_declared_twice() {
+fn rejects_a_field_marker_declared_twice_as_which_one_applies_is_ambiguous() {
     assert!(matches!(
         rejection("repeated_field_marker"),
         AttributeError::RepeatedAttribute { attribute_path, target }
@@ -43,7 +43,7 @@ fn rejects_a_marker_declared_twice_on_a_positional_field() {
 }
 
 #[test]
-fn rejects_a_method_attribute_declared_twice() {
+fn rejects_a_method_attribute_declared_twice_as_which_one_applies_is_ambiguous() {
     assert!(matches!(
         rejection("repeated_method_attribute"),
         AttributeError::RepeatedAttribute { attribute_path, target }
@@ -52,7 +52,7 @@ fn rejects_a_method_attribute_declared_twice() {
 }
 
 #[test]
-fn rejects_a_parameter_marker_declared_twice() {
+fn rejects_a_parameter_marker_declared_twice_as_which_one_applies_is_ambiguous() {
     assert!(matches!(
         rejection("repeated_parameter_marker"),
         AttributeError::RepeatedAttribute { attribute_path, target }

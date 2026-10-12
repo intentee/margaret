@@ -80,7 +80,7 @@ mod tests {
     use super::SingletonRequestHeader;
 
     #[test]
-    fn classifies_every_singleton_request_header() {
+    fn classifies_every_singleton_request_header_so_repeating_any_is_refused() {
         for (name, expected) in [
             (AUTHORIZATION, SingletonRequestHeader::Authorization),
             (CONTENT_LENGTH, SingletonRequestHeader::ContentLength),

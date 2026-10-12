@@ -30,7 +30,7 @@ mod tests {
     }
 
     #[test]
-    fn leaves_a_short_integer_ungrouped() {
+    fn leaves_a_three_digit_integer_ungrouped_so_no_separator_leads_the_literal() {
         assert_eq!(grouped_integer_literal(512).to_string(), "512");
     }
 

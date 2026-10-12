@@ -24,9 +24,9 @@ mod tests {
     use crate::codegen_error::CodegenError;
 
     #[test]
-    fn reports_a_missing_manifest_directory() {
+    fn reports_a_missing_manifest_directory_since_the_crate_to_generate_is_unknown() {
         in_child_process(
-            "generate_from_environment::tests::reports_a_missing_manifest_directory",
+            "generate_from_environment::tests::reports_a_missing_manifest_directory_since_the_crate_to_generate_is_unknown",
             &[ChildVariable::Removed("CARGO_MANIFEST_DIR")],
             || {
                 assert!(matches!(

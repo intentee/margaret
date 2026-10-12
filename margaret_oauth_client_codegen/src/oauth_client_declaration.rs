@@ -357,7 +357,7 @@ pub struct BlogClient;
     }
 
     #[test]
-    fn rejects_a_client_without_a_tag() {
+    fn rejects_a_client_without_a_tag_since_its_generated_module_is_named_after_it() {
         assert_eq!(
             rejection("authentication = ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"blog\", issuer = margaret")
                 .to_string(),
@@ -377,7 +377,7 @@ pub struct BlogClient;
     }
 
     #[test]
-    fn rejects_a_client_without_authentication() {
+    fn rejects_a_client_without_authentication_instead_of_assuming_a_default_method() {
         assert_eq!(
             rejection("blog, client_id = \"blog\", issuer = margaret").to_string(),
             "#[oauth_client] on 'crate::Client' does not declare how the client authenticates"
@@ -500,7 +500,7 @@ pub struct BlogClient;
     }
 
     #[test]
-    fn rejects_a_client_without_an_issuer() {
+    fn rejects_a_client_without_an_issuer_since_nothing_says_which_server_it_talks_to() {
         assert_eq!(
             rejection("blog, authentication = ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"blog\"").to_string(),
             "#[oauth_client] on 'crate::Client' must name its issuer as `issuer = <tag>`"
@@ -544,7 +544,7 @@ pub struct BlogClient;
     }
 
     #[test]
-    fn reports_unparseable_client_arguments() {
+    fn reports_unparseable_oauth_client_arguments_naming_the_oauth_client_attribute_to_fix() {
         assert!(matches!(
             rejection("= 5"),
             OAuthClientCodegenError::Index(AttributeError::Arguments(

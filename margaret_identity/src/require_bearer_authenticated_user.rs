@@ -27,7 +27,7 @@ mod tests {
     use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
 
     #[test]
-    fn hands_over_the_authenticated_user() {
+    fn meets_the_bearer_requirement_with_the_user_so_handlers_receive_the_caller() {
         assert!(matches!(
             require_bearer_authenticated_user(AuthenticatedUserOutcome::Authenticated("runner")),
             Requirement::Met("runner")

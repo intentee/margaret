@@ -9,7 +9,7 @@ use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_s
 use margaret_spiffe_svid_tests::leaf_spiffe_example_org_server_der::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
 
 #[test]
-fn accepts_matching_trust_domain() {
+fn accepts_a_server_svid_of_the_expected_trust_domain_ignoring_the_dns_server_name() {
     let verifier = SvidServerCertVerifier::new(
         build_root_cert_store_with_ca(),
         "example.org",

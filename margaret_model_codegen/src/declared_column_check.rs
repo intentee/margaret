@@ -145,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_absent_arguments_as_not_declared() {
+    fn reads_absent_check_arguments_as_undeclared_so_the_column_gets_no_check() {
         assert_eq!(
             parse(None, None).expect("absent arguments parse"),
             DeclaredColumnCheck::NotDeclared
@@ -153,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_byte_length() {
+    fn reads_a_lone_byte_length_as_a_check_so_the_column_is_constrained_to_that_length() {
         assert_eq!(
             parse(Some(32), None).expect("a byte length parses"),
             DeclaredColumnCheck::ByteLength { length: 32 }
@@ -161,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_minimum() {
+    fn reads_a_zero_minimum_as_a_check_since_zero_is_a_valid_lower_bound() {
         assert_eq!(
             parse(None, Some(0)).expect("a minimum parses"),
             DeclaredColumnCheck::Minimum { minimum: 0 }
@@ -169,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_zero_byte_length() {
+    fn rejects_a_zero_byte_length_since_it_would_admit_only_empty_values() {
         assert!(matches!(
             parse(Some(0), None).expect_err("a zero byte length is rejected"),
             ModelCodegenError::ByteLengthMustBePositive { ref field, ref model }

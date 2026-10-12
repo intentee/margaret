@@ -30,7 +30,7 @@ mod tests {
     }
 
     #[test]
-    fn preserves_underscores_in_the_column() {
+    fn preserves_underscores_in_the_column_so_the_index_names_it_as_declared() {
         assert_eq!(
             index_name("articles", &["author_id".to_string()])
                 .expect("the identifier is within the limit"),
@@ -39,7 +39,7 @@ mod tests {
     }
 
     #[test]
-    fn is_stable_across_repeated_calls() {
+    fn is_stable_across_repeated_calls_so_regenerated_ddl_names_the_same_index() {
         assert_eq!(
             index_name("articles", &["created_at".to_string()])
                 .expect("the identifier is within the limit"),

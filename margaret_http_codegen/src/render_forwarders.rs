@@ -1,7 +1,9 @@
+use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use margaret_attributes::name_allocator::NameAllocator;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 use margaret_route_method::route_method::RouteMethod;
@@ -15,20 +17,26 @@ use crate::route_group::RouteGroup;
 fn forward_method(named: &NamedRoute<'_>) -> TokenStream {
     let method = format_ident!("{}", named.name);
     let name = named.name;
-    let placeholders: Vec<&str> = named.path.parameters().collect();
-    let parameters = placeholders.iter().map(|placeholder| {
-        let parameter = format_ident!("{}", placeholder);
-
-        quote! { #parameter: ::std::string::String }
+    let mut allocator = NameAllocator::new();
+    let forwarded: Vec<ForwardedParameter<'_>> = named
+        .path
+        .parameters()
+        .map(|placeholder| ForwardedParameter {
+            placeholder,
+            value: format_ident!("{}", allocator.allocate(placeholder).field()),
+        })
+        .collect();
+    let parameters = forwarded.iter().map(|ForwardedParameter { value, .. }| {
+        quote! { #value: ::std::string::String }
     });
-    let path_params = if placeholders.is_empty() {
+    let path_params = if forwarded.is_empty() {
         quote! { ::std::collections::HashMap::new() }
     } else {
-        let entries = placeholders.iter().map(|placeholder| {
-            let parameter = format_ident!("{}", placeholder);
-
-            quote! { (#placeholder.to_string(), #parameter) }
-        });
+        let entries = forwarded
+            .iter()
+            .map(|ForwardedParameter { placeholder, value }| {
+                quote! { (#placeholder.to_string(), #value) }
+            });
 
         quote! { ::std::collections::HashMap::from([#(#entries),*]) }
     };
@@ -73,6 +81,11 @@ fn server_forwarder(table: &HttpRouteTable, server: &HttpServer) -> TokenStream 
             #(#methods)*
         }
     }
+}
+
+struct ForwardedParameter<'path> {
+    placeholder: &'path str,
+    value: Ident,
 }
 
 pub(crate) fn render_forwarders(

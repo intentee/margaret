@@ -5,7 +5,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_route_method::route_method::RouteMethod;
-use margaret_route_parameter_codegen::route_path::RoutePath;
+use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
 use margaret_route_parameter_codegen::route_url_template::RouteUrlTemplate;
 use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
 
@@ -20,9 +20,12 @@ pub struct DeclaredRoutes<'index> {
 impl<'index> DeclaredRoutes<'index> {
     /// # Errors
     ///
-    /// Returns `HttpCodegenError` when a `#[responds_to_http]` declaration is malformed or two
-    /// routes share a name.
-    pub fn read(index: &'index AttributeIndex) -> Result<Self, HttpCodegenError> {
+    /// Returns `HttpCodegenError` when a `#[responds_to_http]` declaration is malformed, its path
+    /// is not admitted to the routes of its server, or two routes share a name.
+    pub fn read(
+        index: &'index AttributeIndex,
+        route_paths: &mut RoutePathRegistry,
+    ) -> Result<Self, HttpCodegenError> {
         let mut routes = Vec::new();
         let mut seen_names: HashMap<String, String> = HashMap::new();
 
@@ -46,12 +49,13 @@ impl<'index> DeclaredRoutes<'index> {
                 return Err(HttpCodegenError::InvalidServerName { responder, server });
             }
 
-            let path = match RoutePath::parse(&path) {
-                Ok(parsed) => parsed,
+            let path = match route_paths.admit_responder_path(&server, &path) {
+                Ok(admitted) => admitted,
                 Err(source) => {
-                    return Err(HttpCodegenError::UnroutableRoutePath {
+                    return Err(HttpCodegenError::UnadmittedRoutePath {
                         path,
                         responder,
+                        server,
                         source,
                     });
                 }
@@ -138,7 +142,10 @@ impl<'index> DeclaredRoutes<'index> {
 mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes_tests::indexed_source::IndexedSource;
+    use margaret_route_parameter_codegen::route_path_error::RoutePathError;
+    use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
     use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
+    use margaret_url_path::path_segment_rejection::PathSegmentRejection;
 
     use super::DeclaredRoutes;
     use crate::http_codegen_error::HttpCodegenError;
@@ -152,7 +159,7 @@ mod tests {
     fn redirect_target(route: &str) -> Result<RouteUrlInput, HttpCodegenError> {
         let indexed = IndexedSource::new(ROUTES);
 
-        DeclaredRoutes::read(&indexed.index)
+        DeclaredRoutes::read(&indexed.index, &mut RoutePathRegistry::new())
             .expect("the routes are declared")
             .redirect_target(&path(route), &path("Client"))
     }
@@ -208,14 +215,21 @@ mod tests {
         );
 
         assert!(matches!(
-            DeclaredRoutes::read(&indexed.index),
-            Err(HttpCodegenError::UnroutableRoutePath { path, responder, .. })
-                if path == "/articles/../admin" && responder == "crate::Escaping"
+            DeclaredRoutes::read(&indexed.index, &mut RoutePathRegistry::new()),
+            Err(HttpCodegenError::UnadmittedRoutePath {
+                path,
+                responder,
+                server,
+                source: RoutePathError::UnroutableSegment {
+                    rejection: PathSegmentRejection::DotSegment,
+                    ..
+                },
+            }) if path == "/articles/../admin" && responder == "crate::Escaping" && server == "public"
         ));
     }
 
     #[test]
-    fn rejects_a_redirect_route_with_parameters() {
+    fn rejects_a_redirect_route_with_parameters_since_a_redirect_cannot_fill_them() {
         assert_eq!(
             rejection("Article"),
             "'crate::Client' redirects to 'crate::Article', whose path '/articles/{article}' has parameters a redirect cannot fill"

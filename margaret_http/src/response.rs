@@ -315,14 +315,14 @@ mod tests {
     }
 
     #[test]
-    fn builds_a_forbidden_response() {
+    fn builds_a_403_forbidden_response_for_a_caller_that_lacks_permission() {
         let response = Response::forbidden().into_http();
 
         assert_eq!(response.status().as_u16(), 403);
     }
 
     #[test]
-    fn builds_an_unauthorized_response() {
+    fn builds_a_401_unauthorized_response_for_a_caller_that_must_authenticate_first() {
         let response = Response::unauthorized().into_http();
 
         assert_eq!(response.status().as_u16(), 401);
@@ -348,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn attaches_a_set_cookie_header() {
+    fn attaches_a_set_cookie_header_so_the_browser_stores_the_cookie() {
         let response = Response::text(200, "")
             .set_cookie(&Cookie::new("session", "abc"))
             .into_http();

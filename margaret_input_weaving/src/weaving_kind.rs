@@ -68,7 +68,7 @@ mod tests {
     }
 
     #[test]
-    fn a_required_copy_primitive_is_copy() {
+    fn a_required_copy_primitive_is_copy_so_it_is_passed_without_cloning() {
         assert_eq!(
             WeavingKind::from_canonical(&index(), &path(&["u16"]), true),
             WeavingKind::Copy
@@ -92,7 +92,7 @@ mod tests {
     }
 
     #[test]
-    fn a_required_string_borrows_as_str() {
+    fn a_required_string_borrows_as_str_so_parameters_can_take_a_str() {
         assert_eq!(
             WeavingKind::from_canonical(&index(), &path(&["std", "string", "String"]), true),
             WeavingKind::BorrowedStr
@@ -100,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn an_optional_string_is_cloned() {
+    fn an_optional_string_is_cloned_since_an_option_cannot_lend_a_bare_str() {
         assert_eq!(
             WeavingKind::from_canonical(&index(), &path(&["std", "string", "String"]), false),
             WeavingKind::Cloned
@@ -124,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn a_resolved_custom_type_is_cloned() {
+    fn a_resolved_custom_type_is_cloned_since_nothing_proves_it_is_copy() {
         assert_eq!(
             WeavingKind::from_canonical(&index(), &path(&["crate", "Marker"]), true),
             WeavingKind::Cloned

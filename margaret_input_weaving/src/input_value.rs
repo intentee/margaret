@@ -145,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_generic_value_type() {
+    fn rejects_a_generic_value_type_since_its_resolved_path_would_drop_the_arguments() {
         let error = from_declared(&parse_quote!(Vec<String>)).expect_err("a generic is rejected");
 
         assert!(matches!(
@@ -156,7 +156,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_unresolvable_value_type() {
+    fn rejects_an_unresolvable_value_type_since_generated_code_could_not_name_it() {
         let error = from_declared(&parse_quote!(Widget)).expect_err("an unknown name is rejected");
 
         assert!(matches!(
@@ -192,7 +192,7 @@ mod tests {
     }
 
     #[test]
-    fn a_borrowed_string_refers_to_str() {
+    fn a_borrowed_string_refers_to_str_so_its_parameter_is_an_idiomatic_str() {
         let value = from_declared(&parse_quote!(String)).expect("the type resolves");
 
         assert_eq!(collapsed(&value.parameter_referent()), "str");

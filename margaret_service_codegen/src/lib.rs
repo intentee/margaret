@@ -19,8 +19,10 @@ mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::framework_attribute::FrameworkAttribute;
     use margaret_attributes_tests::indexed_source::IndexedSource;
+    use margaret_container::constructor_outcome::ConstructorOutcome;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::framework_construction::FrameworkConstruction;
+    use margaret_container::framework_dependency::FrameworkDependency;
     use margaret_container::framework_enablement::FrameworkEnablement;
     use margaret_container::framework_injection_role::FrameworkInjectionRole;
     use margaret_container::framework_provider::FrameworkProvider;
@@ -147,7 +149,7 @@ mod tests {
             "letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.issuer_origin,);"
         ));
         assert!(source.contains(
-            "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(&origin_public),);"
+            "letroutes=matchsuper::routes::Routes::from_origins(&origin_public){Ok(routes)=>::std::sync::Arc::new(routes),Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
         assert!(!source.contains("public-url"));
     }
@@ -198,7 +200,7 @@ mod tests {
     }
 
     #[test]
-    fn canonicalizes_imported_ticker_paths_before_rendering() {
+    fn canonicalizes_imported_ticker_paths_so_they_resolve_outside_the_importing_module() {
         let source = rendered(
             r"
 mod schedule {}
@@ -229,7 +231,7 @@ impl Flusher {
     }
 
     #[test]
-    fn rejects_an_unresolvable_ticker_interval_path() {
+    fn rejects_an_unresolvable_ticker_interval_path_since_generated_code_cannot_name_it() {
         let message = error_for(
             "#[scheduled_with_tick_timer(interval = PERIOD)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
@@ -239,7 +241,7 @@ impl Flusher {
     }
 
     #[test]
-    fn rejects_an_unresolvable_ticker_behavior_path() {
+    fn rejects_an_unresolvable_ticker_behavior_path_since_generated_code_cannot_name_it() {
         let message = error_for(
             "#[scheduled_with_tick_timer(interval = crate::PERIOD, behavior = Delay)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
@@ -352,7 +354,7 @@ impl Flusher {
     }
 
     #[test]
-    fn renders_a_ticker_without_a_behavior() {
+    fn renders_a_ticker_without_a_behavior_so_the_default_missed_tick_policy_applies() {
         let source = rendered(
             "#[scheduled_with_tick_timer(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
             &[],
@@ -365,7 +367,7 @@ impl Flusher {
     }
 
     #[test]
-    fn renders_a_service_without_a_token() {
+    fn renders_a_service_without_a_token_so_runners_may_ignore_cancellation() {
         let source = rendered(
             "#[service]\nstruct Idle;\n\nimpl Idle {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
             &[],
@@ -549,6 +551,59 @@ impl Flusher {
     }
 
     #[test]
+    fn builds_only_the_spiffe_issuer_request_client_a_framework_provider_depends_on() {
+        let index = IndexedSource::new(
+            "#[service]\nstruct Worker {\n    sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: tokio_util::sync::CancellationToken) -> anyhow::Result<()> {}\n}\n",
+        )
+        .index;
+        let bindings = render_container(
+            &index,
+            &scan(&index).expect("the console arguments are scanned"),
+            &[FrameworkProvider {
+                construction: FrameworkConstruction::Constructor {
+                    dependencies: vec![FrameworkDependency::SpiffeIssuerRequestClient],
+                    is_async: false,
+                    method: "create".to_string(),
+                    outcome: ConstructorOutcome::Infallible,
+                },
+                enablement: FrameworkEnablement::Declared,
+                injection: FrameworkInjectionRole::Unmarked,
+                provided: CanonicalPath::new(
+                    [
+                        "margaret",
+                        "framework",
+                        "sessions",
+                        "consumed_sessions",
+                        "ConsumedSessions",
+                    ]
+                    .map(str::to_string)
+                    .to_vec(),
+                ),
+            }],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container is rendered")
+        .bindings;
+        let plan = ServicePlan::build(&index, &[], &bindings, &serve_roots(&index))
+            .expect("the service construction is planned");
+        let source: String = render_services(&plan, &[], false, &bindings)
+            .format()
+            .expect("the module formats")
+            .source()
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(
+            "letspiffe_bundle=matchmargaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new("
+        ));
+        assert!(source.contains(
+            "letspiffe_issuer_request_client=matchmargaret::framework::issuer_request::issuer_request_client::IssuerRequestClient::preconfigured(spiffe_bundle.reqwest_client_builder(),){Ok(client)=>::std::sync::Arc::new(client),Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
+        ));
+        assert!(!source.contains("spiffe_http_client"));
+    }
+
+    #[test]
     fn shares_the_svid_bundle_when_a_pinned_server_and_a_client_are_active() {
         let source = rendered(
             SPIFFE_CLIENT,
@@ -598,7 +653,7 @@ impl Flusher {
             ],
         );
 
-        let routes = "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(&origin_internal,&origin_public),);";
+        let routes = "letroutes=matchsuper::routes::Routes::from_origins(&origin_internal,&origin_public,){Ok(routes)=>::std::sync::Arc::new(routes),Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};";
 
         assert!(source.contains(
             r#"letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(matchmatches.get_one::<margaret::framework::server_origin::server_origin::ServerOrigin,>("public-url"){Some(value)=>value.origin.ascii_serialization(),None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}},);"#
@@ -657,7 +712,7 @@ impl Flusher {
     }
 
     #[test]
-    fn rejects_a_non_path_interval() {
+    fn rejects_a_non_path_interval_since_a_bare_number_has_no_time_unit() {
         let error = rejection_for(
             "#[scheduled_with_tick_timer(interval = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
@@ -675,7 +730,7 @@ impl Flusher {
     }
 
     #[test]
-    fn rejects_a_non_path_behavior() {
+    fn rejects_a_non_path_behavior_since_it_must_name_a_missed_tick_variant() {
         let error = rejection_for(
             "#[scheduled_with_tick_timer(interval = crate::P, behavior = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
@@ -706,7 +761,7 @@ impl Flusher {
     }
 
     #[test]
-    fn rejects_conflicting_roles() {
+    fn rejects_a_struct_marked_both_service_and_ticker_because_the_roles_are_mutually_exclusive() {
         let message = error_for(
             "#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
@@ -715,12 +770,12 @@ impl Flusher {
     }
 
     #[test]
-    fn rejects_a_unit_without_a_runner() {
+    fn rejects_a_unit_without_a_runner_since_the_service_would_have_nothing_to_run() {
         assert!(error_for("#[service]\nstruct Bad;\n").contains("no #[process] method"));
     }
 
     #[test]
-    fn rejects_an_ambiguous_runner() {
+    fn rejects_a_service_with_two_process_methods_instead_of_guessing_which_one_runs() {
         let message = error_for(
             "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn a(&self) -> anyhow::Result<()> {}\n    #[process]\n    fn b(&self) -> anyhow::Result<()> {}\n}\n",
         );
@@ -729,7 +784,7 @@ impl Flusher {
     }
 
     #[test]
-    fn rejects_a_ticker_without_an_interval() {
+    fn rejects_a_ticker_without_an_interval_since_no_default_period_is_assumed() {
         let message = error_for(
             "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
@@ -738,7 +793,7 @@ impl Flusher {
     }
 
     #[test]
-    fn rejects_an_unmarked_runner_parameter() {
+    fn rejects_an_unmarked_runner_parameter_since_only_a_token_can_be_supplied() {
         let message = error_for(
             "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<()> {}\n}\n",
         );
@@ -947,7 +1002,7 @@ impl Second {
     }
 
     #[test]
-    fn propagates_malformed_ticker_arguments() {
+    fn surfaces_unparseable_ticker_arguments_instead_of_generating_the_ticker() {
         let message = error_for(
             "#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );

@@ -32,12 +32,12 @@ mod tests {
     }
 
     #[test]
-    fn returns_the_only_generic_type_argument() {
+    fn returns_the_only_generic_type_argument_so_a_wrapper_can_be_peeled_to_it() {
         assert_eq!(argument("Wrapper<Node>").as_deref(), Some("Node"));
     }
 
     #[test]
-    fn ignores_a_segment_without_generic_arguments() {
+    fn ignores_a_segment_without_generic_arguments_since_nothing_is_wrapped_inside() {
         assert!(argument("Wrapper").is_none());
     }
 

@@ -12,7 +12,8 @@ pub fn serve_input_registration(input: &ServeInput) -> TokenStream {
         ServeInput::EnvironmentVariable(_)
         | ServeInput::RouteUrl(_)
         | ServeInput::Routes
-        | ServeInput::SpiffeHttpClient => quote! {},
+        | ServeInput::SpiffeHttpClient
+        | ServeInput::SpiffeIssuerRequestClient => quote! {},
     }
 }
 
@@ -60,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    fn an_environment_variable_registers_nothing() {
+    fn an_environment_variable_registers_nothing_since_clap_never_parses_it() {
         assert!(
             collapsed(&ServeInput::EnvironmentVariable(EnvironmentVariable {
                 name: EnvironmentVariableName::new("DATABASE_URL").expect("the name is usable"),
@@ -71,7 +72,12 @@ mod tests {
     }
 
     #[test]
-    fn a_spiffe_http_client_registers_nothing() {
+    fn a_spiffe_http_client_registers_nothing_since_no_command_line_feeds_it() {
         assert!(collapsed(&ServeInput::SpiffeHttpClient).is_empty());
+    }
+
+    #[test]
+    fn a_spiffe_issuer_request_client_registers_no_console_argument() {
+        assert!(collapsed(&ServeInput::SpiffeIssuerRequestClient).is_empty());
     }
 }

@@ -47,10 +47,11 @@ async fn hands_the_request_body_to_a_content_responder() {
     );
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/echo",
-            vec![MethodHandler::content(ContentMethod::Post, handler)],
-        )],
+        ["/echo"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            handler,
+        )])],
     )
     .await;
 

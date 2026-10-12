@@ -75,7 +75,7 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn restarts_the_limit_after_progress() {
+    async fn restarts_the_limit_after_progress_so_a_slow_but_steady_client_never_stalls() {
         let mut timer = StallTimer::new(CLIENT_BODY_TIMEOUT);
 
         assert!(!stalls_when(&mut timer, Poll::Pending).await);

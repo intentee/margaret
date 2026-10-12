@@ -182,14 +182,14 @@ mod tests {
     }
 
     #[test]
-    fn renders_an_application_namespace() {
+    fn renders_the_application_namespace_so_the_table_is_created_outside_the_framework_schema() {
         assert!(value_table("String").contains(
             "namespace:margaret::framework::sql_identifier::table_namespace::TableNamespace::Application"
         ));
     }
 
     #[test]
-    fn renders_a_framework_namespace() {
+    fn renders_the_framework_namespace_so_the_table_is_created_in_the_framework_schema() {
         assert!(
             table_source(
                 "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n}\n",
@@ -216,19 +216,19 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_column_without_a_default() {
+    fn renders_a_column_without_a_default_as_not_set_so_inserts_must_supply_it() {
         assert!(value_table("String").contains(
             "column_type:margaret::framework::model::column_type::ColumnType::Text,default:margaret::framework::model::column_default::ColumnDefault::NotSet,name:\"value\",nullable:false"
         ));
     }
 
     #[test]
-    fn renders_a_nullable_column() {
+    fn renders_an_option_field_as_a_nullable_column_so_none_can_be_stored() {
         assert!(value_table("Option<String>").contains("name:\"value\",nullable:true"));
     }
 
     #[test]
-    fn renders_a_big_int_column() {
+    fn renders_an_i64_field_as_a_big_int_column_of_the_same_eight_byte_range() {
         assert!(
             value_table("i64").contains(
                 "column_type:margaret::framework::model::column_type::ColumnType::BigInt"
@@ -237,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_boolean_column() {
+    fn renders_a_bool_field_as_a_boolean_column_matching_its_rust_type() {
         assert!(
             value_table("bool").contains(
                 "column_type:margaret::framework::model::column_type::ColumnType::Boolean"
@@ -246,7 +246,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_bytea_column() {
+    fn renders_a_byte_vector_field_as_a_bytea_column_to_hold_raw_bytes() {
         assert!(
             value_table("Vec<u8>")
                 .contains("column_type:margaret::framework::model::column_type::ColumnType::Bytea")
@@ -254,14 +254,14 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_double_precision_column() {
+    fn renders_an_f64_field_as_a_double_precision_column_of_the_same_precision() {
         assert!(value_table("f64").contains(
             "column_type:margaret::framework::model::column_type::ColumnType::DoublePrecision"
         ));
     }
 
     #[test]
-    fn renders_an_integer_column() {
+    fn renders_an_i32_field_as_an_integer_column_of_the_same_four_byte_range() {
         assert!(
             value_table("i32").contains(
                 "column_type:margaret::framework::model::column_type::ColumnType::Integer"
@@ -270,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_real_column() {
+    fn renders_an_f32_field_as_a_real_column_of_the_same_single_precision() {
         assert!(
             value_table("f32")
                 .contains("column_type:margaret::framework::model::column_type::ColumnType::Real")
@@ -278,14 +278,14 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_timestamptz_column() {
+    fn renders_a_utc_datetime_field_as_a_timestamptz_column_storing_an_absolute_instant() {
         assert!(value_table("chrono::DateTime<chrono::Utc>").contains(
             "column_type:margaret::framework::model::column_type::ColumnType::Timestamptz"
         ));
     }
 
     #[test]
-    fn renders_a_numeric_column() {
+    fn renders_a_decimal_field_as_a_numeric_column_with_its_declared_precision_and_scale() {
         assert!(
             application_table(
                 "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    value: rust_decimal::Decimal,\n}\n",
@@ -298,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_byte_length_check() {
+    fn renders_a_byte_length_check_so_postgres_rejects_bytes_of_another_length() {
         assert!(
             application_table(
                 "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, byte_length = 32)]\n    hash: Vec<u8>,\n}\n",
@@ -311,7 +311,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_minimum_check() {
+    fn renders_a_minimum_check_so_postgres_rejects_a_value_below_the_declared_minimum() {
         assert!(
             application_table(
                 "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, minimum = 0)]\n    amount: i64,\n}\n",
@@ -339,7 +339,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_cascading_foreign_key() {
+    fn renders_a_cascading_foreign_key_so_deleting_a_parent_deletes_its_children() {
         assert!(
             on_delete_table("Cascade", "Key<Author>")
                 .contains("on_delete:margaret::framework::model::on_delete::OnDelete::Cascade")
@@ -347,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_restricting_foreign_key() {
+    fn renders_a_restricting_foreign_key_so_a_referenced_parent_cannot_be_deleted() {
         assert!(
             on_delete_table("Restrict", "Key<Author>")
                 .contains("on_delete:margaret::framework::model::on_delete::OnDelete::Restrict")
@@ -363,7 +363,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_plain_index() {
+    fn renders_an_indexed_field_as_a_plain_index_so_lookups_by_it_avoid_a_table_scan() {
         assert!(value_table_with_index().contains(
             "indexes:&[margaret::framework::model::index::Index{columns:&[\"value\"],name:\"values_value_index\",}]"
         ));
@@ -377,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_unique_constraint() {
+    fn renders_a_unique_column_as_a_unique_constraint_so_postgres_rejects_duplicate_values() {
         assert!(
             application_table(
                 "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n    #[column(unique)]\n    value: String,\n}\n",

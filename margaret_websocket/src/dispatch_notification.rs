@@ -47,7 +47,7 @@ mod tests {
     use super::report_notification_result;
 
     #[test]
-    fn reports_a_notification_handler_failure() {
+    fn reports_a_notification_handler_failure_without_panicking_the_dispatcher() {
         report_notification_result(Err(anyhow::anyhow!("database unavailable")));
     }
 }

@@ -39,7 +39,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_valid_fields() {
+    fn builds_the_model_from_a_json_body_that_passes_every_rule_so_the_handler_gets_its_values() {
         let sample =
             outcome(&json!({ "required": "here", "optional": "present" })).expect("a valid body");
 
@@ -48,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_a_rule_violation_as_invalid() {
+    fn reports_a_rule_violation_as_invalid_not_malformed_so_users_can_correct_it() {
         assert_eq!(
             outcome(&json!({ "required": "" })).expect_err("an invalid body"),
             "invalid"
@@ -56,7 +56,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_an_uninterpretable_body_as_malformed() {
+    fn reports_an_uninterpretable_body_as_malformed_since_no_model_can_be_built() {
         assert_eq!(
             outcome(&json!({})).expect_err("an uninterpretable body"),
             "malformed"

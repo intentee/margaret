@@ -24,7 +24,7 @@ async fn lists_the_seeded_articles_in_id_order() {
 }
 
 #[tokio::test]
-async fn lists_the_articles_of_one_author() {
+async fn lists_the_articles_of_one_author_so_the_author_filter_excludes_the_rest() {
     let blog = seeded_blog().await;
 
     assert_eq!(

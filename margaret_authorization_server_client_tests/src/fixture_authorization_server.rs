@@ -30,7 +30,8 @@ impl FixtureAuthorizationServer {
         let fixture = TlsFixture::generate();
         let server = RunningFixtureServer::start(
             fixture.server_config.clone(),
-            vec![RouteEntry::new(endpoint_path, vec![endpoint])],
+            [endpoint_path],
+            [RouteEntry::new(vec![endpoint])],
         )
         .await;
 

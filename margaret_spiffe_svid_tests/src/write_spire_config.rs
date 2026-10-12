@@ -22,7 +22,7 @@ mod tests {
     use super::write_spire_config;
 
     #[tokio::test]
-    async fn writes_config_to_disk() {
+    async fn writes_the_config_contents_verbatim_so_the_spire_daemon_reads_what_was_rendered() {
         let tempdir = tempfile::tempdir().unwrap();
         let config_path = tempdir.path().join("config.toml");
         let contents = "hello = \"world\"\n".to_string();
@@ -37,7 +37,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn errors_when_parent_directory_missing() {
+    async fn errors_when_the_parent_directory_is_missing_instead_of_losing_the_config() {
         let path = PathBuf::from("/nonexistent/intentee-tests/spire.conf");
 
         let result = write_spire_config(&path, "irrelevant".to_string()).await;

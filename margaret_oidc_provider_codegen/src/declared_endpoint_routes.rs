@@ -165,6 +165,7 @@ mod tests {
     use margaret_http_codegen::declared_routes::DeclaredRoutes;
     use margaret_http_codegen::framework_input::FrameworkInput;
     use margaret_route_method::route_method::RouteMethod;
+    use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
 
     use super::DeclaredEndpointRoutes;
     use crate::declared_consent::DeclaredConsent;
@@ -182,7 +183,8 @@ mod tests {
 
     fn read(source: &str) -> Result<DeclaredEndpointRoutes, OidcProviderCodegenError> {
         let indexed = IndexedSource::new(source);
-        let declared = DeclaredRoutes::read(&indexed.index).expect("the routes are declared");
+        let declared = DeclaredRoutes::read(&indexed.index, &mut RoutePathRegistry::new())
+            .expect("the routes are declared");
 
         DeclaredEndpointRoutes::read(&indexed.index, &declared)
     }
@@ -218,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_declaration_without_an_endpoint() {
+    fn rejects_a_declaration_without_an_endpoint_since_it_cannot_say_what_it_serves() {
         assert!(matches!(
             read("#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/jwks\", server = \"identity\")]\n#[serves_oidc_endpoint]\nstruct GetJwks;\n"),
             Err(OidcProviderCodegenError::MissingOidcEndpoint { anchor }) if anchor == "crate::GetJwks"
@@ -252,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_arguments_that_do_not_parse() {
+    fn rejects_arguments_that_do_not_parse_naming_the_attribute_so_it_can_be_located() {
         assert!(matches!(
             read("#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/jwks\", server = \"identity\")]\n#[serves_oidc_endpoint(= 5)]\nstruct GetJwks;\n"),
             Err(OidcProviderCodegenError::Index(AttributeError::Arguments(
@@ -309,7 +311,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_second_consent_endpoint() {
+    fn rejects_a_second_consent_endpoint_so_authorization_has_one_consent_page() {
         assert!(matches!(
             read(&format!(
                 "{}#[responds_to_http(max_body_bytes = 1_024, method = RouteMethod::Post, path = \"/approval\", server = \"identity\")]\n#[serves_oidc_endpoint(OidcEndpoint::Consent(view = ConsentView))]\nstruct PostApproval;\n",

@@ -70,7 +70,7 @@ mod tests {
     use crate::indexed_field::IndexedField;
 
     #[test]
-    fn exposes_the_identifier_type_and_attributes() {
+    fn exposes_the_identifier_type_and_attributes_so_codegen_can_interpret_each_field() {
         let expected_type: Type = parse_quote!(String);
         let field = IndexedField::new(
             FieldIdentifier::Named(parse_quote!(title)),

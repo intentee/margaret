@@ -61,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_primitive_type_bare() {
+    fn renders_a_primitive_type_bare_since_a_leading_double_colon_would_not_compile() {
         assert_eq!(rendered(&["u8"]), "u8");
     }
 

@@ -230,7 +230,7 @@ impl Guard {
     }
 
     #[test]
-    fn rejects_an_unclassifiable_handler_parameter() {
+    fn rejects_an_unclassifiable_handler_parameter_since_no_value_could_be_bound_to_it() {
         assert!(
             plans_error_for(
                 "#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n"
@@ -240,7 +240,7 @@ impl Guard {
     }
 
     #[test]
-    fn resolves_the_layers_in_declaration_order() {
+    fn resolves_the_layers_in_declaration_order_so_the_author_controls_nesting() {
         let layers = layers_for(
             "use margaret::framework::http::next::Next;\n\n#[middleware(first)]\n#[middleware(second)]\nstruct Site;\n\n#[handles_middleware_attribute(attribute = first)]\nstruct First;\nimpl First {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n\n#[handles_middleware_attribute(attribute = second)]\nstruct Second;\nimpl Second {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         )
@@ -260,7 +260,7 @@ impl Guard {
     }
 
     #[test]
-    fn rejects_an_unknown_middleware_tag() {
+    fn rejects_an_unknown_middleware_tag_so_a_typo_never_skips_a_layer() {
         assert!(
             layers_error_for("#[middleware(missing)]\nstruct Site;\n")
                 .contains("which no middleware handler declares")
@@ -268,7 +268,7 @@ impl Guard {
     }
 
     #[test]
-    fn propagates_malformed_middleware_attribute_arguments() {
+    fn propagates_malformed_middleware_arguments_so_no_layer_is_silently_dropped() {
         assert!(layers_error_for("#[middleware(= 5)]\nstruct Site;\n").contains("failed to index"));
     }
 
@@ -312,7 +312,7 @@ impl Guard {
     }
 
     #[test]
-    fn folds_the_first_declared_layer_outermost() {
+    fn folds_the_first_declared_layer_outermost_so_it_sees_the_request_first() {
         let folded = fold_layers(
             &[
                 plain_layer("tracer", "Tracer"),

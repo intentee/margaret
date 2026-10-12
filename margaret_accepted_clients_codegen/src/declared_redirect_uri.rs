@@ -61,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_an_https_redirect_uri() {
+    fn accepts_an_https_redirect_uri_as_written_since_tls_protects_the_code() {
         assert_eq!(
             declared("https://portal.example/callback").expect("https is secure"),
             "https://portal.example/callback"
@@ -75,7 +75,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_http_to_a_named_host() {
+    fn rejects_http_to_a_named_host_even_localhost_since_names_can_resolve_elsewhere() {
         assert!(matches!(
             declared("http://localhost/callback"),
             Err(AcceptedClientsCodegenError::InsecureRedirectUri { redirect_uri, .. })

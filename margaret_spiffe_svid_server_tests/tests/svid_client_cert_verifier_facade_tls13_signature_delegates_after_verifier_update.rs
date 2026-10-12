@@ -12,7 +12,7 @@ use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_s
 use margaret_spiffe_svid_tests::leaf_spiffe_example_org_client_der::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
 
 #[test]
-fn tls13_signature_delegates_after_verifier_update() {
+fn delegates_tls13_signatures_to_the_updated_verifier_so_forged_ones_fail() {
     let facade = SvidClientCertVerifierFacade::default();
     facade.update_internal_verifier(Arc::new(
         SvidClientCertVerifier::new(

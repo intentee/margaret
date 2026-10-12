@@ -13,15 +13,13 @@ use margaret_route_method::content_method::ContentMethod;
 async fn refuses_an_upload_to_a_server_with_uploads_disabled() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/upload",
-            vec![MethodHandler::content(
-                ContentMethod::Post,
-                Arc::new(UploadedFilesReadingHandler {
-                    limit: BodyLimit::new(1024),
-                }),
-            )],
-        )],
+        ["/upload"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            Arc::new(UploadedFilesReadingHandler {
+                limit: BodyLimit::new(1024),
+            }),
+        )])],
     )
     .await;
 

@@ -10,9 +10,9 @@ use margaret_http_codegen::server_origin_source::ServerOriginSource;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::server_uploads::ServerUploads;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
-use margaret_serve_input_codegen::has_spiffe_http_client::has_spiffe_http_client;
 use margaret_serve_input_codegen::serve_input_read::serve_input_read;
 use margaret_serve_input_codegen::serve_input_registration::serve_input_registration;
+use margaret_serve_input_codegen::spiffe_client_requirements::SpiffeClientRequirements;
 
 use crate::console_command::ConsoleCommand;
 
@@ -58,8 +58,8 @@ fn serve_registration(
     serve_inputs: &[SlottedServeInput],
 ) -> TokenStream {
     let spiffe_secured = serves_spiffe(http_servers);
-    let svid_active =
-        spiffe_secured || has_spiffe_http_client(serve_inputs.iter().map(|slotted| &slotted.input));
+    let svid_active = spiffe_secured
+        || SpiffeClientRequirements::of(serve_inputs.iter().map(|slotted| &slotted.input)).any();
     let service_arguments = serve_inputs
         .iter()
         .map(|slotted| serve_input_registration(&slotted.input));

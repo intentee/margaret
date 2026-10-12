@@ -11,7 +11,7 @@ use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_s
 use margaret_spiffe_svid_tests::leaf_spiffe_example_org_untrusted_der::LEAF_SPIFFE_EXAMPLE_ORG_UNTRUSTED_DER;
 
 #[test]
-fn rejects_untrusted_ca() {
+fn rejects_a_server_svid_signed_by_an_untrusted_ca_even_within_the_trust_domain() {
     let verifier = SvidServerCertVerifier::new(
         build_root_cert_store_with_ca(),
         "example.org",

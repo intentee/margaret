@@ -7,7 +7,7 @@ use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_injection_codegen::process_method::process_method;
 use margaret_injection_codegen::runner_signature::RunnerSignature;
-use margaret_serve_input_codegen::has_spiffe_http_client::has_spiffe_http_client;
+use margaret_serve_input_codegen::spiffe_client_requirements::SpiffeClientRequirements;
 
 use crate::console_codegen_error::ConsoleCodegenError;
 use crate::console_command::ConsoleCommand;
@@ -55,8 +55,17 @@ pub(crate) fn console_commands(
             .provider_serve_inputs(item.canonical_path())?
             .to_vec();
 
-        if has_spiffe_http_client(serve_inputs.iter().map(|slotted| &slotted.input)) {
+        let spiffe_clients =
+            SpiffeClientRequirements::of(serve_inputs.iter().map(|slotted| &slotted.input));
+
+        if spiffe_clients.http_client {
             return Err(ConsoleCodegenError::ConsoleCommandInjectsSpiffeHttpClient { command });
+        }
+
+        if spiffe_clients.issuer_request_client {
+            return Err(
+                ConsoleCodegenError::ConsoleCommandDependsOnSpiffeIssuerRequestClient { command },
+            );
         }
 
         if serve_inputs

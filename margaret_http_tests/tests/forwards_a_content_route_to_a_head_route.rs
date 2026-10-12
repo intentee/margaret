@@ -47,22 +47,17 @@ async fn forwards_a_content_route_to_a_head_route() {
     );
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![
-            RouteEntry::new(
-                "/submissions",
-                vec![MethodHandler::content(ContentMethod::Post, submit)],
-            ),
-            RouteEntry::new(
-                "/confirmation",
-                vec![MethodHandler::forwardable(
-                    "confirmation",
-                    Arc::new(StaticHandler {
-                        body: b"confirmed".to_vec(),
-                        content_type: "text/plain",
-                        status: 201,
-                    }),
-                )],
-            ),
+        ["/submissions", "/confirmation"],
+        [
+            RouteEntry::new(vec![MethodHandler::content(ContentMethod::Post, submit)]),
+            RouteEntry::new(vec![MethodHandler::forwardable(
+                "confirmation",
+                Arc::new(StaticHandler {
+                    body: b"confirmed".to_vec(),
+                    content_type: "text/plain",
+                    status: 201,
+                }),
+            )]),
         ],
     )
     .await;

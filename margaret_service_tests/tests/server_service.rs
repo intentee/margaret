@@ -4,14 +4,14 @@ use tokio_util::sync::CancellationToken;
 use trzcina::Service;
 
 use margaret_http::forward_targets::ForwardTargets;
-use margaret_http::router::Router;
 use margaret_http::server::Server;
+use margaret_http::server_paths::ServerPaths;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 use margaret_service::server_service::ServerService;
 
 #[tokio::test]
-async fn binds_and_drains_on_cancellation() {
+async fn binds_and_drains_on_cancellation_so_shutdown_finishes_without_error() {
     let cancellation_token = CancellationToken::new();
 
     cancellation_token.cancel();
@@ -21,7 +21,11 @@ async fn binds_and_drains_on_cancellation() {
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            Router::build(Vec::new()).expect("an empty router builds"),
+            ServerPaths::build([])
+                .expect("an empty path set builds")
+                .routes([])
+                .expect("an empty router builds")
+                .router,
         )),
         Arc::new(ForwardTargets::new(Vec::new())),
     );

@@ -149,7 +149,7 @@ mod tests {
     use super::roll_deadline;
 
     #[test]
-    fn waits_until_the_roll_is_due() {
+    fn waits_until_the_roll_is_due_so_keys_are_not_rotated_early() {
         let secret = fresh_secret(SigningCurve::P256);
         let instant = Instant::now();
 

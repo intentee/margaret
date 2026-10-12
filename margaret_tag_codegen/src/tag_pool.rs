@@ -1087,7 +1087,7 @@ mod tests {
     }
 
     #[test]
-    fn resolves_an_oauth_client_tag() {
+    fn resolves_an_oauth_client_tag_to_its_declaring_struct_so_sites_bind_to_it() {
         let indexed = IndexedSource::new(&oauth_client_source());
         let pool = pool(&indexed);
 
@@ -1257,7 +1257,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_an_unknown_tag() {
+    fn reports_a_tag_no_trusted_issuer_declares_so_a_typo_fails_at_compile_time() {
         let indexed = IndexedSource::new(JWKS_TRUST);
         let pool = pool(&indexed);
 
@@ -1353,7 +1353,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_unparseable_attribute_arguments() {
+    fn surfaces_unparseable_middleware_attribute_arguments_instead_of_collecting_its_tag() {
         assert!(
             error_for("#[handles_middleware_attribute(= 5)]\nstruct RequestLog;\n")
                 .contains("failed to index")
@@ -1440,7 +1440,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_unparseable_subject_token_exchanger_arguments() {
+    fn reports_unparseable_exchanger_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
             exchanger_bindings("#[exchanges_tokens_from(= 5)]\nstruct CiExchanger;\n"),
             Err(TagError::Index {
@@ -1572,7 +1572,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_no_session_for_unmarked_attributes() {
+    fn finds_no_session_for_unmarked_attributes_so_unmarked_items_bind_none() {
         assert_eq!(
             pool(&IndexedSource::new(&format!(
                 "{OWN_ISSUANCE}{OWN_SESSIONS}"

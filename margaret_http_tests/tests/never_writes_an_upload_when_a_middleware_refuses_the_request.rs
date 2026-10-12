@@ -19,18 +19,16 @@ async fn never_writes_an_upload_when_a_middleware_refuses_the_request() {
     let directory = tempdir().expect("a temporary directory");
     let server = RunningFixtureServer::start_plain(
         UploadConfig::enabled(directory.path().to_path_buf()),
-        vec![RouteEntry::new(
-            "/upload",
-            vec![MethodHandler::content(
-                ContentMethod::Post,
-                layer(
-                    Arc::new(RefusingMiddleware),
-                    Arc::new(UploadedFilesReadingHandler {
-                        limit: BodyLimit::new(1024),
-                    }),
-                ),
-            )],
-        )],
+        ["/upload"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            layer(
+                Arc::new(RefusingMiddleware),
+                Arc::new(UploadedFilesReadingHandler {
+                    limit: BodyLimit::new(1024),
+                }),
+            ),
+        )])],
     )
     .await;
 

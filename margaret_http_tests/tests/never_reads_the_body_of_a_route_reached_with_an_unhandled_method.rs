@@ -13,15 +13,13 @@ use margaret_route_method::content_method::ContentMethod;
 async fn never_reads_the_body_of_a_route_reached_with_an_unhandled_method() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/json",
-            vec![MethodHandler::content(
-                ContentMethod::Post,
-                Arc::new(JsonReadingHandler {
-                    limit: BodyLimit::new(1024),
-                }),
-            )],
-        )],
+        ["/json"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            Arc::new(JsonReadingHandler {
+                limit: BodyLimit::new(1024),
+            }),
+        )])],
     )
     .await;
 

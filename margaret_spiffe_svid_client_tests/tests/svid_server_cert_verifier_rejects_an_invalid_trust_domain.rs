@@ -4,7 +4,7 @@ use margaret_spiffe_svid_client::svid_server_cert_verifier::SvidServerCertVerifi
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 
 #[test]
-fn rejects_an_invalid_trust_domain() {
+fn rejects_an_invalid_trust_domain_when_built_so_misconfiguration_surfaces_early() {
     let result = SvidServerCertVerifier::new(
         build_root_cert_store_with_ca(),
         "EXAMPLE.ORG",

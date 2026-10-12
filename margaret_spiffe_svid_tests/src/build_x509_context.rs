@@ -36,7 +36,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_for_valid_inputs() {
+    fn builds_an_x509_context_from_a_valid_chain_key_and_bundle_for_svid_fixtures() {
         let chain = valid_cert_chain();
 
         let result = build_x509_context(
@@ -50,7 +50,7 @@ mod tests {
     }
 
     #[test]
-    fn errors_on_malformed_cert_chain() {
+    fn errors_on_a_malformed_cert_chain_so_broken_fixtures_fail_loudly() {
         let result = build_x509_context(
             &[0u8; 8],
             LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_KEY_DER,
@@ -62,7 +62,7 @@ mod tests {
     }
 
     #[test]
-    fn errors_on_invalid_trust_domain_name() {
+    fn errors_on_an_invalid_trust_domain_name_so_broken_fixtures_fail_loudly() {
         let chain = valid_cert_chain();
 
         let result = build_x509_context(
@@ -76,7 +76,7 @@ mod tests {
     }
 
     #[test]
-    fn errors_on_malformed_bundle_authority() {
+    fn errors_on_a_malformed_bundle_authority_so_broken_fixtures_fail_loudly() {
         let chain = valid_cert_chain();
 
         let result = build_x509_context(

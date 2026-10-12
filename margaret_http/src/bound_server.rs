@@ -421,6 +421,7 @@ mod tests {
     use crate::route_entry::RouteEntry;
     use crate::router::Router;
     use crate::server::Server;
+    use crate::server_paths::ServerPaths;
     use crate::transport_config::TransportConfig;
     use crate::web_socket_driver_sender::WebSocketDriverSender;
     use crate::web_socket_upgrade::WebSocketUpgrade;
@@ -446,19 +447,29 @@ mod tests {
         }
     }
 
+    fn router<const COUNT: usize>(
+        paths: [&'static str; COUNT],
+        entries: [RouteEntry; COUNT],
+    ) -> Router {
+        ServerPaths::build(paths)
+            .expect("the route paths do not conflict")
+            .routes(entries)
+            .expect("the route entries register cleanly")
+            .router
+    }
+
     fn server_with_a_name_parameter() -> Arc<Server> {
         Arc::new(Server::new(
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            Router::build(vec![RouteEntry::new(
-                "/files/{name}",
-                vec![MethodHandler::head(
+            router(
+                ["/files/{name}"],
+                [RouteEntry::new(vec![MethodHandler::head(
                     RouteMethod::Get,
                     Arc::new(EchoesTheNameParameter),
-                )],
-            )])
-            .expect("the route entries register cleanly"),
+                )])],
+            ),
         ))
     }
 
@@ -467,11 +478,13 @@ mod tests {
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            Router::build(vec![RouteEntry::new(
-                "/",
-                vec![MethodHandler::head(RouteMethod::Get, Arc::new(PlainOk))],
-            )])
-            .expect("the route entries register cleanly"),
+            router(
+                ["/"],
+                [RouteEntry::new(vec![MethodHandler::head(
+                    RouteMethod::Get,
+                    Arc::new(PlainOk),
+                )])],
+            ),
         ))
     }
 
@@ -480,11 +493,13 @@ mod tests {
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            Router::build(vec![RouteEntry::new(
-                "/articles/{article}",
-                vec![MethodHandler::head(RouteMethod::Get, Arc::new(PlainOk))],
-            )])
-            .expect("the route paths do not conflict"),
+            router(
+                ["/articles/{article}"],
+                [RouteEntry::new(vec![MethodHandler::head(
+                    RouteMethod::Get,
+                    Arc::new(PlainOk),
+                )])],
+            ),
         ))
     }
 
@@ -493,7 +508,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reports_a_failed_connection_task() {
+    async fn reports_a_panicked_connection_task_without_bringing_down_the_server() {
         let failure = tokio::spawn(async {
             panic!("connection task failure");
         })
@@ -504,36 +519,20 @@ mod tests {
     }
 
     #[test]
-    fn rejects_conflicting_route_paths() {
-        let conflict = Router::build(vec![
-            RouteEntry::new(
-                "/items/{id}",
-                vec![MethodHandler::head(RouteMethod::Get, Arc::new(PlainOk))],
-            ),
-            RouteEntry::new(
-                "/items/{name}",
-                vec![MethodHandler::head(RouteMethod::Get, Arc::new(PlainOk))],
-            ),
-        ]);
-
-        assert!(conflict.is_err());
+    fn rejects_route_paths_differing_only_in_parameter_names_since_a_request_matches_both() {
+        assert_eq!(
+            ServerPaths::build(["/items/{id}", "/items/{name}"])
+                .err()
+                .map(|error| error.to_string()),
+            Some(
+                "Insertion failed due to conflict with previously registered route: /items/{id}"
+                    .to_string()
+            )
+        );
     }
 
     #[test]
-    fn rejects_a_web_socket_route_that_conflicts_with_an_http_route() {
-        let conflict = Router::build(vec![
-            RouteEntry::new(
-                "/x/{id}",
-                vec![MethodHandler::head(RouteMethod::Get, Arc::new(PlainOk))],
-            ),
-            RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade), Vec::new()),
-        ]);
-
-        assert!(conflict.is_err());
-    }
-
-    #[test]
-    fn skips_a_failed_accept() {
+    fn skips_an_aborted_accept_so_one_failed_connection_never_stops_the_accept_loop() {
         accept_outcome(Err(Error::from(ErrorKind::ConnectionAborted)), drop);
     }
 
@@ -588,12 +587,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fails_to_bind_an_invalid_address() {
+    async fn fails_to_bind_an_invalid_address_with_an_error_instead_of_panicking() {
         let server = Arc::new(Server::new(
             "this is not an address".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            Router::build(Vec::new()).expect("an empty router builds"),
+            router([], []),
         ));
 
         assert!(
@@ -659,7 +658,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_ambiguous_request_targets() {
+    async fn answers_an_ambiguous_request_target_with_bad_request_rather_than_guessing_its_path() {
         serve(server_with_one(), |address| async move {
             const AMBIGUOUS_TARGETS: [&[u8]; 7] = [
                 b"/a/../b", b"/a%2Fb", b"/a//b", b"/a%00b", b"/%FF", b"/a%zz", b"*",
@@ -681,7 +680,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_ambiguous_request_headers() {
+    async fn answers_an_ambiguous_request_head_with_bad_request_rather_than_choosing_a_reading() {
         serve(server_with_one(), |address| async move {
             const AMBIGUOUS_REQUESTS: [&[u8]; 6] = [
                 b"GET / HTTP/1.1\r\nHost: test\r\nCookie: a=1\r\nCookie: b=2\r\nConnection: close\r\n\r\n",
@@ -735,7 +734,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn decodes_a_route_parameter_exactly_once() {
+    async fn decodes_a_route_parameter_exactly_once_so_encoded_percent_signs_survive() {
         serve(server_with_a_name_parameter(), |address| async move {
             let response = exchange(
                 address,
@@ -761,7 +760,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn serves_connections_until_cancellation() {
+    async fn answers_concurrent_connections_by_route_until_cancellation_ends_the_serve_task() {
         let bound = BoundServer::bind(server_with_one(), empty_forward_targets())
             .await
             .expect("the server binds to an ephemeral port");
@@ -945,12 +944,10 @@ mod tests {
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            Router::build(vec![RouteEntry::web_socket(
-                "/room/{id}",
-                Arc::new(TestUpgrade),
-                middleware,
-            )])
-            .expect("the route entries register cleanly"),
+            router(
+                ["/room/{id}"],
+                [RouteEntry::web_socket(Arc::new(TestUpgrade), middleware)],
+            ),
         ))
     }
 
@@ -984,7 +981,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn serves_web_socket_routes() {
+    async fn upgrades_only_well_formed_get_handshakes_on_a_websocket_route_with_its_parameters() {
         let bound = BoundServer::bind(server_with_web_socket(), empty_forward_targets())
             .await
             .expect("the server binds to an ephemeral port");

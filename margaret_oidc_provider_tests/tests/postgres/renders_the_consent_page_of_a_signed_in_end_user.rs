@@ -24,13 +24,11 @@ async fn renders_the_consent_page_of_a_signed_in_end_user() {
         .expect("the session secret is set");
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/authorize",
-            vec![MethodHandler::head(
-                RouteMethod::Get,
-                Arc::new(fixture_authorization_handler(&fixture, FixtureConsentView)),
-            )],
-        )],
+        ["/authorize"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
+            Arc::new(fixture_authorization_handler(&fixture, FixtureConsentView)),
+        )])],
     )
     .await;
     let response = reqwest::Client::new()

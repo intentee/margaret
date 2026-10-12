@@ -59,7 +59,7 @@ mod tests {
     }
 
     #[test]
-    fn path_is_the_attributes_written_path() {
+    fn path_is_the_attributes_written_path_so_it_matches_what_the_source_declares() {
         let item = item_bearing(parse_quote!(#[ns::tagged]));
         let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
 
@@ -67,7 +67,7 @@ mod tests {
     }
 
     #[test]
-    fn args_parse_the_matched_attribute() {
+    fn args_parse_the_matched_attribute_so_interpreters_read_its_own_arguments() {
         let item = item_bearing(parse_quote!(#[singleton]));
         let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
 
@@ -75,7 +75,7 @@ mod tests {
     }
 
     #[test]
-    fn args_are_parsed_once_and_reused() {
+    fn args_are_parsed_once_and_reused_so_repeated_reads_never_reparse_the_attribute() {
         let item = item_bearing(parse_quote!(#[responds_to_http(method = RouteMethod::Get)]));
         let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
 

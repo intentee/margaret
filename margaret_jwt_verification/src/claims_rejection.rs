@@ -83,7 +83,7 @@ mod tests {
     use super::ClaimsRejection;
 
     #[test]
-    fn describes_every_rejection() {
+    fn describes_every_claims_rejection_so_a_refused_token_can_be_diagnosed() {
         let described = [
             ClaimsRejection::AudienceMismatch {
                 expected: "ours".to_string(),

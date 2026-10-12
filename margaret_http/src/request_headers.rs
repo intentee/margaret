@@ -99,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_single_field_line() {
+    fn reads_a_single_field_line_as_the_unambiguous_value_of_its_header() {
         assert_eq!(
             parsed(&[(COOKIE, b"session=abc")]).get(&COOKIE),
             Some("session=abc")
@@ -112,7 +112,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_repeated_singleton_header() {
+    fn rejects_a_repeated_singleton_header_rather_than_choosing_one_of_its_values() {
         assert_rejects(
             &[(COOKIE, b"session=abc"), (COOKIE, b"session=stolen")],
             &RequestRejection::RepeatedSingletonHeader {
@@ -122,7 +122,7 @@ mod tests {
     }
 
     #[test]
-    fn combines_a_repeated_list_valued_header() {
+    fn combines_a_repeated_list_valued_header_into_one_list_as_rfc_9110_permits() {
         assert_eq!(
             parsed(&[(ACCEPT_ENCODING, b"gzip"), (ACCEPT_ENCODING, b"br")]).get(&ACCEPT_ENCODING),
             Some("gzip, br")

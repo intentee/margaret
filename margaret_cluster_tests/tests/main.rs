@@ -17,7 +17,7 @@ mod a_replayed_sign_in_callback_is_refused_on_another_instance;
 #[cfg(feature = "tests_that_use_cluster")]
 mod a_resource_token_is_admitted_on_every_instance;
 #[cfg(feature = "tests_that_use_cluster")]
-mod a_restarted_instance_remembers_client_assertions;
+mod a_restarted_instance_remembers_client_assertions_so_a_replay_still_fails;
 #[cfg(feature = "tests_that_use_cluster")]
 mod a_revocation_on_one_instance_refuses_the_refresh_token_everywhere;
 #[cfg(feature = "tests_that_use_cluster")]
@@ -41,7 +41,7 @@ mod a_view_shows_a_note_written_on_another_instance;
 #[cfg(feature = "tests_that_use_cluster")]
 mod addressed_route;
 #[cfg(feature = "tests_that_use_cluster")]
-mod an_expired_code_is_refused_everywhere;
+mod an_expired_code_is_refused_on_a_peer_so_expiry_cannot_be_dodged_by_switching;
 #[cfg(feature = "tests_that_use_cluster")]
 mod an_expired_pending_authorization_is_unknown_everywhere;
 #[cfg(feature = "tests_that_use_cluster")]
@@ -49,11 +49,11 @@ mod an_instance_restarted_after_an_issuer_key_rotation_admits_the_new_key;
 #[cfg(feature = "tests_that_use_cluster")]
 mod an_upload_on_one_instance_downloads_identically_from_another;
 #[cfg(feature = "tests_that_use_cluster")]
-mod any_instance_sweeps_notes_another_wrote;
+mod any_instance_sweeps_notes_another_wrote_so_a_crashed_writer_leaves_no_garbage;
 #[cfg(feature = "tests_that_use_cluster")]
 mod assert_verified_by_instance_keys;
 #[cfg(feature = "tests_that_use_cluster")]
-mod assets_are_identical_on_every_instance;
+mod assets_are_identical_on_every_instance_so_any_peer_can_serve_a_hashed_url;
 #[cfg(feature = "tests_that_use_cluster")]
 mod authorizes_consents_and_redeems_on_different_instances;
 #[cfg(feature = "tests_that_use_cluster")]
@@ -69,9 +69,9 @@ mod concurrent_presentations_of_one_client_assertion_admit_one;
 #[cfg(feature = "tests_that_use_cluster")]
 mod concurrent_rotations_on_several_instances_admit_one;
 #[cfg(feature = "tests_that_use_cluster")]
-mod discovery_is_identical_everywhere;
+mod every_instance_admits_the_external_issuer_so_a_balancer_may_route_anywhere;
 #[cfg(feature = "tests_that_use_cluster")]
-mod every_instance_admits_the_external_issuer;
+mod every_instance_serves_byte_identical_discovery_so_clients_see_one_provider;
 #[cfg(feature = "tests_that_use_cluster")]
 mod exchanges_an_external_token_on_another_instance;
 #[cfg(feature = "tests_that_use_cluster")]
@@ -103,4 +103,4 @@ mod stored_message;
 #[cfg(feature = "tests_that_use_cluster")]
 mod stored_note;
 #[cfg(feature = "tests_that_use_cluster")]
-mod userinfo_answers_on_another_instance;
+mod userinfo_answers_for_a_token_issued_on_another_instance_without_sticky_routing;

@@ -13,15 +13,13 @@ use margaret_route_method::content_method::ContentMethod;
 async fn answers_an_unusable_upload_directory_with_a_server_error() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::enabled("/margaret-nonexistent-upload-directory".into()),
-        vec![RouteEntry::new(
-            "/upload",
-            vec![MethodHandler::content(
-                ContentMethod::Post,
-                Arc::new(UploadedFilesReadingHandler {
-                    limit: BodyLimit::new(1024),
-                }),
-            )],
-        )],
+        ["/upload"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            Arc::new(UploadedFilesReadingHandler {
+                limit: BodyLimit::new(1024),
+            }),
+        )])],
     )
     .await;
 

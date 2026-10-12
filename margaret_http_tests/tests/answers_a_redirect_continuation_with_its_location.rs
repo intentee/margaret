@@ -13,15 +13,13 @@ use margaret_route_method::route_method::RouteMethod;
 async fn answers_a_redirect_continuation_with_its_location() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/moved",
-            vec![MethodHandler::head(
-                RouteMethod::Get,
-                Arc::new(SeeOtherHandler {
-                    route: ForwardableRoute::new("http://fixture.test/greeting".to_string()),
-                }),
-            )],
-        )],
+        ["/moved"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
+            Arc::new(SeeOtherHandler {
+                route: ForwardableRoute::new("http://fixture.test/greeting".to_string()),
+            }),
+        )])],
     )
     .await;
 

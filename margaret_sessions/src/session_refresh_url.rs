@@ -40,7 +40,7 @@ mod tests {
     use crate::sessions_error::SessionsError;
 
     #[test]
-    fn reads_an_https_url() {
+    fn accepts_an_https_refresh_url_so_session_refreshes_travel_over_tls() {
         assert_eq!(
             "https://identity.internal/sessions/refresh"
                 .parse::<SessionRefreshUrl>()
@@ -52,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_url_of_another_scheme() {
+    fn rejects_a_refresh_url_of_another_scheme_so_refreshes_never_travel_unencrypted() {
         assert!(matches!(
             "http://identity.internal/sessions/refresh".parse::<SessionRefreshUrl>(),
             Err(SessionsError::MalformedRefreshUrl(HttpsUrlRejection::NotHttps { scheme })) if scheme == "http"

@@ -19,7 +19,7 @@ mod tests {
     use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
     #[test]
-    fn returns_a_single_segment_unchanged() {
+    fn returns_a_single_segment_unchanged_so_plain_table_names_pass_through() {
         assert_eq!(
             schema_identifier(&["authors"]).expect("the identifier is within the limit"),
             "authors"
@@ -27,7 +27,7 @@ mod tests {
     }
 
     #[test]
-    fn joins_multiple_segments_with_underscores() {
+    fn joins_multiple_segments_with_underscores_so_derived_names_stay_snake_case() {
         assert_eq!(
             schema_identifier(&["articles", "created_at", "index"])
                 .expect("the identifier is within the limit"),
@@ -36,7 +36,7 @@ mod tests {
     }
 
     #[test]
-    fn preserves_underscores_within_segments() {
+    fn keeps_underscores_inside_a_segment_so_snake_case_column_names_survive_the_join() {
         assert_eq!(
             schema_identifier(&["articles", "author_id", "index"])
                 .expect("the identifier is within the limit"),
@@ -45,7 +45,7 @@ mod tests {
     }
 
     #[test]
-    fn is_stable_across_repeated_calls() {
+    fn is_stable_across_repeated_calls_so_regenerated_ddl_keeps_its_identifiers() {
         assert_eq!(
             schema_identifier(&["articles", "created_at", "index"])
                 .expect("the identifier is within the limit"),

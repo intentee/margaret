@@ -102,7 +102,7 @@ mod tests {
     const RFC_7636_VERIFIER: &str = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 
     #[test]
-    fn accepts_the_rfc_7636_example_verifier() {
+    fn accepts_the_rfc_7636_example_verifier_so_conforming_clients_interoperate() {
         assert!(matches!(
             CodeVerifier::parse(RFC_7636_VERIFIER),
             CodeVerifierParsing::Accepted(verifier) if verifier.secret() == RFC_7636_VERIFIER
@@ -110,7 +110,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_every_unreserved_character() {
+    fn accepts_every_rfc_7636_unreserved_character_so_any_conforming_verifier_is_honored() {
         let value = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
 
         assert!(matches!(
@@ -138,7 +138,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_verifiers_at_both_length_bounds() {
+    fn accepts_verifiers_at_both_length_bounds_since_rfc_7636_includes_43_and_128() {
         assert!(matches!(
             CodeVerifier::parse(&"a".repeat(43)),
             CodeVerifierParsing::Accepted(verifier) if verifier.secret().len() == 43
@@ -159,7 +159,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_multibyte_character() {
+    fn rejects_a_multibyte_character_at_its_byte_position_as_outside_the_unreserved_set() {
         assert!(matches!(
             CodeVerifier::parse(&format!("{}é", "a".repeat(42))),
             CodeVerifierParsing::Rejected(rejection)
@@ -168,7 +168,7 @@ mod tests {
     }
 
     #[test]
-    fn generates_an_acceptable_verifier() {
+    fn generates_a_verifier_within_the_rfc_7636_grammar_so_any_server_accepts_it() {
         let generated = CodeVerifier::generate();
 
         assert!(matches!(
@@ -178,7 +178,7 @@ mod tests {
     }
 
     #[test]
-    fn deserializes_an_acceptable_verifier() {
+    fn deserializes_a_conforming_verifier_so_the_sign_in_callback_can_redeem_its_code() {
         let verifier: CodeVerifier = serde_json::from_value(serde_json::json!(RFC_7636_VERIFIER))
             .expect("the verifier deserializes");
 
@@ -186,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn refuses_to_deserialize_a_malformed_verifier() {
+    fn refuses_to_deserialize_a_malformed_verifier_so_serde_cannot_bypass_parsing() {
         assert!(serde_json::from_value::<CodeVerifier>(serde_json::json!("short")).is_err());
     }
 
@@ -196,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn serializes_the_secret() {
+    fn serializes_a_verifier_as_its_secret_so_the_sign_in_transaction_can_carry_it() {
         assert_eq!(
             serde_json::to_value(CodeVerifier::generate())
                 .expect("the verifier serializes")
@@ -207,7 +207,7 @@ mod tests {
     }
 
     #[test]
-    fn hides_the_secret_from_debug_output() {
+    fn hides_the_secret_from_debug_output_so_logs_never_leak_the_verifier() {
         assert_eq!(
             format!("{:?}", CodeVerifier::generate()),
             "CodeVerifier { .. }"

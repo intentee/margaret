@@ -8,7 +8,7 @@ use margaret_example::routes::public::delete_article::DeleteArticle;
 use margaret_example_tests::seeded_blog::seeded_blog;
 
 #[tokio::test]
-async fn removes_an_article() {
+async fn responds_ok_after_deleting_the_bound_article_so_it_is_no_longer_found() {
     let blog = seeded_blog().await;
     let featured = || Article::query().id.eq(FEATURED_ARTICLE_ID);
     let Lookup::Found(article) = featured()

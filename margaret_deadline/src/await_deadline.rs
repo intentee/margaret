@@ -28,7 +28,7 @@ mod tests {
     const WAIT: Duration = Duration::from_mins(1);
 
     #[tokio::test(start_paused = true)]
-    async fn wakes_when_the_deadline_is_reached() {
+    async fn wakes_exactly_when_the_deadline_is_reached_so_timers_neither_fire_early_nor_late() {
         let started_at = Instant::now();
 
         assert_eq!(
@@ -50,7 +50,7 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn wakes_when_cancelled_before_the_deadline() {
+    async fn wakes_at_once_when_cancelled_before_the_deadline_so_shutdown_never_waits_it_out() {
         let started_at = Instant::now();
         let cancellation_token = CancellationToken::new();
 

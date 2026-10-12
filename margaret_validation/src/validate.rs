@@ -51,7 +51,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_valid_fields() {
+    fn builds_the_model_from_form_fields_that_pass_every_rule_so_the_handler_gets_their_values() {
         let data = HashMap::from([
             ("required".to_string(), "here".to_string()),
             ("optional".to_string(), "present".to_string()),
@@ -70,14 +70,14 @@ mod tests {
     }
 
     #[test]
-    fn reports_a_rule_violation_as_invalid() {
+    fn reports_a_rule_violation_as_invalid_not_malformed_so_users_can_correct_it() {
         let data = HashMap::from([("required".to_string(), String::new())]);
 
         assert_eq!(outcome(&data).expect_err("an invalid form"), "invalid");
     }
 
     #[test]
-    fn reports_missing_required_data_as_malformed() {
+    fn reports_missing_required_data_as_malformed_since_no_model_can_be_built() {
         let data = HashMap::new();
 
         assert_eq!(outcome(&data).expect_err("a malformed form"), "malformed");

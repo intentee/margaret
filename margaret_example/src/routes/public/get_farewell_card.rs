@@ -59,7 +59,7 @@ mod tests {
     use crate::views::greeting_view::GreetingView;
 
     #[tokio::test]
-    async fn responds_with_the_rendered_farewell_card() {
+    async fn responds_ok_with_the_rendered_farewell_card_so_the_demo_route_serves_a_page() {
         let card_layout = Arc::new(CardLayout);
         let views = Views {
             card_layout: card_layout.clone(),
@@ -74,7 +74,8 @@ mod tests {
                 GreetingView::create(card_layout).expect("the greeting view is constructed"),
             ),
         };
-        let routes = Routes::from_origins("http://identity", "http://internal", "http://public");
+        let routes = Routes::from_origins("http://identity", "http://internal", "http://public")
+            .expect("the routes build");
         let app_name = AppName::create().expect("the app name is constructed");
         let responder =
             GetFarewellCard::create(Arc::new(app_name)).expect("the responder is constructed");

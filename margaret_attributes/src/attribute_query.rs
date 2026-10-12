@@ -62,7 +62,7 @@ mod tests {
     }
 
     #[test]
-    fn find_returns_the_single_matching_sibling() {
+    fn find_returns_the_single_matching_sibling_so_a_marker_is_located_by_its_kind() {
         let item = item(vec![parse_quote!(#[singleton])]);
 
         assert!(
@@ -84,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn find_all_returns_every_matching_sibling() {
+    fn find_all_returns_every_matching_sibling_so_repeatable_attributes_all_apply() {
         let item = item(vec![
             parse_quote!(#[middleware(logged)]),
             parse_quote!(#[middleware(traced)]),

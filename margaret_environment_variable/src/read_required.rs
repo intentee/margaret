@@ -30,9 +30,9 @@ mod tests {
     use super::read_required;
 
     #[test]
-    fn reads_a_present_value() {
+    fn reads_a_present_required_variable_as_its_parsed_value_rather_than_an_option() {
         in_child_process(
-            "read_required::tests::reads_a_present_value",
+            "read_required::tests::reads_a_present_required_variable_as_its_parsed_value_rather_than_an_option",
             &[ChildVariable::Set {
                 name: "MARGARET_REQUIRED_PRESENT",
                 value: OsString::from("true"),
@@ -47,7 +47,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_an_absent_variable() {
+    fn reports_an_absent_required_variable_as_missing_by_name_so_the_operator_can_set_it() {
         assert!(matches!(
             read_required::<String>("MARGARET_REQUIRED_ABSENT")
                 .expect_err("an absent variable is rejected"),

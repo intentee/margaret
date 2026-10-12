@@ -53,9 +53,9 @@ mod tests {
     use crate::child_variable::ChildVariable;
 
     #[test]
-    fn runs_the_body_with_its_variables() {
+    fn runs_the_body_in_a_child_with_its_variables_so_env_changes_stay_isolated() {
         in_child_process(
-            "in_child_process::tests::runs_the_body_with_its_variables",
+            "in_child_process::tests::runs_the_body_in_a_child_with_its_variables_so_env_changes_stay_isolated",
             &[
                 ChildVariable::Set {
                     name: "MARGARET_CHILD_SET",

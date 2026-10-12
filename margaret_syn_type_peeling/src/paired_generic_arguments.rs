@@ -35,7 +35,7 @@ mod tests {
     }
 
     #[test]
-    fn returns_both_generic_type_arguments() {
+    fn returns_both_generic_type_arguments_in_order_so_each_keeps_its_role() {
         assert_eq!(
             arguments("Wrapper<Claims, Profile>").as_deref(),
             Some("Claims | Profile")
@@ -48,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_a_segment_without_generic_arguments() {
+    fn ignores_a_segment_without_generic_arguments_since_there_is_no_pair_to_return() {
         assert!(arguments("Wrapper").is_none());
     }
 }

@@ -18,10 +18,11 @@ async fn returns_cancelled_when_cancelled_during_a_hung_fetch() {
     let hanging = Arc::new(HangingHandler::default());
     let server = RunningFixtureServer::start(
         fixture.server_config.clone(),
-        vec![RouteEntry::new(
-            "/document",
-            vec![MethodHandler::head(RouteMethod::Get, hanging.clone())],
-        )],
+        ["/document"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
+            hanging.clone(),
+        )])],
     )
     .await;
     let client = IssuerRequestClient::build(fixture_client_builder(&fixture.certificate_authority))

@@ -134,7 +134,7 @@ mod tests {
     ];
 
     #[test]
-    fn describes_the_capability_each_endpoint_serves() {
+    fn describes_the_client_capability_each_endpoint_needs_so_unneeded_routes_say_why() {
         assert_eq!(
             ENDPOINTS.map(ProviderEndpoint::capability),
             [

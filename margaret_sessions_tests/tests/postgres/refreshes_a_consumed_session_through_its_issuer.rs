@@ -12,6 +12,7 @@ use margaret_http::method_handler::MethodHandler;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http_tests::mtls_fixture::MtlsFixture;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
+use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_jwt_verification_tests::fixture_audience::FIXTURE_AUDIENCE;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_peer_identity::peer_identity::PeerIdentity;
@@ -50,16 +51,14 @@ async fn refreshes_a_consumed_session_through_its_issuer() {
     let mtls = MtlsFixture::new();
     let issuer_server = RunningFixtureServer::start(
         mtls.server_config.clone(),
-        vec![RouteEntry::new(
-            "/sessions/refresh",
-            vec![MethodHandler::content(
-                ContentMethod::Post,
-                limited_content_handler(
-                    Arc::new(SessionRefreshEndpoint::create(issued)),
-                    BodyLimit::new(4_096),
-                ),
-            )],
-        )],
+        ["/sessions/refresh"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            limited_content_handler(
+                Arc::new(SessionRefreshEndpoint::create(issued)),
+                BodyLimit::new(4_096),
+            ),
+        )])],
     )
     .await;
     let consumed = ConsumedSessions::create(
@@ -71,10 +70,12 @@ async fn refreshes_a_consumed_session_through_its_issuer() {
         )
         .parse()
         .expect("the refresh url is read"),
-        Client::builder()
-            .use_preconfigured_tls(mtls.client_config.as_ref().clone())
-            .build()
+        Arc::new(
+            IssuerRequestClient::preconfigured(
+                Client::builder().use_preconfigured_tls(mtls.client_config.as_ref().clone()),
+            )
             .expect("the workload client builds"),
+        ),
     );
 
     let resolution = consumed

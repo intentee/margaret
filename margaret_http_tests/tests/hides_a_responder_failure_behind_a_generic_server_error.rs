@@ -12,13 +12,11 @@ use margaret_route_method::route_method::RouteMethod;
 async fn hides_a_responder_failure_behind_a_generic_server_error() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/failing",
-            vec![MethodHandler::head(
-                RouteMethod::Get,
-                Arc::new(FailingHandler),
-            )],
-        )],
+        ["/failing"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
+            Arc::new(FailingHandler),
+        )])],
     )
     .await;
 

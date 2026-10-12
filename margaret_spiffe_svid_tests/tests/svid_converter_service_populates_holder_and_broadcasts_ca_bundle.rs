@@ -7,7 +7,7 @@ use margaret_spiffe_svid::svid_converter_service::SvidConverterService;
 use margaret_spiffe_svid_tests::build_workload_x509_context::build_workload_x509_context;
 
 #[tokio::test]
-async fn populates_holder_and_broadcasts_ca_bundle() {
+async fn populates_the_holder_and_broadcasts_the_ca_bundle_so_rotations_reach_tls() {
     let (ca_bundle_tx, mut ca_bundle_rx) = broadcast::channel(1);
     let (x509_context_tx, x509_context_rx) = broadcast::channel(1);
     let svid_certified_key_holder = SvidCertifiedKeyHolder::default();

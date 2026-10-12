@@ -6,6 +6,7 @@ use chrono::Utc;
 use oauth2::basic::BasicErrorResponseType;
 
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
+use margaret_authorization_grants::refresh_family::RefreshFamily;
 use margaret_authorization_grants::refresh_family_record::RefreshFamilyRecord;
 use margaret_authorization_grants::refresh_token_lookup::RefreshTokenLookup;
 use margaret_authorization_grants::refresh_token_record::RefreshTokenRecord;
@@ -103,22 +104,26 @@ impl RevocationEndpoint {
             .await
             .map_err(ProviderError::AuthorizationGrants)?
         {
-            RefreshTokenLookup::Current { family, record }
-                if record.client_id == client.client_id =>
+            RefreshTokenLookup::Current {
+                family,
+                record: RefreshFamily { client_id, .. },
+            }
+            | RefreshTokenLookup::Superseded { client_id, family }
+                if client_id == client.client_id =>
             {
                 RefreshFamilyRecord::revoke(&self.database, family)
                     .await
                     .map_err(ProviderError::AuthorizationGrants)
                     .map(|()| revoked_or_invalid())
             }
-            RefreshTokenLookup::Current { .. } => Ok(oauth_error(
-                400,
-                BasicErrorResponseType::InvalidGrant,
-                "the refresh token was issued to another client",
-            )),
-            RefreshTokenLookup::Superseded { .. } | RefreshTokenLookup::Unknown => {
-                Ok(revoked_or_invalid())
+            RefreshTokenLookup::Current { .. } | RefreshTokenLookup::Superseded { .. } => {
+                Ok(oauth_error(
+                    400,
+                    BasicErrorResponseType::InvalidGrant,
+                    "the refresh token was issued to another client",
+                ))
             }
+            RefreshTokenLookup::Unknown => Ok(revoked_or_invalid()),
         }
     }
 }

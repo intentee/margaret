@@ -108,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_a_resource_by_its_tag() {
+    fn finds_a_resource_by_its_tag_so_clients_naming_it_resolve_to_its_audience() {
         read(
             &format!(
                 "{ISSUANCE}#[issues_resource_tokens(attachments, audience = \"attachments\")]\npub struct Attachments;\n"
@@ -132,7 +132,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_resource_without_a_tag() {
+    fn rejects_a_resource_without_a_tag_since_clients_name_resources_by_tag() {
         assert!(matches!(
             rejection("#[issues_resource_tokens(audience = \"attachments\")]\npub struct Attachments;\n"),
             TokenIssuanceCodegenError::MissingResourceTag { anchor } if anchor == "crate::Attachments"
@@ -148,7 +148,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_resource_without_an_audience() {
+    fn rejects_a_resource_without_an_audience_since_no_server_could_accept_its_tokens() {
         assert!(matches!(
             rejection("#[issues_resource_tokens(attachments)]\npub struct Attachments;\n"),
             TokenIssuanceCodegenError::MissingResourceAudience { anchor } if anchor == "crate::Attachments"
@@ -156,7 +156,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_empty_audience() {
+    fn rejects_an_empty_resource_audience_since_no_resource_server_could_accept_its_tokens() {
         assert!(matches!(
             rejection("#[issues_resource_tokens(attachments, audience = \"\")]\npub struct Attachments;\n"),
             TokenIssuanceCodegenError::EmptyResourceAudience { anchor } if anchor == "crate::Attachments"
@@ -174,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_arguments_that_do_not_parse() {
+    fn rejects_unparseable_resource_arguments_naming_the_attribute_to_locate_them() {
         assert!(matches!(
             rejection("#[issues_resource_tokens(= 5)]\npub struct Attachments;\n"),
             TokenIssuanceCodegenError::Index(AttributeError::Arguments(
@@ -216,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_two_resources_of_one_audience() {
+    fn rejects_two_resources_sharing_an_audience_so_tokens_reach_exactly_one_resource() {
         assert!(matches!(
             rejection("#[issues_resource_tokens(attachments, audience = \"files\")]\npub struct Attachments;\n#[issues_resource_tokens(uploads, audience = \"files\")]\npub struct Uploads;\n"),
             TokenIssuanceCodegenError::DuplicateResourceAudience { audience, first, second }

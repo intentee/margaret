@@ -58,7 +58,7 @@ mod tests {
     use super::GeneratedModule;
 
     #[test]
-    fn writes_when_the_file_is_absent() {
+    fn writes_a_module_whose_file_is_absent_so_the_generated_source_exists() {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("container.rs");
         let wrote = GeneratedModule::new("container", "first")
@@ -73,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn skips_writing_when_the_content_matches() {
+    fn skips_writing_matching_content_so_unchanged_files_keep_their_timestamps() {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("container.rs");
         let generated = GeneratedModule::new("container", "same");
@@ -89,7 +89,7 @@ mod tests {
     }
 
     #[test]
-    fn rewrites_when_the_content_differs() {
+    fn rewrites_a_file_whose_content_differs_so_stale_generated_code_is_replaced() {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("container.rs");
         GeneratedModule::new("container", "old")
@@ -108,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_a_read_error() {
+    fn propagates_a_read_failure_other_than_absence_instead_of_overwriting_the_path() {
         let directory = tempdir().expect("a temporary directory");
 
         let result =
@@ -118,7 +118,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_a_write_error() {
+    fn propagates_a_write_failure_so_an_unwritten_module_is_never_reported_as_written() {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("missing").join("container.rs");
 

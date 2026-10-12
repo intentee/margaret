@@ -46,7 +46,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_nothing_without_a_positional_argument() {
+    fn renders_nothing_without_a_positional_argument_so_no_empty_block_is_generated() {
         let arguments = AttributeArgs::from_attribute(&parse_quote!(#[serves_oidc_endpoint]))
             .expect("the arguments parse");
 

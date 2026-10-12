@@ -96,7 +96,7 @@ mod tests {
     use crate::database_error::DatabaseError;
 
     #[tokio::test]
-    async fn reports_an_unreachable_database() {
+    async fn reports_a_refused_connection_as_unavailable_not_as_an_error_the_database_returned() {
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("a free port is reserved");

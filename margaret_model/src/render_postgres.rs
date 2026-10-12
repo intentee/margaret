@@ -317,7 +317,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_timestamptz_column() {
+    fn renders_a_timestamptz_column_so_timestamps_are_stored_as_absolute_instants() {
         const EVENTS: Table = Table {
             columns: &[Column {
                 column_type: ColumnType::Timestamptz,
@@ -337,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_bytea_column() {
+    fn renders_a_bytea_column_so_binary_data_is_stored_without_a_text_encoding() {
         const FILES: Table = Table {
             columns: &[Column {
                 column_type: ColumnType::Bytea,
@@ -357,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_real_column() {
+    fn renders_a_real_column_so_f32_fields_map_to_single_precision_storage() {
         const AUTHORS: Table = Table {
             columns: &[Column {
                 column_type: ColumnType::Real,
@@ -377,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_double_precision_column() {
+    fn renders_a_double_precision_column_so_f64_fields_keep_their_full_precision() {
         const ARTICLES: Table = Table {
             columns: &[Column {
                 column_type: ColumnType::DoublePrecision,
@@ -420,7 +420,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_nullable_numeric_column() {
+    fn renders_a_nullable_numeric_column_without_not_null_so_it_accepts_null() {
         const LINE_ITEMS: Table = Table {
             columns: &[Column {
                 column_type: ColumnType::Numeric {
@@ -444,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_composite_primary_key() {
+    fn renders_a_composite_primary_key_so_rows_are_identified_by_both_columns() {
         const PAIRS: Table = Table {
             columns: &[
                 Column {
@@ -474,7 +474,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_single_column_unique_constraint() {
+    fn renders_a_single_column_unique_constraint_so_duplicate_values_are_refused() {
         const USERS: Table = Table {
             columns: &[
                 Column {
@@ -604,7 +604,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_table_without_columns() {
+    fn renders_a_table_without_columns_as_an_empty_list_postgres_accepts() {
         const EMPTY: Table = Table {
             columns: &[],
             name: "empty",
@@ -620,7 +620,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_single_column_foreign_key() {
+    fn renders_a_single_column_foreign_key_so_references_must_point_at_a_real_row() {
         const ARTICLES: Table = Table {
             columns: &[
                 Column {
@@ -655,7 +655,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_nullable_foreign_key_column() {
+    fn renders_a_nullable_foreign_key_column_so_the_reference_may_be_left_empty() {
         const POSTS: Table = Table {
             columns: &[Column {
                 column_type: ColumnType::Uuid,
@@ -718,7 +718,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_on_delete_cascade() {
+    fn renders_on_delete_cascade_so_deleting_a_referenced_row_deletes_its_dependents() {
         const POSTS: Table = Table {
             columns: &[Column {
                 column_type: ColumnType::Uuid,
@@ -742,7 +742,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_on_delete_restrict() {
+    fn renders_on_delete_restrict_so_a_referenced_row_cannot_be_deleted() {
         const POSTS: Table = Table {
             columns: &[Column {
                 column_type: ColumnType::Uuid,
@@ -766,7 +766,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_on_delete_set_null() {
+    fn renders_on_delete_set_null_so_deleting_a_referenced_row_clears_the_reference() {
         const POSTS: Table = Table {
             columns: &[Column {
                 column_type: ColumnType::Uuid,
@@ -791,7 +791,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_single_column_index() {
+    fn renders_a_single_column_index_so_lookups_by_that_column_avoid_full_scans() {
         const ARTICLES: Table = Table {
             columns: &[
                 Column {
@@ -824,7 +824,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_multi_column_index() {
+    fn renders_a_multi_column_index_keeping_column_order_since_it_decides_index_use() {
         const AUTHORS: Table = Table {
             columns: &[
                 Column {
@@ -862,7 +862,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_indexes_in_a_deterministic_order() {
+    fn renders_indexes_in_a_deterministic_order_so_the_schema_output_is_stable() {
         const ARTICLES: Table = Table {
             columns: &[
                 Column {
@@ -899,7 +899,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_byte_length_check() {
+    fn renders_a_byte_length_check_so_the_database_refuses_wrongly_sized_values() {
         const FRAGMENT_METADATA: Table = Table {
             columns: &[Column {
                 checks: &[ColumnCheck {
@@ -923,7 +923,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_minimum_check() {
+    fn renders_a_minimum_check_as_a_named_constraint_so_the_database_refuses_lower_values() {
         const FRAGMENT_METADATA: Table = Table {
             columns: &[Column {
                 checks: &[ColumnCheck {
@@ -977,7 +977,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_composite_foreign_key() {
+    fn renders_a_composite_foreign_key_so_multi_column_references_are_enforced() {
         const FRAGMENT: Table = Table {
             columns: &[
                 Column {

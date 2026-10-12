@@ -4,7 +4,7 @@ use margaret_container::container_error::ContainerError;
 use margaret_container_tests::generate_container_source::generate_container_source;
 
 #[test]
-fn rejects_a_non_struct_service() {
+fn rejects_a_non_struct_service_since_the_container_only_builds_structs() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/service_not_a_struct");
     let error = generate_container_source("crate", &directory)
@@ -14,7 +14,7 @@ fn rejects_a_non_struct_service() {
 }
 
 #[test]
-fn rejects_a_non_struct_ticker() {
+fn rejects_a_non_struct_ticker_since_the_container_only_builds_structs() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ticker_not_a_struct");
     let error = generate_container_source("crate", &directory)

@@ -535,7 +535,7 @@ mod tests {
     }
 
     #[test]
-    fn omits_the_aggregates_no_endpoint_references() {
+    fn omits_the_aggregates_no_endpoint_references_so_no_unused_module_is_generated() {
         assert_eq!(
             named_source(modules(CLIENTS, &[]), "accepted_clients"),
             "pub mod clients;\n"
@@ -543,7 +543,7 @@ mod tests {
     }
 
     #[test]
-    fn declares_the_aggregates_beside_the_clients() {
+    fn declares_the_referenced_aggregates_beside_the_clients_so_endpoints_can_use_them() {
         assert_eq!(
             module_source("accepted_clients"),
             "pub mod accepted_resources;\npub mod provider_support;\npub mod clients;\n"

@@ -41,7 +41,7 @@ mod tests {
     use super::wait_until_unix_socket_ready;
 
     #[tokio::test]
-    async fn errors_when_socket_never_becomes_ready() {
+    async fn errors_when_the_socket_never_becomes_ready_so_waiting_is_bounded_by_timeout() {
         let nonexistent = PathBuf::from("/nonexistent/agent.sock");
 
         let result = wait_until_unix_socket_ready(&nonexistent, Duration::from_millis(50)).await;
@@ -50,7 +50,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn returns_ok_when_socket_already_bound() {
+    async fn returns_ok_when_the_socket_is_already_bound_so_a_ready_agent_is_accepted() {
         let tempdir = tempfile::tempdir().unwrap();
         let socket_path = tempdir.path().join("ready.sock");
         let _listener = UnixListener::bind(&socket_path).unwrap();

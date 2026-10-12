@@ -270,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn verifies_the_rfc_7515_a2_example() {
+    fn verifies_the_rfc_7515_a2_example_so_standard_rs256_signatures_verify() {
         let key = VerificationMaterial::from_rsa_components(
             RFC_7515_A2_N,
             RFC_7515_A2_E,
@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn verifies_the_rfc_7515_a3_example() {
+    fn verifies_the_rfc_7515_a3_example_so_standard_es256_signatures_verify() {
         assert_eq!(
             rfc_7515_a3_key().check(
                 RFC_7515_A3_SIGNING_INPUT.as_bytes(),
@@ -300,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    fn verifies_the_rfc_8037_a4_example() {
+    fn verifies_the_rfc_8037_a4_example_so_standard_eddsa_signatures_verify() {
         let key =
             VerificationMaterial::from_octet_key_pair(OctetKeyPairCurve::Ed25519, RFC_8037_A4_X)
                 .continue_value()

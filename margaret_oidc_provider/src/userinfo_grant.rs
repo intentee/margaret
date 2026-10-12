@@ -46,7 +46,7 @@ mod tests {
     }
 
     #[test]
-    fn includes_a_granted_scope() {
+    fn includes_a_granted_scope_so_userinfo_releases_the_claims_it_covers() {
         assert!(granted_openid().includes::<OpenidScope>());
     }
 

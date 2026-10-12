@@ -5,7 +5,7 @@ use margaret_spiffe_svid_client::svid_server_cert_verifier::SvidServerCertVerifi
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 
 #[test]
-fn returns_inner_supported_verify_schemes() {
+fn returns_inner_supported_verify_schemes_so_handshakes_can_negotiate_a_signature() {
     let verifier = SvidServerCertVerifier::new(
         build_root_cert_store_with_ca(),
         "example.org",

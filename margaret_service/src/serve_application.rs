@@ -75,9 +75,8 @@ mod tests {
     use clap::Command;
 
     use margaret_console::command_outcome::CommandOutcome;
-    use margaret_http::route_entry::RouteEntry;
-    use margaret_http::router::Router;
     use margaret_http::router_error::RouterError;
+    use margaret_http::server_paths::ServerPaths;
     use margaret_http::server_routes::ServerRoutes;
     use margaret_http::transport_config::TransportConfig;
 
@@ -110,11 +109,14 @@ mod tests {
     }
 
     fn empty_routes() -> ServerRoutes {
-        ServerRoutes::build(Vec::new()).expect("an empty entry list builds server routes")
+        ServerPaths::build([])
+            .expect("an empty path set builds")
+            .routes([])
+            .expect("an empty entry list builds server routes")
     }
 
     #[test]
-    fn assembles_one_server_service_per_assembly() {
+    fn assembles_one_server_service_per_assembly_so_each_declared_server_is_served() {
         let server_services = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0"]),
             vec![public_assembly(Ok(empty_routes()))],
@@ -129,7 +131,7 @@ mod tests {
     };
 
     #[test]
-    fn accepts_uploads_into_the_declared_directory() {
+    fn accepts_uploads_into_the_directory_its_argument_names_so_operators_choose_it() {
         assert_eq!(
             upload_config(
                 &matches(&["--public-upload-dir", "/srv/margaret-uploads"]),
@@ -179,12 +181,9 @@ mod tests {
 
     #[test]
     fn reports_failure_when_a_server_router_conflicts() {
-        let conflict = Router::build(vec![
-            RouteEntry::new("/conflict", Vec::new()),
-            RouteEntry::new("/conflict", Vec::new()),
-        ])
-        .err()
-        .expect("duplicate routes conflict");
+        let conflict = ServerPaths::build(["/conflict", "/conflict"])
+            .err()
+            .expect("duplicate routes conflict");
 
         let outcome = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0"]),

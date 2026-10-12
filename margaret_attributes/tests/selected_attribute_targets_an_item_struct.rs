@@ -5,7 +5,7 @@ use margaret_attributes::crate_root::CrateRoot;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 
 #[test]
-fn canonical_framework_attributes_target_item_structs() {
+fn matches_attributes_by_canonical_path_so_an_alias_counts_but_a_lookalike_does_not() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/valid_crate");
     let index = AttributeIndexBuilder::new()
         .index_crate(&CrateRoot::new("valid_crate", &directory))

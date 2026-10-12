@@ -45,13 +45,11 @@ async fn challenges_an_anonymous_visitor_for_bearer_credentials() {
     let fixture = TlsFixture::generate();
     let server = RunningFixtureServer::start(
         fixture.server_config.clone(),
-        vec![RouteEntry::new(
-            "/",
-            vec![MethodHandler::head(
-                RouteMethod::Get,
-                Arc::new(BearerGreeting),
-            )],
-        )],
+        ["/"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
+            Arc::new(BearerGreeting),
+        )])],
     )
     .await;
     let client = fixture_client_builder(&fixture.certificate_authority)

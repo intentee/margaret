@@ -11,17 +11,13 @@ pub struct FixtureIssuerRoutes {
 }
 
 impl FixtureIssuerRoutes {
+    pub const PATHS: [&'static str; 2] = ["/.well-known/openid-configuration", "/jwks"];
+
     #[must_use]
-    pub fn into_route_entries(self) -> Vec<RouteEntry> {
-        vec![
-            RouteEntry::new(
-                "/.well-known/openid-configuration",
-                vec![MethodHandler::head(RouteMethod::Get, self.discovery)],
-            ),
-            RouteEntry::new(
-                "/jwks",
-                vec![MethodHandler::head(RouteMethod::Get, self.key_set)],
-            ),
+    pub fn into_route_entries(self) -> [RouteEntry; 2] {
+        [
+            RouteEntry::new(vec![MethodHandler::head(RouteMethod::Get, self.discovery)]),
+            RouteEntry::new(vec![MethodHandler::head(RouteMethod::Get, self.key_set)]),
         ]
     }
 }

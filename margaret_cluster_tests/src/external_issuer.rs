@@ -60,10 +60,11 @@ impl ExternalIssuer {
 
         let server = RunningFixtureServer::start_plain(
             UploadConfig::Disabled,
-            vec![RouteEntry::new(
-                "/{*document}",
-                vec![MethodHandler::head(RouteMethod::Get, Arc::new(documents))],
-            )],
+            ["/{*document}"],
+            [RouteEntry::new(vec![MethodHandler::head(
+                RouteMethod::Get,
+                Arc::new(documents),
+            )])],
         )
         .await;
         let relay = TlsRelay::open(

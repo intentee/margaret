@@ -54,7 +54,7 @@ mod tests {
     use super::AudienceClaim;
 
     #[test]
-    fn describes_a_single_audience_as_written() {
+    fn describes_a_single_audience_as_written_so_messages_quote_it_verbatim() {
         assert_eq!(
             AudienceClaim::Single("ours".to_string()).to_string(),
             "ours"

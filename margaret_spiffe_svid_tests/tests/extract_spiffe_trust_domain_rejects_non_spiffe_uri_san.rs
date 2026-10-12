@@ -6,7 +6,7 @@ use margaret_spiffe_svid_tests::leaf_https_uri_der::LEAF_HTTPS_URI_DER;
 use margaret_spiffe_svid_tests::peer_identity_rejection::peer_identity_rejection;
 
 #[test]
-fn rejects_non_spiffe_uri_san() {
+fn rejects_a_non_spiffe_uri_san_for_its_wrong_scheme_so_https_ids_are_not_trusted() {
     let error = extract_spiffe_trust_domain(LEAF_HTTPS_URI_DER)
         .expect_err("the certificate does not carry a usable spiffe id");
 

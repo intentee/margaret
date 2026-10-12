@@ -9,7 +9,7 @@ use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::server::Server;
-use margaret_http::server_routes::ServerRoutes;
+use margaret_http::server_paths::ServerPaths;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http::web_socket_upgrade::WebSocketUpgrade;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
@@ -40,7 +40,9 @@ impl RunningWebSocketServer {
             "127.0.0.1:0".to_string(),
             transport,
             UploadConfig::Disabled,
-            ServerRoutes::build(vec![RouteEntry::web_socket("/ws", upgrade, middleware)])
+            ServerPaths::build(["/ws"])
+                .expect("the route paths do not conflict")
+                .routes([RouteEntry::web_socket(upgrade, middleware)])
                 .expect("the route entries register cleanly")
                 .router,
         );

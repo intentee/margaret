@@ -36,7 +36,7 @@ mod tests {
     }
 
     #[test]
-    fn hands_over_the_authenticated_user() {
+    fn meets_the_optional_requirement_with_the_user_so_handlers_see_who_signed_in() {
         assert!(matches!(
             optional_authenticated_user(AuthenticatedUserOutcome::Authenticated("milo")),
             Requirement::Met(Some("milo"))
@@ -52,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_a_terminal_interruption() {
+    fn propagates_a_terminal_interruption_response_instead_of_admitting_an_anonymous_visitor() {
         assert_eq!(
             interruption_status(ResponseContinuation::from(Response::text(
                 410,
@@ -63,7 +63,7 @@ mod tests {
     }
 
     #[test]
-    fn keeps_a_redirecting_interruption_intact() {
+    fn keeps_a_sign_in_redirect_intact_instead_of_admitting_an_anonymous_visitor() {
         assert_eq!(
             interruption_status(ResponseContinuation::from(
                 ForwardableRoute::new("http://localhost/sign-in".to_string()).see_other(),

@@ -69,7 +69,7 @@ async fn sets_the_cookies_the_session_factory_changes_on_the_upgrade() {
 }
 
 #[tokio::test]
-async fn rejects_a_handshake_missing_the_key() {
+async fn rejects_a_handshake_missing_the_key_since_no_accept_header_can_be_derived() {
     let server = RunningWebSocketServer::start().await;
 
     let response = raw_http_exchange(
@@ -131,7 +131,7 @@ async fn rejects_a_handshake_with_an_unsupported_version() {
 }
 
 #[tokio::test]
-async fn upgrades_when_the_query_form_validates() {
+async fn upgrades_when_the_query_form_validates_so_sessions_start_with_checked_input() {
     let server = RunningWebSocketServer::start_with(ValidatingSessionFactory).await;
     let url = format!("ws://{}/ws?label=here", server.address());
     let tcp = TcpStream::connect(server.address())

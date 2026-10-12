@@ -10,7 +10,7 @@ use margaret_spiffe_svid_server::svid_client_cert_verifier_facade::SvidClientCer
 use margaret_spiffe_svid_server::svid_client_cert_verifier_service::SvidClientCertVerifierService;
 
 #[tokio::test]
-async fn errors_when_root_store_is_empty() {
+async fn fails_the_service_on_an_empty_root_store_since_no_verifier_can_be_built() {
     let root_cert_store_holder = RootCertStoreHolder::default();
     root_cert_store_holder.set(Some(RootCertStore::empty()));
 

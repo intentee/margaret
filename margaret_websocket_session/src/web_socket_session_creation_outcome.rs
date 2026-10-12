@@ -59,7 +59,7 @@ mod tests {
     }
 
     #[test]
-    fn precedes_the_response_of_an_interruption() {
+    fn precedes_the_response_of_an_interruption_so_its_cookie_changes_still_apply() {
         assert!(matches!(
             WebSocketSessionCreationOutcome::<()>::Interrupted(ResponseContinuation::from(
                 Response::text(401, "")

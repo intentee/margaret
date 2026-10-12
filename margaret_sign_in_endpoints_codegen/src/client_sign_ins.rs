@@ -185,6 +185,7 @@ mod tests {
     use margaret_oauth_vocabulary::scope::Scope;
     use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
     use margaret_route_method::route_method::RouteMethod;
+    use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
     use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
     use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
     use margaret_tag_codegen::tag_pool::TagPool;
@@ -270,7 +271,8 @@ mod tests {
         .expect("the tags are collected")
         .oauth_client_bindings(&trusts, &clients, &issuance, &admitted)
         .expect("the clients bind");
-        let routes = DeclaredRoutes::read(index).expect("the routes are declared");
+        let routes = DeclaredRoutes::read(index, &mut RoutePathRegistry::new())
+            .expect("the routes are declared");
 
         inspect(client_sign_ins(index, &routes, &bindings, &sessions))
     }
@@ -406,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_sign_in_admitted_twice() {
+    fn rejects_a_sign_in_admitted_by_two_singletons_since_only_one_may_decide_it() {
         assert!(matches!(
             rejection(&format!("{}{}", partner_sign_in(), admission("partner_client").replace("Readers", "Editors"))),
             SignInEndpointsCodegenError::AmbiguousSignInAdmission { client, first, second }
@@ -448,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_parameterized_callback_route() {
+    fn rejects_a_parameterized_callback_route_since_a_redirect_cannot_fill_parameters() {
         assert!(matches!(
             rejection(&partner_sign_in().replace("/sign-in/callback", "/sign-in/{provider}")),
             SignInEndpointsCodegenError::Route(HttpCodegenError::ParameterizedRedirectRoute {
@@ -503,7 +505,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_marker_without_an_endpoint() {
+    fn rejects_a_marker_without_an_endpoint_since_its_sign_in_role_is_unknown() {
         assert!(matches!(
             rejection(&partner_sign_in().replace("#[serves_sign_in(SignInEndpoint::Start, client = partner_client)]", "#[serves_sign_in(client = partner_client)]")),
             SignInEndpointsCodegenError::MissingSignInEndpoint { anchor } if anchor == "crate::GetSignIn"
@@ -520,7 +522,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_marker_without_its_client() {
+    fn rejects_a_marker_without_its_client_since_it_must_sign_in_through_one() {
         assert!(matches!(
             rejection(&partner_sign_in().replace("SignInEndpoint::Start, client = partner_client", "SignInEndpoint::Start")),
             SignInEndpointsCodegenError::MissingSignInClient { anchor } if anchor == "crate::GetSignIn"
@@ -536,7 +538,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_unrouted_marker() {
+    fn rejects_a_sign_in_marker_on_a_struct_without_a_route_since_no_browser_could_reach_it() {
         assert!(matches!(
             rejection(&format!("{}#[serves_sign_in(SignInEndpoint::Start, client = partner_client)]\nstruct Unrouted;\n", partner_sign_in())),
             SignInEndpointsCodegenError::UnroutedSignInEndpoint { anchor } if anchor == "crate::Unrouted"
@@ -553,7 +555,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_marker_on_a_singleton() {
+    fn rejects_a_marker_on_a_singleton_since_declarations_need_a_plain_struct() {
         assert!(matches!(
             rejection(&partner_sign_in().replace("#[responds_to_http(method = RouteMethod::Get, path = \"/sign-in\"", "#[singleton]\n#[responds_to_http(method = RouteMethod::Get, path = \"/sign-in\"")),
             SignInEndpointsCodegenError::Anchor(DeclarationAnchorError::DeclaredAsSingleton { path, .. })

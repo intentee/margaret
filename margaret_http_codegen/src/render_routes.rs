@@ -1,4 +1,7 @@
+use std::collections::BTreeMap;
+
 use proc_macro2::Ident;
+use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
@@ -11,68 +14,21 @@ use margaret_route_parameter_codegen::route_url_template::RouteUrlTemplate;
 use margaret_route_parameter_codegen::url_segment::UrlSegment;
 
 use crate::http_route_table::HttpRouteTable;
-use crate::http_server::HttpServer;
 use crate::named_route::NamedRoute;
+use crate::server_layout::ServerLayout;
 
-fn server_field_ident(server: &HttpServer) -> Ident {
-    format_ident!("{}", server.name())
-}
-
-fn origin_param_ident(server: &HttpServer) -> Ident {
-    format_ident!("origin_{}", server.name())
+fn origin_param_ident(layout: &ServerLayout<'_>) -> Ident {
+    format_ident!("origin_{}", layout.server.name())
 }
 
 fn route_field_ident(named: &NamedRoute<'_>) -> Ident {
     format_ident!("{}", named.name)
 }
 
-fn is_literal(named: &NamedRoute<'_>) -> bool {
-    matches!(named.path.template(), RouteUrlTemplate::Literal(_))
-}
-
-fn server_layouts<'server>(
-    table: &HttpRouteTable,
-    servers: &'server [HttpServer],
-) -> Vec<ServerLayout<'server>> {
-    let mut type_allocator = NameAllocator::new();
-
-    servers
-        .iter()
-        .map(|server| {
-            let struct_ident =
-                format_ident!("{}", type_allocator.allocate(server.name()).type_name());
-            let named = table.named_routes(server.name());
-
-            let mut field_allocator = NameAllocator::new();
-
-            for route in named.iter().filter(|named| is_literal(named)) {
-                field_allocator.reserve(route.name);
-            }
-
-            let origin = format_ident!("{}", field_allocator.allocate("origin").field());
-
-            let mut method_allocator = NameAllocator::new();
-
-            for route in named.iter().filter(|named| !is_literal(named)) {
-                method_allocator.reserve(route.name);
-            }
-
-            let constructor = format_ident!("{}", method_allocator.allocate("new").field());
-
-            ServerLayout {
-                constructor,
-                origin,
-                server,
-                struct_ident,
-            }
-        })
-        .collect()
-}
-
-fn segment_tokens(segment: &UrlSegment) -> TokenStream {
+fn segment_tokens(segment: &UrlSegment, values: &mut ParameterValues) -> TokenStream {
     match segment {
         UrlSegment::CatchAllParameter { name, prefix } => {
-            let value = format_ident!("{}", name);
+            let value = values.allocated(name);
 
             quote! {
                 margaret::framework::http::url_segment::UrlSegment::CatchAllParameter {
@@ -84,15 +40,16 @@ fn segment_tokens(segment: &UrlSegment) -> TokenStream {
                 }
             }
         }
-        UrlSegment::Literal(text) => {
-            quote! { margaret::framework::http::url_segment::UrlSegment::Literal(#text) }
+        UrlSegment::Literal { decoded, encoded } => {
+            quote! {
+                margaret::framework::http::url_segment::UrlSegment::Literal {
+                    decoded: #decoded,
+                    encoded: #encoded,
+                }
+            }
         }
-        UrlSegment::Parameter {
-            name,
-            prefix,
-            suffix,
-        } => {
-            let value = format_ident!("{}", name);
+        UrlSegment::Parameter { name, prefix } => {
+            let value = values.allocated(name);
 
             quote! {
                 margaret::framework::http::url_segment::UrlSegment::Parameter {
@@ -101,7 +58,6 @@ fn segment_tokens(segment: &UrlSegment) -> TokenStream {
                         value: #value,
                     },
                     prefix: #prefix,
-                    suffix: #suffix,
                 }
             }
         }
@@ -132,15 +88,27 @@ fn literal_route_init(named: &NamedRoute<'_>, path: &str, origin: &Ident) -> Tok
     }
 }
 
-fn route_method(named: &NamedRoute<'_>, segments: &[UrlSegment], origin: &Ident) -> TokenStream {
+fn route_method(
+    named: &NamedRoute<'_>,
+    segments: &[UrlSegment],
+    layout: &ServerLayout<'_>,
+) -> TokenStream {
+    let ServerLayout { origin, paths, .. } = layout;
     let method = route_field_ident(named);
     let route_type = route_type_tokens(named);
-    let parameters = named.path.parameters().map(|placeholder| {
-        let parameter = format_ident!("{}", placeholder);
-
-        quote! { #parameter: ::std::string::String }
-    });
-    let segments = segments.iter().map(segment_tokens);
+    let position = Literal::usize_unsuffixed(named.position);
+    let mut values = ParameterValues {
+        allocator: NameAllocator::new(),
+        idents: Vec::new(),
+    };
+    let segments: Vec<TokenStream> = segments
+        .iter()
+        .map(|segment| segment_tokens(segment, &mut values))
+        .collect();
+    let parameters = values
+        .idents
+        .iter()
+        .map(|parameter| quote! { #parameter: ::std::string::String });
 
     quote! {
         #[must_use]
@@ -148,20 +116,43 @@ fn route_method(named: &NamedRoute<'_>, segments: &[UrlSegment], origin: &Ident)
             &self,
             #(#parameters),*
         ) -> margaret::framework::http::route_addressing::RouteAddressing<#route_type> {
-            margaret::framework::http::build_url::build_url(&self.#origin, &[#(#segments),*])
-                .map(#route_type::new)
+            margaret::framework::http::build_url::build_url(
+                &self.#origin,
+                &self.#paths,
+                margaret::framework::http::route_position::RoutePosition::new(#position),
+                &[#(#segments),*],
+            )
+            .map(#route_type::new)
         }
     }
 }
 
-fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
+fn server_struct(
+    table: &HttpRouteTable,
+    layout: &ServerLayout<'_>,
+    websocket_paths: &BTreeMap<String, Vec<String>>,
+) -> TokenStream {
     let ServerLayout {
         constructor,
         origin,
+        paths,
         server,
         struct_ident,
+        ..
     } = layout;
     let named = table.named_routes(server.name());
+    let server_patterns: Vec<&str> = table
+        .route_groups(server.name())
+        .map(|group| group.path().pattern())
+        .chain(
+            websocket_paths
+                .get(server.name())
+                .into_iter()
+                .flatten()
+                .map(String::as_str),
+        )
+        .collect();
+    let path_count = Literal::usize_unsuffixed(server_patterns.len());
     let mut field_decls = Vec::new();
     let mut field_inits = Vec::new();
     let mut methods = Vec::new();
@@ -173,7 +164,7 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
                 field_inits.push(literal_route_init(route, path, origin));
             }
             RouteUrlTemplate::Parameterized(segments) => {
-                methods.push(route_method(route, segments, origin));
+                methods.push(route_method(route, segments, layout));
             }
         }
     }
@@ -191,16 +182,22 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
     quote! {
         pub struct #struct_ident {
             #origin_field
+            pub(crate) #paths: margaret::framework::http::server_paths::ServerPaths<#path_count>,
             #(#field_decls)*
         }
 
         impl #struct_ident {
             #too_many_lines
-            pub(crate) fn #constructor(#origin_param: &str) -> Self {
-                Self {
+            pub(crate) fn #constructor(
+                #origin_param: &str,
+            ) -> ::std::result::Result<Self, margaret::framework::http::router_error::RouterError> {
+                ::std::result::Result::Ok(Self {
+                    #paths: margaret::framework::http::server_paths::ServerPaths::build([
+                        #(#server_patterns),*
+                    ])?,
                     #(#field_inits)*
                     #origin_init
-                }
+                })
             }
 
             #(#methods)*
@@ -208,39 +205,47 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
     }
 }
 
-struct ServerLayout<'server> {
-    constructor: Ident,
-    origin: Ident,
-    server: &'server HttpServer,
-    struct_ident: Ident,
+struct ParameterValues {
+    allocator: NameAllocator,
+    idents: Vec<Ident>,
+}
+
+impl ParameterValues {
+    fn allocated(&mut self, name: &str) -> Ident {
+        let value = format_ident!("{}", self.allocator.allocate(name).field());
+
+        self.idents.push(value.clone());
+
+        value
+    }
 }
 
 pub(crate) fn render_routes(
     table: &HttpRouteTable,
-    servers: &[HttpServer],
+    layouts: &[ServerLayout<'_>],
+    websocket_paths: &BTreeMap<String, Vec<String>>,
 ) -> Vec<GeneratedModuleTokens> {
-    let layouts = server_layouts(table, servers);
     let server_fields = layouts.iter().map(|layout| {
-        let field = server_field_ident(layout.server);
+        let field = &layout.field;
         let struct_ident = &layout.struct_ident;
 
         quote! { pub #field: servers::#field::#struct_ident, }
     });
     let origin_params = layouts.iter().map(|layout| {
-        let param = origin_param_ident(layout.server);
+        let param = origin_param_ident(layout);
 
         quote! { #param: &str, }
     });
     let server_inits = layouts.iter().map(|layout| {
-        let field = server_field_ident(layout.server);
+        let field = &layout.field;
         let struct_ident = &layout.struct_ident;
         let constructor = &layout.constructor;
-        let param = origin_param_ident(layout.server);
+        let param = origin_param_ident(layout);
 
-        quote! { #field: servers::#field::#struct_ident::#constructor(#param), }
+        quote! { #field: servers::#field::#struct_ident::#constructor(#param)?, }
     });
     let server_declarations = layouts.iter().map(|layout| {
-        let field = server_field_ident(layout.server);
+        let field = &layout.field;
 
         quote! {
             #[rustfmt::skip]
@@ -257,11 +262,15 @@ pub(crate) fn render_routes(
         }
 
         impl Routes {
-            #[must_use]
-            pub fn from_origins(#(#origin_params)*) -> Self {
-                Self {
+            #[doc = " # Errors"]
+            #[doc = ""]
+            #[doc = " Returns `RouterError` when the paths of a server cannot build its router."]
+            pub fn from_origins(
+                #(#origin_params)*
+            ) -> ::std::result::Result<Self, margaret::framework::http::router_error::RouterError> {
+                ::std::result::Result::Ok(Self {
                     #(#server_inits)*
-                }
+                })
             }
         }
     };
@@ -274,10 +283,10 @@ pub(crate) fn render_routes(
         GeneratedModuleTokens::new("routes/servers", servers_tokens),
     ];
 
-    for layout in &layouts {
+    for layout in layouts {
         modules.push(GeneratedModuleTokens::new(
-            format!("routes/servers/{}", server_field_ident(layout.server)),
-            server_struct(table, layout),
+            format!("routes/servers/{}", layout.field),
+            server_struct(table, layout, websocket_paths),
         ));
     }
 

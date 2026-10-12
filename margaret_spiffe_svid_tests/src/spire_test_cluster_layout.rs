@@ -204,7 +204,7 @@ mod tests {
     use super::SpireTestClusterLayout;
 
     #[tokio::test]
-    async fn creates_both_data_dirs() {
+    async fn creates_the_server_and_agent_data_dirs_so_both_spire_daemons_can_start() {
         let tempdir = tempfile::tempdir().unwrap();
         let layout = SpireTestClusterLayout::new(tempdir.path(), "spiffe.test", 1234);
 

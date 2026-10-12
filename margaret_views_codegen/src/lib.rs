@@ -80,7 +80,7 @@ struct CardLayout;
 ";
 
     #[test]
-    fn generates_a_views_struct_and_builder() {
+    fn generates_a_views_struct_and_builder_so_responders_reach_views_by_name() {
         let source = formatted(generated(VALID_VIEW).modules);
 
         assert!(source.contains("pub struct Views"));
@@ -124,7 +124,7 @@ impl Banner {
     }
 
     #[test]
-    fn accepts_a_view_without_a_singleton() {
+    fn accepts_a_view_without_a_singleton_since_the_container_still_provides_it() {
         let source =
             formatted(generated("#[renders_view(name = \"plain\")]\nstruct Plain;\n").modules);
 
@@ -146,7 +146,7 @@ impl Banner {
     }
 
     #[test]
-    fn rejects_a_view_without_a_name() {
+    fn rejects_a_view_without_a_name_since_the_views_field_needs_one() {
         assert!(
             rejection("#[renders_view]\n#[singleton]\nstruct Bad;\n")
                 .contains("is missing the 'name' argument")
@@ -172,7 +172,7 @@ impl Banner {
     }
 
     #[test]
-    fn propagates_malformed_view_arguments() {
+    fn surfaces_unparseable_view_arguments_instead_of_generating_the_view() {
         assert!(
             rejection("#[renders_view(= 5)]\n#[singleton]\nstruct Bad;\n")
                 .contains("failed to index the crate")
@@ -180,7 +180,7 @@ impl Banner {
     }
 
     #[test]
-    fn propagates_a_non_string_view_name() {
+    fn propagates_a_non_string_view_name_so_the_error_names_the_bad_argument() {
         let error = rejection_for("#[renders_view(name = 5)]\n#[singleton]\nstruct Bad;\n");
 
         assert!(matches!(

@@ -39,7 +39,7 @@ mod tests {
     use super::ROUTE_METHODS;
 
     #[test]
-    fn reads_back_every_method_it_renders() {
+    fn reads_back_every_method_it_renders_so_generated_method_paths_stay_recognized() {
         let methods = [
             RouteMethod::Delete,
             RouteMethod::Get,

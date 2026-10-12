@@ -172,7 +172,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_uploaded_files_alone() {
+    fn reads_the_body_as_multipart_files_when_uploaded_files_are_the_only_content() {
         assert_reads(
             &[files()],
             &ContentBinding::MultipartFiles {
@@ -202,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_stream_alone() {
+    fn hands_the_raw_body_stream_to_a_lone_stream_parameter_without_parsing_it() {
         assert_reads(
             &[parameter(RequestBinding::RequestBodyStream)],
             &ContentBinding::Stream {
@@ -212,17 +212,17 @@ mod tests {
     }
 
     #[test]
-    fn rejects_form_fields_and_json_together() {
+    fn rejects_form_fields_before_json_since_one_body_cannot_be_both_formats() {
         assert_conflicts(&[form(), json()]);
     }
 
     #[test]
-    fn rejects_json_and_form_fields_together() {
+    fn rejects_json_before_form_fields_since_one_body_cannot_be_both_formats() {
         assert_conflicts(&[json(), form()]);
     }
 
     #[test]
-    fn rejects_uploaded_files_bound_twice() {
+    fn rejects_uploaded_files_bound_twice_since_one_body_streams_its_files_once() {
         assert_conflicts(&[files(), files()]);
     }
 

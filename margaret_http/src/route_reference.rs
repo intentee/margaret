@@ -35,7 +35,7 @@ mod tests {
     }
 
     #[test]
-    fn temporarily_redirects_to_the_reference_url() {
+    fn temporarily_redirects_to_the_reference_url_with_307_keeping_the_request_method() {
         let response = article_reference()
             .temporary_redirect()
             .into_response()
@@ -52,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    fn permanently_redirects_to_the_reference_url() {
+    fn permanently_redirects_to_the_reference_url_with_308_so_clients_cache_the_move() {
         let response = article_reference()
             .permanent_redirect()
             .into_response()

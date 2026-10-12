@@ -73,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn a_flag_reads_from_get_flag() {
+    fn a_flag_reads_through_get_flag_since_a_flag_holds_a_boolean_not_a_value() {
         assert_eq!(
             collapsed(&ConsoleArgument::Flag {
                 name: "loud".to_string(),

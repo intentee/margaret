@@ -41,6 +41,7 @@ pub fn derive_provider_endpoints(
 mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_http_codegen::declared_routes::DeclaredRoutes;
+    use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
     use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
     use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
     use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
@@ -159,7 +160,8 @@ mod tests {
         let issuance = DeclaredTokenIssuance::read(index).expect("the token issuance is read");
         let resources = DeclaredResourceIssuances::read(index, &issuance)
             .expect("the resource issuances are read");
-        let declared = DeclaredRoutes::read(index).expect("the routes are declared");
+        let declared = DeclaredRoutes::read(index, &mut RoutePathRegistry::new())
+            .expect("the routes are declared");
 
         derive_provider_endpoints(
             &DeclaredEndpointRoutes::read(index, &declared).expect("the endpoint routes are read"),
@@ -225,7 +227,7 @@ mod tests {
     }
 
     #[test]
-    fn locates_every_endpoint_at_the_issuer() {
+    fn locates_every_endpoint_at_the_issuer_origin_so_discovery_advertises_real_urls() {
         let endpoints = derived(&provider_routes()).expect("every endpoint is routed");
 
         assert!(matches!(
@@ -425,7 +427,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_parameterized_endpoint_route() {
+    fn rejects_a_parameterized_endpoint_route_since_discovery_needs_one_fixed_url() {
         assert_eq!(
             rejection(&replaced(
                 "PostRevoke",
@@ -458,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_parameterized_consent_route() {
+    fn rejects_a_parameterized_consent_route_since_the_consent_form_needs_a_fixed_url() {
         assert_eq!(
             rejection(&replaced(
                 "PostConsent",
@@ -504,7 +506,7 @@ mod tests {
     }
 
     #[test]
-    fn describes_every_provider_endpoint() {
+    fn names_every_provider_endpoint_in_prose_so_codegen_errors_say_which_endpoint_is_wrong() {
         assert_eq!(
             ENDPOINTS.map(|endpoint| endpoint.to_string()),
             [

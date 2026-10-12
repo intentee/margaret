@@ -31,21 +31,16 @@ async fn keeps_the_cookies_a_forward_target_sets_after_the_carried_ones() {
     );
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![
-            RouteEntry::new(
-                "/forwarding",
-                vec![MethodHandler::head(
-                    RouteMethod::Get,
-                    Arc::new(CookieChangingForwardHandler {
-                        cookie: Cookie::new("session", "removed"),
-                        target: "starting",
-                    }),
-                )],
-            ),
-            RouteEntry::new(
-                "/starting",
-                vec![MethodHandler::forwardable("starting", starting)],
-            ),
+        ["/forwarding", "/starting"],
+        [
+            RouteEntry::new(vec![MethodHandler::head(
+                RouteMethod::Get,
+                Arc::new(CookieChangingForwardHandler {
+                    cookie: Cookie::new("session", "removed"),
+                    target: "starting",
+                }),
+            )]),
+            RouteEntry::new(vec![MethodHandler::forwardable("starting", starting)]),
         ],
     )
     .await;

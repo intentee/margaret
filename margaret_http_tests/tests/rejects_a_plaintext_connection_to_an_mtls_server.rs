@@ -10,7 +10,8 @@ use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 async fn rejects_a_plaintext_connection_to_an_mtls_server() {
     let fixture = MtlsFixture::new();
     let server =
-        RunningFixtureServer::start(fixture.server_config.clone(), vec![echo_peer_route()]).await;
+        RunningFixtureServer::start(fixture.server_config.clone(), ["/"], [echo_peer_route()])
+            .await;
 
     let mut stream = TcpStream::connect(server.address())
         .await

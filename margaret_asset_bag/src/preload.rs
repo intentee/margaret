@@ -47,7 +47,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_fetch_preload_with_crossorigin() {
+    fn renders_a_fetch_preload_with_crossorigin_to_match_the_cors_fetch_request() {
         assert_eq!(
             rendered(Preload::Fetch(AssetHref::Local("assets/data_ABC12345.bin"))),
             "<link rel=\"preload\" href=\"/assets/data_ABC12345.bin\" as=\"fetch\" crossorigin>"
@@ -55,7 +55,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_font_preload_with_crossorigin() {
+    fn renders_a_font_preload_with_crossorigin_to_match_the_cors_font_request() {
         assert_eq!(
             rendered(Preload::Font(AssetHref::Absolute(
                 "https://fonts.example/font.woff2"
@@ -65,7 +65,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_an_image_preload() {
+    fn renders_an_image_preload_without_crossorigin_to_match_the_no_cors_image_request() {
         assert_eq!(
             rendered(Preload::Image(AssetHref::Local("assets/logo_ABC12345.png"))),
             "<link rel=\"preload\" href=\"/assets/logo_ABC12345.png\" as=\"image\">"
@@ -73,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_module_preload() {
+    fn renders_a_module_as_a_modulepreload_so_the_browser_parses_it_as_a_module_script() {
         assert_eq!(
             rendered(Preload::Module(AssetHref::Local(
                 "assets/chunk_ABC12345.js"
@@ -83,7 +83,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_style_preload() {
+    fn renders_a_style_preload_without_crossorigin_to_match_the_stylesheet_request() {
         assert_eq!(
             rendered(Preload::Style(AssetHref::Local("assets/page_ABC12345.css"))),
             "<link rel=\"preload\" href=\"/assets/page_ABC12345.css\" as=\"style\">"

@@ -1,10 +1,16 @@
+use std::collections::BTreeSet;
+use std::iter::Peekable;
 use std::mem;
+use std::str::Chars;
 
-use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
+use margaret_attributes::is_snake_case_name::is_snake_case_name;
 use margaret_url_path::admit_path_segment::admit_path_segment;
 use margaret_url_path::admit_segment_text::admit_segment_text;
-use margaret_url_path::encode_url_path_literal::encode_url_path_literal;
+use margaret_url_path::encode_url_path_segment::encode_url_path_segment;
+use margaret_url_path::path_segment::PathSegment;
 use margaret_url_path::path_segment_admission::PathSegmentAdmission;
+use margaret_url_path::path_segments::path_segments;
+use margaret_url_path::path_separator::PATH_SEPARATOR;
 
 use crate::route_path_error::RoutePathError;
 use crate::url_segment::UrlSegment;
@@ -12,9 +18,8 @@ use crate::url_segment::UrlSegment;
 const CATCH_ALL_MARKER: char = '*';
 const PARAMETER_CLOSE: char = '}';
 const PARAMETER_OPEN: char = '{';
-const PATH_SEPARATOR: char = '/';
 
-fn admitted(text: &str, admission: PathSegmentAdmission) -> Result<(), RoutePathError> {
+fn admitted_text(text: &str, admission: PathSegmentAdmission) -> Result<(), RoutePathError> {
     match admission {
         PathSegmentAdmission::Admitted => Ok(()),
         PathSegmentAdmission::Rejected(rejection) => Err(RoutePathError::UnroutableSegment {
@@ -24,155 +29,135 @@ fn admitted(text: &str, admission: PathSegmentAdmission) -> Result<(), RoutePath
     }
 }
 
-fn parameter_name(name: &str) -> Result<String, RoutePathError> {
-    if is_snake_case_identifier(name) {
-        Ok(name.to_string())
-    } else {
-        Err(RoutePathError::InvalidParameterName {
-            name: name.to_string(),
-        })
-    }
-}
-
-fn pattern_segments(path: &str) -> PatternSegments {
-    let mut leading = Vec::new();
-    let mut segment = PatternSegment::default();
-    let mut characters = path.chars().peekable();
+fn parameter_name(characters: &mut Peekable<Chars<'_>>) -> String {
+    let mut name = String::new();
 
     while let Some(character) = characters.next() {
         match character {
-            PARAMETER_OPEN if characters.peek() == Some(&PARAMETER_OPEN) => {
-                characters.next();
-                segment.push_literal(PARAMETER_OPEN);
+            PARAMETER_OPEN | PARAMETER_CLOSE if characters.next_if_eq(&character).is_some() => {
+                name.push(character);
             }
-            PARAMETER_CLOSE if characters.peek() == Some(&PARAMETER_CLOSE) => {
-                characters.next();
-                segment.push_literal(PARAMETER_CLOSE);
-            }
-            PARAMETER_OPEN => segment.parameters.push(SegmentParameter {
-                name: characters
-                    .by_ref()
-                    .take_while(|inner| *inner != PARAMETER_CLOSE)
-                    .collect(),
-                trailing: String::new(),
-            }),
-            PATH_SEPARATOR => leading.push(mem::take(&mut segment)),
-            _ => segment.push_literal(character),
+            PARAMETER_CLOSE => break,
+            _ => name.push(character),
         }
     }
 
-    PatternSegments {
-        last: segment,
-        leading,
-    }
+    name
 }
 
-#[derive(Default)]
-struct PatternSegment {
-    leading: String,
-    parameters: Vec<SegmentParameter>,
-}
+fn pattern_segment(text: &str) -> PatternSegment {
+    let mut characters = text.chars().peekable();
+    let mut literal = String::new();
 
-impl PatternSegment {
-    fn push_literal(&mut self, character: char) {
-        match self.parameters.last_mut() {
-            Some(parameter) => parameter.trailing.push(character),
-            None => self.leading.push(character),
+    while let Some(character) = characters.next() {
+        match character {
+            PARAMETER_OPEN | PARAMETER_CLOSE if characters.next_if_eq(&character).is_some() => {
+                literal.push(character);
+            }
+            PARAMETER_OPEN => {
+                return PatternSegment::Parameter {
+                    name: parameter_name(&mut characters),
+                    prefix: literal,
+                };
+            }
+            _ => literal.push(character),
         }
     }
+
+    PatternSegment::Literal(literal)
 }
 
-struct PatternSegments {
-    last: PatternSegment,
-    leading: Vec<PatternSegment>,
-}
-
-struct SegmentParameter {
-    name: String,
-    trailing: String,
+enum PatternSegment {
+    Literal(String),
+    Parameter { name: String, prefix: String },
 }
 
 struct TemplateAssembly {
-    literal: String,
+    decoded: String,
+    encoded: String,
+    names: BTreeSet<String>,
     segments: Vec<UrlSegment>,
 }
 
 impl TemplateAssembly {
+    fn declared_name(&mut self, name: &str) -> Result<String, RoutePathError> {
+        if !is_snake_case_name(name) {
+            return Err(RoutePathError::InvalidParameterName {
+                name: name.to_string(),
+            });
+        }
+
+        if !self.names.insert(name.to_string()) {
+            return Err(RoutePathError::DuplicateParameterName {
+                name: name.to_string(),
+            });
+        }
+
+        Ok(name.to_string())
+    }
+
     fn into_template(self) -> RouteUrlTemplate {
         let Self {
-            literal,
+            decoded,
+            encoded,
             mut segments,
+            ..
         } = self;
 
         if segments.is_empty() {
-            RouteUrlTemplate::Literal(literal)
+            RouteUrlTemplate::Literal(encoded)
         } else {
-            if !literal.is_empty() {
-                segments.push(UrlSegment::Literal(literal));
+            if !encoded.is_empty() {
+                segments.push(UrlSegment::Literal { decoded, encoded });
             }
 
             RouteUrlTemplate::Parameterized(segments)
         }
     }
 
-    fn push_literal_segment(&mut self, text: &str, is_last: bool) -> Result<(), RoutePathError> {
-        if !(text.is_empty() && is_last) {
-            admitted(text, admit_path_segment(text))?;
-        }
-
-        self.literal.push_str(&encode_url_path_literal(text));
+    fn push_literal(&mut self, literal: &str) -> Result<(), RoutePathError> {
+        admitted_text(literal, admit_path_segment(literal))?;
+        self.decoded.push_str(literal);
+        self.encoded.push_str(&encode_url_path_segment(literal));
 
         Ok(())
     }
 
-    fn push_parameter(
-        &mut self,
-        prefix: &str,
-        SegmentParameter { name, trailing }: &SegmentParameter,
-        is_last: bool,
-    ) -> Result<(), RoutePathError> {
-        admitted(prefix, admit_segment_text(prefix))?;
-        admitted(trailing, admit_segment_text(trailing))?;
+    fn push_parameter(&mut self, name: &str, prefix: String) -> Result<(), RoutePathError> {
+        admitted_text(&prefix, admit_segment_text(&prefix))?;
 
         let segment = match name.strip_prefix(CATCH_ALL_MARKER) {
-            Some(catch_all) if is_last && trailing.is_empty() => UrlSegment::CatchAllParameter {
-                name: parameter_name(catch_all)?,
-                prefix: prefix.to_string(),
+            Some(catch_all) => UrlSegment::CatchAllParameter {
+                name: self.declared_name(catch_all)?,
+                prefix,
             },
-            Some(catch_all) => {
-                return Err(RoutePathError::CatchAllNotLast {
-                    name: catch_all.to_string(),
-                });
-            }
             None => UrlSegment::Parameter {
-                name: parameter_name(name)?,
-                prefix: prefix.to_string(),
-                suffix: trailing.clone(),
+                name: self.declared_name(name)?,
+                prefix,
             },
         };
 
-        self.segments
-            .push(UrlSegment::Literal(mem::take(&mut self.literal)));
+        self.segments.push(UrlSegment::Literal {
+            decoded: mem::take(&mut self.decoded),
+            encoded: mem::take(&mut self.encoded),
+        });
         self.segments.push(segment);
 
         Ok(())
     }
 
-    fn push_segment(
-        &mut self,
-        PatternSegment {
-            leading,
-            parameters,
-        }: &PatternSegment,
-        is_last: bool,
-    ) -> Result<(), RoutePathError> {
-        match parameters.as_slice() {
-            [] => self.push_literal_segment(leading, is_last),
-            [parameter] => self.push_parameter(leading, parameter, is_last),
-            [first, second, ..] => Err(RoutePathError::ParametersShareSegment {
-                first: first.name.clone(),
-                second: second.name.clone(),
-            }),
+    fn push_separator(&mut self) {
+        self.decoded.push(PATH_SEPARATOR);
+        self.encoded.push(PATH_SEPARATOR);
+    }
+
+    fn push_segment(&mut self, segment: PathSegment<'_>) -> Result<(), RoutePathError> {
+        match segment {
+            PathSegment::Text(text) => match pattern_segment(text) {
+                PatternSegment::Literal(literal) => self.push_literal(&literal),
+                PatternSegment::Parameter { name, prefix } => self.push_parameter(&name, prefix),
+            },
+            PathSegment::TrailingSeparator => Ok(()),
         }
     }
 }
@@ -184,27 +169,26 @@ pub enum RouteUrlTemplate {
 }
 
 impl RouteUrlTemplate {
-    /// # Errors
-    ///
-    /// Returns `RoutePathError` when the pattern does not start with '/', holds a segment no
-    /// request can reach, names a parameter with anything but a `snake_case` identifier, places
-    /// two parameters in one segment, or places a catch-all parameter before the end.
-    pub fn parse(pattern: &str) -> Result<Self, RoutePathError> {
+    pub(crate) fn admitted(pattern: &str) -> Result<Self, RoutePathError> {
         let Some(path) = pattern.strip_prefix(PATH_SEPARATOR) else {
             return Err(RoutePathError::MissingLeadingSlash);
         };
-        let PatternSegments { last, leading } = pattern_segments(path);
         let mut assembly = TemplateAssembly {
-            literal: PATH_SEPARATOR.to_string(),
+            decoded: String::new(),
+            encoded: String::new(),
+            names: BTreeSet::new(),
             segments: Vec::new(),
         };
 
-        for segment in &leading {
-            assembly.push_segment(segment, false)?;
-            assembly.literal.push(PATH_SEPARATOR);
-        }
+        assembly.push_separator();
 
-        assembly.push_segment(&last, true)?;
+        for (position, segment) in path_segments(path).enumerate() {
+            if position > 0 {
+                assembly.push_separator();
+            }
+
+            assembly.push_segment(segment)?;
+        }
 
         Ok(assembly.into_template())
     }
@@ -216,34 +200,50 @@ mod tests {
 
     use super::RouteUrlTemplate;
     use crate::route_path_error::RoutePathError;
+    use crate::route_path_registry::RoutePathRegistry;
     use crate::url_segment::UrlSegment;
 
+    fn admission(pattern: &str) -> Result<RouteUrlTemplate, RoutePathError> {
+        RoutePathRegistry::new()
+            .admit_responder_path("public", pattern)
+            .map(|path| path.template().clone())
+    }
+
     fn parsed(pattern: &str) -> RouteUrlTemplate {
-        RouteUrlTemplate::parse(pattern).expect("the route path is routable")
+        admission(pattern).expect("the route path is admitted")
     }
 
-    fn literal(text: &str) -> UrlSegment {
-        UrlSegment::Literal(text.to_string())
+    fn literal(decoded: &str, encoded: &str) -> UrlSegment {
+        UrlSegment::Literal {
+            decoded: decoded.to_string(),
+            encoded: encoded.to_string(),
+        }
     }
 
-    fn parameter(prefix: &str, name: &str, suffix: &str) -> UrlSegment {
+    fn parameter(prefix: &str, name: &str) -> UrlSegment {
         UrlSegment::Parameter {
             name: name.to_string(),
             prefix: prefix.to_string(),
-            suffix: suffix.to_string(),
         }
     }
 
     fn rejects_segment(pattern: &str, rejected: &str, expected: PathSegmentRejection) -> bool {
         matches!(
-            RouteUrlTemplate::parse(pattern),
+            admission(pattern),
             Err(RoutePathError::UnroutableSegment { segment, rejection })
                 if segment == rejected && rejection == expected
         )
     }
 
+    fn rejects_parameter_name(pattern: &str, rejected: &str) -> bool {
+        matches!(
+            admission(pattern),
+            Err(RoutePathError::InvalidParameterName { name }) if name == rejected
+        )
+    }
+
     #[test]
-    fn keeps_a_literal_path() {
+    fn keeps_a_parameterless_path_as_one_literal_url_since_nothing_is_substituted() {
         assert_eq!(
             parsed("/greeting"),
             RouteUrlTemplate::Literal("/greeting".to_string())
@@ -251,12 +251,12 @@ mod tests {
     }
 
     #[test]
-    fn keeps_the_root_path() {
+    fn keeps_the_root_path_as_a_literal_url_instead_of_rejecting_its_trailing_separator() {
         assert_eq!(parsed("/"), RouteUrlTemplate::Literal("/".to_string()));
     }
 
     #[test]
-    fn keeps_a_trailing_slash() {
+    fn keeps_a_trailing_slash_in_the_literal_url_so_built_urls_reach_the_slashed_route() {
         assert_eq!(
             parsed("/articles/"),
             RouteUrlTemplate::Literal("/articles/".to_string())
@@ -272,24 +272,35 @@ mod tests {
     }
 
     #[test]
-    fn encodes_the_literal_around_a_parameter() {
+    fn percent_encodes_the_literals_around_a_parameter_so_built_urls_stay_valid() {
         assert_eq!(
             parsed("/caf\u{e9}s/{cafe}/m\u{e9}nu"),
             RouteUrlTemplate::Parameterized(vec![
-                literal("/caf%C3%A9s/"),
-                parameter("", "cafe", ""),
-                literal("/m%C3%A9nu"),
+                literal("/caf\u{e9}s/", "/caf%C3%A9s/"),
+                parameter("", "cafe"),
+                literal("/m\u{e9}nu", "/m%C3%A9nu"),
             ])
         );
     }
 
     #[test]
-    fn splits_a_named_parameter() {
+    fn splits_a_named_parameter_from_its_literal_prefix_so_urls_substitute_its_value() {
         assert_eq!(
             parsed("/articles/{article}"),
             RouteUrlTemplate::Parameterized(vec![
-                literal("/articles/"),
-                parameter("", "article", "")
+                literal("/articles/", "/articles/"),
+                parameter("", "article")
+            ])
+        );
+    }
+
+    #[test]
+    fn accepts_a_parameter_named_after_a_rust_keyword_since_names_are_never_reserved() {
+        assert_eq!(
+            parsed("/kinds/{type}"),
+            RouteUrlTemplate::Parameterized(vec![
+                literal("/kinds/", "/kinds/"),
+                parameter("", "type")
             ])
         );
     }
@@ -299,7 +310,7 @@ mod tests {
         assert_eq!(
             parsed("/files/{*rest}"),
             RouteUrlTemplate::Parameterized(vec![
-                literal("/files/"),
+                literal("/files/", "/files/"),
                 UrlSegment::CatchAllParameter {
                     name: "rest".to_string(),
                     prefix: String::new(),
@@ -309,13 +320,21 @@ mod tests {
     }
 
     #[test]
-    fn keeps_the_literal_text_sharing_a_segment_with_a_parameter() {
+    fn keeps_the_literal_text_preceding_a_parameter_so_urls_carry_the_segment_prefix() {
         assert_eq!(
-            parsed("/images/img{id}.png"),
+            parsed("/images/img{id}"),
             RouteUrlTemplate::Parameterized(vec![
-                literal("/images/"),
-                parameter("img", "id", ".png")
+                literal("/images/", "/images/"),
+                parameter("img", "id")
             ])
+        );
+    }
+
+    #[test]
+    fn unescapes_a_doubled_brace_preceding_a_parameter_like_the_router_does() {
+        assert_eq!(
+            parsed("/{{{id}"),
+            RouteUrlTemplate::Parameterized(vec![literal("/", "/"), parameter("{", "id")])
         );
     }
 
@@ -324,7 +343,7 @@ mod tests {
         assert_eq!(
             parsed("/x{*rest}"),
             RouteUrlTemplate::Parameterized(vec![
-                literal("/"),
+                literal("/", "/"),
                 UrlSegment::CatchAllParameter {
                     name: "rest".to_string(),
                     prefix: "x".to_string(),
@@ -334,23 +353,12 @@ mod tests {
     }
 
     #[test]
-    fn treats_an_unterminated_parameter_as_reaching_the_end() {
-        assert_eq!(
-            parsed("/items/{id"),
-            RouteUrlTemplate::Parameterized(vec![literal("/items/"), parameter("", "id", "")])
-        );
-    }
-
-    #[test]
     fn rejects_a_path_without_a_leading_slash() {
-        assert_eq!(
-            RouteUrlTemplate::parse("{id}"),
-            Err(RoutePathError::MissingLeadingSlash)
-        );
+        assert_eq!(admission("{id}"), Err(RoutePathError::MissingLeadingSlash));
     }
 
     #[test]
-    fn rejects_an_empty_interior_segment() {
+    fn rejects_an_empty_interior_segment_so_no_route_path_holds_a_double_slash() {
         assert!(rejects_segment(
             "/articles//comments",
             "",
@@ -359,7 +367,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_dot_segment() {
+    fn rejects_a_route_path_with_a_dot_segment_since_no_request_can_reach_it() {
         assert!(rejects_segment(
             "/articles/../admin",
             "..",
@@ -386,52 +394,32 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_control_character_after_a_parameter() {
-        assert!(rejects_segment(
-            "/{id}\t",
-            "\t",
-            PathSegmentRejection::ControlCharacter
-        ));
+    fn rejects_a_parameter_name_that_is_not_snake_case_like_every_declared_name() {
+        assert!(rejects_parameter_name("/{article-id}", "article-id"));
     }
 
     #[test]
-    fn rejects_two_parameters_in_one_segment() {
-        assert!(matches!(
-            RouteUrlTemplate::parse("/{first}-{second}"),
-            Err(RoutePathError::ParametersShareSegment { first, second })
-                if first == "first" && second == "second"
-        ));
+    fn rejects_a_catch_all_name_that_is_not_snake_case_like_every_declared_name() {
+        assert!(rejects_parameter_name("/{*Rest}", "Rest"));
     }
 
     #[test]
-    fn rejects_a_catch_all_followed_by_another_segment() {
-        assert!(matches!(
-            RouteUrlTemplate::parse("/{*rest}/tail"),
-            Err(RoutePathError::CatchAllNotLast { name }) if name == "rest"
-        ));
+    fn reads_an_escaped_closing_brace_into_the_parameter_name_like_the_router() {
+        assert!(rejects_parameter_name("/{id}}}", "id}"));
     }
 
     #[test]
-    fn rejects_a_catch_all_followed_by_literal_text() {
-        assert!(matches!(
-            RouteUrlTemplate::parse("/{*rest}.png"),
-            Err(RoutePathError::CatchAllNotLast { name }) if name == "rest"
-        ));
+    fn reads_an_escaped_opening_brace_into_the_parameter_name_like_the_router() {
+        assert!(rejects_parameter_name("/{a{{b}", "a{b"));
     }
 
     #[test]
-    fn rejects_a_parameter_name_that_is_not_an_identifier() {
-        assert!(matches!(
-            RouteUrlTemplate::parse("/{article-id}"),
-            Err(RoutePathError::InvalidParameterName { name }) if name == "article-id"
-        ));
-    }
-
-    #[test]
-    fn rejects_a_catch_all_name_that_is_not_an_identifier() {
-        assert!(matches!(
-            RouteUrlTemplate::parse("/{*}"),
-            Err(RoutePathError::InvalidParameterName { name }) if name.is_empty()
-        ));
+    fn rejects_a_parameter_declared_twice_since_its_bound_value_would_be_ambiguous() {
+        assert_eq!(
+            admission("/{id}/{*id}"),
+            Err(RoutePathError::DuplicateParameterName {
+                name: "id".to_string(),
+            })
+        );
     }
 }

@@ -31,15 +31,12 @@ use crate::fixture_provider_support::FIXTURE_PROVIDER_SUPPORT;
 
 const FORM_LIMIT: BodyLimit = BodyLimit::new(16_384);
 
-fn content_route(path: &'static str, handler: Arc<dyn ContentHandler>) -> RouteEntry {
-    RouteEntry::new(
-        path,
-        vec![MethodHandler::content(ContentMethod::Post, handler)],
-    )
+fn content_route(handler: Arc<dyn ContentHandler>) -> RouteEntry {
+    RouteEntry::new(vec![MethodHandler::content(ContentMethod::Post, handler)])
 }
 
-fn head_route(path: &'static str, handler: Arc<dyn HeadHandler>) -> RouteEntry {
-    RouteEntry::new(path, vec![MethodHandler::head(RouteMethod::Get, handler)])
+fn head_route(handler: Arc<dyn HeadHandler>) -> RouteEntry {
+    RouteEntry::new(vec![MethodHandler::head(RouteMethod::Get, handler)])
 }
 
 pub struct ProviderParts {
@@ -52,71 +49,62 @@ pub struct ProviderParts {
 }
 
 impl ProviderParts {
+    pub const PATHS: [&'static str; 6] = [
+        FIXTURE_ENDPOINT_PATHS.discovery,
+        FIXTURE_ENDPOINT_PATHS.introspection,
+        FIXTURE_ENDPOINT_PATHS.jwks,
+        FIXTURE_ENDPOINT_PATHS.revocation,
+        FIXTURE_ENDPOINT_PATHS.token,
+        FIXTURE_ENDPOINT_PATHS.userinfo,
+    ];
+
     /// # Panics
     ///
     /// Panics when the provider metadata cannot be serialized.
     #[must_use]
-    pub fn routes(&self, exchangers: Vec<Arc<SubjectTokenExchanger>>) -> Vec<RouteEntry> {
-        vec![
-            head_route(
-                FIXTURE_ENDPOINT_PATHS.discovery,
-                Arc::new(
-                    ProviderMetadataHandler::create(
-                        FIXTURE_PROVIDER_SUPPORT,
-                        self.endpoints,
-                        self.issuance,
-                    )
-                    .expect("the provider metadata serializes"),
-                ),
-            ),
-            content_route(
-                FIXTURE_ENDPOINT_PATHS.introspection,
-                limited_content_handler(
-                    Arc::new(IntrospectionEndpoint::create(
-                        Arc::clone(&self.clients),
-                        Arc::clone(&self.secret_store),
-                    )),
-                    FORM_LIMIT,
-                ),
-            ),
-            head_route(
-                FIXTURE_ENDPOINT_PATHS.jwks,
-                self.public_jwks_handler.clone(),
-            ),
-            content_route(
-                FIXTURE_ENDPOINT_PATHS.revocation,
-                limited_content_handler(
-                    Arc::new(RevocationEndpoint::create(
-                        Arc::clone(&self.clients),
-                        Arc::clone(&self.secret_store),
-                        Arc::clone(&self.database),
-                        FIXTURE_ACCEPTED_RESOURCES,
-                    )),
-                    FORM_LIMIT,
-                ),
-            ),
-            content_route(
-                FIXTURE_ENDPOINT_PATHS.token,
-                limited_content_handler(
-                    Arc::new(TokenEndpoint::create(
-                        Arc::clone(&self.clients),
-                        Arc::new(SubjectTokenExchangers::create(exchangers)),
-                        Arc::clone(&self.secret_store),
-                        self.issuance,
-                    )),
-                    FORM_LIMIT,
-                ),
-            ),
-            head_route(
-                FIXTURE_ENDPOINT_PATHS.userinfo,
-                Arc::new(UserinfoEndpoint::create(
+    pub fn routes(&self, exchangers: Vec<Arc<SubjectTokenExchanger>>) -> [RouteEntry; 6] {
+        [
+            head_route(Arc::new(
+                ProviderMetadataHandler::create(
+                    FIXTURE_PROVIDER_SUPPORT,
+                    self.endpoints,
+                    self.issuance,
+                )
+                .expect("the provider metadata serializes"),
+            )),
+            content_route(limited_content_handler(
+                Arc::new(IntrospectionEndpoint::create(
+                    Arc::clone(&self.clients),
+                    Arc::clone(&self.secret_store),
+                )),
+                FORM_LIMIT,
+            )),
+            head_route(self.public_jwks_handler.clone()),
+            content_route(limited_content_handler(
+                Arc::new(RevocationEndpoint::create(
+                    Arc::clone(&self.clients),
+                    Arc::clone(&self.secret_store),
+                    Arc::clone(&self.database),
+                    FIXTURE_ACCEPTED_RESOURCES,
+                )),
+                FORM_LIMIT,
+            )),
+            content_route(limited_content_handler(
+                Arc::new(TokenEndpoint::create(
+                    Arc::clone(&self.clients),
+                    Arc::new(SubjectTokenExchangers::create(exchangers)),
                     Arc::clone(&self.secret_store),
                     self.issuance,
-                    Arc::new(FixedUserinfoClaims {
-                        claims: json!({"name": "Ada"}),
-                    }),
                 )),
-            ),
+                FORM_LIMIT,
+            )),
+            head_route(Arc::new(UserinfoEndpoint::create(
+                Arc::clone(&self.secret_store),
+                self.issuance,
+                Arc::new(FixedUserinfoClaims {
+                    claims: json!({"name": "Ada"}),
+                }),
+            ))),
         ]
     }
 }

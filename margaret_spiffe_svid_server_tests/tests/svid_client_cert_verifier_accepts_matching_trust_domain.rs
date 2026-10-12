@@ -8,7 +8,7 @@ use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_s
 use margaret_spiffe_svid_tests::leaf_spiffe_example_org_client_der::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
 
 #[test]
-fn accepts_matching_trust_domain() {
+fn accepts_a_client_svid_of_the_configured_trust_domain_so_its_workloads_can_connect() {
     let verifier = SvidClientCertVerifier::new(
         build_root_cert_store_with_ca(),
         "example.org",

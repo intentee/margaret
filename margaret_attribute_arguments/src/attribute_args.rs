@@ -213,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bare_attribute_is_empty() {
+    fn a_bare_attribute_is_empty_since_a_marker_attribute_carries_no_arguments() {
         assert!(parsed(&parse_quote!(#[singleton])).is_empty());
     }
 
@@ -268,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn interpret_rejects_a_leftover_named_argument() {
+    fn interpret_rejects_a_leftover_named_argument_so_typos_cannot_go_unnoticed() {
         let error = parsed(&parse_quote!(#[index(name = "title", bogus = "x")]))
             .interpret(|reader| reader.take_string("name"))
             .expect_err("the stray named argument is rejected");
@@ -281,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn interpret_rejects_a_leftover_positional_argument() {
+    fn interpret_rejects_a_leftover_positional_argument_so_typos_cannot_go_unnoticed() {
         let error = parsed(&parse_quote!(#[singleton(bogus)]))
             .interpret(|_reader| Ok::<(), AttributeArgumentsError>(()))
             .expect_err("the stray positional argument is rejected");
@@ -614,7 +614,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_positional_variant_with_arguments() {
+    fn reads_a_positional_variant_with_arguments_so_a_variant_carries_its_own_options() {
         assert_eq!(
             read_positional_variant(&parsed(
                 &parse_quote!(#[endpoint(Endpoint::Token(introspection))])
@@ -628,7 +628,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_positional_unit_variant() {
+    fn reads_a_positional_unit_variant_with_its_flags_unset_since_it_has_no_arguments() {
         assert_eq!(
             read_positional_variant(&parsed(&parse_quote!(#[endpoint(Endpoint::Jwks)])))
                 .expect("the positional variant reads"),
@@ -680,7 +680,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_an_array_of_string_literals() {
+    fn reads_an_array_of_string_literals_in_order_so_one_argument_can_list_many_values() {
         assert_eq!(
             parsed(&parse_quote!(#[client(scopes = ["openid", "profile"])]))
                 .interpret(|reader| reader.take_string_array("scopes"))
@@ -775,7 +775,7 @@ mod tests {
     }
 
     #[test]
-    fn an_absent_group_reads_as_none() {
+    fn an_absent_group_reads_as_none_so_optional_groups_may_be_omitted() {
         assert_eq!(
             read_group(&parsed(&parse_quote!(#[client]))).expect("the absent group reads"),
             None
@@ -783,7 +783,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_group_given_twice() {
+    fn rejects_a_group_given_twice_since_which_one_applies_would_be_ambiguous() {
         let error = read_group(&parsed(
             &parse_quote!(#[client(authorization_code(), authorization_code())]),
         ))
@@ -853,7 +853,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_unit_variant() {
+    fn reads_a_named_unit_variant_with_every_flag_unset_since_it_has_no_argument_list() {
         assert_eq!(
             read_variant(&parsed(
                 &parse_quote!(#[client(authentication = Auth::None)])
@@ -867,7 +867,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_variant_with_arguments() {
+    fn reads_a_named_variant_with_arguments_so_the_variant_carries_its_own_options() {
         assert_eq!(
             read_variant(&parsed(
                 &parse_quote!(#[client(authentication = Auth::PrivateKeyJwt(introspection))])
@@ -881,7 +881,7 @@ mod tests {
     }
 
     #[test]
-    fn an_absent_variant_reads_as_none() {
+    fn an_absent_variant_reads_as_none_so_optional_variants_may_be_omitted() {
         assert_eq!(
             read_variant(&parsed(&parse_quote!(#[client]))).expect("the absent variant reads"),
             None
@@ -928,7 +928,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_an_array_of_paths() {
+    fn reads_an_array_of_paths_in_order_so_one_argument_can_name_many_items() {
         let columns = parsed(&parse_quote!(#[foreign_key(columns = [partition, hash])]))
             .interpret(|reader| reader.take_path_array("columns"))
             .expect("the array reads")

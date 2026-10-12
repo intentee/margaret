@@ -19,6 +19,7 @@ pub enum FrameworkDependency {
     Routes,
     SingletonView(CanonicalPath),
     SpiffeHttpClient,
+    SpiffeIssuerRequestClient,
     TokenIssuance,
     Urls(Vec<UrlSource>),
 }

@@ -33,7 +33,7 @@ fn reports_a_fallible_console_command_into_the_command_outcome() {
 }
 
 #[test]
-fn views_builder_reads_only_completed_dependencies() {
+fn views_builder_reads_only_completed_dependencies_so_it_cannot_fail() {
     let source = module(&generated(), "views/build");
 
     assert!(source.contains("->super::Views"));
@@ -54,7 +54,7 @@ fn http_server_assembly_reads_only_completed_dependencies() {
 }
 
 #[test]
-fn websocket_dispatch_reads_only_completed_dependencies() {
+fn websocket_dispatch_reads_only_completed_dependencies_so_none_can_fail_to_build() {
     let source = module(
         &generated(),
         "websocket/chat_chat_session_chat_session/upgrade_entry",

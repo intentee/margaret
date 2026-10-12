@@ -25,7 +25,7 @@ mod tests {
     use crate::consent_decision::ConsentDecision;
 
     #[test]
-    fn decides_as_the_end_user_chose() {
+    fn decides_as_the_end_user_chose_so_a_denial_is_never_taken_as_approval() {
         assert_eq!(
             [ConsentChoice::Approve, ConsentChoice::Deny].map(ConsentChoice::decision),
             [ConsentDecision::Approved, ConsentDecision::Denied]

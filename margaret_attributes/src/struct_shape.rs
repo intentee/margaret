@@ -35,12 +35,12 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_unit_struct() {
+    fn reads_a_unit_struct_so_construction_uses_its_bare_path() {
         assert_eq!(shape_of("struct Marker;"), StructShape::Unit);
     }
 
     #[test]
-    fn reads_a_named_struct() {
+    fn reads_a_named_struct_with_its_field_count_so_construction_uses_braces() {
         assert_eq!(
             shape_of("struct Pair { left: u8, right: u8 }"),
             StructShape::Named { field_count: 2 }
@@ -48,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_tuple_struct() {
+    fn reads_a_tuple_struct_with_its_field_count_so_construction_uses_parentheses() {
         assert_eq!(
             shape_of("struct Wrapper(u8);"),
             StructShape::Unnamed { field_count: 1 }

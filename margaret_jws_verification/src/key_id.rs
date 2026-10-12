@@ -34,7 +34,7 @@ mod tests {
     use super::KeyId;
 
     #[test]
-    fn displays_the_key_id_as_written() {
+    fn displays_the_key_id_as_written_so_diagnostics_match_the_token_header() {
         assert_eq!(KeyId::new("kid-1".to_string()).to_string(), "kid-1");
     }
 }

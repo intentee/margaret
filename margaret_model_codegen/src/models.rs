@@ -200,7 +200,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_model_without_a_table() {
+    fn rejects_a_model_without_a_table_since_tables_are_never_named_implicitly() {
         assert!(matches!(
                 rejection("#[model]\nstruct S;\n"),
                 ModelCodegenError::MissingTable { ref model, .. } if model == "crate::S"
@@ -208,7 +208,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_malformed_model_arguments() {
+    fn rejects_unparseable_model_arguments_naming_the_attribute_so_the_author_can_locate_them() {
         assert!(matches!(
                 rejection("#[model(= 5)]\nstruct S;\n"),
                 ModelCodegenError::Index {
@@ -221,7 +221,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_non_string_table_name() {
+    fn rejects_a_non_string_table_name_since_tables_are_named_by_string_literals() {
         assert!(matches!(
             rejection("#[model(table = 5)]\nstruct S;\n"),
             ModelCodegenError::AttributeArguments {
@@ -253,7 +253,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_raw_table_name() {
+    fn rejects_a_raw_identifier_table_name_since_raw_syntax_is_not_sql() {
         assert!(matches!(
                 rejection("#[model(table = \"r#type\")]\nstruct S;\n"),
                 ModelCodegenError::InvalidTableName { ref table, .. } if table == "r#type"
@@ -312,7 +312,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_positional_field() {
+    fn rejects_a_positional_field_because_every_column_is_named_after_its_field() {
         assert!(matches!(
             rejection("#[model(table = \"t\")]\nstruct S(#[column(primary_key)] i64);\n"),
             ModelCodegenError::ModelRequiresNamedFields { position: 0, ref model } if model == "crate::S"
@@ -330,7 +330,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_malformed_column_arguments() {
+    fn rejects_unparseable_column_arguments_naming_the_attribute_so_the_author_can_locate_them() {
         assert!(matches!(
                 rejection("#[model(table = \"t\")]\nstruct S {\n    #[column(= 5)]\n    id: i64,\n}\n"),
                 ModelCodegenError::Index {
@@ -343,7 +343,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_non_string_column_name() {
+    fn rejects_a_non_string_column_name_since_columns_are_named_by_string_literals() {
         assert!(matches!(
             rejection(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(name = 5)]\n    id: i64,\n}\n"
@@ -367,7 +367,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_non_integer_precision() {
+    fn rejects_a_quoted_precision_since_numeric_digits_are_integer_literals() {
         assert!(matches!(
             rejection(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, precision = \"12\", scale = 2)]\n    value: rust_decimal::Decimal,\n}\n"
@@ -379,7 +379,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_non_integer_scale() {
+    fn rejects_a_quoted_scale_since_numeric_digits_are_integer_literals() {
         assert!(matches!(
             rejection(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, precision = 12, scale = \"2\")]\n    value: rust_decimal::Decimal,\n}\n"
@@ -401,7 +401,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_raw_column_name() {
+    fn rejects_a_raw_identifier_column_name_since_raw_syntax_is_not_sql() {
         assert!(matches!(
                 rejection(
                     "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, name = \"r#id\")]\n    id: i64,\n}\n"
@@ -423,7 +423,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_duplicate_column_name() {
+    fn rejects_a_duplicate_column_name_since_a_table_holds_each_column_once() {
         assert!(matches!(
                 rejection(
                     "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, name = \"value\")]\n    a: i64,\n    #[column(name = \"value\")]\n    b: i64,\n}\n"
@@ -443,7 +443,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_an_uninferrable_column_type() {
+    fn rejects_a_u64_field_since_its_type_maps_to_no_sql_column_type() {
         assert!(matches!(
                 value_rejection("", "u64"),
                 ModelCodegenError::UninferrableColumnType { ref rust_type, .. } if rust_type == "u64"
@@ -459,7 +459,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn infers_a_uuid_column() {
+    fn infers_a_not_null_uuid_column_from_a_qualified_uuid_since_a_plain_uuid_is_never_absent() {
         let resolved = value_column("", "uuid::Uuid");
 
         assert_eq!(resolved.column_type, ColumnType::Uuid);
@@ -475,12 +475,12 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn infers_text_from_string() {
+    fn infers_a_text_column_from_a_string_since_text_holds_strings_of_any_length() {
         assert_eq!(value_column("", "String").column_type, ColumnType::Text);
     }
 
     #[test]
-    fn infers_text_from_secret_text() {
+    fn infers_a_text_column_from_secret_text_since_the_secret_is_stored_as_text() {
         assert_eq!(
             value_column(
                 "use margaret::framework::active_record::secret_text::SecretText;\n",
@@ -492,27 +492,27 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn infers_boolean_from_bool() {
+    fn infers_a_boolean_column_from_a_bool_since_both_hold_only_true_or_false() {
         assert_eq!(value_column("", "bool").column_type, ColumnType::Boolean);
     }
 
     #[test]
-    fn infers_integer_from_i32() {
+    fn infers_an_integer_column_from_an_i32_since_both_are_four_byte_integers() {
         assert_eq!(value_column("", "i32").column_type, ColumnType::Integer);
     }
 
     #[test]
-    fn infers_big_int_from_i64() {
+    fn infers_a_big_int_column_from_an_i64_since_both_are_eight_byte_integers() {
         assert_eq!(value_column("", "i64").column_type, ColumnType::BigInt);
     }
 
     #[test]
-    fn infers_real_from_f32() {
+    fn infers_a_real_column_from_an_f32_since_both_are_single_precision_floats() {
         assert_eq!(value_column("", "f32").column_type, ColumnType::Real);
     }
 
     #[test]
-    fn infers_double_precision_from_f64() {
+    fn infers_a_double_precision_column_from_an_f64_since_both_are_64_bit_floats() {
         assert_eq!(
             value_column("", "f64").column_type,
             ColumnType::DoublePrecision
@@ -528,7 +528,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_datetime_outside_utc() {
+    fn rejects_a_datetime_outside_utc_since_timestamptz_drops_its_offset() {
         assert!(matches!(
                 value_rejection(
                     "use chrono::DateTime;\nuse chrono::FixedOffset;",
@@ -547,7 +547,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn infers_bytea_from_a_byte_vector() {
+    fn infers_a_not_null_bytea_column_from_a_byte_vector_since_both_hold_raw_bytes() {
         let resolved = value_column("", "Vec<u8>");
 
         assert_eq!(resolved.column_type, ColumnType::Bytea);
@@ -563,7 +563,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_vector_of_non_bytes() {
+    fn rejects_a_vector_of_non_bytes_since_only_byte_vectors_map_to_bytea() {
         assert!(matches!(
                 value_rejection("", "Vec<i32>"),
                 ModelCodegenError::UninferrableColumnType { ref rust_type, .. } if rust_type == "Vec < i32 >"
@@ -587,7 +587,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_non_path_type() {
+    fn rejects_an_array_field_type_since_only_path_types_resolve_to_columns() {
         assert!(matches!(
                 value_rejection("", "[u8; 4]"),
                 ModelCodegenError::UnresolvableFieldType { ref rust_type, .. } if rust_type == "[u8 ; 4]"
@@ -595,7 +595,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_bare_option() {
+    fn rejects_an_option_without_its_type_argument_because_no_column_type_can_be_inferred() {
         assert!(matches!(
                 value_rejection("", "Option"),
                 ModelCodegenError::UninferrableColumnType { ref rust_type, .. } if rust_type == "Option"
@@ -603,7 +603,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_an_option_with_multiple_arguments() {
+    fn rejects_an_option_with_two_type_arguments_because_no_column_type_is_inferred() {
         assert!(matches!(
                 value_rejection("", "Option<i32, i64>"),
                 ModelCodegenError::UninferrableColumnType { ref rust_type, .. } if rust_type == "Option < i32 , i64 >"
@@ -611,7 +611,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_lifetime_type_argument() {
+    fn rejects_a_lifetime_where_a_type_argument_belongs_since_it_names_no_type() {
         assert!(matches!(
                 value_rejection("", "Vec<'static>"),
                 ModelCodegenError::UnresolvableFieldType { ref rust_type, .. } if rust_type == "Vec < 'static >"
@@ -661,7 +661,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_an_unknown_column_default() {
+    fn rejects_a_column_default_outside_the_column_default_enum_instead_of_guessing() {
         assert!(matches!(
             rejection(
                 "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::Random)]\n    id: uuid::Uuid,\n}\n"
@@ -765,7 +765,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_an_empty_enum_column() {
+    fn rejects_an_empty_enum_column_since_no_value_could_ever_be_stored() {
         assert!(matches!(
                 value_rejection("enum ArticleStatus {}\n", "ArticleStatus"),
                 ModelCodegenError::EmptyEnumColumn { ref enum_type, .. } if enum_type == "crate::ArticleStatus"
@@ -773,7 +773,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_crate_struct_column() {
+    fn rejects_a_crate_struct_column_since_only_fieldless_enums_map_to_text() {
         assert!(matches!(
             value_rejection("struct Author {}\n", "Author"),
             ModelCodegenError::LocalColumnTypeIsNotAnEnum { ref resolved_type, .. } if resolved_type == "crate::Author"
@@ -1031,6 +1031,23 @@ struct FragmentMetadata {
     }
 
     #[test]
+    fn derives_nested_key_columns_from_the_unraw_field_so_foreign_keys_name_real_columns() {
+        let source = with_author(
+            "#[model(table = \"profiles\")]\nstruct Profile {\n    #[column(primary_key)]\n    r#ref: Key<Author>,\n}\n\n#[model(table = \"cards\")]\nstruct Card {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = margaret::framework::model::on_delete::OnDelete::Cascade)]\n    #[index]\n    profile: Key<Profile>,\n}\n",
+        );
+        let cards = model(&source, "cards");
+
+        assert_eq!(
+            cards.foreign_keys[0].columns,
+            vec!["profile_ref_id".to_string()]
+        );
+        assert_eq!(
+            cards.foreign_keys[0].references_columns,
+            vec!["ref_id".to_string()]
+        );
+    }
+
+    #[test]
     fn treats_an_optional_composite_key_as_nullable_columns() {
         let source = with_fragment_metadata(
             "#[model(table = \"fragment\")]\nstruct Fragment {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    metadata: Option<Key<FragmentMetadata>>,\n}\n",
@@ -1104,7 +1121,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_struct_level_foreign_key() {
+    fn rejects_a_struct_level_foreign_key_since_a_foreign_key_is_a_key_typed_field() {
         assert!(matches!(
                 rejection(&with_fragment_metadata(
                     "#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n"
@@ -1164,7 +1181,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_an_unknown_on_delete_action() {
+    fn rejects_an_on_delete_action_outside_the_on_delete_enum_instead_of_guessing() {
         assert!(matches!(
             rejection(&with_author(
                 "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = margaret::framework::model::on_delete::OnDelete::Purge)]\n    #[index]\n    author: Key<Author>,\n}\n"
@@ -1196,7 +1213,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_malformed_foreign_key_arguments() {
+    fn rejects_malformed_foreign_key_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
                 rejection(&with_author(
                     "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(= 5)]\n    #[index]\n    author: Key<Author>,\n}\n"
@@ -1211,7 +1228,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_repeated_foreign_key_attribute() {
+    fn rejects_a_repeated_foreign_key_attribute_since_its_copies_could_disagree() {
         assert_eq!(
             indexing_rejection(&with_author(
                 "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[foreign_key]\n    author: Key<Author>,\n}\n",
@@ -1329,7 +1346,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn orders_referenced_tables_before_referencing_tables() {
+    fn orders_referenced_tables_first_so_each_foreign_key_targets_an_existing_table() {
         assert_eq!(
             tables(&with_author(
                 "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    author: Key<Author>,\n}\n"
@@ -1359,7 +1376,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_a_foreign_key_cycle() {
+    fn rejects_a_foreign_key_cycle_naming_its_path_since_no_table_order_satisfies_it() {
         assert!(matches!(
                 rejection(&format!(
                     "{KEY}#[model(table = \"alpha\")]\nstruct Alpha {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    beta: Key<Beta>,\n}}\n\n#[model(table = \"beta\")]\nstruct Beta {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    alpha: Key<Alpha>,\n}}\n"
@@ -1435,7 +1452,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_an_optional_primary_key_field() {
+    fn rejects_an_optional_primary_key_field_since_postgres_keys_are_never_null() {
         assert!(matches!(
             rejection(
                 "#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: Option<String>,\n}\n"
@@ -1495,7 +1512,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_malformed_model_primary_key_arguments() {
+    fn rejects_malformed_model_primary_key_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
                 rejection(
                     "#[model(table = \"locks\")]\n#[primary_key(= 5)]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
@@ -1530,7 +1547,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn resolves_a_unique_column() {
+    fn resolves_a_unique_column_into_a_unique_index_named_like_the_constraint_postgres_creates() {
         let source = "#[model(table = \"members\")]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: String,\n}\n";
         let members = model(source, "members");
 
@@ -1555,7 +1572,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_an_optional_unique_column() {
+    fn rejects_an_optional_unique_column_since_postgres_lets_nulls_repeat_in_it() {
         assert!(matches!(
             rejection(
                 "#[model(table = \"members\")]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: Option<String>,\n}\n"
@@ -1605,7 +1622,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_malformed_model_unique_arguments() {
+    fn rejects_malformed_model_unique_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
                 rejection(
                     "#[model(table = \"members\")]\n#[unique(= 5)]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n"
@@ -1652,7 +1669,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn orders_the_plain_indexes_by_name() {
+    fn orders_the_plain_indexes_by_name_so_generated_schemas_are_deterministic() {
         let source = "#[model(table = \"events\")]\n#[index(name = \"events_a\", fields = [label, kind])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"events_b\")]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
 
         assert_eq!(
@@ -1718,7 +1735,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_malformed_model_index_arguments() {
+    fn rejects_malformed_model_index_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
                 rejection(
                     "#[model(table = \"events\")]\n#[index(= 5)]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n"
@@ -1733,7 +1750,7 @@ struct FragmentMetadata {
     }
 
     #[test]
-    fn rejects_malformed_field_index_arguments() {
+    fn rejects_malformed_field_index_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
                 rejection(
                     "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index(= 5)]\n    value: String,\n}\n"
@@ -2123,7 +2140,7 @@ struct ArticleComment {
     }
 
     #[test]
-    fn rejects_a_relation_without_a_name() {
+    fn rejects_a_relation_without_a_name_since_shapes_load_relations_by_name() {
         assert!(matches!(
             article_rejection("#[has_many(model = ArticleTranslation, key = article)]"),
             ModelCodegenError::RelationRequiresName { ref declaration, .. } if declaration == "has_many"
@@ -2141,7 +2158,7 @@ struct ArticleComment {
     }
 
     #[test]
-    fn rejects_a_relation_without_a_model() {
+    fn rejects_a_relation_without_a_model_since_nothing_says_what_it_loads() {
         assert!(matches!(
                 article_rejection("#[has_many(name = \"translations\", key = article)]"),
                 ModelCodegenError::RelationRequiresModel { ref relation, .. } if relation == "translations"
@@ -2169,7 +2186,7 @@ struct ArticleComment {
     }
 
     #[test]
-    fn rejects_a_relation_without_a_key() {
+    fn rejects_a_relation_without_a_key_since_nothing_links_the_related_rows() {
         assert!(matches!(
                 article_rejection("#[has_many(name = \"translations\", model = ArticleTranslation)]"),
                 ModelCodegenError::RelationRequiresKey { ref relation, .. } if relation == "translations"
@@ -2249,7 +2266,7 @@ struct ArticleComment {
     }
 
     #[test]
-    fn rejects_malformed_relation_arguments() {
+    fn rejects_unparseable_relation_arguments_naming_the_attribute_so_the_author_can_locate_them() {
         assert!(matches!(
                 article_rejection("#[has_many(= 5)]"),
                 ModelCodegenError::Index {
@@ -2285,7 +2302,7 @@ struct ArticleComment {
     }
 
     #[test]
-    fn rejects_a_datetime_without_its_timezone() {
+    fn rejects_a_datetime_without_its_timezone_argument_since_utc_must_be_explicit() {
         assert!(matches!(
             value_rejection("use chrono::DateTime;", "DateTime"),
             ModelCodegenError::WrapperRequiresOneArgument { ref wrapper, .. } if wrapper == "chrono::DateTime"
@@ -2313,7 +2330,7 @@ struct ArticleComment {
     }
 
     #[test]
-    fn rejects_a_scale_without_a_precision() {
+    fn rejects_a_decimal_scale_without_a_precision_so_numeric_digits_stay_explicit() {
         assert!(matches!(
             rejection(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column(scale = 2)]\n    value: rust_decimal::Decimal,\n}\n"

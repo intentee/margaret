@@ -69,7 +69,7 @@ mod tests {
     }
 
     #[test]
-    fn omits_server_side_types_when_absent() {
+    fn omits_server_side_types_when_absent_so_only_declared_parts_are_referenced() {
         let source = source(&JwksServerModule::default());
 
         assert!(!source.contains("JwksRoller"));

@@ -61,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_an_absent_variable_as_none() {
+    fn reads_an_absent_variable_as_none_so_optional_settings_may_be_left_unset() {
         assert_eq!(
             read_optional::<String>("MARGARET_OPTIONAL_ABSENT").expect("an absent variable reads"),
             None
@@ -69,9 +69,9 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_present_string() {
+    fn reads_a_present_variable_as_its_verbatim_string_so_values_like_urls_arrive_intact() {
         in_child_process(
-            "read_optional::tests::reads_a_present_string",
+            "read_optional::tests::reads_a_present_variable_as_its_verbatim_string_so_values_like_urls_arrive_intact",
             &[set("MARGARET_OPTIONAL_PRESENT", "postgres://localhost")],
             || {
                 assert_eq!(
@@ -98,9 +98,9 @@ mod tests {
     }
 
     #[test]
-    fn parses_a_present_path() {
+    fn parses_a_present_variable_into_a_path_so_filesystem_locations_are_configurable() {
         in_child_process(
-            "read_optional::tests::parses_a_present_path",
+            "read_optional::tests::parses_a_present_variable_into_a_path_so_filesystem_locations_are_configurable",
             &[set("MARGARET_OPTIONAL_ROOT", "/srv/uploads")],
             || {
                 assert_eq!(

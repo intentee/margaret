@@ -69,7 +69,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_a_plain_struct() {
+    fn anchors_a_declaration_on_a_plain_struct_with_its_allocated_generated_identifier() {
         assert_eq!(
             anchored("#[issues_tokens]\npub struct Issuer;\n").expect("the struct anchors"),
             "Issuer issuer"
@@ -77,7 +77,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_declaration_on_an_enum() {
+    fn rejects_a_declaration_on_an_enum_since_only_structs_get_a_generated_identifier() {
         assert!(matches!(
             anchored("#[issues_tokens]\npub enum Issuer { Only }\n"),
             Err(DeclarationAnchorError::NotAStruct { attribute: "issues_tokens", path })
@@ -86,7 +86,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_declaration_on_a_singleton() {
+    fn rejects_a_declaration_on_a_singleton_since_declarations_need_a_plain_struct() {
         assert!(matches!(
             anchored("#[singleton]\n#[issues_tokens]\npub struct Issuer;\n"),
             Err(DeclarationAnchorError::DeclaredAsSingleton {
@@ -97,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_struct_anchoring_two_declarations() {
+    fn rejects_one_struct_anchoring_two_declarations_as_they_would_share_its_identifier() {
         assert!(matches!(
             anchored("#[issues_tokens]\n#[verifies_tokens_from_issuer(auth)]\npub struct Issuer;\n"),
             Err(DeclarationAnchorError::SharedAnchor { declarations, path })

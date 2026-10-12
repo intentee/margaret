@@ -4,7 +4,7 @@ use margaret_spiffe_svid::svid_certified_key_holder::SvidCertifiedKeyHolder;
 use margaret_spiffe_svid_tests::build_workload_credentials::build_workload_credentials;
 
 #[tokio::test]
-async fn returns_key_after_set() {
+async fn returns_the_certified_key_once_set_so_handshakes_can_present_the_rotated_svid() {
     let holder = SvidCertifiedKeyHolder::default();
     holder.set(Some(Arc::new(build_workload_credentials())));
 

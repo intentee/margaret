@@ -20,39 +20,36 @@ use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::route_entry::RouteEntry;
-use margaret_http::router::Router;
 use margaret_http::server::Server;
+use margaret_http::server_paths::ServerPaths;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 use margaret_route_method::content_method::ContentMethod;
 use margaret_route_method::route_method::RouteMethod;
 
 async fn exchange(request: &[u8], close_write: bool) -> String {
-    let router = Router::build(vec![
-        RouteEntry::new(
-            "/submit",
-            vec![MethodHandler::content(
+    let router = ServerPaths::build(["/submit", "/tiny", "/search"])
+        .expect("the route paths do not conflict")
+        .routes([
+            RouteEntry::new(vec![MethodHandler::content(
                 ContentMethod::Post,
                 Arc::new(ReadsForm {
                     limit: BodyLimit::new(1024),
                 }),
-            )],
-        ),
-        RouteEntry::new(
-            "/tiny",
-            vec![MethodHandler::content(
+            )]),
+            RouteEntry::new(vec![MethodHandler::content(
                 ContentMethod::Post,
                 Arc::new(ReadsForm {
                     limit: BodyLimit::new(4),
                 }),
-            )],
-        ),
-        RouteEntry::new(
-            "/search",
-            vec![MethodHandler::head(RouteMethod::Query, Arc::new(Accepts))],
-        ),
-    ])
-    .expect("the route entries register cleanly");
+            )]),
+            RouteEntry::new(vec![MethodHandler::head(
+                RouteMethod::Query,
+                Arc::new(Accepts),
+            )]),
+        ])
+        .expect("the route entries register cleanly")
+        .router;
     let bound = BoundServer::bind(
         Arc::new(Server::new(
             "127.0.0.1:0".to_string(),
@@ -148,7 +145,7 @@ async fn rejects_a_form_body_that_exceeds_the_route_limit() {
 }
 
 #[tokio::test]
-async fn rejects_a_truncated_form_body() {
+async fn rejects_a_truncated_form_body_rather_than_validating_a_partial_form() {
     let response = exchange(
         b"POST /submit HTTP/1.1\r\nHost: test\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 64\r\nConnection: close\r\n\r\nshort",
         true,

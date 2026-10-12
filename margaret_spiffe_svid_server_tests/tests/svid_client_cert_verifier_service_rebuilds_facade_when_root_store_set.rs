@@ -15,7 +15,7 @@ use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_s
 use margaret_spiffe_svid_tests::leaf_spiffe_example_org_client_der::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
 
 #[tokio::test]
-async fn rebuilds_facade_when_root_store_set() {
+async fn rebuilds_the_facade_verifier_once_a_root_store_is_set_so_clients_get_verified() {
     let root_cert_store_holder = RootCertStoreHolder::default();
     let svid_client_cert_verifier_facade = Arc::new(SvidClientCertVerifierFacade::default());
     let service = SvidClientCertVerifierService {

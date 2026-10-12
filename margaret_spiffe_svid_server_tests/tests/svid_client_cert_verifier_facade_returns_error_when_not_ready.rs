@@ -6,7 +6,7 @@ use rustls::server::danger::ClientCertVerifier as _;
 use margaret_spiffe_svid_server::svid_client_cert_verifier_facade::SvidClientCertVerifierFacade;
 
 #[test]
-fn returns_error_when_not_ready() {
+fn refuses_client_certificates_until_a_verifier_is_installed_so_none_pass() {
     let facade = SvidClientCertVerifierFacade::default();
     let empty_cert = CertificateDer::from(vec![0u8]);
 

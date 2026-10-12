@@ -9,13 +9,10 @@ pub struct RoutePath {
 }
 
 impl RoutePath {
-    /// # Errors
-    ///
-    /// Returns `RoutePathError` when the pattern cannot describe a route a request can reach.
-    pub fn parse(pattern: &str) -> Result<Self, RoutePathError> {
+    pub(crate) fn admitted(pattern: &str) -> Result<Self, RoutePathError> {
         Ok(Self {
             pattern: pattern.to_owned(),
-            template: RouteUrlTemplate::parse(pattern)?,
+            template: RouteUrlTemplate::admitted(pattern)?,
         })
     }
 
@@ -29,7 +26,7 @@ impl RoutePath {
             UrlSegment::CatchAllParameter { name, .. } | UrlSegment::Parameter { name, .. } => {
                 Some(name.as_str())
             }
-            UrlSegment::Literal(_) => None,
+            UrlSegment::Literal { .. } => None,
         })
     }
 
@@ -46,22 +43,25 @@ impl RoutePath {
 
 #[cfg(test)]
 mod tests {
-    use super::RoutePath;
+    use crate::route_path::RoutePath;
+    use crate::route_path_registry::RoutePathRegistry;
     use crate::route_url_template::RouteUrlTemplate;
 
-    fn parsed(pattern: &str) -> RoutePath {
-        RoutePath::parse(pattern).expect("the route path is routable")
+    fn admitted(pattern: &str) -> RoutePath {
+        RoutePathRegistry::new()
+            .admit_responder_path("public", pattern)
+            .expect("the route path is admitted")
     }
 
     #[test]
     fn keeps_the_pattern_it_was_declared_with() {
-        assert_eq!(parsed("/oauth/{{token}}").pattern(), "/oauth/{{token}}");
+        assert_eq!(admitted("/oauth/{{token}}").pattern(), "/oauth/{{token}}");
     }
 
     #[test]
     fn encodes_the_literal_of_a_path_without_parameters() {
         assert_eq!(
-            parsed("/oauth/{{token}}").template(),
+            admitted("/oauth/{{token}}").template(),
             &RouteUrlTemplate::Literal("/oauth/%7Btoken%7D".to_string())
         );
     }
@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn lists_named_and_catch_all_parameters_and_skips_literals() {
         assert_eq!(
-            parsed("/files/{bucket}/{*rest}")
+            admitted("/files/{bucket}/{*rest}")
                 .parameters()
                 .collect::<Vec<_>>(),
             vec!["bucket", "rest"]
@@ -78,6 +78,6 @@ mod tests {
 
     #[test]
     fn lists_no_parameters_of_a_literal_path() {
-        assert_eq!(parsed("/greeting").parameters().count(), 0);
+        assert_eq!(admitted("/greeting").parameters().count(), 0);
     }
 }

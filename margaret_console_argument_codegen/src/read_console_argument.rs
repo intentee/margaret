@@ -118,7 +118,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_required_named_argument() {
+    fn reads_a_plainly_typed_named_argument_as_required_since_it_cannot_be_absent() {
         assert_eq!(
             describe(
                 &parse_quote!(#[console_argument(from = "label")]),
@@ -130,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_an_optional_named_argument() {
+    fn reads_an_option_typed_named_argument_as_optional_so_absence_reads_as_none() {
         assert_eq!(
             describe(
                 &parse_quote!(#[console_argument(from = "label")]),
@@ -190,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_boolean_positional_argument() {
+    fn rejects_a_boolean_positional_argument_since_a_boolean_is_a_named_flag() {
         assert!(
             describe(
                 &parse_quote!(#[console_argument(positional)]),
@@ -202,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_an_unusable_value_type() {
+    fn propagates_a_vec_value_type_rejection_since_inputs_hold_one_concrete_type() {
         assert!(
             describe(
                 &parse_quote!(#[console_argument(from = "tags")]),
@@ -214,7 +214,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_a_malformed_form() {
+    fn propagates_a_form_neither_named_nor_positional_instead_of_guessing_one() {
         assert!(
             describe(
                 &parse_quote!(#[console_argument]),

@@ -70,14 +70,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn serves_with_the_installed_cancellation_token() {
+    async fn serves_after_installing_signals_and_keeps_the_outcome_serving_ends_with() {
         let outcome = dispatch_serve(install, succeed).await;
 
         assert_eq!(outcome, CommandOutcome::Succeeded);
     }
 
     #[tokio::test]
-    async fn reports_failure_when_signal_installation_fails() {
+    async fn reports_failure_when_signal_installation_fails_instead_of_serving_unstoppably() {
         let outcome = dispatch_serve(
             || Err::<ShutdownSignals, _>(Error::other("cannot install signal handlers")),
             succeed,

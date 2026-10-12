@@ -420,6 +420,9 @@ fn framework_dependency_kind(
         FrameworkDependency::SpiffeHttpClient => Ok(DependencyKind::ServeInput {
             input: Box::new(ServeInput::SpiffeHttpClient),
         }),
+        FrameworkDependency::SpiffeIssuerRequestClient => Ok(DependencyKind::ServeInput {
+            input: Box::new(ServeInput::SpiffeIssuerRequestClient),
+        }),
         FrameworkDependency::Urls(sources) => Ok(DependencyKind::Urls {
             sources: sources.clone(),
         }),
@@ -504,6 +507,7 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
                 | FrameworkDependency::SingletonView(_)
                 | FrameworkDependency::Routes
                 | FrameworkDependency::SpiffeHttpClient
+                | FrameworkDependency::SpiffeIssuerRequestClient
                 | FrameworkDependency::TokenIssuance
                 | FrameworkDependency::Urls(_) => &[],
             })

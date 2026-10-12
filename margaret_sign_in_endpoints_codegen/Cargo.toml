@@ -26,6 +26,7 @@ margaret_accepted_clients_codegen = { workspace = true }
 margaret_attributes_tests = { path = "../margaret_attributes_tests" }
 margaret_oauth_client_codegen = { workspace = true }
 margaret_oauth_vocabulary_codegen = { workspace = true }
+margaret_route_parameter_codegen = { workspace = true }
 margaret_token_issuance_codegen = { workspace = true }
 margaret_trusted_issuer_codegen = { workspace = true }
 

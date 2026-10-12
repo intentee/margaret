@@ -48,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn preserves_a_successful_user_result() {
+    fn preserves_a_successful_user_result_so_the_process_exits_successfully() {
         assert_eq!(
             CommandOutcome::from_user_result(Ok(CommandOutcome::Succeeded)),
             CommandOutcome::Succeeded

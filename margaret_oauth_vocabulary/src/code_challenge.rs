@@ -97,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn derives_the_rfc_7636_example_challenge() {
+    fn derives_the_rfc_7636_example_challenge_so_it_matches_every_s256_server() {
         assert_eq!(
             CodeChallenge::of(&verifier(RFC_7636_VERIFIER)).wire(),
             RFC_7636_CHALLENGE
@@ -113,12 +113,12 @@ mod tests {
     }
 
     #[test]
-    fn admits_the_verifier_of_the_challenge() {
+    fn admits_the_verifier_the_challenge_was_derived_from_so_its_client_can_redeem() {
         assert!(challenge(RFC_7636_CHALLENGE).admits(&verifier(RFC_7636_VERIFIER)));
     }
 
     #[test]
-    fn refuses_another_verifier() {
+    fn refuses_a_verifier_the_challenge_was_not_derived_from_so_a_stolen_code_cannot_be_redeemed() {
         assert!(!challenge(RFC_7636_CHALLENGE).admits(&verifier(&"a".repeat(43))));
     }
 
@@ -150,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn refuses_to_deserialize_a_malformed_challenge() {
+    fn refuses_to_deserialize_a_malformed_challenge_so_serde_cannot_bypass_parsing() {
         assert!(
             serde_json::from_value::<CodeChallenge>(serde_json::json!("not-a-digest")).is_err()
         );
@@ -162,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn serializes_the_wire_challenge() {
+    fn serializes_a_challenge_as_its_unpadded_base64url_wire_form_that_servers_expect() {
         assert_eq!(
             serde_json::to_value(challenge(RFC_7636_CHALLENGE)).expect("the challenge serializes"),
             serde_json::json!(RFC_7636_CHALLENGE)

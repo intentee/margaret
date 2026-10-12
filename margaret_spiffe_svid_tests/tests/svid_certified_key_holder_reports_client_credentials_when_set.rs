@@ -9,7 +9,7 @@ use margaret_spiffe_svid_tests::leaf_spiffe_example_org_client_der::LEAF_SPIFFE_
 use margaret_spiffe_svid_tests::leaf_spiffe_example_org_client_key_der::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_KEY_DER;
 
 #[test]
-fn reports_client_credentials_when_set() {
+fn reports_client_credentials_once_set_so_mtls_clients_present_their_svid() {
     let credentials = build_svid_certified_key(
         vec![CertificateDer::from(
             LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER.to_vec(),

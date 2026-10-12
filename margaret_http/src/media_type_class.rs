@@ -32,7 +32,7 @@ mod tests {
     }
 
     #[test]
-    fn classifies_json_regardless_of_parameters() {
+    fn classifies_json_regardless_of_parameters_so_a_charset_never_hides_a_json_body() {
         assert_eq!(
             class_of("application/json; charset=utf-8"),
             MediaTypeClass::Json
@@ -40,7 +40,7 @@ mod tests {
     }
 
     #[test]
-    fn classifies_an_urlencoded_form() {
+    fn classifies_an_urlencoded_form_so_its_body_is_read_as_urlencoded_fields() {
         assert_eq!(
             class_of("application/x-www-form-urlencoded"),
             MediaTypeClass::UrlEncodedForm
@@ -48,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn classifies_multipart_form_data() {
+    fn classifies_multipart_form_data_despite_its_boundary_so_the_body_is_read_as_parts() {
         assert_eq!(
             class_of("multipart/form-data; boundary=X"),
             MediaTypeClass::MultipartFormData

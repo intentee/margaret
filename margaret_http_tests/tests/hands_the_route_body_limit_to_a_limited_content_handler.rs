@@ -14,13 +14,11 @@ use margaret_route_method::content_method::ContentMethod;
 async fn hands_the_route_body_limit_to_a_limited_content_handler() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/form",
-            vec![MethodHandler::content(
-                ContentMethod::Post,
-                limited_content_handler(Arc::new(LimitReportingHandler), BodyLimit::new(4)),
-            )],
-        )],
+        ["/form"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            limited_content_handler(Arc::new(LimitReportingHandler), BodyLimit::new(4)),
+        )])],
     )
     .await;
 

@@ -14,7 +14,7 @@ mod tests {
     use super::construction_errors_doc;
 
     #[test]
-    fn documents_the_construction_error_section() {
+    fn documents_an_errors_section_so_fallible_generated_fns_pass_missing_errors_doc() {
         let rendered: String = construction_errors_doc()
             .to_string()
             .split_whitespace()

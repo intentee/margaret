@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use reqwest::Client;
+use reqwest::ClientBuilder;
 use reqwest::tls::Version;
 use rustls::ClientConfig;
 use rustls::crypto::CryptoProvider;
@@ -78,10 +79,12 @@ impl SvidClientSide {
     ///
     /// Returns `SvidError` propagated from the work it performs.
     pub fn reqwest_client(&self) -> Result<Client, SvidError> {
-        build_reqwest_client(
-            Client::builder()
-                .use_preconfigured_tls(self.client_config())
-                .min_tls_version(Version::TLS_1_3),
-        )
+        build_reqwest_client(self.reqwest_client_builder())
+    }
+
+    pub fn reqwest_client_builder(&self) -> ClientBuilder {
+        Client::builder()
+            .use_preconfigured_tls(self.client_config())
+            .min_tls_version(Version::TLS_1_3)
     }
 }

@@ -47,7 +47,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_an_unfiltered_unbounded_select() {
+    fn renders_an_unfiltered_unbounded_select_with_no_where_or_limit_to_read_every_row() {
         let statement = render_select(&Select {
             columns: vec![column(BASE, "id")],
             filter: SelectFilter::Everything,

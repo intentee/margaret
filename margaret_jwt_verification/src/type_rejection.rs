@@ -52,7 +52,7 @@ mod tests {
     use super::TypeRejection;
 
     #[test]
-    fn describes_every_rejection() {
+    fn describes_every_type_rejection_with_its_typ_values_so_a_refused_token_can_be_diagnosed() {
         assert_eq!(
             TypeRejection::Mismatch {
                 expected: JwtType::AccessToken,

@@ -12,6 +12,7 @@ publish.workspace = true
 [dependencies]
 margaret_attributes = { workspace = true }
 margaret_url_path = { workspace = true }
+matchit = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]

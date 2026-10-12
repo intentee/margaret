@@ -518,7 +518,7 @@ impl Farewell {
     }
 
     #[test]
-    fn requires_a_command_name() {
+    fn rejects_a_command_without_a_name_since_the_cli_dispatches_commands_by_name() {
         let message = error_for("#[console_command]\nstruct Bad;\n");
 
         assert!(message.contains("missing the 'name'"));
@@ -592,14 +592,58 @@ impl Farewell {
     }
 
     #[test]
-    fn propagates_malformed_command_arguments() {
+    fn rejects_a_console_command_depending_on_the_spiffe_issuer_request_client_of_serving() {
+        let index = IndexedSource::new(
+            "#[singleton]\n#[console_command(name = \"refresh\")]\nstruct Refresh {\n    sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>,\n}\n\nimpl Refresh {\n    #[constructor]\n    fn create(sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        )
+        .index;
+        let registry = scan(&index).expect("the console arguments are scanned");
+        let bindings = render_container(
+            &index,
+            &registry,
+            &[FrameworkProvider {
+                construction: FrameworkConstruction::Constructor {
+                    dependencies: vec![FrameworkDependency::SpiffeIssuerRequestClient],
+                    is_async: false,
+                    method: "create".to_string(),
+                    outcome: ConstructorOutcome::Infallible,
+                },
+                enablement: FrameworkEnablement::WhenReferenced,
+                injection: FrameworkInjectionRole::Unmarked,
+                provided: CanonicalPath::new(
+                    [
+                        "margaret",
+                        "framework",
+                        "sessions",
+                        "consumed_sessions",
+                        "ConsumedSessions",
+                    ]
+                    .map(str::to_string)
+                    .to_vec(),
+                ),
+            }],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings;
+
+        assert!(matches!(
+            ConsolePlan::build(&index, &bindings),
+            Err(ConsoleCodegenError::ConsoleCommandDependsOnSpiffeIssuerRequestClient { command })
+                if command == "crate::Refresh"
+        ));
+    }
+
+    #[test]
+    fn reports_unparseable_command_arguments_as_an_index_failure_of_the_attribute_syntax() {
         let message = error_for("#[console_command(= 5)]\nstruct Bad;\n");
 
         assert!(message.contains("failed to index"));
     }
 
     #[test]
-    fn rejects_a_non_string_command_name() {
+    fn rejects_a_non_string_command_name_since_it_names_the_cli_subcommand() {
         let error = rejection_for("#[console_command(name = 5)]\nstruct Bad;\n");
 
         assert!(matches!(
@@ -615,7 +659,7 @@ impl Farewell {
     }
 
     #[test]
-    fn rejects_a_non_string_command_description() {
+    fn rejects_a_non_string_command_description_since_it_is_shown_as_help_text() {
         let error =
             rejection_for("#[console_command(name = \"x\", description = 5)]\nstruct Bad;\n");
 
@@ -646,14 +690,14 @@ impl Farewell {
     }
 
     #[test]
-    fn reports_a_missing_command_runner() {
+    fn reports_a_missing_command_runner_since_the_command_would_have_nothing_to_run() {
         let message = error_for("#[console_command(name = \"bad\")]\nstruct Bad;\n");
 
         assert!(message.contains("no #[process] method"));
     }
 
     #[test]
-    fn rejects_a_non_token_runner_parameter() {
+    fn rejects_a_non_token_runner_parameter_since_only_a_token_can_be_supplied() {
         let message = error_for(
             "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<CommandOutcome> {}\n}\n",
         );
@@ -672,7 +716,7 @@ impl Farewell {
     }
 
     #[test]
-    fn binds_a_destructured_positional_console_argument() {
+    fn binds_a_destructured_positional_console_argument_by_index_as_it_has_no_name() {
         let source = source_for(
             "struct Point {\n    x: i32,\n    y: i32,\n}\n\n#[singleton]\n#[console_command(name = \"plot\")]\nstruct Plot {\n    point: Point,\n}\n\nimpl Plot {\n    #[constructor]\n    fn create(#[console_argument(positional)] Point { x, y }: Point) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,

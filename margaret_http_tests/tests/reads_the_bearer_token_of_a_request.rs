@@ -9,7 +9,8 @@ use margaret_http_tests::tls_fixture::TlsFixture;
 async fn reads_the_bearer_token_of_a_request() {
     let fixture = TlsFixture::generate();
     let server =
-        RunningFixtureServer::start(fixture.server_config.clone(), vec![echo_bearer_route()]).await;
+        RunningFixtureServer::start(fixture.server_config.clone(), ["/"], [echo_bearer_route()])
+            .await;
     let client = fixture_client_builder(&fixture.certificate_authority)
         .build()
         .expect("the fixture client builds");

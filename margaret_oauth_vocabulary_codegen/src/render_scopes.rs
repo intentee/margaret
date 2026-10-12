@@ -57,7 +57,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_no_module_without_declared_scopes() {
+    fn renders_no_module_without_declared_scopes_so_codegen_stays_minimal() {
         assert!(rendered("pub struct Unrelated;\n").is_empty());
     }
 }

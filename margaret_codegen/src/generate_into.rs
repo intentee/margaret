@@ -203,7 +203,7 @@ struct Config {
     }
 
     #[test]
-    fn regenerates_cleanly_on_a_second_run() {
+    fn regenerates_over_its_previous_output_so_every_rebuild_of_the_crate_succeeds() {
         let host = SourceCrate::new(HOST_CRATE);
 
         generated(&host).expect("the first generation succeeds");

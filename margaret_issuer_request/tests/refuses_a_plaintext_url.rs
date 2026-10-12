@@ -6,7 +6,7 @@ use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 
 #[tokio::test]
-async fn refuses_a_plaintext_url_before_connecting() {
+async fn refuses_a_plaintext_url_before_connecting_so_secrets_stay_encrypted() {
     let client = IssuerRequestClient::create().expect("the issuer request client builds");
 
     let fetched = client

@@ -62,14 +62,14 @@ mod tests {
     use super::SyncHolder;
 
     #[test]
-    fn get_returns_none_before_set() {
+    fn get_returns_the_default_none_before_any_set_so_absence_is_observable() {
         let holder: SyncHolder<Option<i32>> = SyncHolder::default();
 
         assert_eq!(holder.get(), None);
     }
 
     #[test]
-    fn set_then_get_returns_value() {
+    fn get_returns_the_last_set_value_so_readers_see_every_update() {
         let holder: SyncHolder<Option<i32>> = SyncHolder::default();
 
         holder.set(Some(42));
@@ -78,7 +78,7 @@ mod tests {
     }
 
     #[test]
-    fn clone_shares_state_with_original() {
+    fn clone_shares_state_with_the_original_so_any_handle_sees_a_set() {
         let holder: SyncHolder<Option<i32>> = SyncHolder::default();
         let cloned = holder.clone();
 
@@ -88,12 +88,12 @@ mod tests {
     }
 
     #[test]
-    fn get_returns_the_initial_value() {
+    fn get_returns_the_initial_value_so_a_new_holder_is_readable_before_any_set() {
         assert_eq!(SyncHolder::new(3).get(), 3);
     }
 
     #[test]
-    fn debug_format_uses_non_exhaustive_struct() {
+    fn debug_format_omits_the_held_value_so_any_item_type_can_be_held() {
         let holder: SyncHolder<Option<i32>> = SyncHolder::default();
 
         assert_eq!(format!("{holder:?}"), "SyncHolder { .. }");

@@ -56,7 +56,7 @@ mod tests {
     }
 
     #[test]
-    fn converts_into_the_url_it_validated() {
+    fn converts_into_the_url_it_validated_so_callers_get_the_parsed_url_unchanged() {
         assert!(matches!(
             HttpsUrl::parse("https://issuer.example/jwks.json"),
             HttpsUrlParsing::Accepted(url) if Url::from(url.clone()) == *url.url()
@@ -64,7 +64,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_plaintext_url() {
+    fn rejects_a_plaintext_http_url_naming_its_scheme_since_its_traffic_is_unencrypted() {
         assert_eq!(
             HttpsUrl::parse("http://issuer.example"),
             HttpsUrlParsing::Rejected(HttpsUrlRejection::NotHttps {
@@ -74,7 +74,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_relative_reference() {
+    fn rejects_a_relative_reference_as_malformed_since_it_names_no_origin_to_contact() {
         assert_eq!(
             HttpsUrl::parse("/jwks.json"),
             HttpsUrlParsing::Rejected(HttpsUrlRejection::Malformed(
@@ -84,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn describes_every_rejection() {
+    fn describes_every_rejection_so_a_misconfigured_url_can_be_diagnosed() {
         assert_eq!(
             [
                 HttpsUrlRejection::Malformed(url::ParseError::RelativeUrlWithoutBase),

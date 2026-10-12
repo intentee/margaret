@@ -10,7 +10,7 @@ use margaret_spiffe_svid_client::svid_server_cert_verifier::SvidServerCertVerifi
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 
 #[test]
-fn rejects_malformed_end_entity() {
+fn rejects_a_non_der_server_certificate_as_badly_encoded_so_the_handshake_fails() {
     let verifier = SvidServerCertVerifier::new(
         build_root_cert_store_with_ca(),
         "example.org",

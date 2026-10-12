@@ -28,7 +28,7 @@ fn reads_a_completed_dependency_without_async_or_failure_handling() {
 }
 
 #[test]
-fn invokes_the_selected_root_construction_function() {
+fn invokes_the_selected_root_construction_function_so_only_that_root_is_built() {
     let bindings = bindings("fallible_constructor");
     let invocation = bindings.construction_invocation(
         &CanonicalPath::new(vec!["crate".to_string(), "Loader".to_string()]),

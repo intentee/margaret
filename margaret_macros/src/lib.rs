@@ -478,7 +478,7 @@ mod tests {
     use super::strip_struct_or_compile_error;
 
     #[test]
-    fn removes_console_argument_markers_from_parameters() {
+    fn removes_console_argument_markers_from_parameters_so_the_item_compiles() {
         let stripped = strip_or_compile_error(
             quote! {
                 pub fn create(
@@ -521,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn removes_several_parameter_markers_at_once() {
+    fn removes_several_parameter_markers_in_one_pass_so_the_handler_compiles() {
         let stripped = strip_or_compile_error(
             quote! {
                 pub async fn respond(
@@ -580,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn removes_authenticated_user_markers_from_parameters() {
+    fn removes_authenticated_user_markers_from_parameters_so_the_item_compiles() {
         let stripped = strip_or_compile_error(
             quote! {
                 pub async fn respond(
@@ -609,7 +609,7 @@ mod tests {
     }
 
     #[test]
-    fn removes_column_markers_from_struct_fields() {
+    fn removes_column_markers_from_struct_fields_so_the_struct_compiles() {
         let stripped = strip_struct_or_compile_error(
             quote! {
                 struct Article {
@@ -651,7 +651,7 @@ mod tests {
     }
 
     #[test]
-    fn removes_index_markers_from_struct_fields() {
+    fn removes_index_markers_from_struct_fields_so_the_struct_compiles() {
         let stripped = strip_struct_or_compile_error(
             quote! {
                 struct Article {
@@ -703,7 +703,7 @@ mod tests {
     }
 
     #[test]
-    fn references_the_default_of_a_column() {
+    fn references_the_default_of_a_column_so_the_compiler_resolves_its_path() {
         let stripped: String = strip_struct_or_compile_error(
             quote! {
                 struct Article {

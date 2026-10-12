@@ -53,7 +53,7 @@ mod tests {
     use crate::discovery_failure::DiscoveryFailure;
 
     #[test]
-    fn describes_every_failure() {
+    fn describes_every_key_set_poll_failure_with_its_cause_for_the_poll_error_log() {
         let described = [
             KeySetPollFailure::Discovery(DiscoveryFailure::Status(StatusCode::NOT_FOUND)),
             KeySetPollFailure::DocumentExchange(IssuerExchangeError::Transport(

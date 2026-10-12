@@ -86,7 +86,7 @@ mod tests {
     const ARTICLE: &str = "use margaret::framework::active_record::key::Key;\n\nenum Status {\n    Draft,\n    Published,\n}\n\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: uuid::Uuid,\n    #[column]\n    status: Status,\n}\n\n#[model(table = \"articles\")]\n#[index(name = \"articles_by_author\", fields = [author, id])]\n#[index(name = \"articles_by_author_title\", fields = [author, title])]\nstruct Article {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: uuid::Uuid,\n    #[column]\n    title: String,\n    #[column]\n    status: Status,\n    #[column]\n    author: Key<Author>,\n}\n";
 
     #[test]
-    fn declares_one_module_per_model() {
+    fn declares_one_module_per_model_so_every_rendered_model_module_is_reachable() {
         assert_eq!(module(ARTICLE, "models"), "pubmodauthor;pubmodarticle;");
     }
 
@@ -141,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn assembles_a_composite_primary_key() {
+    fn assembles_a_composite_primary_key_from_its_fields_so_keys_can_target_the_model() {
         let source = format!("{LOCK}{RELEASE}");
 
         assert!(module(&source, "models/lock/record").contains(
@@ -174,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    fn excludes_defaulted_fields_from_the_draft() {
+    fn excludes_defaulted_fields_from_the_draft_so_the_database_fills_them_in() {
         assert!(
             module(ARTICLE, "models/article/draft").contains(
                 "pubstructDraft{pubtitle:::std::string::String,pubstatus:crate::Status,pubauthor:margaret::framework::active_record::key::Key<crate::Author>}"
@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn implements_the_model_traits() {
+    fn implements_the_model_traits_that_let_a_model_be_queried_updated_and_created() {
         let model = module(ARTICLE, "models/article/model");
 
         assert!(model.contains("typeConditions=crate::margaret::models::article::conditions::Conditions;typeQuery=crate::margaret::models::article::query::Step;"));
@@ -240,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn orders_a_unique_field_by_itself() {
+    fn orders_a_unique_field_by_itself_since_its_values_never_tie() {
         assert!(module(ARTICLE, "models/article/query/edge/id").contains(
             "implmargaret::framework::active_record::scan_order::ScanOrder<crate::Article>forEdge{constSPANS:&'static[margaret::framework::active_record::field_span::FieldSpan]=&[margaret::framework::active_record::field_span::FieldSpan{start:0usize,width:1usize,}];}"
         ));

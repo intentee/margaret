@@ -54,7 +54,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_a_screaming_snake_case_name() {
+    fn accepts_a_screaming_snake_case_name_and_keeps_it_verbatim_for_lookup() {
         let name = EnvironmentVariableName::new("DATABASE_URL").expect("the name is usable");
 
         assert_eq!(name.as_str(), "DATABASE_URL");
@@ -67,17 +67,17 @@ mod tests {
     }
 
     #[test]
-    fn accepts_a_name_that_contains_digits() {
+    fn accepts_a_name_that_contains_digits_since_only_a_leading_digit_is_invalid() {
         assert!(accepts("SERVER_2_PORT"));
     }
 
     #[test]
-    fn accepts_a_lowercase_name() {
+    fn accepts_a_lowercase_name_since_the_environment_does_not_require_uppercase_names() {
         assert!(accepts("database_url"));
     }
 
     #[test]
-    fn rejects_an_empty_name() {
+    fn rejects_an_empty_name_because_no_variable_can_be_looked_up_by_it() {
         assert!(!accepts(""));
     }
 

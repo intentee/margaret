@@ -80,7 +80,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_the_console_argument_source() {
+    fn finds_the_console_argument_source_so_the_command_line_feeds_the_parameter() {
         assert_eq!(
             declared_by(&[IndexedAttribute::new(
                 &parse_quote!(#[console_argument(from = "label")]),
@@ -90,7 +90,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_the_environment_variable_source() {
+    fn finds_the_environment_variable_source_so_the_environment_feeds_the_parameter() {
         assert_eq!(
             declared_by(&[IndexedAttribute::new(
                 &parse_quote!(#[environment_variable(from = "DATABASE_URL")]),
@@ -100,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_the_spiffe_http_client_source() {
+    fn finds_the_spiffe_http_client_source_so_serving_feeds_the_parameter_its_client() {
         assert_eq!(
             declared_by(&[IndexedAttribute::new(&parse_quote!(#[spiffe_http_client]),)]),
             Some(FrameworkAttribute::SpiffeHttpClient)

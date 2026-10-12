@@ -44,6 +44,7 @@ use margaret_oidc_provider_codegen::oidc_provider_item_path::oidc_provider_item_
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
 use margaret_request_binding_codegen::views_availability::ViewsAvailability;
+use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
 use margaret_schema_codegen::render_schema::render_schema;
 use margaret_schema_codegen::render_table::render_table;
 use margaret_schema_codegen::render_tables::render_tables;
@@ -318,6 +319,7 @@ fn render_serving_modules(
     ServedRoutes {
         declared: declared_routes,
         framework: framework_responders,
+        paths: mut route_paths,
     }: ServedRoutes,
     bindings: &ContainerBindings,
     features: &GeneratedFeatures,
@@ -327,7 +329,13 @@ fn render_serving_modules(
 ) -> Result<ServingModules, CodegenError> {
     let websockets = if features.contains(GeneratedFeature::Websockets) {
         render_websocket(
-            WebSocketPlan::build(index, bindings, middleware_plans, registries)?,
+            WebSocketPlan::build(
+                index,
+                &mut route_paths,
+                bindings,
+                middleware_plans,
+                registries,
+            )?,
             bindings,
         )
     } else {
@@ -630,7 +638,8 @@ pub fn build(
     let registry = scan(&index)?;
     let database = DeclaredPostgresDatabase::read(&index)?;
     let identity = IdentityDeclarations::read(&index)?;
-    let declared_routes = DeclaredRoutes::read(&index)?;
+    let mut route_paths = RoutePathRegistry::new();
+    let declared_routes = DeclaredRoutes::read(&index, &mut route_paths)?;
     let tags = identity.tags(&index)?;
     let oauth_client_bindings = tags.oauth_client_bindings(
         &identity.trusts,
@@ -704,6 +713,7 @@ pub fn build(
                 ServedRoutes {
                     declared: declared_routes,
                     framework: responders,
+                    paths: route_paths,
                 },
                 bindings,
                 &features,
@@ -1116,7 +1126,7 @@ impl AssetRoute {
     }
 
     #[test]
-    fn propagates_an_asset_bag_failure() {
+    fn reports_a_metafile_without_outputs_as_an_asset_bag_failure_naming_the_stage() {
         let source_crate = SourceCrate::new(ASSET_MACRO_CRATE);
 
         let message = build(
@@ -1909,7 +1919,7 @@ struct ApplicationDatabase;
                 .split_whitespace()
                 .collect::<String>()
                 .contains(
-                    "letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.issuer_origin,);letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(&origin_public),);"
+                    "letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.issuer_origin,);letroutes=matchsuper::routes::Routes::from_origins(&origin_public){Ok(routes)=>::std::sync::Arc::new(routes),Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
                 )
         );
         assert!(!module(&code, "run").contains("public-url"));
@@ -2261,7 +2271,7 @@ struct GetDiscovery;
     }
 
     #[test]
-    fn propagates_a_sign_in_endpoints_failure() {
+    fn reports_sign_in_via_a_client_without_sign_in_naming_the_declaration_to_add() {
         assert_eq!(
             generate(
                 &SIGN_IN_CRATE
@@ -2303,7 +2313,7 @@ struct GetDiscovery;
     }
 
     #[test]
-    fn propagates_an_http_route_failure() {
+    fn reports_two_responders_of_one_route_as_an_http_failure_since_it_is_ambiguous() {
         assert_eq!(
             generate("#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n")
                 .expect_err("two responders answer the same route")
@@ -2313,7 +2323,7 @@ struct GetDiscovery;
     }
 
     #[test]
-    fn propagates_a_resource_issuance_failure() {
+    fn reports_an_empty_resource_audience_as_an_issuance_failure_since_it_names_no_one() {
         assert_eq!(
             generate("#[rustfmt::skip]\npub mod margaret;\n\n#[issues_tokens(provider, issuer = \"https://issuer.fixture\")]\nstruct Issuer;\n#[issues_resource_tokens(reports, audience = \"\")]\nstruct ReportsResource;\n")
                 .expect_err("the resource audience is empty")
@@ -2609,7 +2619,7 @@ impl HolderPage {
     }
 
     #[test]
-    fn rejects_a_resource_issuance_nothing_uses() {
+    fn rejects_a_resource_issuance_nothing_uses_so_no_unused_declaration_lingers() {
         assert_eq!(
             generate(&OWN_BEARER_CRATE.replace(
                 "#[bearer_token(resource = attachments)] upload: Option<VerifiedJwt<Claims, AccessTokenProfile>>,",
@@ -2800,7 +2810,7 @@ struct SecondEndpoint;
 ";
 
     #[test]
-    fn propagates_a_duplicate_jwks_endpoint_tag() {
+    fn reports_an_issuer_tag_declared_twice_since_a_tag_must_name_one_issuer() {
         let message = generate(JWKS_DUPLICATE_ENDPOINT_TAG_CRATE)
             .expect_err("a duplicate jwks endpoint tag is rejected")
             .to_string();
@@ -2809,7 +2819,7 @@ struct SecondEndpoint;
     }
 
     #[test]
-    fn generates_no_server_without_responders() {
+    fn generates_no_http_server_or_routes_without_responders_since_nothing_is_served() {
         let code = generate(PLAIN_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod container;"));
@@ -2821,7 +2831,7 @@ struct SecondEndpoint;
     }
 
     #[test]
-    fn rejects_a_singleton_nothing_consumes() {
+    fn rejects_a_singleton_nothing_consumes_so_no_unused_service_is_constructed() {
         assert_eq!(
             generate(
                 "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create() -> anyhow::Result<Self> {}\n}\n"
@@ -2844,7 +2854,7 @@ struct SecondEndpoint;
     }
 
     #[test]
-    fn propagates_a_web_socket_codegen_error() {
+    fn reports_a_websocket_session_lacking_a_builder_since_none_could_be_opened() {
         let error = generate(INVALID_WEBSOCKET_CRATE).expect_err("the invalid session is rejected");
 
         assert!(
@@ -2962,7 +2972,7 @@ impl GetProfile {
     }
 
     #[test]
-    fn propagates_a_request_binding_failure() {
+    fn reports_a_user_provider_naming_no_user_model_since_nothing_says_what_it_infers() {
         let message = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[infers_authenticated_user]\nstruct Bad;\n",
         )
@@ -3035,7 +3045,7 @@ impl RequestLog {
     }
 
     #[test]
-    fn propagates_a_middleware_codegen_error() {
+    fn reports_a_middleware_parameter_it_cannot_supply_since_no_value_could_be_bound() {
         let message = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         )
@@ -3073,7 +3083,7 @@ impl RequestLog {
     }
 
     #[test]
-    fn is_idempotent() {
+    fn generates_identical_modules_from_unchanged_sources_so_rebuilds_are_deterministic() {
         let source_crate = SourceCrate::new(WEB_CRATE);
         let source = source_crate.source_directory();
 
@@ -3087,7 +3097,7 @@ impl RequestLog {
     }
 
     #[test]
-    fn propagates_an_index_failure() {
+    fn reports_a_glob_import_as_an_index_failure_since_bindings_need_explicit_paths() {
         let message = generate("use other::*;\n")
             .expect_err("the build fails")
             .to_string();
@@ -3096,7 +3106,7 @@ impl RequestLog {
     }
 
     #[test]
-    fn propagates_a_container_failure() {
+    fn reports_a_singleton_enum_as_a_container_failure_since_only_structs_are_constructed() {
         let message =
             generate("#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nenum Bad {}\n")
                 .expect_err("the build fails")
@@ -3128,7 +3138,7 @@ impl Config {
     }
 
     #[test]
-    fn propagates_an_http_failure() {
+    fn reports_a_route_without_a_method_as_an_http_failure_since_no_request_could_match_it() {
         let message = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(path = \"/x\")]\nstruct Bad;\n\nimpl Bad {\n    #[constructor]\n    fn create() -> anyhow::Result<Self> {}\n}\n",
         )
@@ -3139,7 +3149,7 @@ impl Config {
     }
 
     #[test]
-    fn propagates_a_console_failure() {
+    fn reports_a_nameless_console_command_as_a_console_failure_since_it_cannot_be_invoked() {
         let message =
             generate("#[rustfmt::skip]\npub mod margaret;\n\n#[console_command]\nstruct Bad;\n")
                 .expect_err("the build fails")
@@ -3149,7 +3159,7 @@ impl Config {
     }
 
     #[test]
-    fn propagates_a_services_failure() {
+    fn reports_a_service_lacking_a_process_method_as_a_services_failure_since_nothing_runs() {
         let message = generate("#[rustfmt::skip]\npub mod margaret;\n\n#[service]\nstruct Bad;\n")
             .expect_err("the build fails")
             .to_string();
@@ -3171,7 +3181,7 @@ impl Bad {
 ";
 
     #[test]
-    fn propagates_a_serve_input_failure() {
+    fn reports_a_positional_argument_outside_a_command_since_only_commands_take_them() {
         let message = generate(POSITIONAL_OUTSIDE_COMMAND_CRATE)
             .expect_err("the positional argument outside a command is rejected")
             .to_string();
@@ -3206,7 +3216,7 @@ impl Page {
 ";
 
     #[test]
-    fn propagates_a_conflicting_serve_input_failure() {
+    fn reports_one_serve_input_declared_two_ways_since_shared_inputs_must_match() {
         let message = generate(CONFLICTING_SERVE_INPUT_CRATE)
             .expect_err("the conflicting serve input is rejected")
             .to_string();
@@ -3284,7 +3294,7 @@ impl RespondsToWebSocketMessage for Chatter {
     }
 
     #[test]
-    fn propagates_a_views_failure() {
+    fn reports_a_non_snake_case_view_name_as_a_views_failure_since_it_names_a_views_accessor() {
         let message = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[renders_view(name = \"CardLayout\")]\nstruct Card;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
@@ -3295,7 +3305,7 @@ impl RespondsToWebSocketMessage for Chatter {
     }
 
     #[test]
-    fn propagates_a_dependency_cycle_failure() {
+    fn reports_mutually_dependent_singletons_as_a_cycle_since_neither_builds_first() {
         let message = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\nuse std::sync::Arc;\n\n#[singleton]\nstruct A;\n\nimpl A {\n    #[constructor]\n    fn create(b: Arc<B>) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct B;\n\nimpl B {\n    #[constructor]\n    fn create(a: Arc<A>) -> anyhow::Result<Self> {}\n}\n",
         )
@@ -3365,7 +3375,7 @@ impl Metrics {
     }
 
     #[test]
-    fn rejects_a_non_string_server() {
+    fn rejects_a_server_named_by_a_path_since_servers_are_named_by_string_literals() {
         let error = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
@@ -3553,7 +3563,7 @@ struct ApplicationDatabase;
     }
 
     #[test]
-    fn propagates_a_rejected_shape() {
+    fn reports_a_modelless_eager_load_shape_as_a_shapes_failure_since_it_has_nothing_to_load() {
         assert!(matches!(
             generate(&format!("{MODELS_CRATE}\n#[eager_load]\nstruct LoadedWidget {{}}\n")),
             Err(CodegenError::Shapes {
@@ -3602,7 +3612,7 @@ struct ApplicationDatabase;
     }
 
     #[test]
-    fn rejects_a_postgres_database_nothing_uses() {
+    fn rejects_a_postgres_database_nothing_uses_so_no_unused_pool_is_opened() {
         assert!(matches!(
             generate(
                 "#[rustfmt::skip]\npub mod margaret;\n\n#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]\nstruct ApplicationDatabase;\n",
@@ -3614,7 +3624,7 @@ struct ApplicationDatabase;
     }
 
     #[test]
-    fn propagates_a_database_failure() {
+    fn reports_a_postgres_database_without_url_from_as_a_database_failure_as_it_cannot_connect() {
         assert!(matches!(
             generate(
                 "#[rustfmt::skip]\npub mod margaret;\n\n#[postgres_database]\nstruct ApplicationDatabase;\n",
@@ -3626,7 +3636,7 @@ struct ApplicationDatabase;
     }
 
     #[test]
-    fn propagates_a_token_issuance_failure() {
+    fn reports_token_issuance_lacking_an_issuer_since_every_token_must_name_its_iss() {
         let message = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[issues_tokens(provider)]\nstruct Issuer;\n",
         )
@@ -3637,7 +3647,7 @@ struct ApplicationDatabase;
     }
 
     #[test]
-    fn propagates_a_trusted_issuer_failure() {
+    fn reports_a_trusted_issuer_without_an_audience_since_tokens_must_name_ours() {
         let message = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[verifies_tokens_from_issuer(partner, issuer = \"https://partner.fixture\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct Partner;\n",
         )
@@ -3648,7 +3658,7 @@ struct ApplicationDatabase;
     }
 
     #[test]
-    fn propagates_an_oauth_client_failure() {
+    fn reports_an_oauth_client_without_authentication_since_it_could_not_get_tokens() {
         let message = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[oauth_client(partner_client, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n",
         )
@@ -3659,7 +3669,7 @@ struct ApplicationDatabase;
     }
 
     #[test]
-    fn propagates_an_oauth_vocabulary_failure() {
+    fn reports_a_nameless_oauth_scope_since_no_client_could_ever_request_it() {
         assert_eq!(
             generate(
                 "#[rustfmt::skip]\npub mod margaret;\n\n#[oauth_scope]\nstruct ProfileScope;\n"
@@ -3671,7 +3681,7 @@ struct ApplicationDatabase;
     }
 
     #[test]
-    fn propagates_an_oidc_endpoint_failure() {
+    fn reports_an_unrouted_oidc_endpoint_as_a_provider_failure_naming_the_fix() {
         assert_eq!(
             generate("#[rustfmt::skip]\npub mod margaret;\n\n#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::Jwks)]\nstruct GetJwks;\n")
                 .expect_err("the build fails")
@@ -3681,7 +3691,7 @@ struct ApplicationDatabase;
     }
 
     #[test]
-    fn propagates_a_userinfo_claims_failure() {
+    fn reports_two_userinfo_claims_providers_since_the_endpoint_answers_with_one() {
         assert_eq!(
             generate("#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[provides_userinfo_claims]\nstruct First;\n\n#[singleton]\n#[provides_userinfo_claims]\nstruct Second;\n")
                 .expect_err("the build fails")
@@ -3691,7 +3701,7 @@ struct ApplicationDatabase;
     }
 
     #[test]
-    fn propagates_a_models_failure() {
+    fn reports_a_u64_column_as_a_models_failure_since_no_sql_type_maps_it() {
         let message = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[model(table = \"widgets\")]\nstruct Widget {\n    #[column]\n    id: u64,\n}\n",
         )
@@ -3960,7 +3970,7 @@ struct PostSignOut;
     }
 
     #[test]
-    fn consumes_sessions_through_the_trusted_issuer_and_the_spiffe_client() {
+    fn consumes_sessions_through_the_trusted_issuer_and_the_spiffe_issuer_request_client() {
         let source = collapsed(&concatenated(
             &generate("\
 #[rustfmt::skip]
@@ -3999,11 +4009,15 @@ impl GetWelcome {
         ));
 
         assert!(source.contains("crate::margaret::sessions::ConsumedSessions::create("));
-        assert!(source.contains("spiffe_http_client"));
+        assert!(source.contains(
+            "letspiffe_issuer_request_client=matchmargaret::framework::issuer_request::issuer_request_client::IssuerRequestClient::preconfigured(spiffe_bundle.reqwest_client_builder(),){Ok(client)=>::std::sync::Arc::new(client),"
+        ));
+        assert!(source.contains("::std::sync::Arc::clone(&spiffe_issuer_request_client)"));
+        assert!(!source.contains("spiffe_http_client"));
     }
 
     #[test]
-    fn propagates_a_sessions_failure() {
+    fn reports_sessions_without_an_issuer_tag_as_a_sessions_failure_since_they_belong_to_one() {
         assert_eq!(
             generate("#[rustfmt::skip]\npub mod margaret;\n\n#[issues_sessions(audience = \"browser\")]\nstruct BrowserSessions;\n")
                 .expect_err("the build fails")
@@ -4013,7 +4027,7 @@ impl GetWelcome {
     }
 
     #[test]
-    fn propagates_a_session_endpoints_failure() {
+    fn reports_an_unrouted_session_endpoint_as_a_session_failure_naming_the_fix() {
         assert_eq!(
             generate("#[rustfmt::skip]\npub mod margaret;\n\n#[serves_session_endpoint(margaret::framework::sessions::session_endpoint::SessionEndpoint::Refresh)]\nstruct PostSessionRefresh;\n")
                 .expect_err("the build fails")

@@ -92,7 +92,12 @@ fn primary_key_part(
                 column_type: column.column_type,
                 name: column.name.clone(),
             }),
-            CollectedFieldShape::Key { target, .. } => PrimaryKeySource::Key {
+            CollectedFieldShape::Key {
+                column_base,
+                target,
+                ..
+            } => PrimaryKeySource::Key {
+                column_base: column_base.clone(),
                 target: target.clone(),
             },
         },

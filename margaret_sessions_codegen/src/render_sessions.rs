@@ -89,7 +89,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_no_module_without_sessions() {
+    fn renders_no_module_without_sessions_so_apps_without_them_carry_no_session_code() {
         assert!(rendered("", &[]).is_empty());
     }
 
@@ -115,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_the_consumed_sessions() {
+    fn renders_consumed_sessions_as_a_lone_reexport_without_an_audience_of_their_own() {
         assert_eq!(
             rendered(
                 "#[consumes_sessions(issuer = partner, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]\nstruct PartnerSessions;\n",

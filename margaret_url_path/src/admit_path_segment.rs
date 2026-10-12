@@ -23,7 +23,7 @@ mod tests {
     use crate::path_segment_rejection::PathSegmentRejection;
 
     #[test]
-    fn rejects_an_empty_segment() {
+    fn rejects_an_empty_segment_because_it_cannot_address_a_segment_of_its_own() {
         assert_eq!(
             admit_path_segment(""),
             PathSegmentAdmission::Rejected(PathSegmentRejection::Empty)
@@ -31,7 +31,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_the_current_directory_segment() {
+    fn rejects_the_current_directory_segment_since_url_normalization_removes_it() {
         assert_eq!(
             admit_path_segment("."),
             PathSegmentAdmission::Rejected(PathSegmentRejection::DotSegment)
@@ -39,7 +39,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_the_parent_directory_segment() {
+    fn rejects_the_parent_directory_segment_since_it_would_climb_out_of_the_route() {
         assert_eq!(
             admit_path_segment(".."),
             PathSegmentAdmission::Rejected(PathSegmentRejection::DotSegment)

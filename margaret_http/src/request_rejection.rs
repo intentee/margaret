@@ -176,7 +176,7 @@ mod tests {
     }
 
     #[test]
-    fn describes_every_rejection() {
+    fn describes_every_request_rejection_so_the_logged_reason_is_never_blank() {
         for rejection in every_rejection() {
             assert!(
                 !rejection.to_string().is_empty(),

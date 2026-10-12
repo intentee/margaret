@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
@@ -42,6 +42,7 @@ use crate::route_group::RouteGroup;
 use crate::route_handling::RouteHandling;
 use crate::route_methods::ROUTE_METHODS;
 use crate::route_responder::RouteResponder;
+use crate::server_layout::ServerLayout;
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
     injects_routes(route.arguments())
@@ -441,27 +442,31 @@ fn render_handler(
 }
 
 fn server_router(
-    has_websocket_routes: bool,
-    server: &HttpServer,
+    layout: &ServerLayout<'_>,
+    websocket_session_count: usize,
     routes_param: &Ident,
-    route_entries: &TokenStream,
+    route_entries: &[TokenStream],
 ) -> TokenStream {
-    if has_websocket_routes {
-        let websocket_routes = format_ident!("{}_routes", server.name());
-        let websocket_call = quote! {
-            super::super::websocket::#websocket_routes(container, #routes_param)
-        };
+    let ServerLayout { field, paths, .. } = layout;
+    let websocket_entries: Vec<Ident> = (0..websocket_session_count)
+        .map(|position| format_ident!("web_socket_entry_{position}"))
+        .collect();
+    let websocket_destructure = (websocket_session_count > 0).then(|| {
+        let websocket_routes = format_ident!("{}_routes", layout.server.name());
+
         quote! {
-            {
-                let mut route_entries = #route_entries;
-
-                route_entries.extend(#websocket_call);
-
-                margaret::framework::http::server_routes::ServerRoutes::build(route_entries)
-            }
+            let [#(#websocket_entries),*] =
+                super::super::websocket::#websocket_routes(container, #routes_param);
         }
-    } else {
-        quote! { margaret::framework::http::server_routes::ServerRoutes::build(#route_entries) }
+    });
+
+    quote! {
+        #websocket_destructure
+
+        #routes_param.#field.#paths.routes([
+            #(#route_entries,)*
+            #(#websocket_entries,)*
+        ])
     }
 }
 
@@ -475,7 +480,6 @@ fn route_entries<'handler>(
     table
         .route_groups(server.name())
         .map(|group| {
-            let path = group.path().pattern();
             let method_handlers = group
                 .method_routes()
                 .zip(rendered_handler_entries.by_ref())
@@ -520,7 +524,7 @@ fn route_entries<'handler>(
             let method_handlers = vec_literal_tokens(method_handlers);
 
             quote! {
-                margaret::framework::http::route_entry::RouteEntry::new(#path, #method_handlers)
+                margaret::framework::http::route_entry::RouteEntry::new(#method_handlers)
             }
         })
         .collect()
@@ -528,11 +532,12 @@ fn route_entries<'handler>(
 
 fn server_module(
     table: &HttpRouteTable,
-    server: &HttpServer,
+    layout: &ServerLayout<'_>,
     has_views: bool,
-    has_websocket_routes: bool,
+    websocket_session_count: usize,
     bindings: &ContainerBindings,
 ) -> TokenStream {
+    let server = layout.server;
     let function_name = server.function_name();
     let server_routes: Vec<&HttpRoute> = table
         .route_groups(server.name())
@@ -567,8 +572,12 @@ fn server_module(
         views_argument.as_ref(),
         &mut rendered_handler_entries,
     );
-    let route_entries = vec_literal_tokens(route_entries);
-    let router = server_router(has_websocket_routes, server, &routes_param, &route_entries);
+    let router = server_router(
+        layout,
+        websocket_session_count,
+        &routes_param,
+        &route_entries,
+    );
 
     let inner_return = quote! {
         ::std::result::Result<
@@ -610,13 +619,13 @@ struct RenderedHandler {
 
 pub(crate) fn render(
     table: &HttpRouteTable,
-    servers: &[HttpServer],
+    layouts: &[ServerLayout<'_>],
     has_views: bool,
-    websocket_servers: &BTreeSet<String>,
+    websocket_paths: &BTreeMap<String, Vec<String>>,
     bindings: &ContainerBindings,
 ) -> Vec<GeneratedModuleTokens> {
-    let server_declarations = servers.iter().map(|server| {
-        let function_name = server.function_name();
+    let server_declarations = layouts.iter().map(|layout| {
+        let function_name = layout.server.function_name();
 
         quote! {
             #[rustfmt::skip]
@@ -629,11 +638,13 @@ pub(crate) fn render(
     };
 
     let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];
-    for server in servers {
-        let has_websocket_routes = websocket_servers.contains(server.name());
+    for layout in layouts {
+        let websocket_session_count = websocket_paths
+            .get(layout.server.name())
+            .map_or(0, Vec::len);
         modules.push(GeneratedModuleTokens::new(
-            format!("http/{}", server.function_name()),
-            server_module(table, server, has_views, has_websocket_routes, bindings),
+            format!("http/{}", layout.server.function_name()),
+            server_module(table, layout, has_views, websocket_session_count, bindings),
         ));
     }
 

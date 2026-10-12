@@ -19,7 +19,7 @@ use margaret_spiffe_svid_tests::leaf_spiffe_example_org_server_key_der::LEAF_SPI
 use margaret_spiffe_svid_tests::pump_tls_handshake::pump_tls_handshake;
 
 #[test]
-fn client_presents_cert_resolved_through_holder() {
+fn client_presents_cert_resolved_through_holder_so_mtls_servers_accept_it() {
     let credentials = build_svid_certified_key(
         vec![CertificateDer::from(
             LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER.to_vec(),

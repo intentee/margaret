@@ -176,12 +176,12 @@ mod tests {
     use super::report_close_failure;
 
     #[test]
-    fn accepts_a_successful_websocket_close() {
+    fn accepts_a_successful_websocket_close_without_treating_it_as_a_failure() {
         report_close_failure(Ok(()));
     }
 
     #[test]
-    fn reports_a_failed_websocket_close() {
+    fn reports_a_failed_websocket_close_without_panicking_since_the_peer_may_be_gone() {
         report_close_failure(Err(Error::ConnectionClosed));
     }
 }

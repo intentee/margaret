@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_declared_scope() {
+    fn reads_a_scope_name_anchored_to_its_struct_so_clients_can_reference_it_by_path() {
         assert_eq!(
             read(PROFILE).expect("the scope is read"),
             vec!["crate::ProfileScope=profile".to_string()]
@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_declaration_without_a_name() {
+    fn rejects_a_declaration_without_a_name_since_a_scope_is_requested_by_its_name() {
         assert!(matches!(
             read("#[oauth_scope]\npub struct ProfileScope;\n"),
             Err(OAuthVocabularyCodegenError::MissingScopeName { anchor }) if anchor == "crate::ProfileScope"
@@ -207,7 +207,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_arguments_that_do_not_parse() {
+    fn rejects_arguments_that_do_not_parse_naming_the_attribute_so_it_can_be_located() {
         assert!(matches!(
             read("#[oauth_scope(= 5)]\npub struct ProfileScope;\n"),
             Err(OAuthVocabularyCodegenError::Index(AttributeError::Arguments(
@@ -226,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_malformed_scope_name() {
+    fn rejects_a_malformed_scope_name_since_a_space_would_split_it_into_two_scopes() {
         assert!(matches!(
             read("#[oauth_scope(name = \"two words\")]\npub struct ProfileScope;\n"),
             Err(OAuthVocabularyCodegenError::MalformedScopeName { anchor, .. }) if anchor == "crate::ProfileScope"
@@ -234,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_scope_declared_twice() {
+    fn rejects_a_scope_name_declared_twice_so_each_name_maps_to_one_item() {
         assert!(matches!(
             read(&format!("{PROFILE}#[oauth_scope(name = \"profile\")]\npub struct OtherProfileScope;\n")),
             Err(OAuthVocabularyCodegenError::DuplicateScopeName { name, .. }) if name == "profile"
@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_redeclared_openid_scope() {
+    fn rejects_a_redeclared_openid_scope_since_the_framework_already_declares_it() {
         assert!(matches!(
             read("#[oauth_scope(name = \"openid\")]\npub struct OpenidScope;\n"),
             Err(OAuthVocabularyCodegenError::RedeclaredOpenidScope { anchor }) if anchor == "crate::OpenidScope"
@@ -261,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    fn resolves_the_framework_openid_scope() {
+    fn resolves_the_framework_openid_scope_so_clients_reference_it_without_declaring() {
         assert!(matches!(
             resolved(
                 "use margaret::framework::oauth_vocabulary::openid_scope::OpenidScope;\npub struct Client;\n",
@@ -291,7 +291,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_declared_scope_nothing_references() {
+    fn rejects_a_declared_scope_nothing_references_so_dead_scopes_cannot_linger() {
         let indexed = IndexedSource::new(PROFILE);
 
         assert!(matches!(
@@ -303,7 +303,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_declared_scopes_that_are_referenced() {
+    fn accepts_declared_scopes_that_are_referenced_since_every_one_is_in_use() {
         let indexed = IndexedSource::new(PROFILE);
 
         assert!(

@@ -89,7 +89,7 @@ mod tests {
     }
 
     #[test]
-    fn copy_slots_never_clone() {
+    fn weaves_a_copy_slot_by_value_on_every_use_since_copying_needs_no_clone() {
         let mut weaver = ReverseServeInputWeaver::new(ServeInputNaming::for_slot_count(2));
 
         assert_eq!(collapsed(&weaver.weave(&flag(), 1)), "serve_input_1");
@@ -97,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn slots_are_decided_independently() {
+    fn moves_each_slot_on_its_own_last_use_regardless_of_other_slots_being_moved() {
         let mut weaver = ReverseServeInputWeaver::new(ServeInputNaming::for_slot_count(2));
 
         assert_eq!(collapsed(&weaver.weave(&cloned(), 0)), "serve_input_0");

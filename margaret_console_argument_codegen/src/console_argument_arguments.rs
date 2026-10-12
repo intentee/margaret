@@ -58,7 +58,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_named_form() {
+    fn reads_a_from_key_as_a_named_argument_so_its_value_is_taken_from_that_option() {
         assert_eq!(
             describe(&parse_quote!(#[console_argument(from = "label")])),
             "named:label"
@@ -66,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_positional_form() {
+    fn reads_the_positional_flag_as_a_positional_argument_so_its_value_is_taken_by_order() {
         assert_eq!(
             describe(&parse_quote!(#[console_argument(positional)])),
             "positional"

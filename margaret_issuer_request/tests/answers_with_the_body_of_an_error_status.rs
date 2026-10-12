@@ -22,16 +22,14 @@ async fn answers_with_the_body_of_an_error_status() {
     let fixture = TlsFixture::generate();
     let server = RunningFixtureServer::start(
         fixture.server_config.clone(),
-        vec![RouteEntry::new(
-            "/token",
-            vec![MethodHandler::content(
-                ContentMethod::Post,
-                Arc::new(FormEchoHandler {
-                    limit: BodyLimit::new(1),
-                    wrapping: EchoWrapping::Bare,
-                }),
-            )],
-        )],
+        ["/token"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            Arc::new(FormEchoHandler {
+                limit: BodyLimit::new(1),
+                wrapping: EchoWrapping::Bare,
+            }),
+        )])],
     )
     .await;
     let client = IssuerRequestClient::build(fixture_client_builder(&fixture.certificate_authority))

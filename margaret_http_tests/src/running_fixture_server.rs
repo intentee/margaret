@@ -11,6 +11,7 @@ use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::server::Server;
+use margaret_http::server_paths::ServerPaths;
 use margaret_http::server_routes::ServerRoutes;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
@@ -22,16 +23,20 @@ pub struct RunningFixtureServer {
 }
 
 impl RunningFixtureServer {
-    async fn serve(
+    async fn serve<const COUNT: usize>(
         address: SocketAddr,
         transport: TransportConfig,
         upload_config: UploadConfig,
-        route_entries: Vec<RouteEntry>,
+        paths: [&'static str; COUNT],
+        route_entries: [RouteEntry; COUNT],
     ) -> Self {
         let ServerRoutes {
             named_handlers,
             router,
-        } = ServerRoutes::build(route_entries).expect("the route entries register cleanly");
+        } = ServerPaths::build(paths)
+            .expect("the route paths do not conflict")
+            .routes(route_entries)
+            .expect("the route entries register cleanly");
         let server = Server::new(address.to_string(), transport, upload_config, router);
         let forward_targets = Arc::new(ForwardTargets::new(named_handlers));
         let bound = BoundServer::bind(Arc::new(server), forward_targets)
@@ -53,10 +58,15 @@ impl RunningFixtureServer {
     /// # Panics
     ///
     /// Panics when the fixture it builds cannot be prepared.
-    pub async fn start(server_config: Arc<ServerConfig>, route_entries: Vec<RouteEntry>) -> Self {
+    pub async fn start<const COUNT: usize>(
+        server_config: Arc<ServerConfig>,
+        paths: [&'static str; COUNT],
+        route_entries: [RouteEntry; COUNT],
+    ) -> Self {
         Self::start_at(
             IpAddr::V4(Ipv4Addr::LOCALHOST),
             server_config,
+            paths,
             route_entries,
         )
         .await
@@ -65,15 +75,17 @@ impl RunningFixtureServer {
     /// # Panics
     ///
     /// Panics when the fixture it builds cannot be prepared.
-    pub async fn start_at(
+    pub async fn start_at<const COUNT: usize>(
         ip: IpAddr,
         server_config: Arc<ServerConfig>,
-        route_entries: Vec<RouteEntry>,
+        paths: [&'static str; COUNT],
+        route_entries: [RouteEntry; COUNT],
     ) -> Self {
         Self::serve(
             SocketAddr::new(ip, 0),
             TransportConfig::MutualTls { server_config },
             UploadConfig::Disabled,
+            paths,
             route_entries,
         )
         .await
@@ -82,11 +94,16 @@ impl RunningFixtureServer {
     /// # Panics
     ///
     /// Panics when the fixture it builds cannot be prepared.
-    pub async fn start_plain(upload_config: UploadConfig, route_entries: Vec<RouteEntry>) -> Self {
+    pub async fn start_plain<const COUNT: usize>(
+        upload_config: UploadConfig,
+        paths: [&'static str; COUNT],
+        route_entries: [RouteEntry; COUNT],
+    ) -> Self {
         Self::serve(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
             TransportConfig::Plain,
             upload_config,
+            paths,
             route_entries,
         )
         .await

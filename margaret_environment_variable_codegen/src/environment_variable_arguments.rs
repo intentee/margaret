@@ -60,7 +60,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_declared_name() {
+    fn reads_the_name_given_by_from_as_the_environment_variable_to_read() {
         assert_eq!(
             describe(&parse_quote!(#[environment_variable(from = "DATABASE_URL")])),
             "DATABASE_URL"
@@ -68,7 +68,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_bare_attribute() {
+    fn rejects_a_bare_attribute_because_every_environment_variable_must_be_named() {
         assert!(
             describe(&parse_quote!(#[environment_variable]))
                 .contains("an environment variable is always named by the variable it reads")
@@ -76,7 +76,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_malformed_name() {
+    fn rejects_a_dashed_name_because_it_is_not_a_usable_environment_variable_name() {
         assert!(
             describe(&parse_quote!(#[environment_variable(from = "DATABASE-URL")]))
                 .contains("'DATABASE-URL', which is not a usable environment variable name")
@@ -92,7 +92,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_unrecognized_argument() {
+    fn rejects_an_argument_beside_from_since_from_is_the_only_one_it_takes() {
         assert!(
             describe(&parse_quote!(#[environment_variable(from = "DATABASE_URL", positional)]))
                 .contains("failed to read the attribute arguments")

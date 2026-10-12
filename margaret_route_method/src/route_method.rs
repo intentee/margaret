@@ -34,7 +34,7 @@ mod tests {
     use super::RouteMethod;
 
     #[test]
-    fn classifies_every_routable_request_method() {
+    fn classifies_every_routable_request_method_so_each_declared_route_can_be_reached() {
         assert_eq!(RouteMethod::of(&Method::DELETE), Some(RouteMethod::Delete));
         assert_eq!(RouteMethod::of(&Method::GET), Some(RouteMethod::Get));
         assert_eq!(RouteMethod::of(&Method::PATCH), Some(RouteMethod::Patch));

@@ -27,7 +27,7 @@ mod tests {
     use super::ServeInputNaming;
 
     #[test]
-    fn names_the_local_after_its_slot() {
+    fn names_the_serve_input_local_after_its_slot_so_each_input_binding_is_distinct() {
         assert_eq!(
             ServeInputNaming::for_slot_count(4).ident(3).to_string(),
             "serve_input_3"

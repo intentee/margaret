@@ -48,7 +48,7 @@ mod tests {
     use super::DiscoveryFailure;
 
     #[test]
-    fn describes_every_failure() {
+    fn describes_every_discovery_failure_with_its_cause_for_the_key_set_poll_log() {
         let described = [
             DiscoveryFailure::Exchange(IssuerExchangeError::Transport(
                 reqwest::Client::new()

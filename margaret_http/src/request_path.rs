@@ -1,13 +1,14 @@
 use percent_encoding::percent_decode_str;
 
 use margaret_url_path::admit_path_segment::admit_path_segment;
+use margaret_url_path::path_segment::PathSegment;
 use margaret_url_path::path_segment_admission::PathSegmentAdmission;
 use margaret_url_path::path_segment_rejection::PathSegmentRejection;
+use margaret_url_path::path_segments::path_segments;
+use margaret_url_path::path_separator::PATH_SEPARATOR;
 
 use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
-
-const PATH_SEPARATOR: char = '/';
 
 fn has_malformed_percent_escape(segment: &str) -> bool {
     let bytes = segment.as_bytes();
@@ -82,19 +83,16 @@ impl RequestPath {
             return RequestOutcome::Rejected(RequestRejection::RequestTargetNotOriginForm);
         };
         let mut decoded = String::with_capacity(target.len());
-        let mut segments = path.split(PATH_SEPARATOR).peekable();
 
-        while let Some(segment) = segments.next() {
+        for segment in path_segments(path) {
             decoded.push(PATH_SEPARATOR);
 
-            if segment.is_empty() && segments.peek().is_none() {
-                break;
-            }
-
-            match decode_segment(segment) {
-                RequestOutcome::Parsed(decoded_segment) => decoded.push_str(&decoded_segment),
-                RequestOutcome::Rejected(rejection) => {
-                    return RequestOutcome::Rejected(rejection);
+            if let PathSegment::Text(text) = segment {
+                match decode_segment(text) {
+                    RequestOutcome::Parsed(decoded_segment) => decoded.push_str(&decoded_segment),
+                    RequestOutcome::Rejected(rejection) => {
+                        return RequestOutcome::Rejected(rejection);
+                    }
                 }
             }
         }
@@ -145,17 +143,17 @@ mod tests {
     }
 
     #[test]
-    fn keeps_the_root_path() {
+    fn keeps_the_root_path_instead_of_rejecting_its_trailing_separator_as_an_empty_segment() {
         assert_eq!(parsed("/"), "/");
     }
 
     #[test]
-    fn preserves_a_trailing_slash() {
+    fn preserves_a_trailing_slash_instead_of_rejecting_it_as_an_empty_segment() {
         assert_eq!(parsed("/articles/"), "/articles/");
     }
 
     #[test]
-    fn decodes_a_percent_encoded_segment() {
+    fn decodes_a_percent_encoded_segment_so_routes_match_the_text_it_encodes() {
         assert_eq!(parsed("/files/a%20b"), "/files/a b");
     }
 
@@ -170,12 +168,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_empty_interior_segment() {
+    fn rejects_an_empty_interior_segment_rather_than_guessing_if_it_collapses() {
         assert_rejects("/articles//42", &RequestRejection::EmptyPathSegment);
     }
 
     #[test]
-    fn rejects_a_parent_directory_segment() {
+    fn rejects_a_parent_directory_segment_so_no_path_escapes_its_route_prefix() {
         assert_rejects(
             "/articles/../admin",
             &RequestRejection::DotSegmentInPath {
@@ -185,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_current_directory_segment() {
+    fn rejects_a_current_directory_segment_so_one_resource_has_one_path() {
         assert_rejects(
             "/articles/./42",
             &RequestRejection::DotSegmentInPath {
@@ -205,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_percent_encoded_path_separator() {
+    fn rejects_a_percent_encoded_path_separator_so_decoding_never_adds_a_segment() {
         assert_rejects(
             "/articles/a%2Fb",
             &RequestRejection::EncodedPathSeparator {
@@ -215,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_malformed_percent_escape() {
+    fn rejects_a_malformed_percent_escape_rather_than_guessing_its_byte() {
         assert_rejects(
             "/articles/%zz",
             &RequestRejection::MalformedPercentEncoding {
@@ -225,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_truncated_percent_escape() {
+    fn rejects_a_truncated_percent_escape_rather_than_reading_it_literally() {
         assert_rejects(
             "/articles/%4",
             &RequestRejection::MalformedPercentEncoding {

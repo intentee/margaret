@@ -90,7 +90,7 @@ mod tests {
     }
 
     #[test]
-    fn negotiates_a_plain_transport() {
+    fn parses_plain_as_the_plain_transport_for_a_server_not_pinned_to_mtls() {
         assert_eq!(
             chosen(negotiable(), "plain").expect("plain is a transport"),
             TransportChoice::Plain
@@ -98,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    fn negotiates_a_spiffe_mutual_tls_transport() {
+    fn negotiates_spiffe_mtls_for_an_unpinned_server_so_operators_can_opt_into_it() {
         assert_eq!(
             chosen(negotiable(), "spiffe_mtls").expect("spiffe_mtls is a transport"),
             TransportChoice::SpiffeMtls
@@ -124,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn configures_a_plain_transport() {
+    fn configures_a_plain_transport_without_the_spiffe_server_config_so_no_tls_is_served() {
         assert!(
             mutual_tls_server_config(
                 TransportChoice::Plain.config(&TlsFixture::generate().server_config)
@@ -134,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn configures_a_spiffe_mutual_tls_transport() {
+    fn configures_a_spiffe_mtls_transport_sharing_the_given_server_config_not_a_copy() {
         let server_config = TlsFixture::generate().server_config;
 
         assert!(Arc::ptr_eq(

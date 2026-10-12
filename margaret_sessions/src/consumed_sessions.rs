@@ -5,7 +5,6 @@ use chrono::Utc;
 use http::HeaderValue;
 use http::StatusCode;
 use http::header::CONTENT_TYPE;
-use reqwest::Client;
 use reqwest::Method;
 use url::form_urlencoded::Serializer;
 
@@ -33,7 +32,7 @@ use crate::session_verification::SessionVerification;
 
 pub struct ConsumedSessions {
     cookies: SessionCookieJar,
-    issuer_requests: IssuerRequestClient,
+    issuer_requests: Arc<IssuerRequestClient>,
     refresh_url: SessionRefreshUrl,
     trusted_issuer: Arc<TrustedIssuer>,
 }
@@ -44,11 +43,11 @@ impl ConsumedSessions {
         trusted_issuer: Arc<TrustedIssuer>,
         domain: CookieDomain,
         refresh_url: SessionRefreshUrl,
-        spiffe_http_client: Client,
+        issuer_requests: Arc<IssuerRequestClient>,
     ) -> Self {
         Self {
             cookies: SessionCookieJar::SharedWithDomain(domain),
-            issuer_requests: IssuerRequestClient::preconfigured(spiffe_http_client),
+            issuer_requests,
             refresh_url,
             trusted_issuer,
         }

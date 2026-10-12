@@ -15,7 +15,7 @@ mod tests {
     use super::report_failure;
 
     #[test]
-    fn reports_a_failed_outcome() {
+    fn reports_an_error_as_a_failed_outcome_so_the_command_exits_with_failure() {
         assert_eq!(
             report_failure("service registration failed"),
             CommandOutcome::Failed

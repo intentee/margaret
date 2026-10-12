@@ -12,7 +12,7 @@ use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_s
 use margaret_spiffe_svid_tests::leaf_spiffe_example_org_server_der::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
 
 #[test]
-fn delegates_after_verifier_update() {
+fn delegates_verification_to_the_verifier_installed_by_an_update_so_rotated_roots_apply() {
     let facade = SvidServerCertVerifierFacade::default();
     facade.update_internal_verifier(Arc::new(
         SvidServerCertVerifier::new(

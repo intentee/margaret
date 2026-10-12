@@ -70,7 +70,7 @@ mod tests {
     }
 
     #[test]
-    fn verifies_eddsa_as_the_ed25519_scheme() {
+    fn verifies_eddsa_as_the_ed25519_scheme_since_that_is_the_only_okp_curve() {
         assert_eq!(
             SignatureScheme::of(JwsAlgorithm::EdDsa).algorithm(),
             JwsAlgorithm::Ed25519

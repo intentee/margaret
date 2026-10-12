@@ -48,21 +48,21 @@ mod tests {
     use super::wait_for_shutdown;
 
     #[tokio::test]
-    async fn accepts_an_interrupt_signal() {
+    async fn requests_shutdown_on_an_interrupt_signal_so_ctrl_c_stops_the_service() {
         wait_for_shutdown(ready(Some(())), pending())
             .await
             .expect("the interrupt signal requests shutdown");
     }
 
     #[tokio::test]
-    async fn accepts_a_terminate_signal() {
+    async fn requests_shutdown_on_a_terminate_signal_so_a_supervisor_can_stop_the_service() {
         wait_for_shutdown(pending(), ready(Some(())))
             .await
             .expect("the terminate signal requests shutdown");
     }
 
     #[tokio::test]
-    async fn reports_a_closed_signal_stream() {
+    async fn reports_a_closed_signal_stream_since_it_can_no_longer_request_shutdown() {
         let error = wait_for_shutdown(ready(None), pending())
             .await
             .expect_err("a closed stream cannot request shutdown");

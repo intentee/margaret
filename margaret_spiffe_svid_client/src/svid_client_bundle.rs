@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use reqwest::Client;
+use reqwest::ClientBuilder;
 use rustls::ClientConfig;
 use trzcina::Service;
 use trzcina::ServiceBundle;
@@ -59,6 +60,10 @@ impl SvidClientBundle {
     /// Returns `SvidError` propagated from the work it performs.
     pub fn reqwest_client(&self) -> Result<Client, SvidError> {
         self.svid_client_side.reqwest_client()
+    }
+
+    pub fn reqwest_client_builder(&self) -> ClientBuilder {
+        self.svid_client_side.reqwest_client_builder()
     }
 }
 

@@ -15,18 +15,16 @@ use margaret_route_method::content_method::ContentMethod;
 async fn reads_the_body_once_the_middleware_delegates() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/json",
-            vec![MethodHandler::content(
-                ContentMethod::Post,
-                layer(
-                    Arc::new(DelegatingMiddleware),
-                    Arc::new(JsonReadingHandler {
-                        limit: BodyLimit::new(1024),
-                    }),
-                ),
-            )],
-        )],
+        ["/json"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            layer(
+                Arc::new(DelegatingMiddleware),
+                Arc::new(JsonReadingHandler {
+                    limit: BodyLimit::new(1024),
+                }),
+            ),
+        )])],
     )
     .await;
 

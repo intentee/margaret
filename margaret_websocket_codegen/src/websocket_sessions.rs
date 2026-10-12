@@ -8,7 +8,7 @@ use margaret_middleware_codegen::resolve_layers::resolve_layers;
 use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
-use margaret_route_parameter_codegen::route_path::RoutePath;
+use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
 
 use crate::build_for_session_method::build_for_session_method;
 use crate::session_arguments::SessionArguments;
@@ -17,6 +17,7 @@ use crate::web_socket_session::WebSocketSession;
 
 pub(crate) fn websocket_sessions(
     index: &AttributeIndex,
+    route_paths: &mut RoutePathRegistry,
     bindings: &ContainerBindings,
     middleware_plans: &MiddlewarePlans,
     registries: &BindingRegistries,
@@ -34,11 +35,12 @@ pub(crate) fn websocket_sessions(
         let SessionArguments { path, server } = SessionArguments::parse(matched.args()?, &session)?;
         let method = build_for_session_method(item, &session)?;
 
-        let route_path = match RoutePath::parse(&path) {
-            Ok(parsed) => parsed,
+        let route_path = match route_paths.admit_web_socket_session_path(&server, &path) {
+            Ok(admitted) => admitted,
             Err(source) => {
-                return Err(WebSocketCodegenError::UnroutableSessionPath {
+                return Err(WebSocketCodegenError::UnadmittedSessionPath {
                     path,
+                    server,
                     session,
                     source,
                 });

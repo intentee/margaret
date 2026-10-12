@@ -37,7 +37,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn returns_both_successful_values() {
+    async fn keeps_each_bound_model_in_its_own_position_so_parameters_never_swap() {
         let joined =
             join_route_parameter_bindings(async { Ok::<_, &'static str>(1) }, async { Ok(2) })
                 .await

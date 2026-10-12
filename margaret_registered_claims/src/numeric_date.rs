@@ -107,7 +107,7 @@ mod tests {
     }
 
     #[test]
-    fn displays_the_seconds_since_the_epoch() {
+    fn displays_the_seconds_since_the_epoch_so_rejections_quote_the_claim_value() {
         assert_eq!(NumericDate::new(1_700_000_000).to_string(), "1700000000");
     }
 }

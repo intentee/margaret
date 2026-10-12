@@ -631,7 +631,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_confidential_client() {
+    fn reads_every_privilege_a_confidential_client_declares_so_the_issuer_enforces_each_one() {
         read(
             &format!(
                 "{PRIVATE_KEY_JWT}, {AUTHORIZATION_CODE}, client_id = \"portal\", resources = [artifacts, reports], token_exchange(scopes = [DeployScope])"
@@ -678,7 +678,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_public_client_without_grants() {
+    fn reads_a_bare_public_client_as_withholding_every_grant_so_grants_are_opt_in() {
         read(
             "authentication = ClientAuthenticationMethod::None, client_id = \"spa\", resources = [artifacts]",
             |read| {
@@ -745,7 +745,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_client_without_authentication() {
+    fn rejects_a_client_without_authentication_so_its_method_is_never_defaulted() {
         assert!(matches!(
             rejection(
                 "client_id = \"spa\", resources = [artifacts]"
@@ -778,7 +778,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_privileges_of_a_public_client() {
+    fn rejects_introspection_for_a_public_client_since_it_cannot_authenticate() {
         assert!(matches!(
             rejection(
                 "authentication = ClientAuthenticationMethod::None(introspection), client_id = \"spa\", resources = [artifacts]"
@@ -800,7 +800,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_keys_outside_the_vocabulary() {
+    fn rejects_unknown_client_keys_naming_them_rather_than_guessing_a_verifier() {
         assert!(matches!(
             rejection(
                 "authentication = ClientAuthenticationMethod::PrivateKeyJwt(keys = ClientKeys::Shared), client_id = \"portal\", resources = [artifacts]"
@@ -904,7 +904,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_client_without_its_tag() {
+    fn rejects_a_client_without_its_tag_since_other_declarations_bind_to_it_by_tag() {
         assert!(matches!(
             declaration_rejection("authentication = ClientAuthenticationMethod::None, client_id = \"spa\", resources = [artifacts]"),
             AcceptedClientsCodegenError::MissingTag { anchor } if anchor == ANCHOR
@@ -1000,7 +1000,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_client_credentials_without_their_scopes() {
+    fn rejects_client_credentials_without_scopes_so_their_reach_is_always_explicit() {
         assert!(matches!(
             rejection(
                 "authentication = ClientAuthenticationMethod::PrivateKeyJwt(client_credentials(), keys = ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = JwsAlgorithm::Es256)), client_id = \"portal\", resources = [artifacts]"
@@ -1043,7 +1043,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_consent_outside_the_grammar() {
+    fn rejects_an_unknown_consent_policy_naming_it_rather_than_guessing_one() {
         assert!(matches!(
             rejection(
                 "authentication = ClientAuthenticationMethod::None, authorization_code(consent = ConsentPolicy::Never, id_token_signing = IdTokenSigning::Rsa, redirect_uris = [\"https://spa.example/callback\"], scopes = []), client_id = \"spa\", resources = [artifacts]"
@@ -1120,7 +1120,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_redirect_route_declared_twice() {
+    fn rejects_a_redirect_route_listed_twice_under_different_paths_as_ambiguous() {
         assert_eq!(
             rejection(&code_grant_redirecting(
                 "redirect_routes = [Callback, routes::Callback]"
@@ -1163,7 +1163,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_insecure_redirect_uri() {
+    fn rejects_an_insecure_redirect_uri_so_codes_never_travel_unencrypted() {
         assert!(matches!(
             rejection(
                 "authentication = ClientAuthenticationMethod::None, authorization_code(consent = ConsentPolicy::Implicit, id_token_signing = IdTokenSigning::EllipticCurve, redirect_uris = [\"http://spa.example/callback\"], scopes = []), client_id = \"spa\", resources = [artifacts]"
@@ -1261,7 +1261,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_client_without_resources() {
+    fn rejects_a_client_without_resources_so_its_token_audiences_are_explicit() {
         assert!(matches!(
             rejection(
                 "authentication = ClientAuthenticationMethod::None, client_id = \"spa\""
@@ -1282,7 +1282,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_empty_list_of_resources() {
+    fn rejects_an_empty_list_of_resources_since_every_token_grant_would_lack_a_target() {
         assert!(matches!(
             rejection(
                 "authentication = ClientAuthenticationMethod::None, client_id = \"spa\", resources = []"
@@ -1315,7 +1315,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_resource_named_twice() {
+    fn rejects_a_resource_named_twice_rather_than_silently_collapsing_the_duplicate() {
         assert!(matches!(
             rejection(
                 "authentication = ClientAuthenticationMethod::None, client_id = \"spa\", resources = [artifacts, artifacts]"
@@ -1326,7 +1326,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_unparseable_client_arguments() {
+    fn reports_unparseable_client_arguments_naming_the_attribute_so_the_author_can_locate_them() {
         assert!(matches!(
             rejection(
                 "= 5"

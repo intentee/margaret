@@ -43,7 +43,7 @@ mod tests {
     use crate::key_usage_rejection::KeyUsageRejection;
 
     #[test]
-    fn describes_every_reason() {
+    fn describes_every_ignored_key_reason_so_the_ignored_key_log_says_why_it_was_skipped() {
         let described = [
             IgnoredKeyReason::Algorithm(KeyAlgorithmRejection::UnsupportedAlgorithm {
                 alg: "PS256".to_string(),

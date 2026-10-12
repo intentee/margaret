@@ -11,7 +11,7 @@ use margaret_spiffe_svid_client::svid_server_cert_verifier_facade::SvidServerCer
 use margaret_spiffe_svid_client_tests::recording_service::RecordingService;
 
 #[tokio::test]
-async fn skips_the_inner_service_when_cancelled() {
+async fn skips_the_inner_service_when_cancelled_so_shutdown_never_waits_for_readiness() {
     let ran = Arc::new(AtomicBool::new(false));
     let gated = Box::new(ReadinessGatedService::new(
         SvidClientReadiness::new(SvidServerCertVerifierFacade::default().subscribe()),

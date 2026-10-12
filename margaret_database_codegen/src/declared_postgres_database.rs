@@ -186,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_unknown_argument() {
+    fn rejects_an_unrecognized_argument_instead_of_silently_ignoring_it() {
         read(
             "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\", pool = 4)]\npub struct BlogDatabase;\n",
             |read| {
@@ -201,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_arguments_that_do_not_parse() {
+    fn rejects_unparseable_arguments_naming_the_attribute_so_the_author_can_find_them() {
         read(
             "#[postgres_database(= 5)]\npub struct BlogDatabase;\n",
             |read| {
@@ -216,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_declaration_on_a_singleton() {
+    fn rejects_a_database_declared_on_a_singleton_since_it_needs_a_plain_struct() {
         read(
             "#[singleton]\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n",
             |read| {
@@ -231,7 +231,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_two_databases() {
+    fn rejects_a_second_postgres_database_because_injection_could_not_tell_which_one_is_meant() {
         read(
             "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n\n#[postgres_database(url_from = \"AUDIT_DATABASE_URL\", max_connections_from = \"AUDIT_DATABASE_MAX_CONNECTIONS\")]\npub struct AuditDatabase;\n",
             |read| {

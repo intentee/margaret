@@ -111,19 +111,23 @@ impl<'collected> PrimaryKeyColumns<'collected> {
         {
             match source {
                 PrimaryKeySource::Column(column) => columns.push(column.clone()),
-                PrimaryKeySource::Key { target } => {
+                PrimaryKeySource::Key {
+                    column_base,
+                    target,
+                } => {
                     let nested = self.model(target, &collected_path, key_field)?;
 
                     for KeyColumn { column_type, name } in self.of(nested, visiting)? {
                         columns.push(KeyColumn {
                             column_type,
-                            name: schema_identifier(&[key_field.as_str(), name.as_str()]).map_err(
-                                |source| ModelCodegenError::ForeignKeyColumnNameTooLong {
-                                    field: key_field.clone(),
-                                    model: collected_path.clone(),
-                                    source,
-                                },
-                            )?,
+                            name: schema_identifier(&[column_base.as_str(), name.as_str()])
+                                .map_err(|source| {
+                                    ModelCodegenError::ForeignKeyColumnNameTooLong {
+                                        field: key_field.clone(),
+                                        model: collected_path.clone(),
+                                        source,
+                                    }
+                                })?,
                         });
                     }
                 }

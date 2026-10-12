@@ -3,7 +3,7 @@ use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use http::Method;
-use matchit::MatchError;
+use matchit::Params;
 
 use margaret_route_method::route_method::RouteMethod;
 
@@ -12,6 +12,7 @@ use crate::method_handler::MethodHandler;
 use crate::request_route::RequestRoute;
 use crate::route_entry::RouteEntry;
 use crate::route_handler::RouteHandler;
+use crate::route_position::RoutePosition;
 use crate::route_resolution::RouteResolution;
 use crate::routed_handler::RoutedHandler;
 use crate::router_error::RouterError;
@@ -44,56 +45,60 @@ enum RouteTarget {
     },
 }
 
+struct MatchedTarget<'router, 'path> {
+    params: Params<'router, 'path>,
+    target: &'router RouteTarget,
+}
+
 pub struct Router {
-    matcher: matchit::Router<RouteTarget>,
+    matcher: Arc<matchit::Router<RoutePosition>>,
+    targets: Vec<RouteTarget>,
 }
 
 impl Router {
-    /// # Errors
-    ///
-    /// Returns `RouterError::Path` when two entries claim the same path, and
-    /// `RouterError::DuplicateMethod` when one path answers a method twice.
-    pub fn build(entries: Vec<RouteEntry>) -> Result<Self, RouterError> {
-        let mut matcher: matchit::Router<RouteTarget> = matchit::Router::new();
+    pub(crate) fn build<const COUNT: usize>(
+        matcher: Arc<matchit::Router<RoutePosition>>,
+        paths: [&'static str; COUNT],
+        entries: [RouteEntry; COUNT],
+    ) -> Result<Self, RouterError> {
+        let mut targets = Vec::with_capacity(COUNT);
 
-        for entry in entries {
-            match entry {
-                RouteEntry::Http { handlers, path } => {
-                    matcher.insert(path, RouteTarget::Http(method_handlers(path, handlers)?))?;
+        for (path, entry) in paths.into_iter().zip(entries) {
+            targets.push(match entry {
+                RouteEntry::Http { handlers } => {
+                    RouteTarget::Http(method_handlers(path, handlers)?)
                 }
                 RouteEntry::WebSocket {
                     middleware,
-                    path,
                     upgrade,
-                } => {
-                    matcher.insert(
-                        path,
-                        RouteTarget::WebSocket {
-                            middleware,
-                            upgrade,
-                        },
-                    )?;
-                }
-            }
+                } => RouteTarget::WebSocket {
+                    middleware,
+                    upgrade,
+                },
+            });
         }
 
-        Ok(Self { matcher })
+        Ok(Self { matcher, targets })
     }
 
     pub(crate) fn resolve(&self, method: &Method, path: &str) -> RouteResolution {
-        let matched = match self.matcher.at(path) {
-            Ok(matched) => matched,
-            Err(MatchError::NotFound) => {
-                return RouteResolution::Request(RequestRoute::NotFound);
-            }
+        let matched = self.matcher.at(path).ok().and_then(|matched| {
+            self.targets
+                .get(matched.value.index())
+                .map(|target| MatchedTarget {
+                    params: matched.params,
+                    target,
+                })
+        });
+        let Some(MatchedTarget { params, target }) = matched else {
+            return RouteResolution::Request(RequestRoute::NotFound);
         };
-        let path_params = matched
-            .params
+        let path_params = params
             .iter()
             .map(|(name, value)| (name.to_string(), value.to_string()))
             .collect();
 
-        match matched.value {
+        match target {
             RouteTarget::Http(handlers) => {
                 match RouteMethod::of(method).and_then(|route_method| handlers.get(&route_method)) {
                     Some(handler) => RouteResolution::Request(RequestRoute::Handler {

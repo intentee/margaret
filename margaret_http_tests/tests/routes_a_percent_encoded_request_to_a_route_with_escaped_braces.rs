@@ -11,17 +11,15 @@ use margaret_http_uploaded_file::upload_config::UploadConfig;
 async fn routes_a_percent_encoded_request_to_a_route_with_escaped_braces() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/oauth/{{token}}",
-            vec![MethodHandler::forwardable(
-                "escaped",
-                Arc::new(StaticHandler {
-                    body: b"escaped".to_vec(),
-                    content_type: "text/plain",
-                    status: 222,
-                }),
-            )],
-        )],
+        ["/oauth/{{token}}"],
+        [RouteEntry::new(vec![MethodHandler::forwardable(
+            "escaped",
+            Arc::new(StaticHandler {
+                body: b"escaped".to_vec(),
+                content_type: "text/plain",
+                status: 222,
+            }),
+        )])],
     )
     .await;
 

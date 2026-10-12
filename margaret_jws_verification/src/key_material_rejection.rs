@@ -90,7 +90,7 @@ mod tests {
     }
 
     #[test]
-    fn describes_every_rejection() {
+    fn describes_every_key_material_rejection_so_an_ignored_key_names_its_material_fault() {
         let key_rejected = || {
             ParsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, b"not der")
                 .expect_err("not an rsa key")

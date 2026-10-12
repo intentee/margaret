@@ -1,0 +1,21 @@
+use std::path::Path;
+
+use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
+use margaret_attributes::attribute_error::AttributeError;
+use margaret_container::container_error::ContainerError;
+use margaret_container_tests::generate_container_source::generate_container_source;
+
+#[test]
+fn surfaces_unparseable_singleton_arguments_instead_of_generating_a_container() {
+    let directory =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/malformed_singleton_args");
+    let error = generate_container_source("malformed_singleton_args", &directory)
+        .expect_err("malformed #[singleton] arguments must surface through container generation");
+
+    assert!(matches!(
+        error,
+        ContainerError::Index {
+            source: AttributeError::Arguments(AttributeArgumentsError::Malformed { .. })
+        }
+    ));
+}

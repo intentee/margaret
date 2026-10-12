@@ -12,16 +12,14 @@ use margaret_http_uploaded_file::upload_config::UploadConfig;
 async fn answers_a_forward_to_an_unregistered_name_with_a_server_error() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/origin",
-            vec![MethodHandler::forwardable(
-                "origin",
-                Arc::new(ForwardingHandler {
-                    path_params: HashMap::new(),
-                    target: "unknown",
-                }),
-            )],
-        )],
+        ["/origin"],
+        [RouteEntry::new(vec![MethodHandler::forwardable(
+            "origin",
+            Arc::new(ForwardingHandler {
+                path_params: HashMap::new(),
+                target: "unknown",
+            }),
+        )])],
     )
     .await;
 

@@ -7,7 +7,8 @@ use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 async fn forbids_a_peer_without_a_spiffe_id() {
     let fixture = MtlsFixture::default();
     let server =
-        RunningFixtureServer::start(fixture.server_config.clone(), vec![echo_peer_route()]).await;
+        RunningFixtureServer::start(fixture.server_config.clone(), ["/"], [echo_peer_route()])
+            .await;
 
     let response = mtls_client_request(
         fixture.client_config_without_spiffe_id.clone(),

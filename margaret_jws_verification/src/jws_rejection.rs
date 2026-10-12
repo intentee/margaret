@@ -129,7 +129,7 @@ mod tests {
     }
 
     #[test]
-    fn describes_every_rejection() {
+    fn describes_every_jws_rejection_so_a_refused_token_reports_why_it_failed_verification() {
         let described = [
             JwsRejection::AlgorithmMismatch {
                 key: JwsAlgorithm::Es256,

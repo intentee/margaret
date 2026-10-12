@@ -106,7 +106,7 @@ mod tests {
     }
 
     #[test]
-    fn writes_the_wire_name() {
+    fn serializes_an_algorithm_as_its_registered_wire_name_so_other_jose_parties_read_it() {
         assert_eq!(
             serde_json::to_string(&JwsAlgorithm::Es384).expect("the algorithm serializes"),
             "\"ES384\""
@@ -124,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn displays_the_wire_name() {
+    fn displays_an_algorithm_by_its_registered_wire_name_as_written_in_tokens() {
         assert_eq!(JwsAlgorithm::EdDsa.to_string(), "EdDSA");
     }
 }

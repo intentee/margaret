@@ -55,7 +55,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_declared_claims_provider() {
+    fn reads_the_declared_claims_provider_so_userinfo_answers_with_its_claims() {
         assert!(matches!(
             read("#[singleton]\n#[provides_userinfo_claims]\npub struct ProfileClaims;\n"),
             Ok(DeclaredUserinfoClaims::Declared(path)) if path.to_string() == "crate::ProfileClaims"
@@ -71,7 +71,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_two_claims_providers() {
+    fn rejects_two_claims_providers_since_the_userinfo_endpoint_answers_with_exactly_one() {
         assert!(matches!(
             read("#[singleton]\n#[provides_userinfo_claims]\npub struct ProfileClaims;\n#[singleton]\n#[provides_userinfo_claims]\npub struct EmailClaims;\n"),
             Err(OidcProviderCodegenError::AmbiguousUserinfoClaimsProvider { first, second })
@@ -90,7 +90,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_arguments_that_do_not_parse() {
+    fn rejects_arguments_that_do_not_parse_naming_the_attribute_so_it_can_be_located() {
         assert!(matches!(
             read("#[singleton]\n#[provides_userinfo_claims(= 5)]\npub struct ProfileClaims;\n"),
             Err(OidcProviderCodegenError::Index(AttributeError::Arguments(

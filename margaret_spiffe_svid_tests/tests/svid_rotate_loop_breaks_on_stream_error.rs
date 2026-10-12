@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use margaret_spiffe_svid::svid_rotate_loop::svid_rotate_loop;
 
 #[tokio::test]
-async fn breaks_on_stream_error() {
+async fn returns_on_a_stream_error_instead_of_waiting_on_a_failed_spire_stream() {
     let (x509_context_tx, _x509_context_rx) = broadcast::channel::<X509Context>(1);
 
     let completion = timeout(

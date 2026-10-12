@@ -1,4 +1,3 @@
-use matchit::InsertError;
 use thiserror::Error;
 
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
@@ -70,59 +69,15 @@ pub enum HttpCodegenError {
     #[error("responder '{responder}' is missing the 'path' argument")]
     MissingHttpPath { responder: String },
 
-    #[error("responder '{responder}' has a malformed route path '{path}': {source}")]
-    InvalidRoutePath {
-        responder: String,
-        path: String,
-        #[source]
-        source: InsertError,
-    },
-
     #[error(
-        "responder '{responder}' declares the route path '{path}', which no request can reach: {source}"
+        "responder '{responder}' cannot serve the route path '{path}' on server '{server}': {source}"
     )]
-    UnroutableRoutePath {
-        responder: String,
+    UnadmittedRoutePath {
         path: String,
+        responder: String,
+        server: String,
         #[source]
         source: RoutePathError,
-    },
-
-    #[error(
-        "responder '{responder}' registers route path '{path}' on server '{server}', which conflicts with the already registered route path '{conflicting_path}'"
-    )]
-    ConflictingRoutePaths {
-        conflicting_path: String,
-        path: String,
-        responder: String,
-        server: String,
-    },
-
-    #[error(
-        "websocket session '{session}' serves '{path}' on server '{server}', which conflicts with the already registered route path '{conflicting_path}'"
-    )]
-    ConflictingWebSocketPath {
-        conflicting_path: String,
-        path: String,
-        server: String,
-        session: String,
-    },
-
-    #[error("websocket session '{session}' has a malformed path '{path}': {source}")]
-    InvalidWebSocketPath {
-        path: String,
-        session: String,
-        #[source]
-        source: InsertError,
-    },
-
-    #[error(
-        "websocket session '{session}' serves '{path}' on server '{server}', where a responder already serves that path"
-    )]
-    WebSocketPathOfResponder {
-        path: String,
-        server: String,
-        session: String,
     },
 
     #[error(

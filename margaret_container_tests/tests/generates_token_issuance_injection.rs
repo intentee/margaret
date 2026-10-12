@@ -51,7 +51,7 @@ fn render(fixture: &str) -> Result<RenderedContainer, ContainerError> {
 }
 
 #[test]
-fn passes_the_declared_token_issuance_constant() {
+fn passes_the_declared_token_issuance_constant_so_its_one_declaration_is_reused() {
     let source: String = container_module_source(
         render("token_issuance")
             .expect("the issuance fixture renders")

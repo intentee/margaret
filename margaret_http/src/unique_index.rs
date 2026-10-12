@@ -42,7 +42,7 @@ mod tests {
     }
 
     #[test]
-    fn indexes_distinct_names() {
+    fn indexes_every_value_by_its_name_when_all_names_are_distinct_so_each_is_found_by_name() {
         assert!(matches!(
             UniqueIndex::of(vec![named("a", 1), named("b", 2)]),
             UniqueIndex::Indexed(indexed) if indexed.get("b") == Some(&2)
@@ -50,7 +50,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_the_first_repeated_name() {
+    fn reports_the_first_repeated_name_so_no_later_value_silently_overrides_it() {
         assert!(matches!(
             UniqueIndex::of(vec![named("a", 1), named("b", 2), named("a", 3)]),
             UniqueIndex::Duplicated { name } if name == "a"

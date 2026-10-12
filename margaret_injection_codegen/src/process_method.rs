@@ -39,7 +39,7 @@ mod tests {
     use super::process_method;
 
     #[test]
-    fn returns_the_single_process_method() {
+    fn returns_the_single_process_method_so_the_responder_has_one_entry_point() {
         let indexed = IndexedSource::new(
             r"
 #[singleton]
@@ -58,7 +58,7 @@ impl One {
     }
 
     #[test]
-    fn reports_a_missing_process_method() {
+    fn reports_a_missing_process_method_since_a_responder_needs_an_entry_point() {
         let indexed = IndexedSource::new(
             r"
 #[singleton]
@@ -79,7 +79,7 @@ impl Bare {
     }
 
     #[test]
-    fn reports_an_ambiguous_process_method() {
+    fn reports_an_ambiguous_process_method_instead_of_picking_one_of_them() {
         let indexed = IndexedSource::new(
             r"
 #[singleton]

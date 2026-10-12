@@ -4,5 +4,8 @@ use crate::key_column::KeyColumn;
 
 pub(crate) enum PrimaryKeySource {
     Column(KeyColumn),
-    Key { target: CanonicalPath },
+    Key {
+        column_base: String,
+        target: CanonicalPath,
+    },
 }

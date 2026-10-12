@@ -57,7 +57,7 @@ mod tests {
     }
 
     #[test]
-    fn displays_an_unsupported_type_as_written() {
+    fn displays_an_unsupported_type_as_written_so_rejections_show_what_was_sent() {
         assert_eq!(
             HeaderType::Unsupported("dpop+jwt".to_string()).to_string(),
             "dpop+jwt"

@@ -9,7 +9,7 @@ use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_s
 use margaret_spiffe_svid_tests::leaf_spiffe_example_org_client_der::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
 
 #[test]
-fn tls13_signature_delegates_after_verifier_update() {
+fn delegates_tls13_signatures_to_webpki_so_a_forged_signature_fails() {
     let verifier = SvidClientCertVerifier::new(
         build_root_cert_store_with_ca(),
         "example.org",

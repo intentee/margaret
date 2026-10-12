@@ -85,7 +85,7 @@ mod tests {
     }
 
     #[test]
-    fn describes_every_rejection() {
+    fn describes_every_certificate_rejection_so_an_ignored_key_reports_its_certificate_fault() {
         let not_a_certificate = CertificateDer::from(vec![0_u8]);
         let described = [
             CertificateRejection::CertificateBase64 {

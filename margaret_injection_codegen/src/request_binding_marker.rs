@@ -27,7 +27,7 @@ mod tests {
     use super::request_binding_marker;
 
     #[test]
-    fn finds_the_authenticated_user_marker() {
+    fn finds_the_authenticated_user_marker_so_runners_without_a_request_reject_it() {
         let attributes = vec![IndexedAttribute::new(&parse_quote!(#[authenticated_user]))];
 
         assert_eq!(
@@ -37,7 +37,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_the_form_request_marker() {
+    fn finds_the_form_request_marker_so_runners_without_a_request_reject_it() {
         let attributes = vec![IndexedAttribute::new(
             &parse_quote!(#[form_request(from = RequestInput::Query)]),
         )];
@@ -49,7 +49,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_the_bearer_token_marker() {
+    fn finds_the_bearer_token_marker_so_runners_without_a_request_reject_it() {
         let attributes = vec![IndexedAttribute::new(
             &parse_quote!(#[bearer_token(issuer = partner)]),
         )];
@@ -61,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_the_route_parameter_marker() {
+    fn finds_the_route_parameter_marker_so_runners_without_a_request_reject_it() {
         let attributes = vec![IndexedAttribute::new(
             &parse_quote!(#[route_parameter(from = "id")]),
         )];

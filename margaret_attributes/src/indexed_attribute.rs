@@ -124,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn distinguishes_bare_attributes_from_argument_lists() {
+    fn distinguishes_a_bare_attribute_from_an_empty_list_so_markers_can_forbid_parens() {
         let bare = IndexedAttribute::new(&parse_quote!(#[tag]));
         let listed = IndexedAttribute::new(&parse_quote!(#[tag()]));
 

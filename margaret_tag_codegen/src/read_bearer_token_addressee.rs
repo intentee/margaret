@@ -86,7 +86,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_resource_the_token_addresses() {
+    fn reads_the_resource_whose_own_issued_tokens_the_site_accepts() {
         assert!(matches!(
             read(&parse_quote!(#[bearer_token(resource = attachments)])),
             Ok(BearerTokenAddressee::Resource(tag)) if tag.to_string() == "attachments"
@@ -94,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_token_without_an_addressee() {
+    fn rejects_a_token_without_an_addressee_since_nothing_says_who_verifies_it() {
         assert!(matches!(
             read(&parse_quote!(#[bearer_token])),
             Err(message) if message == "the site must be exactly one of `client = <tag>`, `issuer = <tag>` or `resource = <tag>`"
@@ -102,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_token_with_two_addressees() {
+    fn rejects_a_token_with_two_addressees_since_its_verifier_would_be_ambiguous() {
         assert!(matches!(
             read(&parse_quote!(#[bearer_token(issuer = partner, resource = attachments)])),
             Err(message) if message == "the site must be exactly one of `client = <tag>`, `issuer = <tag>` or `resource = <tag>`"
@@ -123,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_unrecognized_argument() {
+    fn rejects_an_unrecognized_bearer_token_argument_instead_of_silently_ignoring_it() {
         assert!(matches!(
             read(&parse_quote!(#[bearer_token(issuer = partner, audience = ci)])),
             Err(message) if message == "failed to read the attribute arguments: attribute 'bearer_token' has an unrecognized argument 'audience'"
@@ -131,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_addressees_that_are_not_paths() {
+    fn rejects_quoted_addressees_since_tags_are_written_as_plain_paths() {
         assert_eq!(
             [
                 read(&parse_quote!(#[bearer_token(client = "blog")])),

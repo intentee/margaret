@@ -46,7 +46,7 @@ mod tests {
     use crate::id_token_members::ID_TOKEN_MEMBERS;
 
     #[test]
-    fn issues_exactly_the_members_it_advertises() {
+    fn issues_exactly_the_members_discovery_advertises_so_claims_supported_is_accurate() {
         let payload = IdTokenClaims {
             auth_time: NumericDate::new(100),
             client_id: "portal",

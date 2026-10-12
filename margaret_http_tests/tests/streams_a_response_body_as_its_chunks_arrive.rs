@@ -48,13 +48,11 @@ async fn streams_a_response_body_as_its_chunks_arrive() {
     let gate = CancellationToken::new();
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/download",
-            vec![MethodHandler::head(
-                RouteMethod::Get,
-                Arc::new(GatedDownload { gate: gate.clone() }),
-            )],
-        )],
+        ["/download"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
+            Arc::new(GatedDownload { gate: gate.clone() }),
+        )])],
     )
     .await;
     let mut exchange = StreamedExchange::start(

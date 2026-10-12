@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use crate::method_handler::MethodHandler;
 use crate::named_handler::NamedHandler;
 use crate::route_entry::RouteEntry;
+use crate::route_position::RoutePosition;
 use crate::router::Router;
 use crate::router_error::RouterError;
 
@@ -8,7 +11,7 @@ fn named_handlers(entries: &[RouteEntry]) -> Vec<NamedHandler> {
     entries
         .iter()
         .filter_map(|entry| match entry {
-            RouteEntry::Http { handlers, .. } => Some(handlers),
+            RouteEntry::Http { handlers } => Some(handlers),
             RouteEntry::WebSocket { .. } => None,
         })
         .flatten()
@@ -22,15 +25,16 @@ pub struct ServerRoutes {
 }
 
 impl ServerRoutes {
-    /// # Errors
-    ///
-    /// Returns `RouterError` when the entries do not build a router.
-    pub fn build(entries: Vec<RouteEntry>) -> Result<Self, RouterError> {
+    pub(crate) fn build<const COUNT: usize>(
+        matcher: Arc<matchit::Router<RoutePosition>>,
+        paths: [&'static str; COUNT],
+        entries: [RouteEntry; COUNT],
+    ) -> Result<Self, RouterError> {
         let named_handlers = named_handlers(&entries);
 
         Ok(Self {
             named_handlers,
-            router: Router::build(entries)?,
+            router: Router::build(matcher, paths, entries)?,
         })
     }
 }

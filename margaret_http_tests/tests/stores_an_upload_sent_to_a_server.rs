@@ -16,15 +16,13 @@ async fn stores_an_upload_sent_to_a_server() {
     let directory = tempdir().expect("a temporary directory");
     let server = RunningFixtureServer::start_plain(
         UploadConfig::enabled(directory.path().to_path_buf()),
-        vec![RouteEntry::new(
-            "/upload",
-            vec![MethodHandler::content(
-                ContentMethod::Post,
-                Arc::new(UploadedFilesReadingHandler {
-                    limit: BodyLimit::new(1024),
-                }),
-            )],
-        )],
+        ["/upload"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            Arc::new(UploadedFilesReadingHandler {
+                limit: BodyLimit::new(1024),
+            }),
+        )])],
     )
     .await;
 

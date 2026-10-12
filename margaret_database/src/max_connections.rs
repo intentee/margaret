@@ -23,7 +23,7 @@ mod tests {
     use super::MaxConnections;
 
     #[test]
-    fn reads_a_positive_number_of_connections() {
+    fn reads_a_positive_number_of_connections_as_the_size_the_pool_may_grow_to() {
         assert_eq!(
             "3".parse::<MaxConnections>()
                 .expect("three connections are a pool size")
@@ -34,7 +34,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_pool_without_connections() {
+    fn rejects_a_pool_without_connections_since_it_could_never_serve_a_query() {
         assert_eq!(
             "0".parse::<MaxConnections>()
                 .expect_err("a pool needs a connection")

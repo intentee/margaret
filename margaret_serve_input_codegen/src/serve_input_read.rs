@@ -3,6 +3,7 @@ use quote::quote;
 
 use margaret_codegen_tokens::routes_ident::routes_ident;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
+use margaret_codegen_tokens::spiffe_issuer_request_client_ident::spiffe_issuer_request_client_ident;
 use margaret_console_argument_codegen::console_argument_read::console_argument_read;
 use margaret_environment_variable_codegen::environment_variable_read::environment_variable_read;
 
@@ -24,6 +25,11 @@ pub fn serve_input_read(input: &ServeInput) -> TokenStream {
             let spiffe_http_client = spiffe_http_client_ident();
 
             quote! { #spiffe_http_client.clone() }
+        }
+        ServeInput::SpiffeIssuerRequestClient => {
+            let spiffe_issuer_request_client = spiffe_issuer_request_client_ident();
+
+            quote! { ::std::sync::Arc::clone(&#spiffe_issuer_request_client) }
         }
     }
 }
@@ -94,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn the_routes_share_the_serve_local() {
+    fn the_routes_share_the_serve_local_through_an_arc_so_they_are_built_once() {
         assert_eq!(
             collapsed(&ServeInput::Routes),
             "::std::sync::Arc::clone(&routes)"
@@ -106,6 +112,14 @@ mod tests {
         assert_eq!(
             collapsed(&ServeInput::SpiffeHttpClient),
             "spiffe_http_client.clone()"
+        );
+    }
+
+    #[test]
+    fn a_spiffe_issuer_request_client_shares_the_serve_local_built_once() {
+        assert_eq!(
+            collapsed(&ServeInput::SpiffeIssuerRequestClient),
+            "::std::sync::Arc::clone(&spiffe_issuer_request_client)"
         );
     }
 }

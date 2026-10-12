@@ -42,12 +42,16 @@ impl InstancePorts {
         }
     }
 
+    /// # Panics
+    ///
+    /// Panics when the routes of the cluster cannot be built.
     #[must_use]
     pub fn routes(&self) -> Routes {
         Routes::from_origins(
             &format!("http://{}", self.identity),
             &format!("http://{}", self.public),
         )
+        .expect("the routes of the cluster build")
     }
 
     #[must_use]
@@ -90,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn reserves_distinct_ports_for_every_instance() {
+    fn reserves_distinct_ports_for_every_instance_so_instances_never_collide_on_bind() {
         let first = InstancePorts::reserve();
         let second = InstancePorts::reserve();
 

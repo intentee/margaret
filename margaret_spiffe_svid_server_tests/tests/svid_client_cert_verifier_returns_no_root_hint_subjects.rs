@@ -5,7 +5,7 @@ use margaret_spiffe_svid_server::svid_client_cert_verifier::SvidClientCertVerifi
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 
 #[test]
-fn returns_no_root_hint_subjects() {
+fn advertises_no_root_hint_subjects_so_clients_send_their_svid_unfiltered_by_ca() {
     let verifier = SvidClientCertVerifier::new(
         build_root_cert_store_with_ca(),
         "example.org",

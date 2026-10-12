@@ -162,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn re_exports_only_the_referenced_items() {
+    fn re_exports_only_the_referenced_items_so_the_generated_module_stays_minimal() {
         assert_eq!(
             sources(render_oidc_provider(
                 &[OidcProviderItem::TokenEndpoint],

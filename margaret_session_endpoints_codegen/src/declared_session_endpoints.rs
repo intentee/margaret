@@ -143,6 +143,7 @@ mod tests {
     use margaret_http_codegen::declared_routes::DeclaredRoutes;
     use margaret_http_codegen::http_codegen_error::HttpCodegenError;
     use margaret_route_method::route_method::RouteMethod;
+    use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
     use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
     use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
@@ -165,7 +166,8 @@ mod tests {
             .expect("the resources are read");
         let sessions = DeclaredSessions::read(&indexed.index, &issuance, &resources)
             .expect("the sessions are read");
-        let routes = DeclaredRoutes::read(&indexed.index).expect("the routes are declared");
+        let routes = DeclaredRoutes::read(&indexed.index, &mut RoutePathRegistry::new())
+            .expect("the routes are declared");
 
         inspect(DeclaredSessionEndpoints::read(
             &indexed.index,
@@ -185,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_refresh_endpoint() {
+    fn binds_the_refresh_endpoint_to_the_post_route_declaring_it_so_that_route_serves_refreshes() {
         read(
             &format!("{SESSIONS}{}", served("SessionEndpoint::Refresh")),
             |read| {
@@ -221,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_declaration_without_an_endpoint() {
+    fn rejects_a_declaration_without_an_endpoint_since_its_session_role_is_unknown() {
         assert!(matches!(
             rejection(&format!("{SESSIONS}{}", served(""))),
             SessionEndpointsCodegenError::MissingSessionEndpoint { anchor } if anchor == "crate::PostSessions"
@@ -301,7 +303,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_endpoint_served_twice() {
+    fn rejects_an_endpoint_served_by_two_routes_since_its_url_would_be_ambiguous() {
         assert!(matches!(
             rejection(&format!(
                 "{SESSIONS}{}#[responds_to_http(method = RouteMethod::Post, path = \"/again\", server = \"public\")]\n#[serves_session_endpoint(SessionEndpoint::Refresh)]\nstruct PostAgain;\n",

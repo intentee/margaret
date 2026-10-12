@@ -14,28 +14,23 @@ use margaret_http_uploaded_file::upload_config::UploadConfig;
 async fn sets_the_cookies_a_forward_carries_on_the_target_response() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![
-            RouteEntry::new(
-                "/origin",
-                vec![MethodHandler::forwardable(
-                    "origin",
-                    Arc::new(CookieChangingForwardHandler {
-                        cookie: Cookie::new("visited", "origin"),
-                        target: "target",
-                    }),
-                )],
-            ),
-            RouteEntry::new(
-                "/target",
-                vec![MethodHandler::forwardable(
-                    "target",
-                    Arc::new(StaticHandler {
-                        body: b"target".to_vec(),
-                        content_type: "text/plain",
-                        status: 222,
-                    }),
-                )],
-            ),
+        ["/origin", "/target"],
+        [
+            RouteEntry::new(vec![MethodHandler::forwardable(
+                "origin",
+                Arc::new(CookieChangingForwardHandler {
+                    cookie: Cookie::new("visited", "origin"),
+                    target: "target",
+                }),
+            )]),
+            RouteEntry::new(vec![MethodHandler::forwardable(
+                "target",
+                Arc::new(StaticHandler {
+                    body: b"target".to_vec(),
+                    content_type: "text/plain",
+                    status: 222,
+                }),
+            )]),
         ],
     )
     .await;

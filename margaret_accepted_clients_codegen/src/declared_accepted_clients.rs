@@ -124,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn orders_the_clients_by_their_anchors() {
+    fn orders_the_clients_by_their_anchor_paths_so_generated_code_is_deterministic() {
         let indexed = IndexedSource::new(&format!(
             "{ISSUANCE}#[admits_oauth_client(zeta_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"zeta\", resources = [artifacts])]\npub struct Alpha;\n#[admits_oauth_client(alpha_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"alpha\", resources = [artifacts])]\npub struct Zeta;\n"
         ));
@@ -159,7 +159,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_client_accepted_twice() {
+    fn rejects_a_client_id_accepted_by_two_declarations_so_each_id_means_one_client() {
         assert!(matches!(
             rejection(&format!(
                 "{ISSUANCE}#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"spa\", resources = [artifacts])]\npub struct First;\n#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"spa\", resources = [reports])]\npub struct Second;\n"
@@ -170,7 +170,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_clients_sharing_a_jwks_uri() {
+    fn rejects_clients_sharing_a_jwks_uri_so_neither_can_impersonate_the_other() {
         assert!(matches!(
             rejection(&format!(
                 "{ISSUANCE}#[admits_oauth_client(first_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Published(jwks_uri = \"https://keys.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)), client_id = \"first\", resources = [artifacts])]\npub struct First;\n#[admits_oauth_client(second_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Published(jwks_uri = \"https://KEYS.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)), client_id = \"second\", resources = [artifacts])]\npub struct Second;\n"

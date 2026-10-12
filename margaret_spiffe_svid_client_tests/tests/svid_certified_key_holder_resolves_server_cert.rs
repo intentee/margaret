@@ -16,7 +16,7 @@ use margaret_spiffe_svid_tests::leaf_spiffe_example_org_server_key_der::LEAF_SPI
 use margaret_spiffe_svid_tests::pump_tls_handshake::pump_tls_handshake;
 
 #[tokio::test]
-async fn server_serves_cert_resolved_through_holder() {
+async fn server_serves_cert_resolved_through_holder_so_svid_verifying_clients_accept_it() {
     let cert_chain_der = [LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER, CA_DER].concat();
     let svid =
         X509Svid::parse_from_der(&cert_chain_der, LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER).unwrap();

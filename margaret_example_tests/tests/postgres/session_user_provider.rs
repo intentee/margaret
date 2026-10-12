@@ -44,7 +44,7 @@ async fn finds_no_user_for_a_session_of_an_unknown_subject() {
 }
 
 #[tokio::test]
-async fn finds_no_user_without_a_session() {
+async fn finds_no_user_without_a_session_so_the_visitor_stays_anonymous() {
     assert!(matches!(
         inferred(None).await,
         AuthenticatedUserOutcome::Anonymous

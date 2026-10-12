@@ -50,7 +50,7 @@ mod tests {
     use crate::metadata_endpoint::MetadataEndpoint;
 
     #[test]
-    fn describes_every_rejection() {
+    fn describes_each_rejection_with_the_endpoint_issuer_or_parse_error_that_caused_it() {
         let described = [
             ProviderMetadataRejection::Endpoint {
                 endpoint: MetadataEndpoint::TokenEndpoint,

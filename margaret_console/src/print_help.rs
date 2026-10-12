@@ -16,7 +16,7 @@ mod tests {
     use crate::command_outcome::CommandOutcome;
 
     #[test]
-    fn prints_help_and_reports_failure() {
+    fn prints_help_and_reports_failure_since_no_subcommand_was_chosen() {
         let mut command = Command::new("app").subcommand(Command::new("greet"));
 
         assert_eq!(print_help(&mut command), CommandOutcome::Failed);

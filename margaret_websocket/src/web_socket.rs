@@ -77,7 +77,7 @@ mod tests {
     use crate::request_id::RequestId;
 
     #[tokio::test]
-    async fn reports_a_closed_outbound_channel() {
+    async fn reports_a_closed_outbound_channel_as_a_closed_connection_so_senders_can_stop() {
         let (sender, receiver) = mpsc::channel(1);
         drop(receiver);
         let socket = WebSocket::new(sender);

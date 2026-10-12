@@ -315,7 +315,7 @@ struct Message {
 }
 
 #[test]
-fn attribute_macros_leave_runtime_behavior_untouched() {
+fn attribute_macros_keep_items_as_written_so_annotations_never_alter_runtime() {
     let subject = Subject::create("typed-name".to_string());
 
     assert_eq!(subject.respond("path-id"), "typed-name/path-id");

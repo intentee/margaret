@@ -72,12 +72,12 @@ mod tests {
     }
 
     #[test]
-    fn renders_nothing_without_resources() {
+    fn renders_no_modules_without_declared_resources_so_no_empty_resource_tokens_module_exists() {
         assert!(rendered("pub struct Nothing;\n").is_empty());
     }
 
     #[test]
-    fn renders_the_audience_of_each_resource() {
+    fn renders_each_resource_audience_under_its_tag_so_even_keyword_tags_work() {
         assert_eq!(
             sources(rendered(
                 "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(r#async, audience = \"jobs\")]\npub struct Jobs;\n#[issues_resource_tokens(attachments, audience = \"files\")]\npub struct Attachments;\n"

@@ -46,7 +46,7 @@ mod tests {
     use super::KeyAlgorithmRejection;
 
     #[test]
-    fn describes_every_rejection() {
+    fn describes_every_key_algorithm_rejection_so_an_ignored_key_names_its_algorithm_fault() {
         let described = [
             KeyAlgorithmRejection::AlgorithmMismatch {
                 declared: JwsAlgorithm::Es384,

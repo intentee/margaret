@@ -10,7 +10,7 @@ use margaret_process_tests::signal_process::signal_process;
 use margaret_spiffe_svid_tests::spawn_test_subprocess::spawn_test_subprocess;
 
 #[tokio::test]
-async fn runs_binary_and_kills_on_drop() {
+async fn runs_the_binary_and_kills_it_on_drop_so_no_test_process_outlives_its_test() {
     let sh = PathBuf::from("/bin/sh");
     let args: Vec<&OsStr> = vec![OsStr::new("-c"), OsStr::new("sleep 60")];
 

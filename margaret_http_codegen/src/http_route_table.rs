@@ -7,7 +7,6 @@ use crate::http_route::HttpRoute;
 use crate::named_route::NamedRoute;
 use crate::route_group::RouteGroup;
 use crate::server_route_group::ServerRouteGroup;
-use crate::web_socket_session_route::WebSocketSessionRoute;
 
 pub(crate) struct HttpRouteTable {
     servers: BTreeMap<String, ServerRouteGroup>,
@@ -34,25 +33,16 @@ impl HttpRouteTable {
             .insert(&server, path, method, route)
     }
 
-    pub(crate) fn reserve_web_socket(
-        &mut self,
-        server: &str,
-        route: &WebSocketSessionRoute,
-    ) -> Result<(), HttpCodegenError> {
-        self.servers
-            .entry(server.to_owned())
-            .or_insert_with(ServerRouteGroup::new)
-            .reserve_web_socket(server, route)
-    }
-
     pub(crate) fn named_routes(&self, server: &str) -> Vec<NamedRoute<'_>> {
         let mut named: Vec<NamedRoute<'_>> = self
             .route_groups(server)
-            .flat_map(|group| {
-                group.method_routes().filter_map(|route| {
+            .enumerate()
+            .flat_map(|(position, group)| {
+                group.method_routes().filter_map(move |route| {
                     route.name.as_deref().map(|name| NamedRoute {
                         name,
                         path: group.path(),
+                        position,
                         route,
                     })
                 })

@@ -71,7 +71,7 @@ fn sessions_providers(sessions: &DeclaredSessions) -> Vec<FrameworkProvider> {
                     name: refresh_url_from.clone(),
                     value_type: sessions_type_path("session_refresh_url", "SessionRefreshUrl"),
                 },
-                FrameworkDependency::SpiffeHttpClient,
+                FrameworkDependency::SpiffeIssuerRequestClient,
             ],
             "create",
             FrameworkInjectionRole::Unmarked,

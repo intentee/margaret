@@ -44,7 +44,7 @@ mod tests {
     }
 
     #[test]
-    fn hands_over_the_authenticated_user() {
+    fn meets_the_requirement_with_the_authenticated_user_so_handlers_receive_it() {
         assert!(matches!(
             require_authenticated_user(AuthenticatedUserOutcome::Authenticated("milo")),
             Requirement::Met("milo")
@@ -52,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_anonymous_visitor_as_unauthorized() {
+    fn rejects_an_anonymous_visitor_as_unauthorized_so_protected_pages_stay_private() {
         assert_eq!(
             rejection_status(AuthenticatedUserOutcome::Anonymous),
             Some(401)
@@ -70,7 +70,7 @@ mod tests {
     }
 
     #[test]
-    fn keeps_a_redirecting_interruption_intact() {
+    fn keeps_a_sign_in_redirect_intact_instead_of_replacing_it_with_a_401() {
         assert_eq!(
             rejection_status(AuthenticatedUserOutcome::Interrupted(sign_in_redirect())),
             None

@@ -73,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_row_of_defaults() {
+    fn renders_a_valueless_row_as_default_values_since_empty_parentheses_are_invalid() {
         assert_eq!(
             render_insert(&Insert {
                 conflict: ConflictAction::Raise,
@@ -120,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_guarded_row_of_defaults() {
+    fn renders_a_guarded_valueless_row_as_an_empty_select_so_the_guard_still_applies() {
         assert_eq!(
             render_insert(&Insert {
                 conflict: ConflictAction::Raise,

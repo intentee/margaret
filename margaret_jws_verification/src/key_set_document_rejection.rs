@@ -28,7 +28,7 @@ mod tests {
     use crate::key_id::KeyId;
 
     #[test]
-    fn describes_every_rejection() {
+    fn describes_every_key_set_document_rejection_so_a_failed_poll_names_the_bad_document() {
         let described = [
             KeySetDocumentRejection::DuplicateKeyId(DuplicateKeyId {
                 kid: KeyId::new("twice".to_string()),

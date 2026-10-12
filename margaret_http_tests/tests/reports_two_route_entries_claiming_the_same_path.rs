@@ -1,32 +1,11 @@
-use std::sync::Arc;
-
-use margaret_http::method_handler::MethodHandler;
-use margaret_http::route_entry::RouteEntry;
-use margaret_http::server_routes::ServerRoutes;
-use margaret_http_tests::static_handler::StaticHandler;
-use margaret_route_method::route_method::RouteMethod;
-
-fn not_found() -> Arc<StaticHandler> {
-    Arc::new(StaticHandler {
-        body: Vec::new(),
-        content_type: "text/plain",
-        status: 404,
-    })
-}
+use margaret_http::matchit::InsertError;
+use margaret_http::router_error::RouterError;
+use margaret_http::server_paths::ServerPaths;
 
 #[test]
 fn reports_two_route_entries_claiming_the_same_path() {
-    assert!(
-        ServerRoutes::build(vec![
-            RouteEntry::new(
-                "/items/{id}",
-                vec![MethodHandler::head(RouteMethod::Get, not_found())],
-            ),
-            RouteEntry::new(
-                "/items/{name}",
-                vec![MethodHandler::head(RouteMethod::Get, not_found())],
-            ),
-        ])
-        .is_err()
-    );
+    assert!(matches!(
+        ServerPaths::build(["/items/{id}", "/items/{name}"]),
+        Err(RouterError::Path(InsertError::Conflict { .. }))
+    ));
 }

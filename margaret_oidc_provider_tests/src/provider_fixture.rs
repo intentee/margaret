@@ -98,9 +98,13 @@ impl ProviderFixture {
             public_jwks_handler: published_jwks_handler(&secrets),
             secret_store,
         };
-        let server =
-            RunningFixtureServer::start_at(ip, tls.server_config.clone(), parts.routes(exchangers))
-                .await;
+        let server = RunningFixtureServer::start_at(
+            ip,
+            tls.server_config.clone(),
+            ProviderParts::PATHS,
+            parts.routes(exchangers),
+        )
+        .await;
         let client = fixture_client_builder(&tls.certificate_authority)
             .resolve(&tls.server_name, server.address())
             .build()

@@ -79,7 +79,7 @@ fn user_roots(planned: &PlannedContainer) -> Vec<CanonicalPath> {
 }
 
 #[test]
-fn reports_an_unplanned_served_root() {
+fn reports_an_unplanned_served_root_by_name_rather_than_rendering_a_container() {
     let planned = planned_container();
     let Err(error) = planned.render(&[missing_path()], &[]) else {
         panic!("an unplanned served root must not be rendered");
@@ -89,7 +89,7 @@ fn reports_an_unplanned_served_root() {
 }
 
 #[test]
-fn reports_an_unplanned_builder_root() {
+fn reports_an_unplanned_builder_root_by_name_rather_than_rendering_a_container() {
     let planned = planned_container();
     let roots = planned.roots();
     let Err(error) = planned.render(&roots, &[missing_path()]) else {

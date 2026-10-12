@@ -9,7 +9,7 @@ use margaret_spiffe_svid_tests::build_digitally_signed_struct::build_digitally_s
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 
 #[test]
-fn rejects_tls12_signatures() {
+fn rejects_tls12_signatures_because_svid_connections_only_support_tls13() {
     let verifier = SvidClientCertVerifier::new(
         build_root_cert_store_with_ca(),
         "example.org",

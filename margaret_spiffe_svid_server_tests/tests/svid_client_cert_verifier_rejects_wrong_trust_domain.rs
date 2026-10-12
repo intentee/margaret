@@ -10,7 +10,7 @@ use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_s
 use margaret_spiffe_svid_tests::leaf_spiffe_other_org_server_der::LEAF_SPIFFE_OTHER_ORG_SERVER_DER;
 
 #[test]
-fn rejects_wrong_trust_domain() {
+fn rejects_a_client_svid_of_another_trust_domain_so_foreign_workloads_are_refused() {
     let verifier = SvidClientCertVerifier::new(
         build_root_cert_store_with_ca(),
         "example.org",

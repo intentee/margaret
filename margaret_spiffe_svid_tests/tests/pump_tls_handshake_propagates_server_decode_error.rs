@@ -16,7 +16,7 @@ use margaret_spiffe_svid_tests::leaf_spiffe_example_org_server_key_der::LEAF_SPI
 use margaret_spiffe_svid_tests::pump_tls_handshake::pump_tls_handshake;
 
 #[test]
-fn returns_error_when_server_receives_garbage() {
+fn returns_an_error_when_the_server_receives_garbage_so_bad_handshakes_fail() {
     let server_config = ServerConfig::builder_with_provider(svid_crypto_provider())
         .with_safe_default_protocol_versions()
         .expect("the provider supports the safe default protocol versions")

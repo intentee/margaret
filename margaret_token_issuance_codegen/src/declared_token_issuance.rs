@@ -69,7 +69,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_declared_tag_and_issuer() {
+    fn reads_the_declared_tag_and_issuer_so_tokens_carry_the_configured_iss() {
         read(
             "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n",
             |read| {
@@ -98,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_declaration_without_a_tag() {
+    fn rejects_an_issuance_without_a_tag_since_sessions_and_clients_name_it_by_tag() {
         assert!(matches!(
             rejection("issuer = \"https://issuer.example\""),
             TokenIssuanceCodegenError::MissingTag { anchor } if anchor == "crate::Issuer"
@@ -128,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_declaration_without_an_issuer() {
+    fn rejects_an_issuance_without_an_issuer_since_tokens_must_carry_an_iss() {
         assert!(matches!(
             rejection("provider"),
             TokenIssuanceCodegenError::MissingIssuer { anchor } if anchor == "crate::Issuer"
@@ -146,7 +146,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_issuer_over_plain_http() {
+    fn rejects_an_issuer_over_plain_http_since_oidc_issuers_must_use_https() {
         assert!(matches!(
             rejection("provider, issuer = \"http://issuer.example\""),
             TokenIssuanceCodegenError::MalformedIssuer { anchor, .. } if anchor == "crate::Issuer"
@@ -154,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_unrecognized_argument() {
+    fn rejects_an_unrecognized_lifetime_argument_since_issues_tokens_takes_only_a_tag_and_issuer() {
         assert!(matches!(
             rejection("provider, issuer = \"https://issuer.example\", lifetime = 5"),
             TokenIssuanceCodegenError::AttributeArguments(
@@ -164,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_arguments_that_do_not_parse() {
+    fn rejects_unparseable_issuance_arguments_naming_the_attribute_to_locate_them() {
         assert!(matches!(
             rejection("= 5"),
             TokenIssuanceCodegenError::Index(AttributeError::Arguments(

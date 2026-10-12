@@ -17,17 +17,15 @@ async fn fetches_a_document_over_tls_without_client_authentication() {
     let fixture = TlsFixture::generate();
     let server = RunningFixtureServer::start(
         fixture.server_config.clone(),
-        vec![RouteEntry::new(
-            "/document",
-            vec![MethodHandler::head(
-                RouteMethod::Get,
-                Arc::new(StaticHandler {
-                    body: br#"{"keys":[]}"#.to_vec(),
-                    content_type: "application/json",
-                    status: 200,
-                }),
-            )],
-        )],
+        ["/document"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
+            Arc::new(StaticHandler {
+                body: br#"{"keys":[]}"#.to_vec(),
+                content_type: "application/json",
+                status: 200,
+            }),
+        )])],
     )
     .await;
     let client = IssuerRequestClient::build(fixture_client_builder(&fixture.certificate_authority))

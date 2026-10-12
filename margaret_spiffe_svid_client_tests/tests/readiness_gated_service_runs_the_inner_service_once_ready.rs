@@ -14,7 +14,7 @@ use margaret_spiffe_svid_client_tests::recording_service::RecordingService;
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 
 #[tokio::test]
-async fn runs_the_inner_service_once_ready() {
+async fn runs_the_inner_service_once_ready_so_it_starts_only_when_peers_can_be_verified() {
     let facade = SvidServerCertVerifierFacade::default();
     facade.update_internal_verifier(Arc::new(
         SvidServerCertVerifier::new(

@@ -19,17 +19,15 @@ async fn refuses_an_answer_over_the_size_limit() {
     let fixture = TlsFixture::generate();
     let server = RunningFixtureServer::start(
         fixture.server_config.clone(),
-        vec![RouteEntry::new(
-            "/token",
-            vec![MethodHandler::head(
-                RouteMethod::Post,
-                Arc::new(StaticHandler {
-                    body: vec![b' '; ISSUER_RESPONSE_MAX_BYTES + 1],
-                    content_type: "application/json",
-                    status: 200,
-                }),
-            )],
-        )],
+        ["/token"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Post,
+            Arc::new(StaticHandler {
+                body: vec![b' '; ISSUER_RESPONSE_MAX_BYTES + 1],
+                content_type: "application/json",
+                status: 200,
+            }),
+        )])],
     )
     .await;
     let client = IssuerRequestClient::build(fixture_client_builder(&fixture.certificate_authority))

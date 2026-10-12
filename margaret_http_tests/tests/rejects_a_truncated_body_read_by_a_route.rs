@@ -16,15 +16,13 @@ use margaret_route_method::content_method::ContentMethod;
 async fn rejects_a_truncated_body_read_by_a_route() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/json",
-            vec![MethodHandler::content(
-                ContentMethod::Post,
-                Arc::new(JsonReadingHandler {
-                    limit: BodyLimit::new(1024),
-                }),
-            )],
-        )],
+        ["/json"],
+        [RouteEntry::new(vec![MethodHandler::content(
+            ContentMethod::Post,
+            Arc::new(JsonReadingHandler {
+                limit: BodyLimit::new(1024),
+            }),
+        )])],
     )
     .await;
     let mut stream = TcpStream::connect(server.address())

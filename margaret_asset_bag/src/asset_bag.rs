@@ -238,7 +238,7 @@ mod tests {
     }
 
     #[test]
-    fn add_registers_a_script_only_bundle() {
+    fn add_includes_a_script_only_bundle_and_its_preloads_without_needing_a_stylesheet() {
         let asset_bag = AssetBag::new();
 
         asset_bag.add(script_only());
@@ -270,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn script_registers_a_script_only_bundle() {
+    fn script_includes_a_script_only_bundle_since_it_needs_no_stylesheet_part() {
         let asset_bag = AssetBag::new();
 
         asset_bag.script(script_only());
@@ -286,7 +286,7 @@ mod tests {
     }
 
     #[test]
-    fn add_registers_a_stylesheet_only_bundle() {
+    fn add_includes_a_stylesheet_only_bundle_and_its_preloads_without_needing_a_script() {
         let asset_bag = AssetBag::new();
 
         asset_bag.add(stylesheet_only());
@@ -318,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn stylesheet_registers_a_stylesheet_only_bundle() {
+    fn stylesheet_includes_a_stylesheet_only_bundle_since_it_needs_no_script_part() {
         let asset_bag = AssetBag::new();
 
         asset_bag.stylesheet(stylesheet_only());

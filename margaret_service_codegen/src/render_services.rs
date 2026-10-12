@@ -8,6 +8,7 @@ use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::routes_ident::routes_ident;
 use margaret_codegen_tokens::server_origin_ident::server_origin_ident;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
+use margaret_codegen_tokens::spiffe_issuer_request_client_ident::spiffe_issuer_request_client_ident;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
@@ -17,6 +18,7 @@ use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_origin_source::ServerOriginSource;
 use margaret_http_codegen::server_uploads::ServerUploads;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
+use margaret_serve_input_codegen::spiffe_client_requirements::SpiffeClientRequirements;
 
 use crate::runner_outcome::RunnerOutcome;
 use crate::service_kind::ServiceKind;
@@ -55,6 +57,10 @@ fn svid_identity_prelude(
         client_active,
         server_active,
     }: SpiffeActivation,
+    SpiffeClientRequirements {
+        http_client,
+        issuer_request_client,
+    }: SpiffeClientRequirements,
 ) -> TokenStream {
     if !server_active && !client_active {
         return quote! {};
@@ -93,12 +99,24 @@ fn svid_identity_prelude(
         }
     });
 
-    let http_client = client_active.then(|| {
+    let http_client = http_client.then(|| {
         let spiffe_http_client = spiffe_http_client_ident();
 
         quote! {
             let #spiffe_http_client = match spiffe_bundle.reqwest_client() {
                 Ok(client) => client,
+                Err(error) => return margaret::framework::console::report_failure::report_failure(error),
+            };
+        }
+    });
+    let issuer_request_client = issuer_request_client.then(|| {
+        let spiffe_issuer_request_client = spiffe_issuer_request_client_ident();
+
+        quote! {
+            let #spiffe_issuer_request_client = match margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient::preconfigured(
+                spiffe_bundle.reqwest_client_builder(),
+            ) {
+                Ok(client) => ::std::sync::Arc::new(client),
                 Err(error) => return margaret::framework::console::report_failure::report_failure(error),
             };
         }
@@ -118,6 +136,7 @@ fn svid_identity_prelude(
         #server_config
         #client_readiness
         #http_client
+        #issuer_request_client
     }
 }
 
@@ -194,9 +213,10 @@ fn served_routes(servers: &[HttpServer]) -> TokenStream {
     quote! {
         #(#origins)*
 
-        let #routes = ::std::sync::Arc::new(
-            super::routes::Routes::from_origins(#(#origin_arguments),*),
-        );
+        let #routes = match super::routes::Routes::from_origins(#(#origin_arguments),*) {
+            Ok(routes) => ::std::sync::Arc::new(routes),
+            Err(error) => return margaret::framework::console::report_failure::report_failure(error),
+        };
     }
 }
 
@@ -489,7 +509,7 @@ pub fn render_services(
     bindings: &ContainerBindings,
 ) -> GeneratedModuleTokens {
     let activation = SpiffeActivation {
-        client_active: plan.has_spiffe_http_client,
+        client_active: plan.spiffe_clients.any(),
         server_active: serves_spiffe(servers),
     };
 
@@ -498,7 +518,7 @@ pub fn render_services(
         .units
         .iter()
         .map(|unit| registration(unit, bindings, activation.client_active));
-    let identity_prelude = svid_identity_prelude(activation);
+    let identity_prelude = svid_identity_prelude(activation, plan.spiffe_clients);
     let bundle_registration = bundle_registration(activation);
     let served_routes = served_routes(servers);
     let register_servers = register_servers_definition(servers, has_views, activation);

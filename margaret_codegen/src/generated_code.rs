@@ -115,7 +115,7 @@ mod tests {
     use crate::codegen_error::CodegenError;
 
     #[test]
-    fn writes_modules_into_nested_directories() {
+    fn writes_nested_modules_into_subdirectories_where_rust_looks_for_their_files() {
         let directory = tempdir().expect("a temporary directory");
         let code = GeneratedCode::new(vec![
             GeneratedModule::new("container", "container"),

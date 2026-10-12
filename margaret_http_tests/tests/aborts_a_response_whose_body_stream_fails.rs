@@ -47,13 +47,11 @@ async fn aborts_a_response_whose_body_stream_fails() {
     let gate = CancellationToken::new();
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/download",
-            vec![MethodHandler::head(
-                RouteMethod::Get,
-                Arc::new(FailingDownload { gate: gate.clone() }),
-            )],
-        )],
+        ["/download"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
+            Arc::new(FailingDownload { gate: gate.clone() }),
+        )])],
     )
     .await;
     let mut exchange = StreamedExchange::start(

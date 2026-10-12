@@ -13,24 +13,19 @@ use margaret_http_uploaded_file::upload_config::UploadConfig;
 async fn hands_forwarded_path_parameters_to_the_target() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![
-            RouteEntry::new(
-                "/origin",
-                vec![MethodHandler::forwardable(
-                    "origin",
-                    Arc::new(ForwardingHandler {
-                        path_params: HashMap::from([("article".to_string(), "7".to_string())]),
-                        target: "article",
-                    }),
-                )],
-            ),
-            RouteEntry::new(
-                "/articles/{article}",
-                vec![MethodHandler::forwardable(
-                    "article",
-                    Arc::new(PathParamEchoHandler { name: "article" }),
-                )],
-            ),
+        ["/origin", "/articles/{article}"],
+        [
+            RouteEntry::new(vec![MethodHandler::forwardable(
+                "origin",
+                Arc::new(ForwardingHandler {
+                    path_params: HashMap::from([("article".to_string(), "7".to_string())]),
+                    target: "article",
+                }),
+            )]),
+            RouteEntry::new(vec![MethodHandler::forwardable(
+                "article",
+                Arc::new(PathParamEchoHandler { name: "article" }),
+            )]),
         ],
     )
     .await;

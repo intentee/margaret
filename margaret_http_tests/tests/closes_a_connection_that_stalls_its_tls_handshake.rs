@@ -9,7 +9,8 @@ use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 async fn closes_a_connection_that_stalls_its_tls_handshake() {
     let fixture = MtlsFixture::new();
     let server =
-        RunningFixtureServer::start(fixture.server_config.clone(), vec![echo_peer_route()]).await;
+        RunningFixtureServer::start(fixture.server_config.clone(), ["/"], [echo_peer_route()])
+            .await;
     let mut stream = TcpStream::connect(server.address())
         .await
         .expect("the silent client connects to the mTLS server");

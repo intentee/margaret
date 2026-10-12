@@ -179,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn flattens_a_rename_under_its_alias() {
+    fn flattens_a_rename_under_its_alias_so_the_local_name_resolves_to_the_original() {
         assert_eq!(
             entries(
                 &parse_quote!(
@@ -192,7 +192,7 @@ mod tests {
     }
 
     #[test]
-    fn flattens_a_group() {
+    fn flattens_each_group_member_under_the_shared_prefix_like_a_separate_import() {
         assert_eq!(
             entries(
                 &parse_quote!(
@@ -205,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn skips_the_self_group_member() {
+    fn skips_the_self_group_member_so_no_import_binds_the_self_keyword() {
         assert_eq!(
             entries(
                 &parse_quote!(
@@ -218,7 +218,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_a_glob() {
+    fn flattens_a_glob_to_no_entry_because_it_binds_no_name_of_its_own() {
         assert!(
             entries(
                 &parse_quote!(

@@ -53,7 +53,7 @@ mod tests {
     use super::GeneratedModuleTokens;
 
     #[test]
-    fn formats_tokens_into_pretty_source() {
+    fn formats_tokens_into_pretty_source_so_generated_files_stay_human_readable() {
         let generated =
             GeneratedModuleTokens::new("sample", quote! { pub fn answer() -> u8 { 42 } })
                 .format()
@@ -73,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn exposes_the_unformatted_token_source() {
+    fn exposes_the_unformatted_token_source_while_keeping_the_tokens_for_formatting() {
         let module = GeneratedModuleTokens::new("sample", quote! { pub fn answer() -> u8 { 42 } });
 
         assert_eq!(module.name(), "sample");

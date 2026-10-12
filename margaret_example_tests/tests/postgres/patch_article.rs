@@ -9,7 +9,7 @@ use margaret_example::routes::public::patch_article::PatchArticle;
 use margaret_example_tests::seeded_blog::seeded_blog;
 
 #[tokio::test]
-async fn saves_the_changes_of_an_article() {
+async fn saves_the_changes_of_an_article_so_a_patch_keeps_the_fields_it_omits() {
     let blog = seeded_blog().await;
     let Lookup::Found(article) = Article::query()
         .id

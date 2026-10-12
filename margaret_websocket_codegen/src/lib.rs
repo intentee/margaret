@@ -39,11 +39,14 @@ mod tests {
     use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
     use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
+    use margaret_http_codegen::declared_routes::DeclaredRoutes;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
+    use margaret_route_parameter_codegen::route_path_error::RoutePathError;
+    use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_sessions_codegen::sessions_item::SessionsItem;
     use margaret_sessions_codegen::sessions_item_path::sessions_item_path;
@@ -62,8 +65,14 @@ mod tests {
         middleware_plans: &MiddlewarePlans,
         registries: &BindingRegistries,
     ) -> Result<WebSocketArtifacts, WebSocketCodegenError> {
-        WebSocketPlan::build(index, bindings, middleware_plans, registries)
-            .map(|plan| render_websocket::render_websocket(plan, bindings))
+        WebSocketPlan::build(
+            index,
+            &mut RoutePathRegistry::new(),
+            bindings,
+            middleware_plans,
+            registries,
+        )
+        .map(|plan| render_websocket::render_websocket(plan, bindings))
     }
 
     const REQUEST_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;\n";
@@ -219,6 +228,62 @@ impl RespondsToWebSocketNotification for Typist {
 
         render_websocket(&index, &bindings(&index), &plans, &registries)
             .expect_err("the websocket module is rejected")
+    }
+
+    fn session_path_rejection(responders: &str, session_path: &str) -> Option<String> {
+        let index = IndexedSource::new(&format!(
+            "{responders}\n#[websocket_session(path = \"{session_path}\", server = \"public\")]\nstruct Chat;\n\nimpl Chat {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n"
+        ))
+        .index;
+        let registries = registries_for(&index);
+        let tags = collected_tags(&index);
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
+        let mut route_paths = RoutePathRegistry::new();
+
+        DeclaredRoutes::read(&index, &mut route_paths).expect("the responders are declared");
+
+        WebSocketPlan::build(
+            &index,
+            &mut route_paths,
+            &bindings(&index),
+            &plans,
+            &registries,
+        )
+        .err()
+        .map(|rejection| rejection.to_string())
+    }
+
+    const GREETING_RESPONDER: &str = "#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/greeting/{name}\", server = \"public\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"name\")] name: String) -> anyhow::Result<Response> {}\n}\n";
+
+    #[test]
+    fn rejects_a_session_at_the_path_of_a_responder_since_one_path_has_one_handler() {
+        assert_eq!(
+            session_path_rejection(GREETING_RESPONDER, "/greeting/{name}").as_deref(),
+            Some(
+                "session 'crate::Chat' cannot serve the path '/greeting/{name}' on server 'public': a responder already serves the route path"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_path_conflicting_with_a_route_a_request_could_also_match() {
+        assert_eq!(
+            session_path_rejection(GREETING_RESPONDER, "/greeting/{other}").as_deref(),
+            Some(
+                "session 'crate::Chat' cannot serve the path '/greeting/{other}' on server 'public': the route path conflicts with the already admitted route path '/greeting/{name}'"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_path_its_router_cannot_route() {
+        assert_eq!(
+            session_path_rejection("", "/chat/{unclosed").as_deref(),
+            Some(
+                "session 'crate::Chat' cannot serve the path '/chat/{unclosed' on server 'public': the router cannot route the path: Parameters must be registered with a valid name"
+            )
+        );
     }
 
     const CONSOLE_ARGUMENT_HANDLER: &str = r#"
@@ -543,7 +608,7 @@ impl Guard {
 "#;
 
     #[test]
-    fn reads_a_preconstructed_session_middleware() {
+    fn reads_a_session_middleware_from_the_container_since_it_is_built_once_there() {
         let source = generated(SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE);
 
         assert!(source.contains("public_routes(container:&super::super::container::Container,"));
@@ -599,7 +664,7 @@ impl Guard {
     }
 
     #[test]
-    fn generates_a_factory_with_concrete_dependencies() {
+    fn generates_a_factory_with_concrete_dependencies_so_sessions_reuse_singletons() {
         let source = generated(FULL_SESSION);
 
         assert!(source.contains("argument_0:::std::sync::Arc<crate::SystemClock>"));
@@ -621,7 +686,7 @@ impl Guard {
     }
 
     #[test]
-    fn generates_request_and_notification_dispatch_tables() {
+    fn generates_dispatch_tables_keyed_by_method_so_each_message_reaches_its_handler() {
         let source = generated(FULL_SESSION);
 
         assert!(source.contains("SayDispatch"));
@@ -634,7 +699,7 @@ impl Guard {
     }
 
     #[test]
-    fn generates_a_public_upgrade_entry() {
+    fn generates_a_public_upgrade_entry_so_server_routes_can_register_the_session() {
         let source = generated(FULL_SESSION);
 
         assert!(source.contains("pubfnupgrade_entry"));
@@ -647,8 +712,10 @@ impl Guard {
         let source = generated(FULL_SESSION);
 
         assert!(source.contains("pubfnpublic_routes"));
-        assert!(source.contains("route_entry::RouteEntry::web_socket(\"/chat/{room}\""));
-        assert!(source.contains("chat_session::upgrade_entry(container)"));
+        assert!(source.contains("->[margaret::framework::http::route_entry::RouteEntry;1]"));
+        assert!(source.contains(
+            "route_entry::RouteEntry::web_socket(super::chat_session::upgrade_entry(container)"
+        ));
     }
 
     #[test]
@@ -661,7 +728,7 @@ impl Guard {
     }
 
     #[test]
-    fn rejects_a_message_without_a_kind() {
+    fn rejects_a_message_without_a_kind_instead_of_guessing_how_it_is_dispatched() {
         assert!(
             error(r#"#[websocket_message(method = "x")] struct Bad;"#)
                 .to_string()
@@ -670,12 +737,12 @@ impl Guard {
     }
 
     #[test]
-    fn rejects_a_message_with_multiple_kinds() {
+    fn rejects_a_message_with_multiple_kinds_so_its_dispatch_is_never_ambiguous() {
         assert!(error(r#"#[websocket_message(request, response, method = "x", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#).to_string().contains("more than one message kind"));
     }
 
     #[test]
-    fn rejects_a_request_without_a_method() {
+    fn rejects_a_request_without_a_method_since_requests_are_dispatched_by_it() {
         assert!(
             error(r"#[websocket_message(request, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
                 .to_string()
@@ -684,7 +751,7 @@ impl Guard {
     }
 
     #[test]
-    fn rejects_a_request_without_a_cardinality() {
+    fn rejects_a_request_without_a_cardinality_instead_of_assuming_a_single_reply() {
         assert!(
             error(r#"#[websocket_message(request, method = "x")] struct Bad;"#)
                 .to_string()
@@ -728,12 +795,12 @@ impl Guard {
     }
 
     #[test]
-    fn rejects_a_non_snake_case_method() {
+    fn rejects_a_non_snake_case_method_so_wire_method_names_follow_one_convention() {
         assert!(error(r#"#[websocket_message(request, method = "NotSnake", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#).to_string().contains("has method"));
     }
 
     #[test]
-    fn rejects_a_response_without_a_method() {
+    fn rejects_a_response_without_a_method_since_clients_identify_responses_by_it() {
         assert!(
             error(r"#[websocket_message(response)] struct Bad;")
                 .to_string()
@@ -793,7 +860,7 @@ impl Guard {
     }
 
     #[test]
-    fn rejects_a_session_without_a_path() {
+    fn rejects_a_session_without_a_path_since_clients_could_never_reach_it() {
         assert!(
             error(r#"#[websocket_session(server = "public")] struct Bad;"#)
                 .to_string()
@@ -814,12 +881,17 @@ impl Room {
 }
 "#
             ),
-            WebSocketCodegenError::UnroutableSessionPath { path, .. } if path == "/rooms/../admin"
+            WebSocketCodegenError::UnadmittedSessionPath {
+                path,
+                server,
+                source: RoutePathError::UnroutableSegment { .. },
+                ..
+            } if path == "/rooms/../admin" && server == "public"
         ));
     }
 
     #[test]
-    fn rejects_a_session_without_a_server() {
+    fn rejects_a_session_without_a_server_instead_of_guessing_where_it_is_served() {
         assert!(
             error(r#"#[websocket_session(path = "/x")] struct Bad;"#)
                 .to_string()
@@ -906,7 +978,7 @@ impl Bad {
     }
 
     #[test]
-    fn rejects_an_unsupported_session_parameter_shape() {
+    fn rejects_an_unsupported_session_parameter_shape_since_nothing_could_supply_it() {
         assert!(
             error(
                 r#"
@@ -1152,7 +1224,7 @@ impl RespondsToWebSocketMessage for Chatter {
     }
 
     #[test]
-    fn interrupts_the_handshake_with_a_continuation() {
+    fn interrupts_the_handshake_with_a_continuation_so_it_can_answer_without_upgrading() {
         let source = generated(AUTHENTICATED_HANDSHAKE);
 
         assert!(source.contains("->::std::result::Result<"));
@@ -1578,7 +1650,7 @@ impl Bad {
     }
 
     #[test]
-    fn rejects_a_forwarder_in_a_session() {
+    fn rejects_a_forwarder_in_a_session_since_a_websocket_cannot_forward_a_request() {
         assert!(
             error(
                 r#"
@@ -1640,7 +1712,7 @@ impl Bad {
     }
 
     #[test]
-    fn propagates_a_route_parameter_binder_error() {
+    fn propagates_a_route_parameter_binder_error_so_a_broken_binder_fails_codegen() {
         assert!(
             error(
                 r#"
@@ -1845,7 +1917,7 @@ mod second_notification {
     }
 
     #[test]
-    fn rejects_a_message_without_a_handler() {
+    fn rejects_a_message_without_a_handler_so_no_declared_message_goes_unanswered() {
         let source = "#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n";
 
         assert!(error(source).to_string().contains("has no handler"));
@@ -1878,7 +1950,7 @@ impl BetaSession {
     }
 
     #[test]
-    fn propagates_a_non_path_cardinality() {
+    fn propagates_a_non_path_cardinality_instead_of_generating_the_message() {
         assert!(
             error(r#"#[websocket_message(request, method = "m", response = 5)] struct Bad;"#)
                 .to_string()
@@ -1887,7 +1959,7 @@ impl BetaSession {
     }
 
     #[test]
-    fn propagates_a_non_string_request_method() {
+    fn propagates_a_non_string_request_method_instead_of_generating_the_message() {
         assert!(
             error(r"#[websocket_message(request, method = 5, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
                 .to_string()
@@ -1896,7 +1968,7 @@ impl BetaSession {
     }
 
     #[test]
-    fn rejects_a_notification_without_a_method() {
+    fn rejects_a_notification_without_a_method_since_notifications_dispatch_by_it() {
         assert!(
             error(r"#[websocket_message(notification)] struct Bad;")
                 .to_string()
@@ -1914,7 +1986,7 @@ impl BetaSession {
     }
 
     #[test]
-    fn propagates_a_non_string_response_method() {
+    fn propagates_a_non_string_response_method_instead_of_generating_the_message() {
         assert!(
             error(r"#[websocket_message(response, method = 5)] struct Bad;")
                 .to_string()
@@ -1923,7 +1995,7 @@ impl BetaSession {
     }
 
     #[test]
-    fn propagates_malformed_message_arguments() {
+    fn surfaces_unparseable_message_arguments_instead_of_generating_the_message() {
         assert!(
             error(r"#[websocket_message(= 5)] struct Bad;")
                 .to_string()
@@ -1932,7 +2004,7 @@ impl BetaSession {
     }
 
     #[test]
-    fn propagates_malformed_session_arguments() {
+    fn surfaces_unparseable_session_arguments_instead_of_generating_the_session() {
         assert!(
             error(r"#[websocket_session(= 5)] struct Bad;")
                 .to_string()
@@ -1941,7 +2013,7 @@ impl BetaSession {
     }
 
     #[test]
-    fn propagates_a_non_string_session_path() {
+    fn propagates_a_non_string_session_path_instead_of_generating_the_session() {
         assert!(
             error(r#"#[websocket_session(path = 5, server = "public")] struct Bad;"#)
                 .to_string()
@@ -1950,7 +2022,7 @@ impl BetaSession {
     }
 
     #[test]
-    fn propagates_a_non_string_session_server() {
+    fn propagates_a_non_string_session_server_instead_of_generating_the_session() {
         assert!(
             error(r#"#[websocket_session(path = "/x", server = 5)] struct Bad;"#)
                 .to_string()
@@ -1959,7 +2031,7 @@ impl BetaSession {
     }
 
     #[test]
-    fn propagates_malformed_route_parameter_arguments() {
+    fn propagates_malformed_route_parameter_arguments_instead_of_building_the_session() {
         assert!(
             error(
                 r#"

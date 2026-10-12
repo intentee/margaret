@@ -43,7 +43,7 @@ mod tests {
     use super::SecretParameter;
 
     #[test]
-    fn describes_itself_without_its_contents() {
+    fn describes_itself_without_its_contents_so_debug_output_never_leaks_the_secret() {
         assert_eq!(
             format!(
                 "{:?}",

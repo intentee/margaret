@@ -412,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_metafile_without_outputs() {
+    fn rejects_a_metafile_without_outputs_rather_than_generating_an_empty_asset_bag() {
         assert_eq!(
             render_asset_bag(r#"{ "outputs": {} }"#, &AssetBagGeneration::Macro)
                 .expect_err("a metafile without outputs is rejected")
@@ -422,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_an_ambiguous_static_input_error() {
+    fn rejects_a_static_input_with_two_outputs_as_ambiguous_rather_than_picking_one() {
         assert!(matches!(
             render_asset_bag(
                 r#"{
@@ -445,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_a_duplicate_entrypoint_error() {
+    fn rejects_two_outputs_of_one_entry_point_as_duplicate_rather_than_picking_one() {
         assert!(matches!(
             render_asset_bag(
                 r#"{

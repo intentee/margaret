@@ -40,7 +40,7 @@ mod tests {
     use super::JwtType;
 
     #[test]
-    fn displays_the_wire_name() {
+    fn displays_a_jwt_type_as_its_typ_header_value_so_rejections_name_it_as_written() {
         assert_eq!(JwtType::AccessToken.to_string(), "at+jwt");
     }
 }

@@ -239,14 +239,14 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_foreign_path() {
+    fn does_not_match_a_user_type_sharing_the_injectable_name_since_matching_is_by_full_path() {
         let shadowed = path(&["crate", "app", "Routes"]);
 
         assert!(!RequestInjectable::Routes.matches(Some(&shadowed), true));
     }
 
     #[test]
-    fn rejects_an_unresolved_type() {
+    fn does_not_match_an_unresolved_type_since_an_injectable_is_identified_by_its_path() {
         assert!(!RequestInjectable::CurrentRequest.matches(None, true));
     }
 }

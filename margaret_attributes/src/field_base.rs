@@ -18,7 +18,7 @@ mod tests {
     use crate::field_base::field_base;
 
     #[test]
-    fn joins_the_snake_cased_module_path() {
+    fn joins_the_snake_cased_module_path_so_generated_fields_get_snake_case_names() {
         let path = CanonicalPath::new(vec![
             "crate".to_string(),
             "routes".to_string(),
@@ -29,7 +29,7 @@ mod tests {
     }
 
     #[test]
-    fn disambiguates_repeated_leaves_across_modules() {
+    fn disambiguates_repeated_leaves_across_modules_so_same_named_items_never_collide() {
         let routes = CanonicalPath::new(vec![
             "crate".to_string(),
             "routes".to_string(),

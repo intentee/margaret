@@ -5,7 +5,7 @@ use margaret_process_tests::signal_process::signal_process;
 use margaret_service::install::install;
 
 #[tokio::test]
-async fn receives_sigint() {
+async fn wakes_the_shutdown_wait_on_sigint_so_ctrl_c_stops_the_service_gracefully() {
     let signals = install().expect("the shutdown signal handlers install");
 
     assert!(signal_process(process::id(), ProcessSignal::Interrupt).success());
@@ -14,7 +14,7 @@ async fn receives_sigint() {
 }
 
 #[tokio::test]
-async fn receives_sigterm() {
+async fn wakes_the_shutdown_wait_on_sigterm_so_a_supervisor_can_stop_the_service_gracefully() {
     let signals = install().expect("the shutdown signal handlers install");
 
     assert!(signal_process(process::id(), ProcessSignal::Terminate).success());

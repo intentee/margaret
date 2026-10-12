@@ -81,6 +81,7 @@ mod tests {
     use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_injection_codegen::process_method::process_method;
     use margaret_route_parameter_codegen::route_path::RoutePath;
+    use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_sessions_codegen::sessions_item::SessionsItem;
     use margaret_sessions_codegen::sessions_item_path::sessions_item_path;
@@ -115,6 +116,12 @@ use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUser
 
 struct User;
 ";
+
+    fn admitted_path(pattern: &str) -> RoutePath {
+        RoutePathRegistry::new()
+            .admit_responder_path("public", pattern)
+            .expect("the route path is admitted")
+    }
 
     fn provider_source(declaration: &str) -> String {
         format!("{PRELUDE}{declaration}")
@@ -299,7 +306,7 @@ impl SessionUserProvider {
     }
 
     #[test]
-    fn rejects_a_repeated_provider_attribute() {
+    fn rejects_a_repeated_provider_attribute_while_indexing_so_no_occurrence_wins() {
         assert_eq!(
             IndexedSource::try_new(&provider_source(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
@@ -348,7 +355,7 @@ impl SessionUserProvider {
     }
 
     #[test]
-    fn propagates_malformed_provider_arguments() {
+    fn reports_unparseable_provider_arguments_as_a_parse_failure_of_the_attribute_syntax() {
         assert!(
             rejection_for("#[singleton]\n#[infers_authenticated_user(= 5)]\nstruct Bad;\n")
                 .contains("could not be parsed")
@@ -455,7 +462,7 @@ impl SessionUserProvider {
         let registries = collect_registries(index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
         let item = indexed.item(identifier);
-        let route_path = RoutePath::parse("/{x}").expect("the route path is routable");
+        let route_path = admitted_path("/{x}");
         let method = process_method(item).expect("the responder has a #[process] method");
 
         classify_parameters(
@@ -510,7 +517,7 @@ impl SessionUserProvider {
         )
         .expect("the binding registries are collected");
         let item = indexed.item("Page");
-        let route_path = RoutePath::parse("/{x}").expect("the route path is routable");
+        let route_path = admitted_path("/{x}");
 
         classify_parameters(
             index,
@@ -577,7 +584,7 @@ impl SessionUserProvider {
     }
 
     #[test]
-    fn binds_a_required_authenticated_user() {
+    fn binds_a_plain_authenticated_user_as_required_so_the_handler_always_gets_one() {
         assert_eq!(
             authenticated_user_requirements(
                 "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {}\n}\n"
@@ -587,7 +594,7 @@ impl SessionUserProvider {
     }
 
     #[test]
-    fn binds_an_optional_authenticated_user() {
+    fn binds_an_option_authenticated_user_as_optional_so_anonymous_requests_proceed() {
         assert_eq!(
             authenticated_user_requirements(
                 "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: Option<User>) -> anyhow::Result<Response> {}\n}\n"
@@ -996,7 +1003,7 @@ struct SecondClient;
     }
 
     #[test]
-    fn rejects_a_second_introspected_bearer_token() {
+    fn rejects_a_second_introspected_bearer_token_since_a_request_carries_one_token() {
         assert!(
             introspection_rejection(&format!(
                 "{INTROSPECTED_TOKEN}, #[bearer_token(client = second_client)] second: Option<IntrospectedToken<Claims>>"
@@ -1295,7 +1302,7 @@ struct SecondClient;
         let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
         let item = indexed.item("Page");
-        let route_path = RoutePath::parse("/").expect("the route path is routable");
+        let route_path = admitted_path("/");
         let parameters = classify_parameters(
             &indexed.index,
             item,
@@ -1336,7 +1343,7 @@ struct SecondClient;
         let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
         let item = indexed.item("Page");
-        let route_path = RoutePath::parse("/").expect("the route path is routable");
+        let route_path = admitted_path("/");
         let holders: Vec<String> = classify_parameters(
             &indexed.index,
             item,
@@ -1362,7 +1369,7 @@ struct SecondClient;
             "struct Room;\n\nimpl Room {\n    #[process]\n    fn build(trusted_issuer: std::sync::Arc<crate::margaret::trusted_issuers::partner::TrustedIssuer>) -> anyhow::Result<Self> {}\n}\n",
         );
         let item = indexed.item("Room");
-        let route_path = RoutePath::parse("/room").expect("the route path is routable");
+        let route_path = admitted_path("/room");
         let bindings = trusted_issuer_bindings();
         let rejection = classify_parameters(
             &indexed.index,
@@ -1556,7 +1563,7 @@ struct PartnerSessions;
         let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
         let item = indexed.item("Page");
-        let route_path = RoutePath::parse("/").expect("the route path is routable");
+        let route_path = admitted_path("/");
         let parameters = classify_parameters(
             &indexed.index,
             item,
@@ -1610,7 +1617,7 @@ struct PartnerSessions;
     }
 
     #[test]
-    fn rejects_a_session_of_another_type() {
+    fn rejects_a_session_not_taken_as_an_option_since_requests_may_carry_none() {
         assert!(
             rejection_for(&reader_provider(
                 ISSUED_SESSIONS,
@@ -1621,7 +1628,7 @@ struct PartnerSessions;
     }
 
     #[test]
-    fn rejects_a_session_with_another_marker() {
+    fn rejects_a_session_with_another_marker_so_each_argument_has_one_source() {
         assert!(
             rejection_for(&reader_provider(
                 ISSUED_SESSIONS,
@@ -1643,7 +1650,7 @@ struct PartnerSessions;
     }
 
     #[test]
-    fn rejects_a_session_read_twice() {
+    fn rejects_a_session_read_twice_so_one_argument_alone_carries_the_session() {
         assert!(
             rejection_for(&reader_provider(
                 ISSUED_SESSIONS,
@@ -1721,7 +1728,7 @@ struct PartnerSessions;
         .index;
         let registries = collect_registries(&index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
-        let route_path = RoutePath::parse("/").expect("the route path is routable");
+        let route_path = admitted_path("/");
         let item = index
             .item(&CanonicalPath::new(vec![
                 "crate".to_string(),

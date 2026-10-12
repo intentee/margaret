@@ -48,6 +48,10 @@ impl GetArticles {
                         RouteAddressing::Addressed(route) => {
                             Ok(format!("{}: {}", article.title, route.url()))
                         }
+                        RouteAddressing::Misrouted { url } => Err(anyhow::anyhow!(
+                            "the link of the article {} at '{url}' reaches another route",
+                            article.id
+                        )),
                         RouteAddressing::Unaddressable(UnaddressableParameter {
                             name,
                             rejection,

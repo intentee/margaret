@@ -20,13 +20,11 @@ async fn runs_a_head_route_once_its_middleware_delegates() {
     });
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/page",
-            vec![MethodHandler::head(
-                RouteMethod::Get,
-                layer(Arc::new(DelegatingMiddleware), page),
-            )],
-        )],
+        ["/page"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
+            layer(Arc::new(DelegatingMiddleware), page),
+        )])],
     )
     .await;
 

@@ -24,7 +24,7 @@ mod tests {
     use crate::value_identifier::value_identifier;
 
     #[test]
-    fn constructs_directly_without_reads() {
+    fn wraps_the_construction_in_ok_when_there_are_no_reads_that_could_fail() {
         assert_eq!(
             chained_construction(&[], &quote! { Self {} }).to_string(),
             quote! { ::std::result::Result::Ok(Self {}) }.to_string()
@@ -32,7 +32,7 @@ mod tests {
     }
 
     #[test]
-    fn binds_each_read_before_the_construction() {
+    fn chains_each_read_before_the_construction_so_a_failed_read_skips_building() {
         assert_eq!(
             chained_construction(
                 &[

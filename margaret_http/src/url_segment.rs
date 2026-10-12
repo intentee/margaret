@@ -5,10 +5,12 @@ pub enum UrlSegment {
         parameter: UrlParameter,
         prefix: &'static str,
     },
-    Literal(&'static str),
+    Literal {
+        decoded: &'static str,
+        encoded: &'static str,
+    },
     Parameter {
         parameter: UrlParameter,
         prefix: &'static str,
-        suffix: &'static str,
     },
 }

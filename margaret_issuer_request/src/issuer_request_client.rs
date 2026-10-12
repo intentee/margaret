@@ -34,6 +34,16 @@ async fn received_document(request: RequestBuilder) -> IssuerDocument {
     }
 }
 
+fn under_issuer_policy(
+    client_builder: ClientBuilder,
+) -> Result<IssuerRequestClient, reqwest::Error> {
+    client_builder
+        .https_only(true)
+        .redirect(Policy::none())
+        .build()
+        .map(|http_client| IssuerRequestClient { http_client })
+}
+
 pub struct IssuerRequestClient {
     http_client: Client,
 }
@@ -41,14 +51,9 @@ pub struct IssuerRequestClient {
 impl IssuerRequestClient {
     /// # Errors
     ///
-    /// Returns `reqwest::Error` when the builder cannot produce a client.
+    /// Returns `reqwest::Error` when the builder cannot produce a client over the system TLS.
     pub fn build(client_builder: ClientBuilder) -> Result<Self, reqwest::Error> {
-        client_builder
-            .use_native_tls()
-            .https_only(true)
-            .redirect(Policy::none())
-            .build()
-            .map(|http_client| Self { http_client })
+        under_issuer_policy(client_builder.use_native_tls())
     }
 
     /// # Errors
@@ -58,9 +63,12 @@ impl IssuerRequestClient {
         Self::build(Client::builder())
     }
 
-    #[must_use]
-    pub fn preconfigured(http_client: Client) -> Self {
-        Self { http_client }
+    /// # Errors
+    ///
+    /// Returns `reqwest::Error` when the builder cannot produce a client over the TLS it was
+    /// preconfigured with.
+    pub fn preconfigured(client_builder: ClientBuilder) -> Result<Self, reqwest::Error> {
+        under_issuer_policy(client_builder)
     }
 
     /// # Errors

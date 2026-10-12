@@ -357,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_no_sessions_without_a_declaration() {
+    fn finds_no_sessions_without_a_declaration_so_none_of_their_code_is_generated() {
         read("", |read| {
             assert!(read.is_ok_and(
                 |sessions| discriminant(&sessions) == discriminant(&DeclaredSessions::Absent)
@@ -379,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_sessions_without_their_issuer() {
+    fn rejects_sessions_without_their_issuer_since_their_tokens_need_a_known_signer() {
         assert!(matches!(
             rejection(&issuing("audience = \"browser\", cookies = SessionCookies::HostOnly")),
             SessionsCodegenError::MissingSessionsIssuer { anchor } if anchor == "crate::BrowserSessions"
@@ -404,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_issued_sessions_without_an_audience() {
+    fn rejects_issued_sessions_without_an_audience_since_their_tokens_must_name_one() {
         assert!(matches!(
             rejection(&issuing("issuer = provider, cookies = SessionCookies::HostOnly")),
             SessionsCodegenError::MissingSessionAudience { anchor } if anchor == "crate::BrowserSessions"
@@ -421,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_empty_audience() {
+    fn rejects_an_empty_session_audience_because_no_token_could_be_addressed_to_it() {
         assert!(matches!(
             rejection(&issuing("issuer = provider, audience = \"\", cookies = SessionCookies::HostOnly")),
             SessionsCodegenError::EmptySessionAudience { anchor } if anchor == "crate::BrowserSessions"
@@ -429,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_the_audience_of_a_resource() {
+    fn rejects_a_session_audience_a_resource_uses_so_session_tokens_never_pass_there() {
         assert!(matches!(
             rejection(&issuing("issuer = provider, audience = \"artifacts\", cookies = SessionCookies::HostOnly")),
             SessionsCodegenError::SessionAudienceOfResource { audience, resource, .. }
@@ -457,7 +457,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_shared_cookies_without_their_domain() {
+    fn rejects_shared_cookies_without_their_domain_since_only_a_domain_shares_them() {
         assert!(matches!(
             rejection(&issuing("issuer = provider, audience = \"browser\", cookies = SessionCookies::SharedWithDomain")),
             SessionsCodegenError::MissingCookieDomainSource { anchor } if anchor == "crate::BrowserSessions"

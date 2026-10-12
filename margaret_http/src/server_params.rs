@@ -295,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_ambiguous_path() {
+    fn rejects_a_path_with_a_dot_segment_instead_of_resolving_it_to_another_route() {
         assert_rejects(
             Version::HTTP_11,
             "/articles/../admin",

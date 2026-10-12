@@ -50,7 +50,7 @@ mod tests {
     use crate::views::asset_showcase::AssetShowcase;
 
     #[tokio::test]
-    async fn responds_with_the_rendered_asset_page() {
+    async fn responds_ok_with_the_rendered_asset_page_so_the_demo_route_serves_a_page() {
         let page =
             AssetPage::create(Arc::new(AssetShowcase)).expect("the asset page is constructed");
         let responder =

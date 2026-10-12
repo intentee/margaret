@@ -4,7 +4,7 @@ use margaret_spiffe_svid_server::svid_error::SvidError;
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 
 #[test]
-fn rejects_an_invalid_trust_domain() {
+fn rejects_an_uppercase_trust_domain_since_spiffe_trust_domains_are_lowercase() {
     let result = SvidClientCertVerifier::new(
         build_root_cert_store_with_ca(),
         "EXAMPLE.ORG",

@@ -28,8 +28,8 @@ impl HeadHandler for EchoBearer {
 
 #[must_use]
 pub fn echo_bearer_route() -> RouteEntry {
-    RouteEntry::new(
-        "/",
-        vec![MethodHandler::head(RouteMethod::Get, Arc::new(EchoBearer))],
-    )
+    RouteEntry::new(vec![MethodHandler::head(
+        RouteMethod::Get,
+        Arc::new(EchoBearer),
+    )])
 }

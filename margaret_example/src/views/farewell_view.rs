@@ -64,7 +64,8 @@ mod tests {
         let view = FarewellView {
             card_layout: Arc::new(CardLayout),
         };
-        let routes = Routes::from_origins("http://identity", "http://internal", "http://public");
+        let routes = Routes::from_origins("http://identity", "http://internal", "http://public")
+            .expect("the routes build");
 
         let markup = view
             .render(FarewellViewProps {

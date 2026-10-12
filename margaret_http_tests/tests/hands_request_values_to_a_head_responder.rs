@@ -35,10 +35,11 @@ async fn hands_request_values_to_a_head_responder() {
     );
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
-        vec![RouteEntry::new(
-            "/echo/{id}",
-            vec![MethodHandler::head(RouteMethod::Get, handler)],
-        )],
+        ["/echo/{id}"],
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
+            handler,
+        )])],
     )
     .await;
 

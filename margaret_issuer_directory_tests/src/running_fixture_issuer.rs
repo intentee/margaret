@@ -15,9 +15,12 @@ pub struct RunningFixtureIssuer {
 impl RunningFixtureIssuer {
     pub async fn start(routes: FixtureIssuerRoutes) -> Self {
         let fixture = TlsFixture::generate();
-        let server =
-            RunningFixtureServer::start(fixture.server_config.clone(), routes.into_route_entries())
-                .await;
+        let server = RunningFixtureServer::start(
+            fixture.server_config.clone(),
+            FixtureIssuerRoutes::PATHS,
+            routes.into_route_entries(),
+        )
+        .await;
 
         Self { fixture, server }
     }

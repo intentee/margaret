@@ -22,17 +22,17 @@ fn is_copy(segments: &[&str]) -> bool {
 }
 
 #[test]
-fn detects_a_struct_deriving_copy() {
+fn detects_a_struct_deriving_copy_so_it_is_copied_rather_than_cloned() {
     assert!(is_copy(&["crate", "DerivedCopy"]));
 }
 
 #[test]
-fn detects_an_enum_deriving_copy() {
+fn detects_an_enum_deriving_copy_so_it_is_copied_rather_than_cloned() {
     assert!(is_copy(&["crate", "DerivedCopyEnum"]));
 }
 
 #[test]
-fn detects_a_manually_implemented_copy() {
+fn detects_a_manually_implemented_copy_so_it_is_copied_rather_than_cloned() {
     assert!(is_copy(&["crate", "ManuallyCopied"]));
 }
 
@@ -42,12 +42,12 @@ fn rejects_a_type_that_only_derives_clone() {
 }
 
 #[test]
-fn detects_a_copy_primitive() {
+fn detects_a_built_in_copy_primitive_although_no_indexed_crate_defines_it() {
     assert!(is_copy(&["u16"]));
 }
 
 #[test]
-fn detects_a_standard_library_copy_type() {
+fn detects_a_standard_library_copy_type_so_it_is_copied_rather_than_cloned() {
     assert!(is_copy(&["std", "num", "NonZeroU32"]));
     assert!(is_copy(&["std", "net", "SocketAddr"]));
 }

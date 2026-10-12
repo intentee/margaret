@@ -78,12 +78,12 @@ mod tests {
     const WITH_CHILDREN: &str = "#[eager_load(model = Author)]\nstruct AuthorWithFamily {\n    #[base]\n    author: Author,\n    #[relation(articles, limit = 3)]\n    articles: Children<ArticleWithAuthor>,\n    #[relation(profile)]\n    profile: Option<Profile>,\n}\n";
 
     #[test]
-    fn renders_no_modules_without_shapes() {
+    fn renders_no_modules_without_shapes_so_no_empty_shapes_module_is_generated() {
         assert!(outcome("").expect("nothing renders").is_empty());
     }
 
     #[test]
-    fn declares_one_module_per_shape() {
+    fn declares_one_module_per_shape_so_every_rendered_shape_module_is_reachable() {
         assert_eq!(
             outcome(&format!("{WITH_AUTHOR}\n{WITH_CHILDREN}")).expect("the shapes render")["shapes"],
             "pubmodarticle_with_author;pubmodauthor_with_family;"
@@ -91,7 +91,7 @@ mod tests {
     }
 
     #[test]
-    fn joins_a_belongs_to_relation() {
+    fn inner_joins_a_belongs_to_relation_so_its_owner_loads_in_the_same_query() {
         let rendered = shape(WITH_AUTHOR, "shapes/article_with_author");
 
         assert!(rendered.contains("constJOIN:margaret::framework::active_record::join_context::JoinContext=margaret::framework::active_record::join_context::JoinContext::Required;"));
@@ -167,7 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_base_held_by_reference() {
+    fn rejects_a_base_held_by_reference_since_loading_yields_an_owned_record() {
         assert!(matches!(
             rejection("#[eager_load(model = Article)]\nstruct Loaded {\n    #[base]\n    article: &'static Article,\n}\n"),
             ActiveRecordCodegenError::BaseTypeMismatch { ref field, .. } if field == "article"
@@ -183,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_malformed_shape_arguments() {
+    fn rejects_malformed_eager_load_arguments_naming_the_eager_load_attribute_to_fix() {
         assert!(matches!(
             rejection("#[eager_load(= 5)]\nstruct Loaded {}\n"),
             ActiveRecordCodegenError::Index {
@@ -193,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_shape_without_its_model() {
+    fn rejects_a_shape_without_its_model_since_nothing_names_the_records_to_load() {
         assert!(matches!(
             rejection("#[eager_load]\nstruct Loaded {}\n"),
             ActiveRecordCodegenError::EagerLoadRequiresModel { ref shape } if shape == "crate::Loaded"
@@ -217,7 +217,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_positional_shape_field() {
+    fn rejects_a_positional_shape_field_since_loading_assigns_fields_by_name() {
         assert!(matches!(
             rejection("#[eager_load(model = Article)]\nstruct Loaded(#[base] Article);\n"),
             ActiveRecordCodegenError::ShapeRequiresNamedFields { position: 0, ref shape } if shape == "crate::Loaded"
@@ -233,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_unmarked_shape_field() {
+    fn rejects_an_unmarked_shape_field_since_nothing_says_how_to_load_it() {
         assert!(matches!(
             rejection("#[eager_load(model = Article)]\nstruct Loaded {\n    #[base]\n    article: Article,\n    note: String,\n}\n"),
             ActiveRecordCodegenError::ShapeFieldUnmarked { ref field, .. } if field == "note"
@@ -241,7 +241,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_base_of_another_model() {
+    fn rejects_a_base_of_another_model_since_the_loaded_rows_are_of_the_shape_model() {
         assert!(matches!(
             rejection("#[eager_load(model = Article)]\nstruct Loaded {\n    #[base]\n    article: Author,\n}\n"),
             ActiveRecordCodegenError::BaseTypeMismatch { ref found, .. } if found == "Author"
@@ -249,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_optional_base() {
+    fn rejects_an_optional_base_because_every_loaded_row_holds_its_base_record() {
         assert!(matches!(
             rejection("#[eager_load(model = Article)]\nstruct Loaded {\n    #[base]\n    article: Option<Article>,\n}\n"),
             ActiveRecordCodegenError::BaseTypeMismatch { ref field, .. } if field == "article"
@@ -257,7 +257,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_shape_without_a_base() {
+    fn rejects_a_shape_without_a_base_since_nothing_would_hold_the_loaded_record() {
         assert!(matches!(
             rejection(
                 "#[eager_load(model = Article)]\nstruct Loaded {\n    #[relation(author)]\n    author: Author,\n}\n"
@@ -267,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_shape_with_several_bases() {
+    fn rejects_a_shape_with_several_bases_since_its_base_would_be_ambiguous() {
         assert!(matches!(
             rejection(
                 "#[eager_load(model = Article)]\nstruct Loaded {\n    #[base]\n    first: Article,\n    #[base]\n    second: Article,\n}\n"
@@ -277,7 +277,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_relation_without_a_name() {
+    fn rejects_a_relation_without_a_name_since_nothing_says_which_one_to_load() {
         assert!(matches!(
             rejection("#[eager_load(model = Article)]\nstruct Loaded {\n    #[base]\n    article: Article,\n    #[relation(limit = 2)]\n    author: Author,\n}\n"),
             ActiveRecordCodegenError::RelationRequiresName { ref field, .. } if field == "author"
@@ -303,7 +303,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_malformed_relation_arguments() {
+    fn rejects_malformed_relation_arguments_naming_the_relation_attribute_to_fix() {
         assert!(matches!(
             rejection(
                 "#[eager_load(model = Article)]\nstruct Loaded {\n    #[base]\n    article: Article,\n    #[relation(= 5)]\n    author: Author,\n}\n"
@@ -315,7 +315,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_unknown_relation() {
+    fn rejects_a_relation_the_model_does_not_declare_because_there_is_nothing_to_load() {
         assert!(matches!(
             rejection("#[eager_load(model = Article)]\nstruct Loaded {\n    #[base]\n    article: Article,\n    #[relation(writer)]\n    writer: Author,\n}\n"),
             ActiveRecordCodegenError::UnknownRelation { ref relation, .. } if relation == "writer"
@@ -355,7 +355,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_zero_limit() {
+    fn rejects_a_zero_relation_limit_because_it_would_load_no_children() {
         assert!(matches!(
             rejection("#[eager_load(model = Author)]\nstruct Loaded {\n    #[base]\n    author: Author,\n    #[relation(articles, limit = 0)]\n    articles: Children<Article>,\n}\n"),
             ActiveRecordCodegenError::RelationLimitMustBePositive { ref relation, .. } if relation == "articles"
@@ -379,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_relation_holding_another_model() {
+    fn rejects_a_relation_holding_another_model_since_the_loaded_record_cannot_fit() {
         assert!(matches!(
             rejection("#[eager_load(model = Article)]\nstruct Loaded {\n    #[base]\n    article: Article,\n    #[relation(author)]\n    author: Profile,\n}\n"),
             ActiveRecordCodegenError::RelationTypeMismatch { ref found, .. } if found == "Profile"
@@ -411,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_wrapper_without_its_argument() {
+    fn rejects_a_wrapper_without_its_argument_since_it_names_no_record_to_hold() {
         assert!(matches!(
             rejection("#[eager_load(model = Author)]\nstruct Loaded {\n    #[base]\n    author: Author,\n    #[relation(profile)]\n    profile: Option,\n}\n"),
             ActiveRecordCodegenError::RelationTypeMismatch { ref field, .. } if field == "profile"
@@ -419,7 +419,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_relation_declared_twice() {
+    fn rejects_a_relation_declared_twice_so_each_relation_loads_into_one_field() {
         assert!(matches!(
             rejection("#[eager_load(model = Article)]\nstruct Loaded {\n    #[base]\n    article: Article,\n    #[relation(author)]\n    first: Author,\n    #[relation(author)]\n    second: Author,\n}\n"),
             ActiveRecordCodegenError::DuplicateShapeRelation { ref relation, .. } if relation == "author"

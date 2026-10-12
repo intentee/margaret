@@ -47,6 +47,9 @@ impl ClusterDoors {
         })
     }
 
+    /// # Panics
+    ///
+    /// Panics when the routes of the cluster cannot be built.
     #[must_use]
     pub fn routes(&self) -> Routes {
         Routes::from_origins(
@@ -59,6 +62,7 @@ impl ClusterDoors {
                 .origin()
                 .ascii_serialization(),
         )
+        .expect("the routes of the cluster build")
     }
 
     pub async fn close(self) {

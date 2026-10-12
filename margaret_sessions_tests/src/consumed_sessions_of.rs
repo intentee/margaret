@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use margaret_http_tests::fixture_client_builder::fixture_client_builder;
 use margaret_http_tests::tls_fixture::TlsFixture;
+use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_sessions::consumed_sessions::ConsumedSessions;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
@@ -21,8 +22,9 @@ pub fn consumed_sessions_of(
             .as_str()
             .parse()
             .expect("the refresh url is read"),
-        fixture_client_builder(&tls.certificate_authority)
-            .build()
-            .expect("the workload client builds"),
+        Arc::new(
+            IssuerRequestClient::preconfigured(fixture_client_builder(&tls.certificate_authority))
+                .expect("the workload client builds"),
+        ),
     )
 }

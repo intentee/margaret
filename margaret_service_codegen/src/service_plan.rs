@@ -5,7 +5,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::serve_input_binding::ServeInputBinding;
 use margaret_container::slotted_serve_input::SlottedServeInput;
-use margaret_serve_input_codegen::has_spiffe_http_client::has_spiffe_http_client;
+use margaret_serve_input_codegen::spiffe_client_requirements::SpiffeClientRequirements;
 
 use crate::framework_service::FrameworkService;
 use crate::serve_inputs::ServeInputs;
@@ -15,13 +15,13 @@ use crate::service_units::service_units;
 
 pub struct ServicePlan {
     pub(crate) construction_arguments: Vec<ServeInputBinding>,
-    pub(crate) has_spiffe_http_client: bool,
     pub(crate) reads_clap_matches: bool,
     pub(crate) prelude: TokenStream,
     pub(crate) units: Vec<ServiceUnit>,
     roots: Vec<CanonicalPath>,
     pub(crate) served_roots: Vec<CanonicalPath>,
     serve_inputs: Vec<SlottedServeInput>,
+    pub(crate) spiffe_clients: SpiffeClientRequirements,
 }
 
 impl ServicePlan {
@@ -49,15 +49,15 @@ impl ServicePlan {
 
         Ok(Self {
             construction_arguments,
-            has_spiffe_http_client: has_spiffe_http_client(
-                serve_inputs.iter().map(|slotted| &slotted.input),
-            ),
             prelude,
             reads_clap_matches: serve_inputs
                 .iter()
                 .any(|slotted| slotted.input.reads_clap_matches()),
             roots,
             served_roots,
+            spiffe_clients: SpiffeClientRequirements::of(
+                serve_inputs.iter().map(|slotted| &slotted.input),
+            ),
             serve_inputs,
             units,
         })

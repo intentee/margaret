@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    fn declares_a_submodule_per_oauth_client() {
+    fn declares_a_submodule_per_oauth_client_so_each_is_addressed_by_its_tag() {
         assert_eq!(
             module_source(two_clients(), "oauth_clients"),
             "pub mod billing;\npub mod ci;\n"
@@ -274,7 +274,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_the_declared_client_id() {
+    fn renders_the_declared_client_id_verbatim_so_the_issuer_recognizes_the_client() {
         assert_eq!(
             module_source(two_clients(), "oauth_clients/billing/client_id"),
             "pub const CLIENT_ID: &str = \"billing:app\";\n"

@@ -21,7 +21,7 @@ mod tests {
     use super::HeadInputSource;
 
     #[test]
-    fn reads_cookies_from_the_cookie_inputs() {
+    fn reads_cookies_from_the_cookie_inputs_so_a_cookie_binding_never_reads_the_query() {
         assert_eq!(
             HeadInputSource::Cookie.inputs_field().to_string(),
             "cookies"

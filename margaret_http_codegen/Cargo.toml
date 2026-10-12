@@ -23,7 +23,6 @@ margaret_request_binding_codegen = { workspace = true }
 margaret_route_method = { workspace = true }
 margaret_route_parameter_codegen = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
-matchit = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }
@@ -38,6 +37,8 @@ margaret_tag_codegen = { workspace = true }
 margaret_tag_codegen_tests = { path = "../margaret_tag_codegen_tests" }
 margaret_token_issuance_codegen = { workspace = true }
 margaret_trusted_issuer_codegen = { workspace = true }
+margaret_url_path = { workspace = true }
+matchit = { workspace = true }
 
 [lints]
 workspace = true

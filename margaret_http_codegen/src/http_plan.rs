@@ -46,7 +46,7 @@ pub struct HttpPlan {
     pub(crate) retained_roots: Vec<CanonicalPath>,
     pub(crate) servers: Vec<HttpServer>,
     pub(crate) table: HttpRouteTable,
-    pub(crate) websocket_servers: BTreeSet<String>,
+    pub(crate) websocket_paths: BTreeMap<String, Vec<String>>,
 }
 
 impl HttpPlan {
@@ -62,19 +62,13 @@ impl HttpPlan {
         middleware_plans: &MiddlewarePlans,
         registries: &BindingRegistries,
     ) -> Result<Self, HttpCodegenError> {
-        let mut table = http_routes(
+        let table = http_routes(
             index,
             routes,
             framework_responders,
             middleware_plans,
             registries,
         )?;
-
-        for (server, requirements) in websocket_servers {
-            for route in &requirements.sessions {
-                table.reserve_web_socket(server, route)?;
-            }
-        }
 
         let servers = active_servers(&table, websocket_servers);
         let retained_roots = retained_roots(&table);
@@ -84,7 +78,19 @@ impl HttpPlan {
             retained_roots,
             servers,
             table,
-            websocket_servers: websocket_servers.keys().cloned().collect(),
+            websocket_paths: websocket_servers
+                .iter()
+                .map(|(server, requirements)| {
+                    (
+                        server.clone(),
+                        requirements
+                            .sessions
+                            .iter()
+                            .map(|session| session.path.clone())
+                            .collect(),
+                    )
+                })
+                .collect(),
         })
     }
 }

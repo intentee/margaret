@@ -39,7 +39,7 @@ mod tests {
     use crate::sessions_error::SessionsError;
 
     #[test]
-    fn reads_a_domain_name() {
+    fn reads_a_domain_name_lowercased_since_browsers_match_cookie_domains_case_insensitively() {
         assert_eq!(
             "Intentee.AI"
                 .parse::<CookieDomain>()
@@ -58,7 +58,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_malformed_domain() {
+    fn rejects_a_malformed_domain_naming_it_so_the_cookie_configuration_can_be_fixed() {
         assert!(matches!(
             "intentee ai".parse::<CookieDomain>(),
             Err(SessionsError::MalformedCookieDomain { domain, .. }) if domain == "intentee ai"

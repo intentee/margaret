@@ -66,10 +66,11 @@ pub enum WebSocketCodegenError {
     #[error("session '{session}' is missing the required 'path' argument")]
     MissingSessionPath { session: String },
 
-    #[error("session '{session}' serves the path '{path}', which no request can reach: {source}")]
-    UnroutableSessionPath {
-        session: String,
+    #[error("session '{session}' cannot serve the path '{path}' on server '{server}': {source}")]
+    UnadmittedSessionPath {
         path: String,
+        server: String,
+        session: String,
         #[source]
         source: RoutePathError,
     },
