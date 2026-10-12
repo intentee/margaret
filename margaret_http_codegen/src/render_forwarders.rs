@@ -13,6 +13,7 @@ use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::named_route::NamedRoute;
 use crate::route_group::RouteGroup;
+use crate::server_layout::ServerLayout;
 
 fn forward_method(named: &NamedRoute<'_>) -> TokenStream {
     let method = format_ident!("{}", named.name);
@@ -57,14 +58,14 @@ fn injects_forwarder(table: &HttpRouteTable, server: &HttpServer) -> bool {
         .any(|argument| matches!(argument.binding, RequestBinding::Forwarder))
 }
 
-fn server_forwarder(table: &HttpRouteTable, server: &HttpServer) -> TokenStream {
-    let methods: Vec<TokenStream> = table
-        .named_routes(server.name())
+fn server_forwarder(table: &HttpRouteTable, layout: &ServerLayout<'_>) -> TokenStream {
+    let methods: Vec<TokenStream> = layout
+        .named
         .iter()
         .filter(|named| named.route.method() == RouteMethod::Get)
         .map(forward_method)
         .collect();
-    let constructor = injects_forwarder(table, server).then(|| {
+    let constructor = injects_forwarder(table, layout.server).then(|| {
         quote! {
             pub(in crate::margaret) fn new() -> Self {
                 Self(())
@@ -90,10 +91,10 @@ struct ForwardedParameter<'path> {
 
 pub(crate) fn render_forwarders(
     table: &HttpRouteTable,
-    servers: &[HttpServer],
+    layouts: &[ServerLayout<'_>],
 ) -> Vec<GeneratedModuleTokens> {
-    let server_declarations = servers.iter().map(|server| {
-        let field = format_ident!("{}", server.name());
+    let server_declarations = layouts.iter().map(|layout| {
+        let field = &layout.field;
 
         quote! {
             #[rustfmt::skip]
@@ -106,17 +107,17 @@ pub(crate) fn render_forwarders(
         quote! { #(#server_declarations)* },
     )];
 
-    for server in servers {
+    for layout in layouts {
         modules.push(GeneratedModuleTokens::new(
-            format!("forwarders/{}", server.name()),
+            format!("forwarders/{}", layout.field),
             quote! {
                 mod forwarder;
                 pub use forwarder::Forwarder;
             },
         ));
         modules.push(GeneratedModuleTokens::new(
-            format!("forwarders/{}/forwarder", server.name()),
-            server_forwarder(table, server),
+            format!("forwarders/{}/forwarder", layout.field),
+            server_forwarder(table, layout),
         ));
     }
 

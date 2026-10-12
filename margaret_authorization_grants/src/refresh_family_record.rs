@@ -53,6 +53,16 @@ impl RefreshFamilyRecord {
             .map(|_removal| ())
     }
 
+    pub(crate) fn into_family(self) -> RefreshFamily {
+        RefreshFamily {
+            auth_time: self.auth_time,
+            client_id: self.client_id,
+            expires_at: NumericDate::new(self.expires_at),
+            scopes: self.scopes.into_payload(),
+            subject: self.subject,
+        }
+    }
+
     pub(crate) async fn open(
         transaction: &Transaction<'_>,
         family: Uuid,
@@ -93,15 +103,5 @@ impl RefreshFamilyRecord {
                     .map_err(AuthorizationGrantsError::IssueFirstRefreshToken)
             })
             .await
-    }
-
-    pub(crate) fn into_family(self) -> RefreshFamily {
-        RefreshFamily {
-            auth_time: self.auth_time,
-            client_id: self.client_id,
-            expires_at: NumericDate::new(self.expires_at),
-            scopes: self.scopes.into_payload(),
-            subject: self.subject,
-        }
     }
 }

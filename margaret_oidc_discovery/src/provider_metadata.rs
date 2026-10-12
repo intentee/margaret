@@ -72,31 +72,6 @@ pub struct ProviderMetadata {
 }
 
 impl ProviderMetadata {
-    #[must_use]
-    pub fn of_endpoints(endpoints: &ProviderEndpoints) -> ProviderMetadataParsing {
-        match Self::from_endpoints(endpoints) {
-            ControlFlow::Continue(metadata) => {
-                ProviderMetadataParsing::Accepted(Arc::new(metadata))
-            }
-            ControlFlow::Break(rejection) => ProviderMetadataParsing::Rejected(rejection),
-        }
-    }
-
-    #[must_use]
-    pub fn parse(document: &[u8], issuer: &'static str) -> ProviderMetadataParsing {
-        match serde_json::from_slice(document) {
-            Ok(document) => match Self::from_document(document, issuer) {
-                ControlFlow::Continue(metadata) => {
-                    ProviderMetadataParsing::Accepted(Arc::new(metadata))
-                }
-                ControlFlow::Break(rejection) => ProviderMetadataParsing::Rejected(rejection),
-            },
-            Err(source) => {
-                ProviderMetadataParsing::Rejected(ProviderMetadataRejection::Malformed { source })
-            }
-        }
-    }
-
     fn from_document(
         ProviderMetadataDocument {
             authorization_endpoint,
@@ -165,5 +140,30 @@ impl ProviderMetadata {
             )?),
             userinfo_endpoint: served_endpoint(MetadataEndpoint::UserinfoEndpoint, *userinfo)?,
         })
+    }
+
+    #[must_use]
+    pub fn of_endpoints(endpoints: &ProviderEndpoints) -> ProviderMetadataParsing {
+        match Self::from_endpoints(endpoints) {
+            ControlFlow::Continue(metadata) => {
+                ProviderMetadataParsing::Accepted(Arc::new(metadata))
+            }
+            ControlFlow::Break(rejection) => ProviderMetadataParsing::Rejected(rejection),
+        }
+    }
+
+    #[must_use]
+    pub fn parse(document: &[u8], issuer: &'static str) -> ProviderMetadataParsing {
+        match serde_json::from_slice(document) {
+            Ok(document) => match Self::from_document(document, issuer) {
+                ControlFlow::Continue(metadata) => {
+                    ProviderMetadataParsing::Accepted(Arc::new(metadata))
+                }
+                ControlFlow::Break(rejection) => ProviderMetadataParsing::Rejected(rejection),
+            },
+            Err(source) => {
+                ProviderMetadataParsing::Rejected(ProviderMetadataRejection::Malformed { source })
+            }
+        }
     }
 }

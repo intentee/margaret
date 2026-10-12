@@ -2388,7 +2388,7 @@ struct GetDiscovery;
                 &code,
                 "oauth_clients/service_client/resources/reports/resource_grant"
             ),
-            "pub const RESOURCE_GRANT: margaret::framework::client_credentials::resource_grant::ResourceGrant = margaret::framework::client_credentials::resource_grant::ResourceGrant {\n    audience: crate::margaret::resource_tokens::reports::AUDIENCE,\n    scopes: &[\"reports:read\"],\n};\n"
+            "pub const RESOURCE_GRANT: margaret::framework::client_credentials::resource_grant::ResourceGrant = margaret::framework::client_credentials::resource_grant::ResourceGrant {\n    audience: crate::margaret::resource_tokens::reports::audience::AUDIENCE,\n    scopes: &[\"reports:read\"],\n};\n"
         );
         assert!(construction.contains(
             "crate::margaret::oauth_clients::service_client::resources::reports::ResourceCredentials::create(::std::sync::Arc::<crate::margaret::oauth_clients::service_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_service_client_authorization_server_client,),crate::margaret::oauth_clients::service_client::resources::reports::resource_grant::RESOURCE_GRANT,)"
@@ -2613,7 +2613,7 @@ impl HolderPage {
             "pub const TOKEN_TRUST: margaret::framework::token_trust::token_trust::TokenTrust = margaret::framework::token_trust::token_trust::TokenTrust {\n    audience: \"attachments\",\n    issuer: \"https://issuer.fixture\",\n};\n"
         );
         assert_eq!(
-            module(&code, "resource_tokens/attachments"),
+            module(&code, "resource_tokens/attachments/audience"),
             "pub const AUDIENCE: &str = \"attachments\";\n"
         );
     }

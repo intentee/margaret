@@ -17,7 +17,7 @@ use crate::key_targeting::KeyTargeting;
 use crate::render_columns::render_columns;
 use crate::render_conditions::render_conditions;
 use crate::render_draft::render_draft;
-use crate::render_enum_columns::render_enum_column;
+use crate::render_enum_column::render_enum_column;
 use crate::render_model_impl::render_model_impl;
 use crate::render_primary_key::render_primary_key;
 use crate::render_query::render_query;

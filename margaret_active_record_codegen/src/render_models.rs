@@ -192,7 +192,7 @@ mod tests {
     fn implements_the_model_traits_that_let_a_model_be_queried_updated_and_created() {
         let model = module(ARTICLE, "models/article/model");
 
-        assert!(model.contains("typeConditions=crate::margaret::models::article::conditions::Conditions;typeQuery=crate::margaret::models::article::query::Step;"));
+        assert!(model.contains("typeConditions=crate::margaret::models::article::conditions::Conditions;typeQuery=crate::margaret::models::article::query::step::Step;"));
         assert!(model.contains(
             "implmargaret::framework::active_record::assignable::Assignableforcrate::Article"
         ));
@@ -206,21 +206,32 @@ mod tests {
 
     #[test]
     fn walks_the_leading_fields_of_every_index_from_the_query_root() {
-        let query = module(ARTICLE, "models/article/query");
+        let step = module(ARTICLE, "models/article/query/step");
 
-        assert!(query.contains("pubmodedge;pubmodthen;"));
-        assert!(query.contains("pubid:margaret::framework::active_record::next::Next<crate::Article,::uuid::Uuid,crate::margaret::models::article::query::edge::id::Edge,margaret::framework::active_record::root::Root>"));
-        assert!(query.contains("pubauthor:margaret::framework::active_record::next::Next<crate::Article,margaret::framework::active_record::key::Key<crate::Author>,crate::margaret::models::article::query::edge::author::Edge,margaret::framework::active_record::root::Root>"));
-        assert!(query.contains("id:margaret::framework::active_record::next::Next::new(margaret::framework::active_record::root::Root,0usize)"));
+        assert!(step.contains("pubid:margaret::framework::active_record::next::Next<crate::Article,::uuid::Uuid,crate::margaret::models::article::query::then::id::edge::Edge,margaret::framework::active_record::root::Root>"));
+        assert!(step.contains("pubauthor:margaret::framework::active_record::next::Next<crate::Article,margaret::framework::active_record::key::Key<crate::Author>,crate::margaret::models::article::query::then::author::edge::Edge,margaret::framework::active_record::root::Root>"));
+        assert!(step.contains("id:margaret::framework::active_record::next::Next::new(margaret::framework::active_record::root::Root,0usize)"));
+    }
+
+    #[test]
+    fn declares_every_trie_struct_in_a_module_named_after_it() {
+        let modules = rendered(ARTICLE);
+
+        assert_eq!(modules["models/article/query"], "pubmodstep;pubmodthen;");
+        assert_eq!(
+            modules["models/article/query/then/author"],
+            "pubmodedge;pubmodstep;pubmodthen;"
+        );
+        assert_eq!(modules["models/article/query/then/id"], "pubmodedge;");
     }
 
     #[test]
     fn narrows_a_branch_into_each_of_its_indexes() {
-        let branch = module(ARTICLE, "models/article/query/then/author");
+        let branch = module(ARTICLE, "models/article/query/then/author/step");
 
-        assert!(module(ARTICLE, "models/article/query/then/author/edge/id").contains("typeContinued=margaret::framework::active_record::unique::Unique<crate::Article,margaret::framework::active_record::unguarded::Unguarded,>;"));
+        assert!(module(ARTICLE, "models/article/query/then/author/then/id/edge").contains("typeContinued=margaret::framework::active_record::unique::Unique<crate::Article,margaret::framework::active_record::unguarded::Unguarded,>;"));
         assert!(
-            module(ARTICLE, "models/article/query/then/author/edge/title").contains(
+            module(ARTICLE, "models/article/query/then/author/then/title/edge").contains(
                 "typeContinued=margaret::framework::active_record::prefix::Prefix<crate::Article>;"
             )
         );
@@ -236,12 +247,12 @@ mod tests {
 
     #[test]
     fn leaves_a_branch_with_several_continuations_unordered() {
-        assert!(!module(ARTICLE, "models/article/query/edge/author").contains("ScanOrder"));
+        assert!(!module(ARTICLE, "models/article/query/then/author/edge").contains("ScanOrder"));
     }
 
     #[test]
     fn orders_a_unique_field_by_itself_since_its_values_never_tie() {
-        assert!(module(ARTICLE, "models/article/query/edge/id").contains(
+        assert!(module(ARTICLE, "models/article/query/then/id/edge").contains(
             "implmargaret::framework::active_record::scan_order::ScanOrder<crate::Article>forEdge{constSPANS:&'static[margaret::framework::active_record::field_span::FieldSpan]=&[margaret::framework::active_record::field_span::FieldSpan{start:0usize,width:1usize,}];}"
         ));
     }
@@ -252,7 +263,7 @@ mod tests {
             "{KEY}#[model(table = \"authors\")]\nstruct Author {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n\n#[model(table = \"articles\")]\n#[index(name = \"articles_by_author\", fields = [author, id])]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    author: Key<Author>,\n}}\n"
         );
 
-        assert!(module(&source, "models/article/query/edge/author").contains(
+        assert!(module(&source, "models/article/query/then/author/edge").contains(
             "constSPANS:&'static[margaret::framework::active_record::field_span::FieldSpan]=&[margaret::framework::active_record::field_span::FieldSpan{start:1usize,width:1usize,},margaret::framework::active_record::field_span::FieldSpan{start:0usize,width:1usize,}];"
         ));
     }
@@ -262,11 +273,11 @@ mod tests {
         let source = "#[model(table = \"tokens\")]\n#[index(name = \"tokens_by_type\", fields = [r#type, id])]\nstruct Token {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(name = \"kind\")]\n    r#type: i64,\n}\n";
         let modules = rendered(source);
 
-        assert!(modules["models/token/query/edge"].contains("pubmodr#type;"));
-        assert!(modules.contains_key("models/token/query/edge/type"));
+        assert!(modules["models/token/query/then"].contains("pubmodr#type;"));
         assert!(modules.contains_key("models/token/query/then/type"));
-        assert!(modules["models/token/query"].contains(
-            "pubr#type:margaret::framework::active_record::next::Next<crate::Token,i64,crate::margaret::models::token::query::edge::r#type::Edge,"
+        assert!(modules.contains_key("models/token/query/then/type/edge"));
+        assert!(modules["models/token/query/step"].contains(
+            "pubr#type:margaret::framework::active_record::next::Next<crate::Token,i64,crate::margaret::models::token::query::then::r#type::edge::Edge,"
         ));
     }
 
@@ -276,21 +287,21 @@ mod tests {
             "{KEY}#[model(table = \"nodes\")]\n#[index(name = \"nodes_by_label\", fields = [label, parent, id])]\nstruct Node {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    label: String,\n    #[column]\n    #[index]\n    parent: Option<Key<Node>>,\n}}\n"
         );
 
-        assert!(!module(&source, "models/node/query/edge/label").contains("ScanOrder"));
+        assert!(!module(&source, "models/node/query/then/label/edge").contains("ScanOrder"));
     }
 
     #[test]
     fn leaves_a_branch_ending_in_a_plain_index_unordered() {
         let source = "#[model(table = \"events\")]\n#[index(name = \"events_by_kind\", fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
 
-        assert!(!module(source, "models/event/query/edge/kind").contains("ScanOrder"));
+        assert!(!module(source, "models/event/query/then/kind/edge").contains("ScanOrder"));
     }
 
     #[test]
     fn omits_bulk_updates_from_the_branches_of_a_model_made_of_its_primary_key() {
         let source = LOCK;
 
-        assert!(!module(source, "models/lock/query/then/repository").contains("update"));
+        assert!(!module(source, "models/lock/query/then/repository/step").contains("update"));
     }
 
     #[test]
@@ -298,7 +309,7 @@ mod tests {
         let source = "#[model(table = \"events\")]\n#[index(name = \"events_by_kind\", fields = [kind, label, id])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
         let modules = rendered(source);
 
-        assert_eq!(modules["models/event/query/then"], "pubmodkind;");
+        assert_eq!(modules["models/event/query/then"], "pubmodid;pubmodkind;");
         assert_eq!(modules["models/event/query/then/kind/then"], "pubmodlabel;");
         assert!(modules.contains_key("models/event/query/then/kind/then/label"));
     }

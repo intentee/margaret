@@ -3,8 +3,8 @@ struct Twice;
 
 impl Twice {
     #[constructor]
-    fn new() -> anyhow::Result<Self> {}
+    fn create() -> anyhow::Result<Self> {}
 
     #[constructor]
-    fn create() -> anyhow::Result<Self> {}
+    fn new() -> anyhow::Result<Self> {}
 }

@@ -275,22 +275,6 @@ impl SignInFlow {
         })
     }
 
-    fn verified_transaction(
-        &self,
-        presented: &str,
-        now: NumericDate,
-    ) -> JwtVerification<SignInTransactionClaims, SignInTransactionProfile> {
-        verify_serialized_jwt(
-            self.secrets.get().token_key_set(),
-            presented,
-            &JwtExpectation {
-                audience: ExpectedAudience::One(self.server.client_id),
-                issuer: self.server.trusted_issuer.trust.issuer,
-            },
-            now,
-        )
-    }
-
     async fn verified_id_token<TIdClaims: DeserializeOwned>(
         &self,
         id_token: &str,
@@ -322,5 +306,21 @@ impl SignInFlow {
             }
             IssuerVerification::Verified(verified) => ControlFlow::Continue(verified),
         }
+    }
+
+    fn verified_transaction(
+        &self,
+        presented: &str,
+        now: NumericDate,
+    ) -> JwtVerification<SignInTransactionClaims, SignInTransactionProfile> {
+        verify_serialized_jwt(
+            self.secrets.get().token_key_set(),
+            presented,
+            &JwtExpectation {
+                audience: ExpectedAudience::One(self.server.client_id),
+                issuer: self.server.trusted_issuer.trust.issuer,
+            },
+            now,
+        )
     }
 }

@@ -22,17 +22,17 @@ impl Forward {
         &self.cookies
     }
 
-    pub(crate) fn preceded_by(mut self, cookies: &[Cookie<'static>]) -> Self {
-        self.cookies.splice(0..0, cookies.iter().cloned());
-
-        self
-    }
-
     pub(crate) fn into_path_params(self) -> HashMap<String, String> {
         self.path_params
     }
 
     pub(crate) fn name(&self) -> &'static str {
         self.name
+    }
+
+    pub(crate) fn preceded_by(mut self, cookies: &[Cookie<'static>]) -> Self {
+        self.cookies.splice(0..0, cookies.iter().cloned());
+
+        self
     }
 }

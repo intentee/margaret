@@ -1,4 +1,4 @@
-use margaret_cluster_fixture::margaret::resource_tokens::notes::AUDIENCE;
+use margaret_cluster_fixture::margaret::resource_tokens::notes::audience::AUDIENCE;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::cluster_server::ClusterServer;
 use margaret_cluster_tests::partner_code::partner_code;

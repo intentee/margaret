@@ -24,6 +24,38 @@ pub struct MargaretClient {
 }
 
 impl MargaretClient {
+    async fn discovering(
+        request_client: impl Fn() -> IssuerRequestClient,
+        issuer: &'static IssuerLocation,
+        audience: &'static str,
+        secrets: Arc<JwksSecretHolder>,
+        server: impl FnOnce(
+            Arc<IssuerRequestClient>,
+            Arc<IssuerMetadata>,
+            Arc<TrustedIssuer>,
+        ) -> AuthorizationServerClient,
+    ) -> Self {
+        let metadata = Arc::new(IssuerMetadata::awaiting());
+        let polled = PolledFixture::discovered(issuer.discovered(), Arc::clone(&metadata));
+        let snapshot = polled.key_set.snapshot();
+        let directory = PolledDirectory::start(vec![Arc::clone(&polled.polled)], request_client());
+
+        polled.key_set.request_refresh_after(&snapshot).await;
+
+        Self {
+            directory,
+            secrets,
+            server: Arc::new(server(
+                Arc::new(request_client()),
+                metadata,
+                Arc::new(polled.trusted(TokenTrust {
+                    audience,
+                    issuer: issuer.issuer.as_str(),
+                })),
+            )),
+        }
+    }
+
     pub async fn of_portal(fixture: &ProviderFixture) -> Self {
         let secrets = Arc::clone(&fixture.clients.asserting(PORTAL_CLIENT_ID).secrets);
 
@@ -85,37 +117,5 @@ impl MargaretClient {
 
     pub async fn stop(self) {
         self.directory.stop().await;
-    }
-
-    async fn discovering(
-        request_client: impl Fn() -> IssuerRequestClient,
-        issuer: &'static IssuerLocation,
-        audience: &'static str,
-        secrets: Arc<JwksSecretHolder>,
-        server: impl FnOnce(
-            Arc<IssuerRequestClient>,
-            Arc<IssuerMetadata>,
-            Arc<TrustedIssuer>,
-        ) -> AuthorizationServerClient,
-    ) -> Self {
-        let metadata = Arc::new(IssuerMetadata::awaiting());
-        let polled = PolledFixture::discovered(issuer.discovered(), Arc::clone(&metadata));
-        let snapshot = polled.key_set.snapshot();
-        let directory = PolledDirectory::start(vec![Arc::clone(&polled.polled)], request_client());
-
-        polled.key_set.request_refresh_after(&snapshot).await;
-
-        Self {
-            directory,
-            secrets,
-            server: Arc::new(server(
-                Arc::new(request_client()),
-                metadata,
-                Arc::new(polled.trusted(TokenTrust {
-                    audience,
-                    issuer: issuer.issuer.as_str(),
-                })),
-            )),
-        }
     }
 }

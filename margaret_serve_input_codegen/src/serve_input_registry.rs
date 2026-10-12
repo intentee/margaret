@@ -22,11 +22,6 @@ impl ServeInputRegistry {
         }
     }
 
-    #[must_use]
-    pub fn slot_count(&self) -> usize {
-        self.entries.len()
-    }
-
     /// # Errors
     ///
     /// Returns `ServeInputCodegenError::ConflictingServeInput` or
@@ -72,6 +67,11 @@ impl ServeInputRegistry {
                 Ok(next_slot)
             }
         }
+    }
+
+    #[must_use]
+    pub fn slot_count(&self) -> usize {
+        self.entries.len()
     }
 }
 

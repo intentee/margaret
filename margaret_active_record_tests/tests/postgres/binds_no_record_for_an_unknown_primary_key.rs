@@ -1,7 +1,8 @@
+use uuid::Uuid;
+
 use margaret::framework::active_record::primary_key_binder::PrimaryKeyBinder;
 use margaret_route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;
 use margaret_route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome;
-use uuid::Uuid;
 
 use margaret_active_record_tests::models::author::Author;
 

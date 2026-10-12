@@ -141,45 +141,6 @@ impl VerificationKeySet {
         }
     }
 
-    fn verified<'jws>(
-        &self,
-        CompactJws {
-            header: JwsHeader { alg, crit, kid, .. },
-            signature,
-            signing_input,
-            ..
-        }: &'jws CompactJws<'_>,
-    ) -> ControlFlow<JwsRejection, VerifiedJws<'jws>> {
-        if crit.is_some() {
-            return ControlFlow::Break(JwsRejection::CriticalHeader);
-        }
-
-        let algorithm = match alg {
-            ParameterValue::Supported(algorithm) => *algorithm,
-            ParameterValue::Unsupported(alg) => {
-                return ControlFlow::Break(JwsRejection::UnsupportedAlgorithm { alg: alg.clone() });
-            }
-        };
-        let SelectedMaterial {
-            material,
-            selection,
-        } = self.material_for(kid.as_ref(), algorithm)?;
-
-        match material.check(signing_input.as_bytes(), signature) {
-            SignatureCheck::LengthMismatch { expected, found } => {
-                ControlFlow::Break(JwsRejection::SignatureLength { expected, found })
-            }
-            SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws { kid: kid.as_ref() }),
-            SignatureCheck::Mismatch(source) => {
-                ControlFlow::Break(JwsRejection::SignatureMismatch {
-                    algorithm,
-                    selection,
-                    source,
-                })
-            }
-        }
-    }
-
     fn material_for(
         &self,
         kid: Option<&KeyId>,
@@ -216,6 +177,45 @@ impl VerificationKeySet {
                     candidates: candidates.len(),
                 }),
             },
+        }
+    }
+
+    fn verified<'jws>(
+        &self,
+        CompactJws {
+            header: JwsHeader { alg, crit, kid, .. },
+            signature,
+            signing_input,
+            ..
+        }: &'jws CompactJws<'_>,
+    ) -> ControlFlow<JwsRejection, VerifiedJws<'jws>> {
+        if crit.is_some() {
+            return ControlFlow::Break(JwsRejection::CriticalHeader);
+        }
+
+        let algorithm = match alg {
+            ParameterValue::Supported(algorithm) => *algorithm,
+            ParameterValue::Unsupported(alg) => {
+                return ControlFlow::Break(JwsRejection::UnsupportedAlgorithm { alg: alg.clone() });
+            }
+        };
+        let SelectedMaterial {
+            material,
+            selection,
+        } = self.material_for(kid.as_ref(), algorithm)?;
+
+        match material.check(signing_input.as_bytes(), signature) {
+            SignatureCheck::LengthMismatch { expected, found } => {
+                ControlFlow::Break(JwsRejection::SignatureLength { expected, found })
+            }
+            SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws { kid: kid.as_ref() }),
+            SignatureCheck::Mismatch(source) => {
+                ControlFlow::Break(JwsRejection::SignatureMismatch {
+                    algorithm,
+                    selection,
+                    source,
+                })
+            }
         }
     }
 }

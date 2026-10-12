@@ -1,3 +1,6 @@
+use oauth2::PkceCodeChallenge;
+use oauth2::PkceCodeVerifier;
+
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider_tests::code_exchange::code_exchange;
 use margaret_oidc_provider_tests::issued_code::issued_code;
@@ -5,8 +8,6 @@ use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::with_parameter::with_parameter;
-use oauth2::PkceCodeChallenge;
-use oauth2::PkceCodeVerifier;
 
 const RESERVED_VERIFIER: &str = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk/";
 

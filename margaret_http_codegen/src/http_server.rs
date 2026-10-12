@@ -31,14 +31,6 @@ impl HttpServer {
     }
 
     #[must_use]
-    pub fn served_at_issuer_origin(self, endpoints: CanonicalPath) -> Self {
-        Self {
-            origin: ServerOriginSource::Issuer { endpoints },
-            ..self
-        }
-    }
-
-    #[must_use]
     pub fn address_argument(&self) -> String {
         format!("{}-addr", self.name)
     }
@@ -59,6 +51,14 @@ impl HttpServer {
     }
 
     #[must_use]
+    pub fn served_at_issuer_origin(self, endpoints: CanonicalPath) -> Self {
+        Self {
+            origin: ServerOriginSource::Issuer { endpoints },
+            ..self
+        }
+    }
+
+    #[must_use]
     pub fn transport_argument(&self) -> String {
         format!("{}-transport", self.name)
     }
@@ -69,13 +69,13 @@ impl HttpServer {
     }
 
     #[must_use]
-    pub fn uploads(&self) -> ServerUploads {
-        self.uploads
+    pub fn upload_dir_argument(&self) -> String {
+        format!("{}-upload-dir", self.name)
     }
 
     #[must_use]
-    pub fn upload_dir_argument(&self) -> String {
-        format!("{}-upload-dir", self.name)
+    pub fn uploads(&self) -> ServerUploads {
+        self.uploads
     }
 
     #[must_use]

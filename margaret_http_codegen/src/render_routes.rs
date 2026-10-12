@@ -134,13 +134,13 @@ fn server_struct(
 ) -> TokenStream {
     let ServerLayout {
         constructor,
+        named,
         origin,
         paths,
         server,
         struct_ident,
         ..
     } = layout;
-    let named = table.named_routes(server.name());
     let server_patterns: Vec<&str> = table
         .route_groups(server.name())
         .map(|group| group.path().pattern())
@@ -157,7 +157,7 @@ fn server_struct(
     let mut field_inits = Vec::new();
     let mut methods = Vec::new();
 
-    for route in &named {
+    for route in named {
         match route.path.template() {
             RouteUrlTemplate::Literal(path) => {
                 field_decls.push(literal_route_field(route));

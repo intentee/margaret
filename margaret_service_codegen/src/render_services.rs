@@ -351,19 +351,18 @@ fn ticker_adapter(
 
         #[async_trait::async_trait]
         impl trzcina::Ticker for #name {
-            fn tick_interval(&self) -> std::time::Duration {
-                #interval
-            }
-
-
-            #missed_tick_behavior_method
-
             async fn handle_tick(
                 &mut self,
                 #token_binding: tokio_util::sync::CancellationToken,
                 _tick_context: trzcina::TickContext,
             ) -> margaret::framework::anyhow::Result<()> {
                 #outcome
+            }
+
+            #missed_tick_behavior_method
+
+            fn tick_interval(&self) -> std::time::Duration {
+                #interval
             }
         }
     }

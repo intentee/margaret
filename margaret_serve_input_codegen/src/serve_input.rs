@@ -64,11 +64,6 @@ impl ServeInput {
     }
 
     #[must_use]
-    pub fn reads_server_origins(&self) -> bool {
-        matches!(self, ServeInput::RouteUrl(_) | ServeInput::Routes)
-    }
-
-    #[must_use]
     pub fn reads_clap_matches(&self) -> bool {
         match self {
             ServeInput::ConsoleArgument(_) => true,
@@ -78,6 +73,11 @@ impl ServeInput {
             | ServeInput::SpiffeHttpClient
             | ServeInput::SpiffeIssuerRequestClient => false,
         }
+    }
+
+    #[must_use]
+    pub fn reads_server_origins(&self) -> bool {
+        matches!(self, ServeInput::RouteUrl(_) | ServeInput::Routes)
     }
 
     #[must_use]

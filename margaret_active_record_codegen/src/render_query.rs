@@ -5,7 +5,6 @@ use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_model_codegen::model::Model;
 
-use crate::branch_edge::BranchEdge;
 use crate::field_identifier::field_identifier;
 use crate::field_span_tokens::field_span_tokens;
 use crate::field_type_tokens::field_type_tokens;
@@ -14,170 +13,26 @@ use crate::node_location::NodeLocation;
 use crate::node_ordering::NodeOrdering;
 use crate::node_update_tokens::node_update_tokens;
 use crate::query_edge::QueryEdge;
+use crate::query_edges::QueryEdges;
 use crate::query_node::QueryNode;
 use crate::trie_builder::TrieBuilder;
 
-fn branches<'tree, 'model>(edges: &[&'tree QueryEdge<'model>]) -> Vec<BranchEdge<'tree, 'model>> {
-    edges
-        .iter()
-        .filter_map(|edge| match &edge.node {
-            QueryNode::Branch(edges) => Some(BranchEdge {
-                edges,
-                field: edge.field,
-            }),
-            QueryNode::Leaf(_) => None,
-        })
-        .collect()
-}
-
-fn continued_tokens(edge: &QueryEdge, location: &NodeLocation, model: &Model) -> TokenStream {
-    let record = path_tokens(&model.path);
-
-    match &edge.node {
-        QueryNode::Branch(_) => {
-            let path = location.child(edge.field).path(model);
-
-            quote! { #path::Step }
-        }
-        QueryNode::Leaf(NodeEnding::UniqueEnd) => quote! {
-            margaret::framework::active_record::unique::Unique<
-                #record,
-                margaret::framework::active_record::unguarded::Unguarded,
-            >
-        },
-        QueryNode::Leaf(NodeEnding::PlainEnd) => {
-            quote! { margaret::framework::active_record::prefix::Prefix<#record> }
-        }
-    }
-}
-
-fn edge_modules(
-    edges: &[&QueryEdge],
+fn branch_step_module(
+    edges: &QueryEdges,
     location: &NodeLocation,
     model: &Model,
-) -> Vec<GeneratedModuleTokens> {
+) -> GeneratedModuleTokens {
     let record = path_tokens(&model.path);
-    let declarations = edges.iter().map(|edge| {
-        let identifier = field_identifier(edge.field);
-
-        quote! { pub mod #identifier; }
-    });
-    let mut modules = vec![GeneratedModuleTokens::new(
-        location.edge().module(model),
-        quote! { #(#declarations)* },
-    )];
-
-    modules.extend(edges.iter().map(|edge| {
-        let continued = continued_tokens(edge, location, model);
-        let scan_order = match edge.node.ordering() {
-            NodeOrdering::Total(rest) => {
-                let spans = [edge.field]
-                    .into_iter()
-                    .chain(rest)
-                    .map(field_span_tokens);
-
-                quote! {
-                    impl margaret::framework::active_record::scan_order::ScanOrder<#record> for Edge {
-                        const SPANS: &'static [margaret::framework::active_record::field_span::FieldSpan] =
-                            &[#(#spans),*];
-                    }
-                }
-            }
-            NodeOrdering::Partial => quote! {},
-        };
-
-        GeneratedModuleTokens::new(
-            location.edge_of(edge.field).module(model),
-            quote! {
-                pub struct Edge;
-
-                impl margaret::framework::active_record::query_edge::QueryEdge<#record> for Edge {
-                    type Continued = #continued;
-                }
-
-                #scan_order
-            },
-        )
-    }));
-    modules
-}
-
-fn step_declaration(
-    edges: &[&QueryEdge],
-    location: &NodeLocation,
-    model: &Model,
-    state: &TokenStream,
-) -> TokenStream {
-    let record = path_tokens(&model.path);
-    let then = if branches(edges).is_empty() {
-        quote! {}
-    } else {
-        quote! { pub mod then; }
-    };
-    let fields = edges.iter().map(|edge| {
-        let identifier = field_identifier(edge.field);
-        let field_type = field_type_tokens(edge.field);
-        let edge_path = location.edge_of(edge.field).path(model);
-
-        quote! {
-            pub #identifier: margaret::framework::active_record::next::Next<#record, #field_type, #edge_path::Edge, #state>
-        }
-    });
-
-    quote! {
-        pub mod edge;
-        #then
-
-        pub struct Step {
-            #(#fields),*
-        }
-    }
-}
-
-fn branch_modules(
-    edges: &[&QueryEdge],
-    location: &NodeLocation,
-    model: &Model,
-) -> Vec<GeneratedModuleTokens> {
-    let branches = branches(edges);
-
-    if branches.is_empty() {
-        return Vec::new();
-    }
-
-    let declarations = branches.iter().map(|branch| {
-        let identifier = field_identifier(branch.field);
-
-        quote! { pub mod #identifier; }
-    });
-    let mut modules = vec![GeneratedModuleTokens::new(
-        location.then().module(model),
-        quote! { #(#declarations)* },
-    )];
-
-    for branch in &branches {
-        modules.extend(render_branch(branch, &location.child(branch.field), model));
-    }
-
-    modules
-}
-
-fn render_branch(
-    branch: &BranchEdge,
-    location: &NodeLocation,
-    model: &Model,
-) -> Vec<GeneratedModuleTokens> {
-    let record = path_tokens(&model.path);
-    let edges: Vec<&QueryEdge> = branch.edges.all().collect();
+    let all: Vec<&QueryEdge> = edges.all().collect();
     let step = step_declaration(
-        &edges,
+        &all,
         location,
         model,
         &quote! { margaret::framework::active_record::narrowed::Narrowed<#record> },
     );
-    let first = field_identifier(branch.edges.first.field);
-    let first_start = branch.edges.first.field.start;
-    let rest = branch.edges.rest.iter().map(|edge| {
+    let first = field_identifier(edges.first.field);
+    let first_start = edges.first.field.start;
+    let rest = edges.rest.iter().map(|edge| {
         let identifier = field_identifier(edge.field);
         let start = edge.field.start;
 
@@ -189,8 +44,9 @@ fn render_branch(
         }
     });
     let update_impl = node_update_tokens(model, &first);
-    let mut modules = vec![GeneratedModuleTokens::new(
-        location.module(model),
+
+    GeneratedModuleTokens::new(
+        location.step().module(model),
         quote! {
             #step
 
@@ -223,12 +79,140 @@ fn render_branch(
                     }
                 }
             }
-
         },
+    )
+}
+
+fn continuation_modules(
+    edge: &QueryEdge,
+    location: &NodeLocation,
+    model: &Model,
+) -> Vec<GeneratedModuleTokens> {
+    match &edge.node {
+        QueryNode::Branch(edges) => {
+            let continued: Vec<&QueryEdge> = edges.all().collect();
+            let mut modules = vec![
+                GeneratedModuleTokens::new(
+                    location.module(model),
+                    quote! {
+                        pub mod edge;
+                        pub mod step;
+                        pub mod then;
+                    },
+                ),
+                edge_module(edge, location, model),
+                branch_step_module(edges, location, model),
+            ];
+
+            modules.extend(then_modules(&continued, location, model));
+            modules
+        }
+        QueryNode::Leaf(_) => vec![
+            GeneratedModuleTokens::new(location.module(model), quote! { pub mod edge; }),
+            edge_module(edge, location, model),
+        ],
+    }
+}
+
+fn continued_tokens(edge: &QueryEdge, location: &NodeLocation, model: &Model) -> TokenStream {
+    let record = path_tokens(&model.path);
+
+    match &edge.node {
+        QueryNode::Branch(_) => {
+            let path = location.step().path(model);
+
+            quote! { #path::Step }
+        }
+        QueryNode::Leaf(NodeEnding::UniqueEnd) => quote! {
+            margaret::framework::active_record::unique::Unique<
+                #record,
+                margaret::framework::active_record::unguarded::Unguarded,
+            >
+        },
+        QueryNode::Leaf(NodeEnding::PlainEnd) => {
+            quote! { margaret::framework::active_record::prefix::Prefix<#record> }
+        }
+    }
+}
+
+fn edge_module(edge: &QueryEdge, location: &NodeLocation, model: &Model) -> GeneratedModuleTokens {
+    let record = path_tokens(&model.path);
+    let continued = continued_tokens(edge, location, model);
+    let scan_order = match edge.node.ordering() {
+        NodeOrdering::Total(rest) => {
+            let spans = [edge.field].into_iter().chain(rest).map(field_span_tokens);
+
+            quote! {
+                impl margaret::framework::active_record::scan_order::ScanOrder<#record> for Edge {
+                    const SPANS: &'static [margaret::framework::active_record::field_span::FieldSpan] =
+                        &[#(#spans),*];
+                }
+            }
+        }
+        NodeOrdering::Partial => quote! {},
+    };
+
+    GeneratedModuleTokens::new(
+        location.edge().module(model),
+        quote! {
+            pub struct Edge;
+
+            impl margaret::framework::active_record::query_edge::QueryEdge<#record> for Edge {
+                type Continued = #continued;
+            }
+
+            #scan_order
+        },
+    )
+}
+
+fn step_declaration(
+    edges: &[&QueryEdge],
+    location: &NodeLocation,
+    model: &Model,
+    state: &TokenStream,
+) -> TokenStream {
+    let record = path_tokens(&model.path);
+    let fields = edges.iter().map(|edge| {
+        let identifier = field_identifier(edge.field);
+        let field_type = field_type_tokens(edge.field);
+        let edge_path = location.child(edge.field).edge().path(model);
+
+        quote! {
+            pub #identifier: margaret::framework::active_record::next::Next<#record, #field_type, #edge_path::Edge, #state>
+        }
+    });
+
+    quote! {
+        pub struct Step {
+            #(#fields),*
+        }
+    }
+}
+
+fn then_modules(
+    edges: &[&QueryEdge],
+    location: &NodeLocation,
+    model: &Model,
+) -> Vec<GeneratedModuleTokens> {
+    let declarations = edges.iter().map(|edge| {
+        let identifier = field_identifier(edge.field);
+
+        quote! { pub mod #identifier; }
+    });
+    let mut modules = vec![GeneratedModuleTokens::new(
+        location.then().module(model),
+        quote! { #(#declarations)* },
     )];
 
-    modules.extend(edge_modules(&edges, location, model));
-    modules.extend(branch_modules(&edges, location, model));
+    for edge in edges {
+        modules.extend(continuation_modules(
+            edge,
+            &location.child(edge.field),
+            model,
+        ));
+    }
+
     modules
 }
 
@@ -248,18 +232,26 @@ pub(crate) fn render_query(model: &Model) -> Vec<GeneratedModuleTokens> {
         model,
         &quote! { margaret::framework::active_record::root::Root },
     );
-    let mut modules = vec![GeneratedModuleTokens::new(
-        location.module(model),
-        quote! {
-            #step
+    let mut modules = vec![
+        GeneratedModuleTokens::new(
+            location.module(model),
+            quote! {
+                pub mod step;
+                pub mod then;
+            },
+        ),
+        GeneratedModuleTokens::new(
+            location.step().module(model),
+            quote! {
+                #step
 
-            impl margaret::framework::active_record::field_set::FieldSet for Step {
-                const FIELDS: Self = Self { #(#constructions),* };
-            }
-        },
-    )];
+                impl margaret::framework::active_record::field_set::FieldSet for Step {
+                    const FIELDS: Self = Self { #(#constructions),* };
+                }
+            },
+        ),
+    ];
 
-    modules.extend(edge_modules(&edges, &location, model));
-    modules.extend(branch_modules(&edges, &location, model));
+    modules.extend(then_modules(&edges, &location, model));
     modules
 }

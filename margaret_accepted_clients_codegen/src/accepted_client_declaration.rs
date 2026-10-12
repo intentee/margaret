@@ -442,6 +442,54 @@ pub struct AcceptedClientDeclaration<'index> {
 }
 
 impl<'index> AcceptedClientDeclaration<'index> {
+    pub(crate) fn read(
+        index: &'index AttributeIndex,
+        matched: &MatchedAttribute<'index>,
+        declared_resources: &DeclaredResourceIssuances,
+        scopes: &DeclaredScopes,
+    ) -> Result<Self, AcceptedClientsCodegenError> {
+        let anchor = declaration_anchor(index, matched, FrameworkAttribute::AdmitsOAuthClient)?;
+        let item = anchor.item;
+        let path = item.canonical_path().to_string();
+        let context = ScopeContext {
+            index,
+            item,
+            scopes,
+        };
+
+        matched.args()?.interpret(|reader| {
+            Ok(Self {
+                tag: reader
+                    .take_positional_path()
+                    .ok_or_else(|| AcceptedClientsCodegenError::MissingTag {
+                        anchor: path.clone(),
+                    })
+                    .and_then(|tag| {
+                        Tag::from_path(&tag).ok_or_else(|| {
+                            AcceptedClientsCodegenError::MalformedTag {
+                                anchor: path.clone(),
+                            }
+                        })
+                    })?,
+                authentication: reader
+                    .take_variant(
+                        ItemNamingArgument::ClientAuthentication.key(),
+                        |variant, arguments| declared_authentication(&context, variant, arguments),
+                    )?
+                    .ok_or_else(|| AcceptedClientsCodegenError::MissingAuthentication {
+                        anchor: path.clone(),
+                    })?,
+                authorization_code: reader
+                    .take_group("authorization_code", |group| code_policy(&context, group))?
+                    .map_or(DeclaredCodeGrant::Withheld, DeclaredCodeGrant::Granted),
+                client_id: client_id(reader, &path)?,
+                resources: resources(reader, declared_resources, &path)?,
+                token_exchange: token_exchange(&context, reader, &path)?,
+                anchor,
+            })
+        })
+    }
+
     #[must_use]
     pub fn grant_types(&self) -> BTreeSet<GrantType> {
         let mut grant_types = BTreeSet::new();
@@ -509,54 +557,6 @@ impl<'index> AcceptedClientDeclaration<'index> {
         }
 
         Ok(())
-    }
-
-    pub(crate) fn read(
-        index: &'index AttributeIndex,
-        matched: &MatchedAttribute<'index>,
-        declared_resources: &DeclaredResourceIssuances,
-        scopes: &DeclaredScopes,
-    ) -> Result<Self, AcceptedClientsCodegenError> {
-        let anchor = declaration_anchor(index, matched, FrameworkAttribute::AdmitsOAuthClient)?;
-        let item = anchor.item;
-        let path = item.canonical_path().to_string();
-        let context = ScopeContext {
-            index,
-            item,
-            scopes,
-        };
-
-        matched.args()?.interpret(|reader| {
-            Ok(Self {
-                tag: reader
-                    .take_positional_path()
-                    .ok_or_else(|| AcceptedClientsCodegenError::MissingTag {
-                        anchor: path.clone(),
-                    })
-                    .and_then(|tag| {
-                        Tag::from_path(&tag).ok_or_else(|| {
-                            AcceptedClientsCodegenError::MalformedTag {
-                                anchor: path.clone(),
-                            }
-                        })
-                    })?,
-                authentication: reader
-                    .take_variant(
-                        ItemNamingArgument::ClientAuthentication.key(),
-                        |variant, arguments| declared_authentication(&context, variant, arguments),
-                    )?
-                    .ok_or_else(|| AcceptedClientsCodegenError::MissingAuthentication {
-                        anchor: path.clone(),
-                    })?,
-                authorization_code: reader
-                    .take_group("authorization_code", |group| code_policy(&context, group))?
-                    .map_or(DeclaredCodeGrant::Withheld, DeclaredCodeGrant::Granted),
-                client_id: client_id(reader, &path)?,
-                resources: resources(reader, declared_resources, &path)?,
-                token_exchange: token_exchange(&context, reader, &path)?,
-                anchor,
-            })
-        })
     }
 }
 

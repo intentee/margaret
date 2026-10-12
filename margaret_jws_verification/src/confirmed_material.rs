@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 
-use crate::declared_algorithm::confirm_declared_algorithm;
+use crate::confirm_declared_algorithm::confirm_declared_algorithm;
 use crate::ignored_key_reason::IgnoredKeyReason;
 use crate::key_material_rejection::KeyMaterialRejection;
 use crate::parameter_value::ParameterValue;

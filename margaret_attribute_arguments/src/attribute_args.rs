@@ -72,6 +72,32 @@ impl AttributeArgs {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeArgumentsError::Malformed` or `AttributeArgumentsError::DuplicateNamedArgument`.
+    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgumentsError> {
+        let attribute_path = format_path(attribute.path());
+
+        match &attribute.meta {
+            Meta::Path(_) => Ok(Self {
+                attribute_path,
+                named: Vec::new(),
+                positional: Vec::new(),
+            }),
+            Meta::NameValue(meta_name_value) => Ok(Self {
+                named: vec![NamedArgument {
+                    name: format_path(&meta_name_value.path),
+                    value: meta_name_value.value.clone(),
+                }],
+                attribute_path,
+                positional: Vec::new(),
+            }),
+            Meta::List(meta_list) => {
+                Self::from_argument_tokens(attribute_path, meta_list.tokens.clone())
+            }
+        }
+    }
+
     pub(crate) fn from_expressions(
         attribute_path: String,
         expressions: impl IntoIterator<Item = Expr>,
@@ -100,32 +126,6 @@ impl AttributeArgs {
             named,
             positional,
         })
-    }
-
-    /// # Errors
-    ///
-    /// Returns `AttributeArgumentsError::Malformed` or `AttributeArgumentsError::DuplicateNamedArgument`.
-    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgumentsError> {
-        let attribute_path = format_path(attribute.path());
-
-        match &attribute.meta {
-            Meta::Path(_) => Ok(Self {
-                attribute_path,
-                named: Vec::new(),
-                positional: Vec::new(),
-            }),
-            Meta::NameValue(meta_name_value) => Ok(Self {
-                named: vec![NamedArgument {
-                    name: format_path(&meta_name_value.path),
-                    value: meta_name_value.value.clone(),
-                }],
-                attribute_path,
-                positional: Vec::new(),
-            }),
-            Meta::List(meta_list) => {
-                Self::from_argument_tokens(attribute_path, meta_list.tokens.clone())
-            }
-        }
     }
 
     /// # Errors

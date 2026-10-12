@@ -30,6 +30,18 @@ pub enum EndpointOutcome<TAnswer> {
 }
 
 impl<TAnswer: DeserializeOwned> EndpointOutcome<TAnswer> {
+    fn answered(answer: &Response<Vec<u8>>) -> Self {
+        match answer.headers().get(CONTENT_TYPE) {
+            Some(content_type) if !is_json(content_type) => {
+                Self::Unavailable(ServerUnavailability::UnexpectedContentType {
+                    content_type: content_type.clone(),
+                })
+            }
+            _ if answer.body().is_empty() => Self::Unavailable(ServerUnavailability::EmptyAnswer),
+            _ => Self::parsed_into(answer.body(), Self::Answered),
+        }
+    }
+
     pub(crate) fn of(exchanged: Result<IssuerAnswer, IssuerExchangeError>) -> Self {
         match exchanged {
             Ok(IssuerAnswer::Received(answer)) if answer.status() == StatusCode::OK => {
@@ -40,18 +52,6 @@ impl<TAnswer: DeserializeOwned> EndpointOutcome<TAnswer> {
                 Self::Unavailable(ServerUnavailability::OversizedAnswer { max_bytes })
             }
             Err(failure) => Self::Unavailable(ServerUnavailability::Exchange(failure)),
-        }
-    }
-
-    fn answered(answer: &Response<Vec<u8>>) -> Self {
-        match answer.headers().get(CONTENT_TYPE) {
-            Some(content_type) if !is_json(content_type) => {
-                Self::Unavailable(ServerUnavailability::UnexpectedContentType {
-                    content_type: content_type.clone(),
-                })
-            }
-            _ if answer.body().is_empty() => Self::Unavailable(ServerUnavailability::EmptyAnswer),
-            _ => Self::parsed_into(answer.body(), Self::Answered),
         }
     }
 

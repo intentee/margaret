@@ -24,6 +24,13 @@ pub(crate) struct TrieBuilder<'model> {
 }
 
 impl<'model> TrieBuilder<'model> {
+    fn empty() -> Self {
+        Self {
+            children: Vec::new(),
+            ends_on_a_row: false,
+        }
+    }
+
     pub(crate) fn of(model: &'model Model) -> Self {
         let mut root = Self::empty();
 
@@ -55,23 +62,6 @@ impl<'model> TrieBuilder<'model> {
         }
     }
 
-    fn sorted_edges(mut self) -> impl Iterator<Item = QueryEdge<'model>> {
-        self.children.sort_by_key(|edge| edge.field.start);
-        self.children
-            .into_iter()
-            .map(|BuilderEdge { field, node }| QueryEdge {
-                field,
-                node: node.built(),
-            })
-    }
-
-    fn empty() -> Self {
-        Self {
-            children: Vec::new(),
-            ends_on_a_row: false,
-        }
-    }
-
     fn insert(&mut self, path: &'model [ModelField], identifies_a_row: bool) {
         let Some((first, rest)) = path.split_first() else {
             self.ends_on_a_row |= identifies_a_row;
@@ -87,5 +77,15 @@ impl<'model> TrieBuilder<'model> {
             node.insert(rest, identifies_a_row);
             self.children.push(BuilderEdge { field: first, node });
         }
+    }
+
+    fn sorted_edges(mut self) -> impl Iterator<Item = QueryEdge<'model>> {
+        self.children.sort_by_key(|edge| edge.field.start);
+        self.children
+            .into_iter()
+            .map(|BuilderEdge { field, node }| QueryEdge {
+                field,
+                node: node.built(),
+            })
     }
 }

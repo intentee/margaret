@@ -66,22 +66,6 @@ pub struct Cluster {
 impl Cluster {
     /// # Panics
     ///
-    /// Panics when the database, the doors or the instances cannot be prepared.
-    pub async fn start(binary: &Path, instances: usize) -> Self {
-        let mut cluster = Self::prepare(binary).await;
-        let mut started = Vec::new();
-
-        for _ in 0..instances {
-            started.push(cluster.add_member().await);
-        }
-
-        cluster.restart(&started).await;
-
-        cluster
-    }
-
-    /// # Panics
-    ///
     /// Panics when the database, the doors or the seed cannot be prepared.
     pub async fn prepare(binary: &Path) -> Self {
         let tls = TlsFixture::generate();
@@ -117,42 +101,18 @@ impl Cluster {
 
     /// # Panics
     ///
-    /// Panics when the console command cannot be run.
-    pub async fn command(&self, arguments: &[&str]) -> Output {
-        self.launch
-            .command()
-            .args(arguments)
-            .output()
-            .await
-            .expect("the console command runs")
-    }
+    /// Panics when the database, the doors or the instances cannot be prepared.
+    pub async fn start(binary: &Path, instances: usize) -> Self {
+        let mut cluster = Self::prepare(binary).await;
+        let mut started = Vec::new();
 
-    pub fn admit(&self, index: usize) {
-        self.front_door.backends.admit(self.members[index].ports);
-    }
+        for _ in 0..instances {
+            started.push(cluster.add_member().await);
+        }
 
-    pub fn drain(&self, index: usize) {
-        self.front_door.backends.drain(self.members[index].ports);
-    }
+        cluster.restart(&started).await;
 
-    #[must_use]
-    pub fn url(&self, server: ClusterServer) -> Url {
-        self.front_door.doors.url(server)
-    }
-
-    #[must_use]
-    pub fn instance_url(&self, index: usize, server: ClusterServer) -> Url {
-        self.members[index].doors.url(server)
-    }
-
-    #[must_use]
-    pub fn instance_routes(&self, index: usize) -> Routes {
-        self.members[index].doors.routes()
-    }
-
-    #[must_use]
-    pub fn routes(&self) -> Routes {
-        self.front_door.doors.routes()
+        cluster
     }
 
     pub async fn add_member(&mut self) -> usize {
@@ -169,6 +129,38 @@ impl Cluster {
         self.members.len() - 1
     }
 
+    pub fn admit(&self, index: usize) {
+        self.front_door.backends.admit(self.members[index].ports);
+    }
+
+    /// # Panics
+    ///
+    /// Panics when a running instance does not exit cleanly.
+    pub async fn close(self) {
+        for (_index, instance) in self.running {
+            assert!(instance.terminate().await.success());
+        }
+
+        for member in self.members {
+            member.doors.close().await;
+        }
+
+        self.front_door.doors.close().await;
+        self.external_issuer.close().await;
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the console command cannot be run.
+    pub async fn command(&self, arguments: &[&str]) -> Output {
+        self.launch
+            .command()
+            .args(arguments)
+            .output()
+            .await
+            .expect("the console command runs")
+    }
+
     /// # Panics
     ///
     /// Panics when the instance is not running.
@@ -176,18 +168,18 @@ impl Cluster {
         self.withdrawn(index).kill().await;
     }
 
-    /// # Panics
-    ///
-    /// Panics when the instance is not running.
-    pub async fn stop(&mut self, index: usize) -> ExitStatus {
-        self.withdrawn(index).terminate().await
+    pub fn drain(&self, index: usize) {
+        self.front_door.backends.drain(self.members[index].ports);
     }
 
-    /// # Panics
-    ///
-    /// Panics when an instance exits before it becomes ready.
-    pub async fn restart(&mut self, indices: &[usize]) {
-        self.launch(indices, InstanceAdmission::Admitted).await;
+    #[must_use]
+    pub fn instance_routes(&self, index: usize) -> Routes {
+        self.members[index].doors.routes()
+    }
+
+    #[must_use]
+    pub fn instance_url(&self, index: usize, server: ClusterServer) -> Url {
+        self.members[index].doors.url(server)
     }
 
     /// # Panics
@@ -220,18 +212,26 @@ impl Cluster {
 
     /// # Panics
     ///
-    /// Panics when a running instance does not exit cleanly.
-    pub async fn close(self) {
-        for (_index, instance) in self.running {
-            assert!(instance.terminate().await.success());
-        }
+    /// Panics when an instance exits before it becomes ready.
+    pub async fn restart(&mut self, indices: &[usize]) {
+        self.launch(indices, InstanceAdmission::Admitted).await;
+    }
 
-        for member in self.members {
-            member.doors.close().await;
-        }
+    #[must_use]
+    pub fn routes(&self) -> Routes {
+        self.front_door.doors.routes()
+    }
 
-        self.front_door.doors.close().await;
-        self.external_issuer.close().await;
+    /// # Panics
+    ///
+    /// Panics when the instance is not running.
+    pub async fn stop(&mut self, index: usize) -> ExitStatus {
+        self.withdrawn(index).terminate().await
+    }
+
+    #[must_use]
+    pub fn url(&self, server: ClusterServer) -> Url {
+        self.front_door.doors.url(server)
     }
 
     fn withdrawn(&mut self, index: usize) -> ClusterInstance {

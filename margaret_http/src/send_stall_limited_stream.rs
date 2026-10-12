@@ -50,6 +50,24 @@ impl<TStream: AsyncRead + Unpin> AsyncRead for SendStallLimitedStream<TStream> {
 }
 
 impl<TStream: AsyncWrite + Unpin> AsyncWrite for SendStallLimitedStream<TStream> {
+    fn is_write_vectored(&self) -> bool {
+        self.stream.is_write_vectored()
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let this = self.get_mut();
+        let outcome = Pin::new(&mut this.stream).poll_flush(context);
+
+        this.sent(context, outcome)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let this = self.get_mut();
+        let outcome = Pin::new(&mut this.stream).poll_shutdown(context);
+
+        this.sent(context, outcome)
+    }
+
     fn poll_write(
         self: Pin<&mut Self>,
         context: &mut Context<'_>,
@@ -68,24 +86,6 @@ impl<TStream: AsyncWrite + Unpin> AsyncWrite for SendStallLimitedStream<TStream>
     ) -> Poll<io::Result<usize>> {
         let this = self.get_mut();
         let outcome = Pin::new(&mut this.stream).poll_write_vectored(context, buffers);
-
-        this.sent(context, outcome)
-    }
-
-    fn is_write_vectored(&self) -> bool {
-        self.stream.is_write_vectored()
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<io::Result<()>> {
-        let this = self.get_mut();
-        let outcome = Pin::new(&mut this.stream).poll_flush(context);
-
-        this.sent(context, outcome)
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<io::Result<()>> {
-        let this = self.get_mut();
-        let outcome = Pin::new(&mut this.stream).poll_shutdown(context);
 
         this.sent(context, outcome)
     }

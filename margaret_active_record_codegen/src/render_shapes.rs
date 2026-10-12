@@ -24,7 +24,7 @@ pub fn render_shapes(shapes: &[ShapeDeclaration]) -> Vec<GeneratedModuleTokens> 
         quote! { #(#declarations)* },
     )]
     .into_iter()
-    .chain(shapes.iter().map(render_shape))
+    .chain(shapes.iter().flat_map(render_shape))
     .collect()
 }
 
@@ -91,6 +91,20 @@ mod tests {
     }
 
     #[test]
+    fn declares_the_preloaded_relations_of_a_shape_in_a_module_named_after_them() {
+        let rendered = shape(WITH_AUTHOR, "shapes/article_with_author");
+
+        assert!(rendered.starts_with("pubmodpreloaded;"));
+        assert!(rendered.contains(
+            "typePreloaded=crate::margaret::shapes::article_with_author::preloaded::Preloaded;"
+        ));
+        assert_eq!(
+            shape(WITH_AUTHOR, "shapes/article_with_author/preloaded"),
+            "pubstructPreloaded{pubauthor:<crate::Authorasmargaret::framework::active_record::loadable::Loadable>::Preloaded}"
+        );
+    }
+
+    #[test]
     fn inner_joins_a_belongs_to_relation_so_its_owner_loads_in_the_same_query() {
         let rendered = shape(WITH_AUTHOR, "shapes/article_with_author");
 
@@ -123,6 +137,10 @@ mod tests {
             &format!("{WITH_AUTHOR}\n{WITH_CHILDREN}"),
             "shapes/author_with_family",
         );
+        let preloaded = shape(
+            &format!("{WITH_AUTHOR}\n{WITH_CHILDREN}"),
+            "shapes/author_with_family/preloaded",
+        );
 
         assert!(rendered.contains("builder.primary_key::<crate::Author>(source);"));
         assert!(rendered.contains("cursor.record::<crate::Author>().inspect(|_|{cursor.skip(margaret::framework::active_record::primary_key_width::primary_key_width::<crate::Author>());})"));
@@ -132,19 +150,17 @@ mod tests {
         ));
         assert!(rendered.contains("articles:preloaded.articles.children(cursor.index())"));
         assert!(rendered.contains("profile:preloaded.profile.child(cursor.index())"));
-        assert!(rendered.contains("pubarticles:margaret::framework::active_record::child_groups::ChildGroups<crate::ArticleWithAuthor>"));
+        assert!(preloaded.contains("pubarticles:margaret::framework::active_record::child_groups::ChildGroups<crate::ArticleWithAuthor>"));
     }
 
     #[test]
     fn preloads_the_relations_of_a_joined_shape() {
-        let rendered = shape(
-            &format!(
-                "{WITH_AUTHOR}\n{WITH_CHILDREN}\n#[eager_load(model = Article)]\nstruct ArticleWithFamily {{\n    #[base]\n    article: Article,\n    #[relation(author)]\n    author: AuthorWithFamily,\n}}\n"
-            ),
-            "shapes/article_with_family",
+        let shapes = format!(
+            "{WITH_AUTHOR}\n{WITH_CHILDREN}\n#[eager_load(model = Article)]\nstruct ArticleWithFamily {{\n    #[base]\n    article: Article,\n    #[relation(author)]\n    author: AuthorWithFamily,\n}}\n"
         );
+        let rendered = shape(&shapes, "shapes/article_with_family");
 
-        assert!(rendered.contains("pubauthor:<crate::AuthorWithFamilyasmargaret::framework::active_record::loadable::Loadable>::Preloaded"));
+        assert!(shape(&shapes, "shapes/article_with_family/preloaded").contains("pubauthor:<crate::AuthorWithFamilyasmargaret::framework::active_record::loadable::Loadable>::Preloaded"));
         assert!(rendered.contains("author:<crate::AuthorWithFamilyasmargaret::framework::active_record::loadable::Loadable>::preload(rows,offset+<crate::Articleasmargaret::framework::active_record::loadable::Loadable>::WIDTH,executor,).await?"));
     }
 

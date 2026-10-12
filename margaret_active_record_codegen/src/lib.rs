@@ -1,7 +1,6 @@
 pub mod active_record_codegen_error;
 mod assignable_fields;
 mod bound_read;
-mod branch_edge;
 mod builder_edge;
 mod chained_construction;
 mod chained_writes;
@@ -32,7 +31,7 @@ mod relation_arguments;
 mod render_columns;
 mod render_conditions;
 mod render_draft;
-mod render_enum_columns;
+mod render_enum_column;
 mod render_model_impl;
 mod render_model_module;
 pub mod render_models;

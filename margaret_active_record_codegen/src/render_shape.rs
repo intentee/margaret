@@ -79,7 +79,7 @@ fn shape_read(base: &Ident, read_base: TokenStream, reads: Vec<ShapeRead>) -> To
     chained_construction(&bound, &quote! { Self { #(#assignments),* } })
 }
 
-pub(crate) fn render_shape(shape: &ShapeDeclaration) -> GeneratedModuleTokens {
+pub(crate) fn render_shape(shape: &ShapeDeclaration) -> [GeneratedModuleTokens; 2] {
     let shape_type = path_tokens(&shape.path);
     let model = path_tokens(&shape.model.path);
     let base = format_ident!("{}", shape.base);
@@ -118,55 +118,64 @@ pub(crate) fn render_shape(shape: &ShapeDeclaration) -> GeneratedModuleTokens {
         quote! { #base_width #key_width },
     );
     let read = shape_read(&base, read_base, reads);
+    let shape_module = format!("{SHAPES_MODULE_NAME}/{}", shape.module);
 
-    GeneratedModuleTokens::new(
-        format!("{SHAPES_MODULE_NAME}/{}", shape.module),
-        quote! {
-            pub struct Preloaded {
-                #(#preloaded_fields),*
-            }
+    [
+        GeneratedModuleTokens::new(
+            format!("{shape_module}/preloaded"),
+            quote! {
+                pub struct Preloaded {
+                    #(#preloaded_fields),*
+                }
+            },
+        ),
+        GeneratedModuleTokens::new(
+            shape_module,
+            quote! {
+                pub mod preloaded;
 
-            impl margaret::framework::active_record::loadable::Loadable for #shape_type {
-                type Preloaded = crate::margaret::#shapes::#module::Preloaded;
-                type Root = #model;
+                impl margaret::framework::active_record::loadable::Loadable for #shape_type {
+                    type Preloaded = crate::margaret::#shapes::#module::preloaded::Preloaded;
+                    type Root = #model;
 
-                const JOIN: margaret::framework::active_record::join_context::JoinContext =
-                    margaret::framework::active_record::join_context::JoinContext::Required;
+                    const JOIN: margaret::framework::active_record::join_context::JoinContext =
+                        margaret::framework::active_record::join_context::JoinContext::Required;
 
-                const WIDTH: usize = #joined_width;
+                    const WIDTH: usize = #joined_width;
 
-                async fn preload<Executing: margaret::framework::database::executor::Executor>(
-                    #preload_parameters
-                ) -> ::std::result::Result<
-                    Self::Preloaded,
-                    margaret::framework::active_record::active_record_error::ActiveRecordError,
-                > {
-                    ::std::result::Result::Ok(crate::margaret::#shapes::#module::Preloaded {
-                        #(#preloads),*
-                    })
+                    async fn preload<Executing: margaret::framework::database::executor::Executor>(
+                        #preload_parameters
+                    ) -> ::std::result::Result<
+                        Self::Preloaded,
+                        margaret::framework::active_record::active_record_error::ActiveRecordError,
+                    > {
+                        ::std::result::Result::Ok(crate::margaret::#shapes::#module::preloaded::Preloaded {
+                            #(#preloads),*
+                        })
+                    }
+
+                    fn read(
+                        cursor: &mut margaret::framework::active_record::load_cursor::LoadCursor<'_>,
+                        preloaded: &mut Self::Preloaded,
+                    ) -> ::std::result::Result<
+                        Self,
+                        margaret::framework::active_record::active_record_error::ActiveRecordError,
+                    > {
+                        #read
+                    }
+
+                    fn select(
+                        builder: &mut margaret::framework::active_record::select_builder::SelectBuilder,
+                        source: margaret::framework::active_record::joined_source::JoinedSource,
+                    ) {
+                        builder.record::<#model>(source);
+                        #select_key
+                        #(#selects)*
+                    }
                 }
 
-                fn read(
-                    cursor: &mut margaret::framework::active_record::load_cursor::LoadCursor<'_>,
-                    preloaded: &mut Self::Preloaded,
-                ) -> ::std::result::Result<
-                    Self,
-                    margaret::framework::active_record::active_record_error::ActiveRecordError,
-                > {
-                    #read
-                }
-
-                fn select(
-                    builder: &mut margaret::framework::active_record::select_builder::SelectBuilder,
-                    source: margaret::framework::active_record::joined_source::JoinedSource,
-                ) {
-                    builder.record::<#model>(source);
-                    #select_key
-                    #(#selects)*
-                }
-            }
-
-            impl margaret::framework::active_record::shape::Shape for #shape_type {}
-        },
-    )
+                impl margaret::framework::active_record::shape::Shape for #shape_type {}
+            },
+        ),
+    ]
 }

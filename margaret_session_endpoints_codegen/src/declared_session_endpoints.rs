@@ -11,8 +11,8 @@ use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
 use crate::declared_session_endpoint_route::DeclaredSessionEndpointRoute;
 use crate::served_session_endpoint::ServedSessionEndpoint;
 use crate::session_endpoint_variant::SessionEndpointVariant;
+use crate::session_endpoints::SESSION_ENDPOINTS;
 use crate::session_endpoints_codegen_error::SessionEndpointsCodegenError;
-use crate::session_endpoints_vocabulary::SESSION_ENDPOINTS;
 
 fn served_endpoint(
     index: &AttributeIndex,

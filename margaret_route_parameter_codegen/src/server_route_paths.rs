@@ -24,7 +24,7 @@ impl ServerRoutePaths {
                 Err(RoutePathError::ServedByWebSocketSession)
             }
             None => {
-                let path = self.routed(pattern)?;
+                let path = self.admitted_by_router(pattern)?;
 
                 self.admitted.insert(
                     pattern.to_owned(),
@@ -43,7 +43,7 @@ impl ServerRoutePaths {
         match self.admitted.get(pattern) {
             Some(AdmittedRoutePath::Responder(_)) => Err(RoutePathError::ServedByResponder),
             Some(AdmittedRoutePath::WebSocketSession) | None => {
-                let path = self.routed(pattern)?;
+                let path = self.admitted_by_router(pattern)?;
 
                 self.admitted
                     .insert(pattern.to_owned(), AdmittedRoutePath::WebSocketSession);
@@ -53,7 +53,7 @@ impl ServerRoutePaths {
         }
     }
 
-    fn routed(&mut self, pattern: &str) -> Result<RoutePath, RoutePathError> {
+    fn admitted_by_router(&mut self, pattern: &str) -> Result<RoutePath, RoutePathError> {
         self.matcher
             .insert(pattern, ())
             .map_err(|source| match source {

@@ -31,6 +31,18 @@ impl StreamedExchange {
 
     /// # Panics
     ///
+    /// Panics when the rest of the response cannot be read.
+    pub async fn finish(mut self) -> String {
+        self.client
+            .read_to_end(&mut self.received)
+            .await
+            .expect("the rest of the response is read");
+
+        String::from_utf8_lossy(&self.received).into_owned()
+    }
+
+    /// # Panics
+    ///
     /// Panics when the server ends the response before sending `fragment`.
     pub async fn receive_until(&mut self, fragment: &str) {
         while !String::from_utf8_lossy(&self.received).contains(fragment) {
@@ -44,17 +56,5 @@ impl StreamedExchange {
             assert_ne!(read, 0, "the server ended the response before `{fragment}`");
             self.received.extend_from_slice(&buffer[..read]);
         }
-    }
-
-    /// # Panics
-    ///
-    /// Panics when the rest of the response cannot be read.
-    pub async fn finish(mut self) -> String {
-        self.client
-            .read_to_end(&mut self.received)
-            .await
-            .expect("the rest of the response is read");
-
-        String::from_utf8_lossy(&self.received).into_owned()
     }
 }

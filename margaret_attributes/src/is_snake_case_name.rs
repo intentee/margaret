@@ -35,6 +35,11 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_word_followed_by_a_comment_so_no_declared_name_carries_one() {
+        assert!(!is_snake_case_name("articles/**/"));
+    }
+
+    #[test]
     fn rejects_text_that_is_not_a_single_word() {
         assert!(!is_snake_case_name("article-translations"));
     }

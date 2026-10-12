@@ -63,25 +63,6 @@ impl IssuedSessions {
         }
     }
 
-    pub(crate) async fn refresh(&self, secret: &str) -> Result<SessionRefresh, SessionsError> {
-        let now = Utc::now();
-
-        Ok(
-            match SessionRecord::current(
-                &self.database,
-                TokenDigest::of(secret),
-                NumericDate::from(now),
-            )
-            .await?
-            {
-                Lookup::Found(session) => {
-                    SessionRefresh::Refreshed(self.access_token(session, now))
-                }
-                Lookup::Missing => SessionRefresh::Refused,
-            },
-        )
-    }
-
     /// # Errors
     ///
     /// Returns `SessionsError` when the session of a presented secret cannot be looked up.
@@ -185,6 +166,25 @@ impl IssuedSessions {
             },
             session,
         })
+    }
+
+    pub(crate) async fn refresh(&self, secret: &str) -> Result<SessionRefresh, SessionsError> {
+        let now = Utc::now();
+
+        Ok(
+            match SessionRecord::current(
+                &self.database,
+                TokenDigest::of(secret),
+                NumericDate::from(now),
+            )
+            .await?
+            {
+                Lookup::Found(session) => {
+                    SessionRefresh::Refreshed(self.access_token(session, now))
+                }
+                Lookup::Missing => SessionRefresh::Refused,
+            },
+        )
     }
 
     fn access_token(

@@ -443,25 +443,6 @@ impl<'index> TagPool<'index> {
     }
 
     #[must_use]
-    pub fn session(&self, attributes: &[IndexedAttribute]) -> Option<SessionSource> {
-        self.sessions
-            .iter()
-            .find(|scanned| {
-                attributes
-                    .iter()
-                    .any(|attribute| ptr::eq(attribute, scanned.attribute))
-            })
-            .map(|scanned| scanned.source)
-    }
-
-    #[must_use]
-    pub fn verifies_resource_tokens_for(&self, tag: &Tag) -> bool {
-        self.bearer_tokens.iter().any(|scanned| {
-            matches!(&scanned.addressee, BearerTokenAddressee::Resource(verified) if verified == tag)
-        })
-    }
-
-    #[must_use]
     pub fn middleware_handlers(&self) -> Vec<TaggedItem<'index>> {
         let mut handlers: Vec<TaggedItem<'index>> = self
             .sorted_entries()
@@ -557,6 +538,18 @@ impl<'index> TagPool<'index> {
         resolve_entry(&self.entries, tag, expected, site).map(|entry| entry.item)
     }
 
+    #[must_use]
+    pub fn session(&self, attributes: &[IndexedAttribute]) -> Option<SessionSource> {
+        self.sessions
+            .iter()
+            .find(|scanned| {
+                attributes
+                    .iter()
+                    .any(|attribute| ptr::eq(attribute, scanned.attribute))
+            })
+            .map(|scanned| scanned.source)
+    }
+
     /// # Errors
     ///
     /// Returns `TagError::MalformedSubjectTokenExchangerIssuer` for an exchanger that names no
@@ -625,6 +618,13 @@ impl<'index> TagPool<'index> {
         }
 
         Ok(bindings)
+    }
+
+    #[must_use]
+    pub fn verifies_resource_tokens_for(&self, tag: &Tag) -> bool {
+        self.bearer_tokens.iter().any(|scanned| {
+            matches!(&scanned.addressee, BearerTokenAddressee::Resource(verified) if verified == tag)
+        })
     }
 
     fn external_issuer<'declarations>(

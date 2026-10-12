@@ -22,10 +22,10 @@ use crate::join_context::JoinContext;
 use crate::joined_source::JoinedSource;
 use crate::keyset_position::KeysetPosition;
 use crate::loaded_records::loaded_records;
+use crate::next_page_of_rows::next_page_of_rows;
 use crate::ordering_columns::ordering_columns;
 use crate::page::Page;
 use crate::page_cursor::PageCursor;
-use crate::page_rows::next_page;
 use crate::read_record::read_record;
 use crate::record::Record;
 use crate::record_columns::record_columns;
@@ -76,7 +76,7 @@ where
         executed_rows(statement, StatementKind::Select, Modeled::TABLE, executor)
             .await
             .and_then(|rows| {
-                next_page(
+                next_page_of_rows(
                     &rows,
                     LIMIT,
                     Modeled::TABLE.columns.len(),
@@ -117,7 +117,7 @@ where
 
         executed_rows(statement, StatementKind::Select, Modeled::TABLE, executor)
             .and_then(|rows| async move {
-                ready(next_page(
+                ready(next_page_of_rows(
                     &rows,
                     LIMIT,
                     Loaded::WIDTH,

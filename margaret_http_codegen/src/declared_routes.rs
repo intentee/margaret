@@ -182,6 +182,25 @@ mod tests {
     }
 
     #[test]
+    fn locates_a_route_declared_through_an_aliased_attribute_and_a_partial_method_path_since_imports_must_suffice()
+     {
+        let indexed = IndexedSource::new(
+            "use margaret::framework::macros::responds_to_http as respond;\nuse margaret::framework::route_method::route_method;\n\n#[respond(method = route_method::RouteMethod::Get, path = \"/sign-in/callback\", server = \"public\")]\nstruct Callback;\n",
+        );
+
+        assert_eq!(
+            DeclaredRoutes::read(&indexed.index, &mut RoutePathRegistry::new())
+                .expect("the routes are declared")
+                .redirect_target(&path("Callback"), &path("Client"))
+                .expect("the redirect route is routed"),
+            RouteUrlInput {
+                path: "/sign-in/callback".to_string(),
+                server: "public".to_string(),
+            }
+        );
+    }
+
+    #[test]
     fn locates_a_redirect_route_with_escaped_braces_at_its_encoded_literal_path() {
         assert_eq!(
             redirect_target("EscapedCallback").expect("the redirect route is routed"),
@@ -226,6 +245,23 @@ mod tests {
                 },
             }) if path == "/articles/../admin" && responder == "crate::Escaping" && server == "public"
         ));
+    }
+
+    #[test]
+    fn rejects_a_route_path_declaring_a_parameter_twice_since_its_value_is_ambiguous() {
+        let indexed = IndexedSource::new(
+            "use margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(method = RouteMethod::Get, path = \"/notes/{id}/{id}\", server = \"public\")]\nstruct Duplicated;\n",
+        );
+
+        assert_eq!(
+            DeclaredRoutes::read(&indexed.index, &mut RoutePathRegistry::new())
+                .err()
+                .map(|rejection| rejection.to_string()),
+            Some(
+                "responder 'crate::Duplicated' cannot serve the route path '/notes/{id}/{id}' on server 'public': the route path declares the parameter 'id' more than once"
+                    .to_string()
+            )
+        );
     }
 
     #[test]

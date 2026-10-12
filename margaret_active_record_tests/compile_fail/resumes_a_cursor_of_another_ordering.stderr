@@ -6,8 +6,8 @@ error[E0308]: mismatched types
    |              |
    |              arguments to this method are incorrect
    |
-   = note: expected struct `PageCursor<Message, margaret_active_record_tests::margaret::models::models_message_message::query::edge::id::Edge, Ascending>`
-              found struct `PageCursor<Message, margaret_active_record_tests::margaret::models::models_message_message::query::edge::posted_at::Edge, Ascending>`
+   = note: expected struct `PageCursor<Message, margaret_active_record_tests::margaret::models::models_message_message::query::then::id::edge::Edge, Ascending>`
+              found struct `PageCursor<Message, margaret_active_record_tests::margaret::models::models_message_message::query::then::posted_at::edge::Edge, Ascending>`
 note: method defined here
   --> $WORKSPACE/margaret_active_record/src/bounded.rs
    |

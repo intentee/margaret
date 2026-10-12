@@ -94,16 +94,16 @@ impl TlsRelay {
         }
     }
 
-    #[must_use]
-    pub fn port(&self) -> u16 {
-        self.address.port()
-    }
-
     /// # Panics
     ///
     /// Panics when the relay stopped accepting connections by panicking.
     pub async fn close(self) {
         self.cancellation_token.cancel();
         self.task.await.expect("the relay closes cleanly");
+    }
+
+    #[must_use]
+    pub fn port(&self) -> u16 {
+        self.address.port()
     }
 }

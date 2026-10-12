@@ -125,24 +125,6 @@ impl JwksSecretStore {
     }
 
     #[must_use]
-    pub fn verify_session_access_token(
-        &self,
-        token: &str,
-        audience: &str,
-        now: DateTime<Utc>,
-    ) -> JwtVerification<SessionAccessTokenClaims, AccessTokenProfile> {
-        verify_serialized_jwt(
-            self.secrets.get().token_key_set(),
-            token,
-            &JwtExpectation {
-                audience: ExpectedAudience::One(audience),
-                issuer: self.issuance.issuer,
-            },
-            NumericDate::from(now),
-        )
-    }
-
-    #[must_use]
     pub fn verify_issued_jwt<TClaims: DeserializeOwned, TProfile: JwtProfile>(
         &self,
         jwt: &AttributedJwt<'_>,
@@ -172,6 +154,24 @@ impl JwksSecretStore {
             token,
             &JwtExpectation {
                 audience: ExpectedAudience::AnyOf(audiences),
+                issuer: self.issuance.issuer,
+            },
+            NumericDate::from(now),
+        )
+    }
+
+    #[must_use]
+    pub fn verify_session_access_token(
+        &self,
+        token: &str,
+        audience: &str,
+        now: DateTime<Utc>,
+    ) -> JwtVerification<SessionAccessTokenClaims, AccessTokenProfile> {
+        verify_serialized_jwt(
+            self.secrets.get().token_key_set(),
+            token,
+            &JwtExpectation {
+                audience: ExpectedAudience::One(audience),
                 issuer: self.issuance.issuer,
             },
             NumericDate::from(now),

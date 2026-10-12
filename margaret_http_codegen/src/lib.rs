@@ -1122,6 +1122,13 @@ impl GetWorkload {
     }
 
     fn routes_source_for(lib_source: &str) -> String {
+        routes_source_with(lib_source, &no_websocket_servers())
+    }
+
+    fn routes_source_with(
+        lib_source: &str,
+        websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
+    ) -> String {
         let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
         let tags = collected_tags(&index);
@@ -1132,7 +1139,7 @@ impl GetWorkload {
         render_http(
             &index,
             false,
-            &no_websocket_servers(),
+            websocket_servers,
             &plans,
             &bindings,
             &registries,
@@ -1213,6 +1220,19 @@ impl GetKind { #[process] fn respond(&self, #[route_parameter(from = "type")] ki
         assert!(source.contains(
             "margaret::framework::http::url_parameter::UrlParameter{name:\"type\",value:type_2,}"
         ));
+    }
+
+    #[test]
+    fn matches_web_socket_session_paths_with_the_server_routes_so_no_link_hits_a_session() {
+        assert!(
+            routes_source_with(
+                HEALTH_RESPONDER,
+                &websocket_server("public", ServerTransportPolicy::Negotiable)
+            )
+            .contains(
+                "margaret::framework::http::server_paths::ServerPaths::build([\"/health\",\"/chat\",])"
+            )
+        );
     }
 
     #[test]

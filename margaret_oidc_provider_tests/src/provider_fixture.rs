@@ -181,19 +181,6 @@ impl ProviderFixture {
 
     /// # Panics
     ///
-    /// Panics when the authorization cannot reach the provider state.
-    pub async fn authorized(&self, parameters: &Value) -> AuthorizationOutcome {
-        self.authorization
-            .authorize(
-                validated_form(parameters),
-                &EndUserAuthentication::Authenticated(signed_in_end_user()),
-            )
-            .await
-            .expect("the authorization reaches its state")
-    }
-
-    /// # Panics
-    ///
     /// Panics when no asserting fixture client carries the client identifier.
     #[must_use]
     pub fn assertion(&self, client_id: &'static str) -> String {
@@ -203,6 +190,19 @@ impl ProviderFixture {
                 client_id,
                 self.issuer.location.issuer.as_str(),
             ))
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the authorization cannot reach the provider state.
+    pub async fn authorized(&self, parameters: &Value) -> AuthorizationOutcome {
+        self.authorization
+            .authorize(
+                validated_form(parameters),
+                &EndUserAuthentication::Authenticated(signed_in_end_user()),
+            )
+            .await
+            .expect("the authorization reaches its state")
     }
 
     /// # Panics
@@ -234,6 +234,32 @@ impl ProviderFixture {
     /// # Panics
     ///
     /// Panics when the provider does not answer.
+    pub async fn post_encoded_form(
+        &self,
+        path: &str,
+        client_id: &'static str,
+        form: &str,
+    ) -> Answer {
+        let presented = Serializer::new(String::new())
+            .append_pair("client_assertion", &self.assertion(client_id))
+            .append_pair("client_assertion_type", JWT_BEARER_CLIENT_ASSERTION_TYPE)
+            .finish();
+
+        Answer::of(
+            self.client
+                .post(provider_url(path))
+                .header(CONTENT_TYPE, FORM_CONTENT_TYPE)
+                .body(format!("{form}&{presented}"))
+                .send()
+                .await
+                .expect("the provider answers"),
+        )
+        .await
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the provider does not answer.
     pub async fn post_form(
         &self,
         path: &str,
@@ -256,32 +282,6 @@ impl ProviderFixture {
         Answer::of(
             request
                 .form(&form)
-                .send()
-                .await
-                .expect("the provider answers"),
-        )
-        .await
-    }
-
-    /// # Panics
-    ///
-    /// Panics when the provider does not answer.
-    pub async fn post_encoded_form(
-        &self,
-        path: &str,
-        client_id: &'static str,
-        form: &str,
-    ) -> Answer {
-        let presented = Serializer::new(String::new())
-            .append_pair("client_assertion", &self.assertion(client_id))
-            .append_pair("client_assertion_type", JWT_BEARER_CLIENT_ASSERTION_TYPE)
-            .finish();
-
-        Answer::of(
-            self.client
-                .post(provider_url(path))
-                .header(CONTENT_TYPE, FORM_CONTENT_TYPE)
-                .body(format!("{form}&{presented}"))
                 .send()
                 .await
                 .expect("the provider answers"),

@@ -45,20 +45,6 @@ impl RequestAuthorization {
         }
     }
 
-    /// # Errors
-    ///
-    /// Breaks with the `BearerChallenge` answering a request that presents no bearer token, or a
-    /// malformed one.
-    pub fn bearer(&self) -> ControlFlow<BearerChallenge, &BearerToken> {
-        match self {
-            Self::Absent | Self::OtherScheme => {
-                ControlFlow::Break(BearerChallenge::MissingCredentials)
-            }
-            Self::Bearer(token) => ControlFlow::Continue(token),
-            Self::Malformed => ControlFlow::Break(BearerChallenge::InvalidRequest),
-        }
-    }
-
     fn scheme_only(scheme: &str) -> Self {
         if is_token(scheme) && !scheme.eq_ignore_ascii_case(BEARER_SCHEME) {
             Self::OtherScheme
@@ -82,6 +68,20 @@ impl RequestAuthorization {
             Self::Bearer(BearerToken::new(token.to_string()))
         } else {
             Self::Malformed
+        }
+    }
+
+    /// # Errors
+    ///
+    /// Breaks with the `BearerChallenge` answering a request that presents no bearer token, or a
+    /// malformed one.
+    pub fn bearer(&self) -> ControlFlow<BearerChallenge, &BearerToken> {
+        match self {
+            Self::Absent | Self::OtherScheme => {
+                ControlFlow::Break(BearerChallenge::MissingCredentials)
+            }
+            Self::Bearer(token) => ControlFlow::Continue(token),
+            Self::Malformed => ControlFlow::Break(BearerChallenge::InvalidRequest),
         }
     }
 }

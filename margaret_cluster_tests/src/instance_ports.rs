@@ -42,6 +42,14 @@ impl InstancePorts {
         }
     }
 
+    #[must_use]
+    pub fn address(&self, server: ClusterServer) -> SocketAddr {
+        match server {
+            ClusterServer::Identity => self.identity,
+            ClusterServer::Public => self.public,
+        }
+    }
+
     /// # Panics
     ///
     /// Panics when the routes of the cluster cannot be built.
@@ -52,14 +60,6 @@ impl InstancePorts {
             &format!("http://{}", self.public),
         )
         .expect("the routes of the cluster build")
-    }
-
-    #[must_use]
-    pub fn address(&self, server: ClusterServer) -> SocketAddr {
-        match server {
-            ClusterServer::Identity => self.identity,
-            ClusterServer::Public => self.public,
-        }
     }
 }
 

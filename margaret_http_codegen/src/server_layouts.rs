@@ -12,10 +12,10 @@ fn is_literal(named: &NamedRoute<'_>) -> bool {
     matches!(named.path.template(), RouteUrlTemplate::Literal(_))
 }
 
-pub(crate) fn server_layouts<'server>(
-    table: &HttpRouteTable,
-    servers: &'server [HttpServer],
-) -> Vec<ServerLayout<'server>> {
+pub(crate) fn server_layouts<'plan>(
+    table: &'plan HttpRouteTable,
+    servers: &'plan [HttpServer],
+) -> Vec<ServerLayout<'plan>> {
     let mut type_allocator = NameAllocator::new();
 
     servers
@@ -43,6 +43,7 @@ pub(crate) fn server_layouts<'server>(
             ServerLayout {
                 constructor,
                 field: format_ident!("{}", server.name()),
+                named,
                 origin,
                 paths,
                 server,

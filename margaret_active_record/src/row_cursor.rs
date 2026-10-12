@@ -59,6 +59,15 @@ impl<'row> RowCursor<'row> {
             })
     }
 
+    pub(crate) fn next_columns_are_null(&self, width: usize) -> Result<bool, ActiveRecordError> {
+        let first = self.offset + self.column;
+
+        (first..first + width).try_fold(true, |all_null, position| {
+            row_column::<ColumnPresence>(self.row, position, self.table)
+                .map(|presence| all_null && matches!(presence, ColumnPresence::Null))
+        })
+    }
+
     pub(crate) fn read_json<Payload: DeserializeOwned>(
         &mut self,
     ) -> Result<Payload, ActiveRecordError> {
@@ -71,15 +80,6 @@ impl<'row> RowCursor<'row> {
                 source,
                 table,
             })
-        })
-    }
-
-    pub(crate) fn next_columns_are_null(&self, width: usize) -> Result<bool, ActiveRecordError> {
-        let first = self.offset + self.column;
-
-        (first..first + width).try_fold(true, |all_null, position| {
-            row_column::<ColumnPresence>(self.row, position, self.table)
-                .map(|presence| all_null && matches!(presence, ColumnPresence::Null))
         })
     }
 

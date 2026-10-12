@@ -8,6 +8,7 @@ use margaret_model_codegen::model_field::ModelField;
 use crate::generated_model_module::generated_model_module;
 use crate::generated_model_path::generated_model_path;
 use crate::is_defaulted::is_defaulted;
+use crate::node_location::NodeLocation;
 
 pub(crate) fn render_model_impl(
     model: &Model,
@@ -15,6 +16,7 @@ pub(crate) fn render_model_impl(
 ) -> GeneratedModuleTokens {
     let record = path_tokens(&model.path);
     let generated = generated_model_path(model);
+    let query = NodeLocation::query().step().path(model);
     let assignable_impl = if assignable.is_empty() {
         quote! {}
     } else {
@@ -39,7 +41,7 @@ pub(crate) fn render_model_impl(
         quote! {
             impl margaret::framework::active_record::model::Model for #record {
                 type Conditions = #generated::conditions::Conditions;
-                type Query = #generated::query::Step;
+                type Query = #query::Step;
             }
 
             #assignable_impl

@@ -10,6 +10,6 @@ mod sign_in_admissions;
 pub mod sign_in_callback;
 mod sign_in_client;
 mod sign_in_endpoint_variant;
+mod sign_in_endpoints;
 pub mod sign_in_endpoints_codegen_error;
-mod sign_in_endpoints_vocabulary;
 pub mod sign_in_service;

@@ -112,6 +112,23 @@ impl FrameworkAttribute {
         Self::WebsocketSession,
     ];
 
+    fn macro_at(canonical: &CanonicalPath) -> Option<Self> {
+        let name = match canonical.segments() {
+            [name] => name.as_str(),
+            [crate_name, name] if crate_name == "margaret_macros" => name.as_str(),
+            [crate_name, framework, macros, name]
+                if crate_name == "margaret" && framework == "framework" && macros == "macros" =>
+            {
+                name.as_str()
+            }
+            _ => return None,
+        };
+
+        Self::ALL
+            .into_iter()
+            .find(|attribute| !attribute.is_marker() && attribute.name() == name)
+    }
+
     #[must_use]
     pub fn recognize(written: &Path, canonical: &CanonicalPath) -> Option<Self> {
         written
@@ -215,23 +232,6 @@ impl FrameworkAttribute {
                 | Self::Middleware
                 | Self::Unique
         )
-    }
-
-    fn macro_at(canonical: &CanonicalPath) -> Option<Self> {
-        let name = match canonical.segments() {
-            [name] => name.as_str(),
-            [crate_name, name] if crate_name == "margaret_macros" => name.as_str(),
-            [crate_name, framework, macros, name]
-                if crate_name == "margaret" && framework == "framework" && macros == "macros" =>
-            {
-                name.as_str()
-            }
-            _ => return None,
-        };
-
-        Self::ALL
-            .into_iter()
-            .find(|attribute| !attribute.is_marker() && attribute.name() == name)
     }
 }
 

@@ -66,20 +66,6 @@ pub struct SigningKeySet {
 impl SigningKeySet {
     /// # Errors
     ///
-    /// Returns `SigningKeysError::Load` when the signing keys cannot be read, and
-    /// `SigningKeysError::StoredGenerationOutOfRange` when their generation is no roll's.
-    pub async fn load(database: &Database) -> Result<StoredSigningKeys, SigningKeysError> {
-        Self::query()
-            .name
-            .eq(SIGNING_KEY_SET_NAME.to_string())
-            .find(database)
-            .await
-            .map_err(SigningKeysError::Load)
-            .and_then(stored_signing_keys)
-    }
-
-    /// # Errors
-    ///
     /// Returns `SigningKeysError::GenerationOutOfRange` when the generation does not fit the
     /// database, and `SigningKeysError::Create` when the signing keys cannot be stored.
     pub async fn create(
@@ -101,6 +87,20 @@ impl SigningKeySet {
         .await
         .map(creation)
         .map_err(SigningKeysError::Create)
+    }
+
+    /// # Errors
+    ///
+    /// Returns `SigningKeysError::Load` when the signing keys cannot be read, and
+    /// `SigningKeysError::StoredGenerationOutOfRange` when their generation is no roll's.
+    pub async fn load(database: &Database) -> Result<StoredSigningKeys, SigningKeysError> {
+        Self::query()
+            .name
+            .eq(SIGNING_KEY_SET_NAME.to_string())
+            .find(database)
+            .await
+            .map_err(SigningKeysError::Load)
+            .and_then(stored_signing_keys)
     }
 
     /// # Errors

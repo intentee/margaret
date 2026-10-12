@@ -39,12 +39,9 @@ impl ClusterDoors {
         }
     }
 
-    #[must_use]
-    pub fn url(&self, server: ClusterServer) -> Url {
-        front_door_url(match server {
-            ClusterServer::Identity => self.identity.port(),
-            ClusterServer::Public => self.public.port(),
-        })
+    pub async fn close(self) {
+        self.identity.close().await;
+        self.public.close().await;
     }
 
     /// # Panics
@@ -65,8 +62,11 @@ impl ClusterDoors {
         .expect("the routes of the cluster build")
     }
 
-    pub async fn close(self) {
-        self.identity.close().await;
-        self.public.close().await;
+    #[must_use]
+    pub fn url(&self, server: ClusterServer) -> Url {
+        front_door_url(match server {
+            ClusterServer::Identity => self.identity.port(),
+            ClusterServer::Public => self.public.port(),
+        })
     }
 }

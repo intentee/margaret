@@ -30,10 +30,6 @@ impl NodeLocation {
         self.nested(format_ident!("edge"))
     }
 
-    pub(crate) fn edge_of(&self, field: &ModelField) -> Self {
-        self.edge().nested(field_identifier(field))
-    }
-
     pub(crate) fn module(&self, model: &Model) -> String {
         generated_model_module(
             model,
@@ -51,6 +47,10 @@ impl NodeLocation {
         let segments = &self.segments;
 
         quote! { #generated #(::#segments)* }
+    }
+
+    pub(crate) fn step(&self) -> Self {
+        self.nested(format_ident!("step"))
     }
 
     pub(crate) fn then(&self) -> Self {

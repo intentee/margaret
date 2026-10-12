@@ -184,113 +184,6 @@ impl TokenEndpoint {
         }
     }
 
-    /// # Errors
-    ///
-    /// Returns `ProviderError::ClientAuthentication` when the client assertion cannot be
-    /// remembered, `ProviderError::AuthorizationGrants` when the application cannot keep its grants,
-    /// `ProviderError::Signing` when an id token cannot be signed, and
-    /// `ProviderError::SubjectTokenExchange` when a subject token exchanger fails.
-    async fn respond(
-        &self,
-        request: &Request,
-        token_request: ValidationResult<TokenRequest>,
-    ) -> Result<Response, ProviderError> {
-        let ValidationResult::Valid(TokenRequest {
-            client_authentication,
-            grant,
-        }) = token_request
-        else {
-            return Ok(oauth_error(
-                400,
-                BasicErrorResponseType::InvalidRequest,
-                "the token request is malformed",
-            ));
-        };
-        let now = Utc::now();
-        let registered = match authenticated_client(
-            &self.clients,
-            request,
-            &client_authentication,
-            NumericDate::from(now),
-        )
-        .await?
-        {
-            ControlFlow::Break(refusal) => return Ok(refusal),
-            ControlFlow::Continue(registered) => registered,
-        };
-        let client = &registered.client;
-
-        match grant {
-            TokenGrant::AuthorizationCode {
-                code,
-                code_verifier,
-                redirect_uri,
-                resource,
-            } => {
-                self.authorization_code(
-                    registered,
-                    &code,
-                    code_verifier,
-                    &redirect_uri,
-                    resource.as_deref(),
-                    now,
-                )
-                .await
-            }
-            TokenGrant::ClientCredentials { resource, scope } => {
-                Ok(self.client_credentials(registered, resource.as_deref(), scope.as_deref(), now))
-            }
-            TokenGrant::RefreshToken {
-                refresh_token,
-                resource,
-                scope,
-            } => {
-                self.refresh_token(
-                    registered,
-                    &refresh_token,
-                    resource.as_deref(),
-                    scope.as_deref(),
-                    now,
-                )
-                .await
-            }
-            TokenGrant::TokenExchange {
-                actor_token,
-                audience,
-                requested_token_type,
-                resource,
-                scope,
-                subject_token,
-                subject_token_type,
-            } => {
-                self.token_exchange(
-                    client,
-                    TokenExchangeParameters {
-                        actor_token,
-                        audience,
-                        requested_token_type,
-                        resource,
-                        scope,
-                        subject_token,
-                        subject_token_type,
-                    },
-                    now,
-                )
-                .await
-            }
-            TokenGrant::GrantTypeOmitted => Ok(oauth_error(
-                400,
-                BasicErrorResponseType::InvalidRequest,
-                "the token request names no grant type",
-            )),
-            TokenGrant::Unsupported => Ok(oauth_error(
-                400,
-                BasicErrorResponseType::UnsupportedGrantType,
-                "the grant type is not supported",
-            )),
-        }
-    }
-
     async fn authorization_code(
         &self,
         registered: &RegisteredClient,
@@ -585,6 +478,113 @@ impl TokenEndpoint {
             RefreshRotation::Rotated => Ok(prepared.response()),
             RefreshRotation::Superseded { family } => revoked_family(database, family).await,
             RefreshRotation::Unknown => Ok(unknown_refresh_token()),
+        }
+    }
+
+    /// # Errors
+    ///
+    /// Returns `ProviderError::ClientAuthentication` when the client assertion cannot be
+    /// remembered, `ProviderError::AuthorizationGrants` when the application cannot keep its grants,
+    /// `ProviderError::Signing` when an id token cannot be signed, and
+    /// `ProviderError::SubjectTokenExchange` when a subject token exchanger fails.
+    async fn respond(
+        &self,
+        request: &Request,
+        token_request: ValidationResult<TokenRequest>,
+    ) -> Result<Response, ProviderError> {
+        let ValidationResult::Valid(TokenRequest {
+            client_authentication,
+            grant,
+        }) = token_request
+        else {
+            return Ok(oauth_error(
+                400,
+                BasicErrorResponseType::InvalidRequest,
+                "the token request is malformed",
+            ));
+        };
+        let now = Utc::now();
+        let registered = match authenticated_client(
+            &self.clients,
+            request,
+            &client_authentication,
+            NumericDate::from(now),
+        )
+        .await?
+        {
+            ControlFlow::Break(refusal) => return Ok(refusal),
+            ControlFlow::Continue(registered) => registered,
+        };
+        let client = &registered.client;
+
+        match grant {
+            TokenGrant::AuthorizationCode {
+                code,
+                code_verifier,
+                redirect_uri,
+                resource,
+            } => {
+                self.authorization_code(
+                    registered,
+                    &code,
+                    code_verifier,
+                    &redirect_uri,
+                    resource.as_deref(),
+                    now,
+                )
+                .await
+            }
+            TokenGrant::ClientCredentials { resource, scope } => {
+                Ok(self.client_credentials(registered, resource.as_deref(), scope.as_deref(), now))
+            }
+            TokenGrant::RefreshToken {
+                refresh_token,
+                resource,
+                scope,
+            } => {
+                self.refresh_token(
+                    registered,
+                    &refresh_token,
+                    resource.as_deref(),
+                    scope.as_deref(),
+                    now,
+                )
+                .await
+            }
+            TokenGrant::TokenExchange {
+                actor_token,
+                audience,
+                requested_token_type,
+                resource,
+                scope,
+                subject_token,
+                subject_token_type,
+            } => {
+                self.token_exchange(
+                    client,
+                    TokenExchangeParameters {
+                        actor_token,
+                        audience,
+                        requested_token_type,
+                        resource,
+                        scope,
+                        subject_token,
+                        subject_token_type,
+                    },
+                    now,
+                )
+                .await
+            }
+            TokenGrant::GrantTypeOmitted => Ok(oauth_error(
+                400,
+                BasicErrorResponseType::InvalidRequest,
+                "the token request names no grant type",
+            )),
+            TokenGrant::Unsupported => Ok(oauth_error(
+                400,
+                BasicErrorResponseType::UnsupportedGrantType,
+                "the grant type is not supported",
+            )),
         }
     }
 

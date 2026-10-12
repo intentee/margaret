@@ -86,6 +86,11 @@ impl ExternalIssuer {
         }
     }
 
+    pub async fn close(self) {
+        self.relay.close().await;
+        self.server.stop().await;
+    }
+
     #[must_use]
     pub fn external_token(&self, subject: &str) -> String {
         let issued_at = NumericDate::from(Utc::now());
@@ -119,10 +124,5 @@ impl ExternalIssuer {
     pub fn rotate_external_key(&mut self) {
         self.external_key = fresh_key();
         self.external_jwks.set(key_set_document(&self.external_key));
-    }
-
-    pub async fn close(self) {
-        self.relay.close().await;
-        self.server.stop().await;
     }
 }

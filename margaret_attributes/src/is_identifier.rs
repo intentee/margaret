@@ -21,6 +21,11 @@ mod tests {
     }
 
     #[test]
+    fn rejects_an_identifier_followed_by_a_comment_since_format_ident_would_panic_on_it() {
+        assert!(!is_identifier("get_article/**/"));
+    }
+
+    #[test]
     fn rejects_a_keyword_because_generated_code_cannot_name_an_item_with_it() {
         assert!(!is_identifier("match"));
     }

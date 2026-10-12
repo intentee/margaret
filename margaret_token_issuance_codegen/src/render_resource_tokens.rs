@@ -1,22 +1,29 @@
 use quote::ToTokens as _;
+use quote::format_ident;
 use quote::quote;
 use syn::ext::IdentExt as _;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::declared_resource_issuances::DeclaredResourceIssuances;
+use crate::resource_audience_module_name::RESOURCE_AUDIENCE_MODULE_NAME;
 use crate::resource_issuance_declaration::ResourceIssuanceDeclaration;
 use crate::resource_tokens_module_name::RESOURCE_TOKENS_MODULE_NAME;
 
-fn resource_module(
+fn resource_modules(
     ResourceIssuanceDeclaration { audience, tag, .. }: &ResourceIssuanceDeclaration,
-) -> GeneratedModuleTokens {
+) -> [GeneratedModuleTokens; 2] {
     let audience = audience.as_str();
+    let resource_module = format!("{RESOURCE_TOKENS_MODULE_NAME}/{}", tag.ident().unraw());
+    let audience_module = format_ident!("{RESOURCE_AUDIENCE_MODULE_NAME}");
 
-    GeneratedModuleTokens::new(
-        format!("{RESOURCE_TOKENS_MODULE_NAME}/{}", tag.ident().unraw()),
-        quote! { pub const AUDIENCE: &str = #audience; },
-    )
+    [
+        GeneratedModuleTokens::new(
+            format!("{resource_module}/{RESOURCE_AUDIENCE_MODULE_NAME}"),
+            quote! { pub const AUDIENCE: &str = #audience; },
+        ),
+        GeneratedModuleTokens::new(resource_module, quote! { pub mod #audience_module; }),
+    ]
 }
 
 #[must_use]
@@ -36,7 +43,7 @@ pub fn render_resource_tokens(resources: &DeclaredResourceIssuances) -> Vec<Gene
         quote! { #(#submodules)* },
     )]
     .into_iter()
-    .chain(resources.resources().map(resource_module))
+    .chain(resources.resources().flat_map(resource_modules))
     .collect()
 }
 
@@ -84,8 +91,12 @@ mod tests {
             )),
             vec![
                 "resource_tokens: pub mod attachments;\npub mod r#async;\n".to_string(),
-                "resource_tokens/attachments: pub const AUDIENCE: &str = \"files\";\n".to_string(),
-                "resource_tokens/async: pub const AUDIENCE: &str = \"jobs\";\n".to_string(),
+                "resource_tokens/attachments/audience: pub const AUDIENCE: &str = \"files\";\n"
+                    .to_string(),
+                "resource_tokens/attachments: pub mod audience;\n".to_string(),
+                "resource_tokens/async/audience: pub const AUDIENCE: &str = \"jobs\";\n"
+                    .to_string(),
+                "resource_tokens/async: pub mod audience;\n".to_string(),
             ]
         );
     }

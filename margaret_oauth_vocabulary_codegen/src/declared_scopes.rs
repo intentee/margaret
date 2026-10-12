@@ -93,6 +93,27 @@ impl<'index> DeclaredScopes<'index> {
         Ok(Self { scopes })
     }
 
+    /// # Errors
+    ///
+    /// Returns `OAuthVocabularyCodegenError::UnconsumedScope` for the first declared scope that
+    /// no client declaration references.
+    pub fn reject_unconsumed(
+        &self,
+        referenced: &BTreeSet<&str>,
+    ) -> Result<(), OAuthVocabularyCodegenError> {
+        match self
+            .scopes
+            .iter()
+            .find(|declared| !referenced.contains(declared.scope.as_str()))
+        {
+            Some(declared) => Err(OAuthVocabularyCodegenError::UnconsumedScope {
+                anchor: declared.anchor.canonical_path().to_string(),
+                name: declared.scope.as_str().to_string(),
+            }),
+            None => Ok(()),
+        }
+    }
+
     #[must_use]
     pub fn resolve(
         &self,
@@ -114,27 +135,6 @@ impl<'index> DeclaredScopes<'index> {
             .map_or(ScopeResolution::Unknown, |declared| {
                 ScopeResolution::Declared(declared.scope.clone())
             })
-    }
-
-    /// # Errors
-    ///
-    /// Returns `OAuthVocabularyCodegenError::UnconsumedScope` for the first declared scope that
-    /// no client declaration references.
-    pub fn reject_unconsumed(
-        &self,
-        referenced: &BTreeSet<&str>,
-    ) -> Result<(), OAuthVocabularyCodegenError> {
-        match self
-            .scopes
-            .iter()
-            .find(|declared| !referenced.contains(declared.scope.as_str()))
-        {
-            Some(declared) => Err(OAuthVocabularyCodegenError::UnconsumedScope {
-                anchor: declared.anchor.canonical_path().to_string(),
-                name: declared.scope.as_str().to_string(),
-            }),
-            None => Ok(()),
-        }
     }
 }
 

@@ -71,23 +71,6 @@ impl OidcProviderItem {
     }
 
     #[must_use]
-    pub fn uses_provider_endpoints(self) -> bool {
-        match self {
-            Self::AuthorizationEndpoint | Self::IssuerMetadata | Self::ProviderMetadataHandler => {
-                true
-            }
-            Self::AcceptedClients
-            | Self::ConsentEndpoint
-            | Self::ConsentHandler
-            | Self::IntrospectionEndpoint
-            | Self::RevocationEndpoint
-            | Self::SubjectTokenExchangers
-            | Self::TokenEndpoint
-            | Self::UserinfoEndpoint => false,
-        }
-    }
-
-    #[must_use]
     pub fn type_name(self) -> &'static str {
         match self {
             Self::AcceptedClients => "AcceptedClients",
@@ -101,6 +84,23 @@ impl OidcProviderItem {
             Self::SubjectTokenExchangers => "SubjectTokenExchangers",
             Self::TokenEndpoint => "TokenEndpoint",
             Self::UserinfoEndpoint => "UserinfoEndpoint",
+        }
+    }
+
+    #[must_use]
+    pub fn uses_provider_endpoints(self) -> bool {
+        match self {
+            Self::AuthorizationEndpoint | Self::IssuerMetadata | Self::ProviderMetadataHandler => {
+                true
+            }
+            Self::AcceptedClients
+            | Self::ConsentEndpoint
+            | Self::ConsentHandler
+            | Self::IntrospectionEndpoint
+            | Self::RevocationEndpoint
+            | Self::SubjectTokenExchangers
+            | Self::TokenEndpoint
+            | Self::UserinfoEndpoint => false,
         }
     }
 }

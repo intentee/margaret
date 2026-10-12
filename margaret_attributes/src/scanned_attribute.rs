@@ -18,6 +18,10 @@ impl ScannedAttribute {
         Self { attribute }
     }
 
+    pub(crate) fn scan_all(attributes: Vec<Attribute>) -> Vec<Self> {
+        attributes.into_iter().map(Self::new).collect()
+    }
+
     pub(crate) fn resolve_all(
         attributes: Vec<Self>,
         host: AttributeHost,
@@ -47,9 +51,5 @@ impl ScannedAttribute {
                 }
             })
             .collect()
-    }
-
-    pub(crate) fn scan_all(attributes: Vec<Attribute>) -> Vec<Self> {
-        attributes.into_iter().map(Self::new).collect()
     }
 }

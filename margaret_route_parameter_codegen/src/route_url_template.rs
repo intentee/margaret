@@ -146,11 +146,6 @@ impl TemplateAssembly {
         Ok(())
     }
 
-    fn push_separator(&mut self) {
-        self.decoded.push(PATH_SEPARATOR);
-        self.encoded.push(PATH_SEPARATOR);
-    }
-
     fn push_segment(&mut self, segment: PathSegment<'_>) -> Result<(), RoutePathError> {
         match segment {
             PathSegment::Text(text) => match pattern_segment(text) {
@@ -159,6 +154,11 @@ impl TemplateAssembly {
             },
             PathSegment::TrailingSeparator => Ok(()),
         }
+    }
+
+    fn push_separator(&mut self) {
+        self.decoded.push(PATH_SEPARATOR);
+        self.encoded.push(PATH_SEPARATOR);
     }
 }
 
@@ -406,6 +406,11 @@ mod tests {
     #[test]
     fn reads_an_escaped_closing_brace_into_the_parameter_name_like_the_router() {
         assert!(rejects_parameter_name("/{id}}}", "id}"));
+    }
+
+    #[test]
+    fn reads_braces_escaped_around_a_parameter_into_its_name_like_the_router() {
+        assert!(rejects_parameter_name("/{{{id}}}", "id}"));
     }
 
     #[test]

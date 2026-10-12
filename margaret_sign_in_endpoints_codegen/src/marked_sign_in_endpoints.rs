@@ -12,8 +12,8 @@ use crate::marked_endpoint::MarkedEndpoint;
 use crate::marked_start::MarkedStart;
 use crate::sign_in_client::sign_in_client;
 use crate::sign_in_endpoint_variant::SignInEndpointVariant;
+use crate::sign_in_endpoints::SIGN_IN_ENDPOINTS;
 use crate::sign_in_endpoints_codegen_error::SignInEndpointsCodegenError;
-use crate::sign_in_endpoints_vocabulary::SIGN_IN_ENDPOINTS;
 
 fn marked_endpoint(
     index: &AttributeIndex,

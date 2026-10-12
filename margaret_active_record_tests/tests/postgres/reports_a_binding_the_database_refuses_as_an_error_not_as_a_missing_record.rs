@@ -1,12 +1,12 @@
-use margaret::framework::active_record::primary_key_binder::PrimaryKeyBinder;
-use margaret_route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;
 use uuid::Uuid;
 
 use margaret::framework::active_record::active_record_error::ActiveRecordError;
+use margaret::framework::active_record::primary_key_binder::PrimaryKeyBinder;
 use margaret::framework::active_record::statement_kind::StatementKind;
 use margaret::framework::sql_identifier::table_namespace::TableNamespace;
 use margaret_active_record_tests::models::author::Author;
 use margaret_database_tests::table_privilege::TablePrivilege;
+use margaret_route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;
 
 use crate::postgres::started_with_models::started_with_models;
 

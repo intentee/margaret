@@ -286,6 +286,16 @@ impl RespondsToWebSocketNotification for Typist {
         );
     }
 
+    #[test]
+    fn rejects_a_session_path_declaring_a_parameter_twice_since_its_value_is_ambiguous() {
+        assert_eq!(
+            session_path_rejection("", "/rooms/{id}/{id}").as_deref(),
+            Some(
+                "session 'crate::Chat' cannot serve the path '/rooms/{id}/{id}' on server 'public': the route path declares the parameter 'id' more than once"
+            )
+        );
+    }
+
     const CONSOLE_ARGUMENT_HANDLER: &str = r#"
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 

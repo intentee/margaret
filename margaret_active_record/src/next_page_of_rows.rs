@@ -20,7 +20,7 @@ fn cursor_of<Modeled, Ordering, Toward>(
         .map(PageCursor::new)
 }
 
-pub(crate) fn next_page<Modeled, Ordering, Toward>(
+pub(crate) fn next_page_of_rows<Modeled, Ordering, Toward>(
     rows: &[Row],
     limit: usize,
     cursor_offset: usize,

@@ -2,6 +2,7 @@ pub mod declared_resource_issuances;
 pub mod declared_token_issuance;
 pub mod render_resource_tokens;
 pub mod render_token_issuance;
+mod resource_audience_module_name;
 pub mod resource_audience_path;
 pub mod resource_issuance_declaration;
 mod resource_tokens_module_name;
