@@ -37,7 +37,7 @@ mod tests {
     #[test]
     fn lists_the_tables_in_foreign_key_order() {
         let indexed = IndexedSource::new(
-            "use margaret::framework::active_record::key::Key;\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index]\n    author: Key<Author>,\n}\n\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key)]\n    id: i64,\n}\n",
+            "use margaret::framework::macros::model;\nuse margaret::framework::active_record::key::Key;\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index]\n    author: Key<Author>,\n}\n\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key)]\n    id: i64,\n}\n",
         );
         let tables = render_tables(
             &models(&indexed.index, TableNamespace::Application).expect("the models resolve"),

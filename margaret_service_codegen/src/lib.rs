@@ -94,8 +94,12 @@ mod tests {
     }
 
     fn rejection_for(lib_source: &str) -> ServiceCodegenError {
-        let placeholder =
-            bindings(&IndexedSource::new("#[singleton]\nstruct Placeholder;\n").index);
+        let placeholder = bindings(
+            &IndexedSource::new(
+                "use margaret::framework::macros::singleton;\n#[singleton]\nstruct Placeholder;\n",
+            )
+            .index,
+        );
 
         let index = IndexedSource::new(lib_source).index;
         ServicePlan::build(&index, &[], &placeholder, &[])
@@ -115,10 +119,10 @@ mod tests {
         )]
     }
 
-    const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
-    const STATELESS_RESPONDER: &str = "#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
-    const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n";
-    const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
+    const SERVICE: &str = "use tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::service;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
+    const STATELESS_RESPONDER: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
+    const TICKER: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n";
+    const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::service;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
 
     #[test]
     fn serves_the_issuer_server_at_the_origin_of_its_provider() {
@@ -202,7 +206,9 @@ mod tests {
     #[test]
     fn canonicalizes_imported_ticker_paths_so_they_resolve_outside_the_importing_module() {
         let source = rendered(
-            r"
+            r"use margaret::framework::macros::process;
+use margaret::framework::macros::scheduled_with_tick_timer;
+
 mod schedule {}
 
 use crate::schedule as cadence;
@@ -233,7 +239,7 @@ impl Flusher {
     #[test]
     fn rejects_an_unresolvable_ticker_interval_path_since_generated_code_cannot_name_it() {
         let message = error_for(
-            "#[scheduled_with_tick_timer(interval = PERIOD)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n#[scheduled_with_tick_timer(interval = PERIOD)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("'interval' path 'PERIOD'"));
@@ -243,7 +249,7 @@ impl Flusher {
     #[test]
     fn rejects_an_unresolvable_ticker_behavior_path_since_generated_code_cannot_name_it() {
         let message = error_for(
-            "#[scheduled_with_tick_timer(interval = crate::PERIOD, behavior = Delay)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n#[scheduled_with_tick_timer(interval = crate::PERIOD, behavior = Delay)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("'behavior' path 'Delay'"));
@@ -261,7 +267,10 @@ impl Flusher {
 
     #[test]
     fn renders_framework_service_adapters_beside_user_units() {
-        let index = IndexedSource::new("#[singleton]\nstruct Placeholder;\n").index;
+        let index = IndexedSource::new(
+            "use margaret::framework::macros::singleton;\n#[singleton]\nstruct Placeholder;\n",
+        )
+        .index;
         let framework_services = vec![
             FrameworkService {
                 concrete_path: canonical(&[
@@ -343,7 +352,7 @@ impl Flusher {
     #[test]
     fn renders_a_ticker_that_passes_the_token() {
         let source = rendered(
-            "use tokio_util::sync::CancellationToken;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
@@ -356,7 +365,7 @@ impl Flusher {
     #[test]
     fn renders_a_ticker_without_a_behavior_so_the_default_missed_tick_policy_applies() {
         let source = rendered(
-            "#[scheduled_with_tick_timer(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n#[scheduled_with_tick_timer(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
@@ -369,7 +378,7 @@ impl Flusher {
     #[test]
     fn renders_a_service_without_a_token_so_runners_may_ignore_cancellation() {
         let source = rendered(
-            "#[service]\nstruct Idle;\n\nimpl Idle {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::service;\n#[service]\nstruct Idle;\n\nimpl Idle {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
@@ -382,7 +391,7 @@ impl Flusher {
     #[test]
     fn awaits_a_service_that_declares_an_asynchronous_runner() {
         let source = rendered(
-            "#[service]\nstruct Idle;\n\nimpl Idle {\n    #[process]\n    async fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::service;\n#[service]\nstruct Idle;\n\nimpl Idle {\n    #[process]\n    async fn run(&self) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
@@ -394,7 +403,7 @@ impl Flusher {
     #[test]
     fn awaits_a_ticker_that_declares_an_asynchronous_runner() {
         let source = rendered(
-            "use tokio_util::sync::CancellationToken;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    async fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    async fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
@@ -553,7 +562,7 @@ impl Flusher {
     #[test]
     fn builds_only_the_spiffe_issuer_request_client_a_framework_provider_depends_on() {
         let index = IndexedSource::new(
-            "#[service]\nstruct Worker {\n    sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: tokio_util::sync::CancellationToken) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::service;\n#[service]\nstruct Worker {\n    sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: tokio_util::sync::CancellationToken) -> anyhow::Result<()> {}\n}\n",
         )
         .index;
         let bindings = render_container(
@@ -705,7 +714,7 @@ impl Flusher {
     #[test]
     fn rejects_a_ticker_conflicting_with_a_command() {
         let message = error_for(
-            "#[scheduled_with_tick_timer(interval = crate::P)]\n#[console_command(name = \"x\")]\nstruct Bad;\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n#[scheduled_with_tick_timer(interval = crate::P)]\n#[console_command(name = \"x\")]\nstruct Bad;\n",
         );
 
         assert!(message.contains("mutually exclusive"));
@@ -714,7 +723,7 @@ impl Flusher {
     #[test]
     fn rejects_a_non_path_interval_since_a_bare_number_has_no_time_unit() {
         let error = rejection_for(
-            "#[scheduled_with_tick_timer(interval = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n#[scheduled_with_tick_timer(interval = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(matches!(
@@ -732,7 +741,7 @@ impl Flusher {
     #[test]
     fn rejects_a_non_path_behavior_since_it_must_name_a_missed_tick_variant() {
         let error = rejection_for(
-            "#[scheduled_with_tick_timer(interval = crate::P, behavior = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n#[scheduled_with_tick_timer(interval = crate::P, behavior = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(matches!(
@@ -749,13 +758,16 @@ impl Flusher {
 
     #[test]
     fn rejects_a_service_on_a_non_struct() {
-        assert!(error_for("#[service]\nenum Bad {}\n").contains("#[service]"));
+        assert!(
+            error_for("use margaret::framework::macros::service;\n#[service]\nenum Bad {}\n")
+                .contains("#[service]")
+        );
     }
 
     #[test]
     fn rejects_a_ticker_on_a_non_struct() {
         assert!(
-            error_for("#[scheduled_with_tick_timer(interval = crate::P)]\nenum Bad {}\n")
+            error_for("use margaret::framework::macros::scheduled_with_tick_timer;\n#[scheduled_with_tick_timer(interval = crate::P)]\nenum Bad {}\n")
                 .contains("#[scheduled_with_tick_timer]")
         );
     }
@@ -763,7 +775,7 @@ impl Flusher {
     #[test]
     fn rejects_a_struct_marked_both_service_and_ticker_because_the_roles_are_mutually_exclusive() {
         let message = error_for(
-            "#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\nuse margaret::framework::macros::service;\n#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("mutually exclusive"));
@@ -771,13 +783,16 @@ impl Flusher {
 
     #[test]
     fn rejects_a_unit_without_a_runner_since_the_service_would_have_nothing_to_run() {
-        assert!(error_for("#[service]\nstruct Bad;\n").contains("no #[process] method"));
+        assert!(
+            error_for("use margaret::framework::macros::service;\n#[service]\nstruct Bad;\n")
+                .contains("no #[process] method")
+        );
     }
 
     #[test]
     fn rejects_a_service_with_two_process_methods_instead_of_guessing_which_one_runs() {
         let message = error_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn a(&self) -> anyhow::Result<()> {}\n    #[process]\n    fn b(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::service;\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn a(&self) -> anyhow::Result<()> {}\n    #[process]\n    fn b(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("more than one #[process]"));
@@ -786,7 +801,7 @@ impl Flusher {
     #[test]
     fn rejects_a_ticker_without_an_interval_since_no_default_period_is_assumed() {
         let message = error_for(
-            "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("missing the 'interval'"));
@@ -795,7 +810,7 @@ impl Flusher {
     #[test]
     fn rejects_an_unmarked_runner_parameter_since_only_a_token_can_be_supplied() {
         let message = error_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::service;\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("takes parameter 'value'"));
@@ -805,7 +820,7 @@ impl Flusher {
     #[test]
     fn rejects_a_request_binding_marker_on_a_runner_parameter() {
         let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[authenticated_user] token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::service;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[authenticated_user] token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("carries #[authenticated_user]"));
@@ -815,7 +830,7 @@ impl Flusher {
     #[test]
     fn rejects_a_cancellation_token_passed_by_reference() {
         let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> anyhow::Result<()> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::service;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("takes parameter 'token'"));
@@ -826,6 +841,9 @@ impl Flusher {
     fn weaves_a_serve_input_into_a_ticker() {
         let source = rendered(
             r#"use std::path::PathBuf;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::scheduled_with_tick_timer;
 
 #[scheduled_with_tick_timer(interval = crate::P)]
 struct Roller {
@@ -860,6 +878,9 @@ impl Roller {
         let source = rendered(
             r#"use std::path::PathBuf;
 use tokio_util::sync::CancellationToken;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::scheduled_with_tick_timer;
 
 #[scheduled_with_tick_timer(interval = crate::P)]
 struct Roller {
@@ -888,6 +909,9 @@ impl Roller {
     fn weaves_a_serve_input_into_a_service_with_a_token() {
         let source = rendered(
             r#"use tokio_util::sync::CancellationToken;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::service;
 
 #[service]
 struct Worker {
@@ -914,7 +938,10 @@ impl Worker {
     #[test]
     fn weaves_a_serve_input_into_a_service() {
         let source = rendered(
-            r#"#[service]
+            r#"use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::service;
+#[service]
 struct Worker {
     label: String,
 }
@@ -943,7 +970,10 @@ impl Worker {
     #[test]
     fn weaves_a_copy_serve_input_into_a_service_by_value() {
         let source = rendered(
-            r#"#[service]
+            r#"use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::service;
+#[service]
 struct Watcher {
     verbose: bool,
 }
@@ -966,7 +996,10 @@ impl Watcher {
     #[test]
     fn weaves_a_shared_serve_input_into_both_services_once() {
         let source = rendered(
-            r#"#[service]
+            r#"use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::service;
+#[service]
 struct First {
     shared: String,
 }
@@ -1004,7 +1037,7 @@ impl Second {
     #[test]
     fn surfaces_unparseable_ticker_arguments_instead_of_generating_the_ticker() {
         let message = error_for(
-            "#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::scheduled_with_tick_timer;\n#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));

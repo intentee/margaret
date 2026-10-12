@@ -41,7 +41,7 @@ impl ScannedParameter {
     pub(crate) fn resolve(
         self,
         method: &str,
-        resolve: impl Copy + Fn(&Path) -> CanonicalPath,
+        resolve: impl Copy + Fn(&Path) -> Option<CanonicalPath>,
     ) -> Result<IndexedParameter, AttributeError> {
         let attributes = ScannedAttribute::resolve_all(
             self.attributes,

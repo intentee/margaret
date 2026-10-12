@@ -52,6 +52,7 @@ fn flatten(tree: &UseTree, prefix: Vec<String>) -> Vec<FlattenedImport> {
                 path: CanonicalPath::new(segments),
             }]
         }
+        UseTree::Rename(use_rename) if use_rename.rename == "_" => Vec::new(),
         UseTree::Rename(use_rename) => {
             let mut segments = prefix;
             segments.push(use_rename.ident.to_string());

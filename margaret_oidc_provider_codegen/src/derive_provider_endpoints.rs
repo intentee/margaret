@@ -57,7 +57,7 @@ mod tests {
     use crate::provider_endpoint::ProviderEndpoint;
     use crate::served_authorization::ServedAuthorization;
 
-    const ISSUANCE: &str = "use margaret::framework::sessions::session_cookies::SessionCookies;\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n\n#[renders_view(name = \"consent_view\")]\n#[singleton]\npub struct ConsentView;\n\n";
+    const ISSUANCE: &str = "use margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::sessions::session_cookies::SessionCookies;\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n\n#[renders_view(name = \"consent_view\")]\n#[singleton]\npub struct ConsentView;\n\n";
 
     const SESSIONS: &str = "#[issues_sessions(issuer = provider, audience = \"browser\", cookies = SessionCookies::HostOnly)]\npub struct BrowserSessions;\n\n";
 

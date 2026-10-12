@@ -52,7 +52,7 @@ mod tests {
     #[test]
     fn rejects_a_consent_route_of_a_crate_that_admits_no_clients() {
         let indexed = IndexedSource::new(
-            "use margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint;\nuse margaret::framework::route_method::route_method::RouteMethod;\n\n#[renders_view(name = \"consent_view\")]\n#[singleton]\npub struct ConsentView;\n\n#[responds_to_http(max_body_bytes = 1_024, method = RouteMethod::Post, path = \"/consent\", server = \"identity\")]\n#[serves_oidc_endpoint(OidcEndpoint::Consent(view = ConsentView))]\nstruct PostConsent;\n",
+            "use margaret::framework::macros::renders_view;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint;\nuse margaret::framework::route_method::route_method::RouteMethod;\n\n#[renders_view(name = \"consent_view\")]\n#[singleton]\npub struct ConsentView;\n\n#[responds_to_http(max_body_bytes = 1_024, method = RouteMethod::Post, path = \"/consent\", server = \"identity\")]\n#[serves_oidc_endpoint(OidcEndpoint::Consent(view = ConsentView))]\nstruct PostConsent;\n",
         );
         let declared = DeclaredRoutes::read(&indexed.index, &mut RoutePathRegistry::new())
             .expect("the routes are declared");

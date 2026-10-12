@@ -78,13 +78,13 @@ mod tests {
             .expect("the module is rendered")
     }
 
-    const LOCK: &str = "#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n";
+    const LOCK: &str = "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n";
 
     const RELEASE: &str = "use margaret::framework::active_record::key::Key;\n\n#[model(table = \"releases\")]\nstruct Release {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    lock: Key<Lock>,\n}\n";
 
-    const COUNTER: &str = "#[model(table = \"counters\")]\nstruct Counter {\n    #[column(primary_key)]\n    name: String,\n    #[column]\n    hits: i64,\n}\n";
+    const COUNTER: &str = "use margaret::framework::macros::model;\n#[model(table = \"counters\")]\nstruct Counter {\n    #[column(primary_key)]\n    name: String,\n    #[column]\n    hits: i64,\n}\n";
 
-    const ARTICLE: &str = "use margaret::framework::active_record::key::Key;\n\nenum Status {\n    Draft,\n    Published,\n}\n\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: uuid::Uuid,\n    #[column]\n    status: Status,\n}\n\n#[model(table = \"articles\")]\n#[index(name = \"articles_by_author\", fields = [author, id])]\n#[index(name = \"articles_by_author_title\", fields = [author, title])]\nstruct Article {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: uuid::Uuid,\n    #[column]\n    title: String,\n    #[column]\n    status: Status,\n    #[column]\n    author: Key<Author>,\n}\n";
+    const ARTICLE: &str = "use margaret::framework::macros::model;\nuse margaret::framework::active_record::key::Key;\n\nenum Status {\n    Draft,\n    Published,\n}\n\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: uuid::Uuid,\n    #[column]\n    status: Status,\n}\n\n#[model(table = \"articles\")]\n#[index(name = \"articles_by_author\", fields = [author, id])]\n#[index(name = \"articles_by_author_title\", fields = [author, title])]\nstruct Article {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: uuid::Uuid,\n    #[column]\n    title: String,\n    #[column]\n    status: Status,\n    #[column]\n    author: Key<Author>,\n}\n";
 
     #[test]
     fn declares_one_module_per_model_so_every_rendered_model_module_is_reachable() {
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn orders_a_field_by_itself_and_the_rest_of_its_unique_path() {
         let source = format!(
-            "{KEY}#[model(table = \"authors\")]\nstruct Author {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n\n#[model(table = \"articles\")]\n#[index(name = \"articles_by_author\", fields = [author, id])]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    author: Key<Author>,\n}}\n"
+            "use margaret::framework::macros::model;\n{KEY}#[model(table = \"authors\")]\nstruct Author {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n\n#[model(table = \"articles\")]\n#[index(name = \"articles_by_author\", fields = [author, id])]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    author: Key<Author>,\n}}\n"
         );
 
         assert!(module(&source, "models/article/query/then/author/edge").contains(
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn names_the_module_of_a_raw_identifier_field_after_its_identifier() {
-        let source = "#[model(table = \"tokens\")]\n#[index(name = \"tokens_by_type\", fields = [r#type, id])]\nstruct Token {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(name = \"kind\")]\n    r#type: i64,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"tokens\")]\n#[index(name = \"tokens_by_type\", fields = [r#type, id])]\nstruct Token {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(name = \"kind\")]\n    r#type: i64,\n}\n";
         let modules = rendered(source);
 
         assert!(modules["models/token/query/then"].contains("pubmodr#type;"));
@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn leaves_a_branch_through_a_nullable_field_unordered() {
         let source = format!(
-            "{KEY}#[model(table = \"nodes\")]\n#[index(name = \"nodes_by_label\", fields = [label, parent, id])]\nstruct Node {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    label: String,\n    #[column]\n    #[index]\n    parent: Option<Key<Node>>,\n}}\n"
+            "use margaret::framework::macros::model;\n{KEY}#[model(table = \"nodes\")]\n#[index(name = \"nodes_by_label\", fields = [label, parent, id])]\nstruct Node {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    label: String,\n    #[column]\n    #[index]\n    parent: Option<Key<Node>>,\n}}\n"
         );
 
         assert!(!module(&source, "models/node/query/then/label/edge").contains("ScanOrder"));
@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn leaves_a_branch_ending_in_a_plain_index_unordered() {
-        let source = "#[model(table = \"events\")]\n#[index(name = \"events_by_kind\", fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(name = \"events_by_kind\", fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
 
         assert!(!module(source, "models/event/query/then/kind/edge").contains("ScanOrder"));
     }
@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn nests_the_branches_of_a_deep_index() {
-        let source = "#[model(table = \"events\")]\n#[index(name = \"events_by_kind\", fields = [kind, label, id])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(name = \"events_by_kind\", fields = [kind, label, id])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
         let modules = rendered(source);
 
         assert_eq!(modules["models/event/query/then"], "pubmodid;pubmodkind;");
@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn wraps_optional_json_and_scalar_fields_in_their_types() {
-        let source = "#[model(table = \"payloads\")]\nstruct Payload {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    document: Option<margaret::framework::active_record::json::Json<std::collections::BTreeMap<String, i64>>>,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"payloads\")]\nstruct Payload {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    document: Option<margaret::framework::active_record::json::Json<std::collections::BTreeMap<String, i64>>>,\n}\n";
 
         assert!(module(source, "models/payload/conditions").contains(
             "pubdocument:margaret::framework::active_record::operand::Operand<crate::Payload,::std::option::Option<margaret::framework::active_record::json::Json<::std::collections::BTreeMap<::std::string::String,i64>>>>"

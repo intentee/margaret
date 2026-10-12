@@ -63,7 +63,9 @@ mod tests {
 
     fn rejection(arguments: &str) -> TokenIssuanceCodegenError {
         read(
-            &format!("#[issues_tokens({arguments})]\npub struct Issuer;\n"),
+            &format!(
+                "use margaret::framework::macros::issues_tokens;\n#[issues_tokens({arguments})]\npub struct Issuer;\n"
+            ),
             |read| read.err().expect("the declaration is rejected"),
         )
     }
@@ -71,7 +73,7 @@ mod tests {
     #[test]
     fn reads_the_declared_tag_and_issuer_so_tokens_carry_the_configured_iss() {
         read(
-            "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n",
+            "use margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -116,7 +118,7 @@ mod tests {
     #[test]
     fn rejects_two_declarations_of_the_token_issuance() {
         read(
-            "#[issues_tokens(provider, issuer = \"https://a.example\")]\npub struct First;\n#[issues_tokens(provider, issuer = \"https://b.example\")]\npub struct Second;\n",
+            "use margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://a.example\")]\npub struct First;\n#[issues_tokens(provider, issuer = \"https://b.example\")]\npub struct Second;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -176,7 +178,7 @@ mod tests {
     #[test]
     fn rejects_a_declaration_that_is_not_anchored_by_a_struct() {
         read(
-            "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub enum Issuer { Only }\n",
+            "use margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub enum Issuer { Only }\n",
             |read| {
                 assert!(matches!(
                     read,

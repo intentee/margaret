@@ -150,7 +150,7 @@ mod tests {
     use super::DeclaredRoutes;
     use crate::http_codegen_error::HttpCodegenError;
 
-    const ROUTES: &str = "use margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(method = RouteMethod::Get, path = \"/sign-in/callback\", server = \"public\")]\nstruct Callback;\n#[responds_to_http(method = RouteMethod::Post, path = \"/sign-in\", server = \"public\")]\nstruct PostSignIn;\n#[responds_to_http(method = RouteMethod::Get, path = \"/articles/{article}\", server = \"public\")]\nstruct Article;\n#[responds_to_http(method = RouteMethod::Get, path = \"/oauth/{{callback}}\", server = \"public\")]\nstruct EscapedCallback;\nstruct Unrouted;\n";
+    const ROUTES: &str = "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(method = RouteMethod::Get, path = \"/sign-in/callback\", server = \"public\")]\nstruct Callback;\n#[responds_to_http(method = RouteMethod::Post, path = \"/sign-in\", server = \"public\")]\nstruct PostSignIn;\n#[responds_to_http(method = RouteMethod::Get, path = \"/articles/{article}\", server = \"public\")]\nstruct Article;\n#[responds_to_http(method = RouteMethod::Get, path = \"/oauth/{{callback}}\", server = \"public\")]\nstruct EscapedCallback;\nstruct Unrouted;\n";
 
     fn path(name: &str) -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn rejects_a_route_path_no_request_can_reach() {
         let indexed = IndexedSource::new(
-            "use margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(method = RouteMethod::Get, path = \"/articles/../admin\", server = \"public\")]\nstruct Escaping;\n",
+            "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(method = RouteMethod::Get, path = \"/articles/../admin\", server = \"public\")]\nstruct Escaping;\n",
         );
 
         assert!(matches!(
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn rejects_a_route_path_declaring_a_parameter_twice_since_its_value_is_ambiguous() {
         let indexed = IndexedSource::new(
-            "use margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(method = RouteMethod::Get, path = \"/notes/{id}/{id}\", server = \"public\")]\nstruct Duplicated;\n",
+            "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(method = RouteMethod::Get, path = \"/notes/{id}/{id}\", server = \"public\")]\nstruct Duplicated;\n",
         );
 
         assert_eq!(

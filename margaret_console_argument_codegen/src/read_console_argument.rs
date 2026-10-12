@@ -102,7 +102,9 @@ mod tests {
         declared: &Type,
         scope: ConsoleArgumentScope,
     ) -> Result<ConsoleArgument, ConsoleArgumentCodegenError> {
-        let indexed = IndexedSource::new("#[singleton]\nstruct Config;\n");
+        let indexed = IndexedSource::new(
+            "use margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n",
+        );
 
         read_console_argument(
             &indexed.index,

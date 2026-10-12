@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn reads_the_environment_variable_of_the_database_url() {
         read(
-            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn rejects_a_declaration_without_a_url_source() {
         read(
-            "#[postgres_database()]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database()]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn rejects_a_declaration_without_a_max_connections_source() {
         read(
-            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\")]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\")]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn rejects_a_max_connections_source_that_is_not_an_environment_variable_name() {
         read(
-            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"blog pool\")]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"blog pool\")]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn rejects_a_url_and_a_pool_size_read_from_one_environment_variable() {
         read(
-            "#[postgres_database(url_from = \"BLOG_DATABASE\", max_connections_from = \"BLOG_DATABASE\")]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database(url_from = \"BLOG_DATABASE\", max_connections_from = \"BLOG_DATABASE\")]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn rejects_a_url_source_that_is_not_an_environment_variable_name() {
         read(
-            "#[postgres_database(url_from = \"blog database\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database(url_from = \"blog database\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn rejects_a_url_source_that_is_not_a_string() {
         read(
-            "#[postgres_database(url_from = BLOG_DATABASE_URL)]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database(url_from = BLOG_DATABASE_URL)]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn rejects_a_max_connections_source_that_is_not_a_string() {
         read(
-            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = BLOG_DATABASE_MAX_CONNECTIONS)]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = BLOG_DATABASE_MAX_CONNECTIONS)]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn rejects_an_unrecognized_argument_instead_of_silently_ignoring_it() {
         read(
-            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\", pool = 4)]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\", pool = 4)]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn rejects_unparseable_arguments_naming_the_attribute_so_the_author_can_find_them() {
         read(
-            "#[postgres_database(= 5)]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database(= 5)]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn rejects_a_database_declared_on_a_singleton_since_it_needs_a_plain_struct() {
         read(
-            "#[singleton]\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn rejects_a_second_postgres_database_because_injection_could_not_tell_which_one_is_meant() {
         read(
-            "#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n\n#[postgres_database(url_from = \"AUDIT_DATABASE_URL\", max_connections_from = \"AUDIT_DATABASE_MAX_CONNECTIONS\")]\npub struct AuditDatabase;\n",
+            "use margaret::framework::macros::postgres_database;\n#[postgres_database(url_from = \"BLOG_DATABASE_URL\", max_connections_from = \"BLOG_DATABASE_MAX_CONNECTIONS\")]\npub struct BlogDatabase;\n\n#[postgres_database(url_from = \"AUDIT_DATABASE_URL\", max_connections_from = \"AUDIT_DATABASE_MAX_CONNECTIONS\")]\npub struct AuditDatabase;\n",
             |read| {
                 assert!(matches!(
                     read,

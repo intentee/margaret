@@ -23,7 +23,7 @@ mod tests {
 
     use super::generate_framework_models;
 
-    const MODELS_CRATE: &str = "\
+    const MODELS_CRATE: &str = "use margaret::framework::macros::model;\n\
 #[model(table = \"widgets\")]
 struct Widget {
     #[column(primary_key)]

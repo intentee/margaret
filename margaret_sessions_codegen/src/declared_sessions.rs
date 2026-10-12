@@ -250,7 +250,7 @@ mod tests {
     use crate::issued_sessions_declaration::IssuedSessionsDeclaration;
     use crate::sessions_codegen_error::SessionsCodegenError;
 
-    const ISSUANCE: &str = "use margaret::framework::sessions::session_cookies::SessionCookies;\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n";
+    const ISSUANCE: &str = "use margaret::framework::macros::consumes_sessions;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::sessions::session_cookies::SessionCookies;\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n";
 
     fn read<TOutcome>(
         declarations: &str,

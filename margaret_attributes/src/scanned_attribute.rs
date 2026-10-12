@@ -26,16 +26,16 @@ impl ScannedAttribute {
         attributes: Vec<Self>,
         host: AttributeHost,
         target: impl Fn() -> String,
-        resolve: impl Copy + Fn(&Path) -> CanonicalPath,
+        resolve: impl Copy + Fn(&Path) -> Option<CanonicalPath>,
     ) -> Result<Vec<IndexedAttribute>, AttributeError> {
         let mut held: BTreeSet<FrameworkAttribute> = BTreeSet::new();
 
         attributes
             .into_iter()
             .map(|attribute| {
-                let indexed = IndexedAttribute::from_canonical(
+                let indexed = IndexedAttribute::from_resolution(
                     &attribute.attribute,
-                    &resolve(attribute.attribute.path()),
+                    resolve(attribute.attribute.path()).as_ref(),
                 );
 
                 match indexed.framework_attribute() {

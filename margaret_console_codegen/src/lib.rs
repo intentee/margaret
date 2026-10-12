@@ -37,6 +37,10 @@ mod tests {
 
     const COMMANDS: &str = r#"
 use std::sync::Arc;
+use margaret::framework::macros::console_command;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::singleton;
 
 #[singleton]
 struct EnglishGreeter;
@@ -200,7 +204,7 @@ impl Farewell {
     #[test]
     fn declares_the_package_version_on_the_generated_command() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"boot\")]\nstruct Boot;\n\nimpl Boot {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"boot\")]\nstruct Boot;\n\nimpl Boot {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
@@ -210,7 +214,7 @@ impl Farewell {
     #[test]
     fn accepts_commands_named_after_the_generated_entry_point() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"run\")]\nstruct Run;\n\nimpl Run {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"command\")]\nstruct Command;\n\nimpl Command {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"run\")]\nstruct Run;\n\nimpl Run {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"command\")]\nstruct Command;\n\nimpl Command {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
@@ -454,7 +458,7 @@ impl Farewell {
     #[test]
     fn injects_the_cancellation_token_into_a_command_runner() {
         let source = source_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch {\n    target: String,\n}\n\nimpl Watch {\n    #[constructor]\n    fn create(#[console_argument(positional)] target: String) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch {\n    target: String,\n}\n\nimpl Watch {\n    #[constructor]\n    fn create(#[console_argument(positional)] target: String) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
@@ -467,7 +471,7 @@ impl Farewell {
     #[test]
     fn awaits_an_asynchronous_command_runner_that_takes_the_cancellation_token() {
         let source = source_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[process]\n    async fn run(&self, token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[process]\n    async fn run(&self, token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
@@ -477,7 +481,7 @@ impl Farewell {
     #[test]
     fn awaits_a_command_that_declares_an_asynchronous_runner() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    async fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    async fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
@@ -488,7 +492,7 @@ impl Farewell {
     #[test]
     fn awaits_a_command_whose_construction_is_asynchronous() {
         let source = source_for(
-            "use std::sync::Arc;\n\n#[singleton]\nstruct Slow;\n\nimpl Slow {\n    #[constructor]\n    async fn create() -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare {\n    slow: Arc<Slow>,\n}\n\nimpl Bare {\n    #[constructor]\n    fn create(slow: Arc<Slow>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use std::sync::Arc;\nuse margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\nstruct Slow;\n\nimpl Slow {\n    #[constructor]\n    async fn create() -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare {\n    slow: Arc<Slow>,\n}\n\nimpl Bare {\n    #[constructor]\n    fn create(slow: Arc<Slow>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
@@ -500,7 +504,7 @@ impl Farewell {
     #[test]
     fn renders_a_command_that_takes_only_a_flag() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged {\n    loud: bool,\n}\n\nimpl Flagged {\n    #[constructor]\n    fn create(#[console_argument(from = \"loud\")] loud: bool) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged {\n    loud: bool,\n}\n\nimpl Flagged {\n    #[constructor]\n    fn create(#[console_argument(from = \"loud\")] loud: bool) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
@@ -512,14 +516,18 @@ impl Farewell {
 
     #[test]
     fn rejects_console_command_on_a_non_struct() {
-        let message = error_for("#[console_command(name = \"bad\")]\nenum Bad {}\n");
+        let message = error_for(
+            "use margaret::framework::macros::console_command;\n#[console_command(name = \"bad\")]\nenum Bad {}\n",
+        );
 
         assert!(message.contains("#[console_command]"));
     }
 
     #[test]
     fn rejects_a_command_without_a_name_since_the_cli_dispatches_commands_by_name() {
-        let message = error_for("#[console_command]\nstruct Bad;\n");
+        let message = error_for(
+            "use margaret::framework::macros::console_command;\n#[console_command]\nstruct Bad;\n",
+        );
 
         assert!(message.contains("missing the 'name'"));
     }
@@ -527,7 +535,7 @@ impl Farewell {
     #[test]
     fn rejects_two_commands_registering_the_same_name() {
         let message = error_for(
-            "#[singleton]\n#[console_command(name = \"greet\")]\nstruct First;\n\nimpl First {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"greet\")]\nstruct Second;\n\nimpl Second {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"greet\")]\nstruct First;\n\nimpl First {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"greet\")]\nstruct Second;\n\nimpl Second {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
         );
 
         assert!(message.contains("already registered"));
@@ -536,7 +544,7 @@ impl Farewell {
     #[test]
     fn rejects_a_console_command_that_injects_the_spiffe_http_client() {
         let message = error_for(
-            "use reqwest::Client;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use reqwest::Client;\nuse margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
         );
 
         assert!(message.contains("injects the #[spiffe_http_client]"));
@@ -545,7 +553,7 @@ impl Farewell {
     #[test]
     fn rejects_a_console_command_that_depends_on_the_url_of_a_route() {
         let index = IndexedSource::new(
-            "#[singleton]\n#[console_command(name = \"sign\")]\nstruct Sign {\n    flow: std::sync::Arc<margaret::framework::oidc_sign_in::sign_in_flow::SignInFlow>,\n}\n\nimpl Sign {\n    #[constructor]\n    fn create(flow: std::sync::Arc<margaret::framework::oidc_sign_in::sign_in_flow::SignInFlow>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"sign\")]\nstruct Sign {\n    flow: std::sync::Arc<margaret::framework::oidc_sign_in::sign_in_flow::SignInFlow>,\n}\n\nimpl Sign {\n    #[constructor]\n    fn create(flow: std::sync::Arc<margaret::framework::oidc_sign_in::sign_in_flow::SignInFlow>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
         )
         .index;
         let registry = scan(&index).expect("the console arguments are scanned");
@@ -594,7 +602,7 @@ impl Farewell {
     #[test]
     fn rejects_a_console_command_depending_on_the_spiffe_issuer_request_client_of_serving() {
         let index = IndexedSource::new(
-            "#[singleton]\n#[console_command(name = \"refresh\")]\nstruct Refresh {\n    sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>,\n}\n\nimpl Refresh {\n    #[constructor]\n    fn create(sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"refresh\")]\nstruct Refresh {\n    sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>,\n}\n\nimpl Refresh {\n    #[constructor]\n    fn create(sessions: std::sync::Arc<margaret::framework::sessions::consumed_sessions::ConsumedSessions>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
         )
         .index;
         let registry = scan(&index).expect("the console arguments are scanned");
@@ -637,14 +645,18 @@ impl Farewell {
 
     #[test]
     fn reports_unparseable_command_arguments_as_an_index_failure_of_the_attribute_syntax() {
-        let message = error_for("#[console_command(= 5)]\nstruct Bad;\n");
+        let message = error_for(
+            "use margaret::framework::macros::console_command;\n#[console_command(= 5)]\nstruct Bad;\n",
+        );
 
         assert!(message.contains("failed to index"));
     }
 
     #[test]
     fn rejects_a_non_string_command_name_since_it_names_the_cli_subcommand() {
-        let error = rejection_for("#[console_command(name = 5)]\nstruct Bad;\n");
+        let error = rejection_for(
+            "use margaret::framework::macros::console_command;\n#[console_command(name = 5)]\nstruct Bad;\n",
+        );
 
         assert!(matches!(
             error,
@@ -660,8 +672,9 @@ impl Farewell {
 
     #[test]
     fn rejects_a_non_string_command_description_since_it_is_shown_as_help_text() {
-        let error =
-            rejection_for("#[console_command(name = \"x\", description = 5)]\nstruct Bad;\n");
+        let error = rejection_for(
+            "use margaret::framework::macros::console_command;\n#[console_command(name = \"x\", description = 5)]\nstruct Bad;\n",
+        );
 
         assert!(matches!(
             error,
@@ -678,7 +691,7 @@ impl Farewell {
     #[test]
     fn dispatches_a_fieldless_command_without_a_constructor() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
@@ -691,7 +704,9 @@ impl Farewell {
 
     #[test]
     fn reports_a_missing_command_runner_since_the_command_would_have_nothing_to_run() {
-        let message = error_for("#[console_command(name = \"bad\")]\nstruct Bad;\n");
+        let message = error_for(
+            "use margaret::framework::macros::console_command;\n#[console_command(name = \"bad\")]\nstruct Bad;\n",
+        );
 
         assert!(message.contains("no #[process] method"));
     }
@@ -699,7 +714,7 @@ impl Farewell {
     #[test]
     fn rejects_a_non_token_runner_parameter_since_only_a_token_can_be_supplied() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<CommandOutcome> {}\n}\n",
         );
 
         assert!(message.contains("may only take &self and an optional CancellationToken"));
@@ -708,7 +723,7 @@ impl Farewell {
     #[test]
     fn rejects_a_request_binding_marker_on_a_runner_parameter() {
         let message = error_for(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse tokio_util::sync::CancellationToken;\n\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[form_request(from = RequestInput::Query)] token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\n\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[form_request(from = RequestInput::Query)] token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
         );
 
         assert!(message.contains("carries #[form_request]"));
@@ -718,7 +733,7 @@ impl Farewell {
     #[test]
     fn binds_a_destructured_positional_console_argument_by_index_as_it_has_no_name() {
         let source = source_for(
-            "struct Point {\n    x: i32,\n    y: i32,\n}\n\n#[singleton]\n#[console_command(name = \"plot\")]\nstruct Plot {\n    point: Point,\n}\n\nimpl Plot {\n    #[constructor]\n    fn create(#[console_argument(positional)] Point { x, y }: Point) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\nstruct Point {\n    x: i32,\n    y: i32,\n}\n\n#[singleton]\n#[console_command(name = \"plot\")]\nstruct Plot {\n    point: Point,\n}\n\nimpl Plot {\n    #[constructor]\n    fn create(#[console_argument(positional)] Point { x, y }: Point) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 

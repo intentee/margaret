@@ -153,7 +153,7 @@ mod tests {
     use crate::served_session_endpoint::ServedSessionEndpoint;
     use crate::session_endpoints_codegen_error::SessionEndpointsCodegenError;
 
-    const SESSIONS: &str = "use margaret::framework::route_method::route_method::RouteMethod;\nuse margaret::framework::sessions::session_endpoint::SessionEndpoint;\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct ProviderIssuance;\n\n#[issues_sessions(issuer = provider, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n\n#[singleton]\n#[responds_to_http(method = RouteMethod::Get, path = \"/welcome\", server = \"public\")]\nstruct GetWelcome;\n";
+    const SESSIONS: &str = "use margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_session_endpoint;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::route_method::route_method::RouteMethod;\nuse margaret::framework::sessions::session_endpoint::SessionEndpoint;\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct ProviderIssuance;\n\n#[issues_sessions(issuer = provider, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n\n#[singleton]\n#[responds_to_http(method = RouteMethod::Get, path = \"/welcome\", server = \"public\")]\nstruct GetWelcome;\n";
 
     fn read<TOutcome>(
         source: &str,
@@ -295,7 +295,7 @@ mod tests {
     fn rejects_an_endpoint_of_sessions_the_crate_does_not_issue() {
         assert!(matches!(
             rejection(&format!(
-                "use margaret::framework::route_method::route_method::RouteMethod;\nuse margaret::framework::sessions::session_endpoint::SessionEndpoint;\n{}",
+                "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_session_endpoint;\nuse margaret::framework::route_method::route_method::RouteMethod;\nuse margaret::framework::sessions::session_endpoint::SessionEndpoint;\n{}",
                 served("SessionEndpoint::Refresh")
             )),
             SessionEndpointsCodegenError::SessionEndpointWithoutIssuedSessions { anchor } if anchor == "crate::PostSessions"

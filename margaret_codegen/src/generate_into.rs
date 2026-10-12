@@ -70,7 +70,7 @@ mod tests {
     use super::generate_into;
     use crate::codegen_error::CodegenError;
 
-    const HOST_CRATE: &str = "\
+    const HOST_CRATE: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\
 #[singleton]
 #[console_command(name = \"inspect\")]
 struct Config;
@@ -84,7 +84,7 @@ impl Config {
 }
 ";
 
-    const ASSET_MACRO_HOST: &str = "\
+    const ASSET_MACRO_HOST: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\
 use crate::margaret::asset_bag::asset;
 
 #[singleton]
@@ -100,7 +100,7 @@ impl Config {
 }
 ";
 
-    const ASSET_RESPONDER_HOST: &str = "\
+    const ASSET_RESPONDER_HOST: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\
 #[singleton]
 #[console_command(name = \"assets\")]
 struct AssetRoute {
@@ -118,7 +118,7 @@ impl AssetRoute {
 }
 ";
 
-    const FIELDED_SINGLETON_CRATE: &str = "\
+    const FIELDED_SINGLETON_CRATE: &str = "use margaret::framework::macros::singleton;\n\
 #[singleton]
 struct Config {
     name: String,

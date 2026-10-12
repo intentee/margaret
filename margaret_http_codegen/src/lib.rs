@@ -220,7 +220,11 @@ mod tests {
         .join("\n"))
     }
 
-    const FRAMEWORK_ENDPOINTS: &str = r#"
+    const FRAMEWORK_ENDPOINTS: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::responds_to_http;
+
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -354,7 +358,14 @@ impl Tracer {
         ));
     }
 
-    const SESSION_READER: &str = r#"
+    const SESSION_READER: &str = r#"use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::issues_sessions;
+use margaret::framework::macros::issues_tokens;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::sessions::session::Session;
 
@@ -450,7 +461,12 @@ impl PostNote {
         assert!(inference < block && block < content_rejection && content_rejection < application);
     }
 
-    const RESPONDERS_AND_MIDDLEWARE: &str = r#"
+    const RESPONDERS_AND_MIDDLEWARE: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -491,7 +507,10 @@ impl Tracer {
 }
 "#;
 
-    const ROUTE_PARAMETER: &str = r#"
+    const ROUTE_PARAMETER: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/users/{id}", server = "public")]
 struct GetUser;
@@ -502,7 +521,13 @@ impl GetUser {
 }
 "#;
 
-    const AUTHENTICATED_RESPONDER: &str = r#"
+    const AUTHENTICATED_RESPONDER: &str = r#"use margaret::framework::macros::constructor;
+use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
 struct User;
@@ -569,7 +594,7 @@ impl GetProfile {
     #[test]
     fn hands_the_views_to_an_authenticated_user_provider_that_renders_them() {
         let source: String = source_for_with_views(
-            "use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/profile\", server = \"public\")]\nstruct GetProfile;\n\nimpl GetProfile {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/profile\", server = \"public\")]\nstruct GetProfile;\n\nimpl GetProfile {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {}\n}\n",
         )
         .split_whitespace()
         .collect();
@@ -581,7 +606,7 @@ impl GetProfile {
     fn rejects_a_route_parameter_binder_that_is_not_a_singleton() {
         assert!(
             error_for(
-                "struct User;\n\n#[provides_route_parameter]\nstruct UserBinder;\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n"
+                "use margaret::framework::macros::provides_route_parameter;\nstruct User;\n\n#[provides_route_parameter]\nstruct UserBinder;\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n"
             )
             .contains("must also be declared as a #[singleton]")
         );
@@ -591,13 +616,18 @@ impl GetProfile {
     fn rejects_an_authenticated_user_in_a_middleware() {
         assert!(
             error_for(
-                "use margaret::framework::http::next::Next;\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n"
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http::next::Next;\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n"
             )
             .contains("only available in an HTTP responder")
         );
     }
 
-    const COLLIDING_PROVIDER: &str = r#"
+    const COLLIDING_PROVIDER: &str = r#"use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::http::request::Request;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
@@ -636,7 +666,11 @@ impl GetProfile {
         ));
     }
 
-    const COLLIDING_BINDER: &str = r#"use margaret::framework::http_validation::request_input::RequestInput;
+    const COLLIDING_BINDER: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::provides_route_parameter;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+use margaret::framework::http_validation::request_input::RequestInput;
 
 
 struct User;
@@ -677,7 +711,10 @@ impl GetUser {
         ));
     }
 
-    const ASSET_BAG_NAMED_REQUEST: &str = r#"
+    const ASSET_BAG_NAMED_REQUEST: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/assets/{id}", server = "public")]
 struct GetAsset;
@@ -707,7 +744,13 @@ impl GetAsset {
         ));
     }
 
-    const PROVIDER_THAT_ALSO_BINDS: &str = r#"
+    const PROVIDER_THAT_ALSO_BINDS: &str = r#"use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::process;
+use margaret::framework::macros::provides_route_parameter;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::http::request::Request;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
@@ -777,7 +820,11 @@ impl GetArticle {
         assert!(authentication < binding);
     }
 
-    const TWICE_BOUND_MODEL: &str = r#"
+    const TWICE_BOUND_MODEL: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::provides_route_parameter;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 struct User;
 
 #[singleton]
@@ -828,7 +875,11 @@ impl GetPair {
         assert!(source.contains("\"editor\",user_binder.as_ref(),"));
     }
 
-    const BOUND_MODEL: &str = r#"
+    const BOUND_MODEL: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::provides_route_parameter;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 struct User;
 
 #[singleton]
@@ -850,7 +901,11 @@ impl GetUser {
 }
 "#;
 
-    const DESTRUCTURED_ROUTE_PARAMETER: &str = r#"
+    const DESTRUCTURED_ROUTE_PARAMETER: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::provides_route_parameter;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 struct User;
 
 #[singleton]
@@ -872,7 +927,10 @@ impl GetUser {
 }
 "#;
 
-    const CURRENT_REQUEST: &str = r#"
+    const CURRENT_REQUEST: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::http::request::Request;
 
 #[singleton]
@@ -907,7 +965,10 @@ impl Echo {
         rejection_for(lib_source).to_string()
     }
 
-    const VIEWS_INJECTION: &str = r#"
+    const VIEWS_INJECTION: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/card", server = "public")]
 struct GetCard;
@@ -944,7 +1005,10 @@ impl GetHealth {
         assert!(message.contains("requests the views, but this crate generates none"));
     }
 
-    const HEALTH_RESPONDER: &str = r#"
+    const HEALTH_RESPONDER: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/health", server = "public")]
 struct Health;
@@ -1092,6 +1156,11 @@ impl Health {
             r#"
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use spiffe::spiffe_id::SpiffeId;
+use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
 
 struct Workload;
 
@@ -1168,7 +1237,10 @@ impl GetWorkload {
         .collect()
     }
 
-    const ROUTES_FIXTURE: &str = r#"
+    const ROUTES_FIXTURE: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = "get_greeting", path = "/greeting", server = "public")]
 struct GetGreeting;
@@ -1215,7 +1287,10 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn names_a_builder_parameter_apart_from_a_rust_keyword_so_the_builder_compiles() {
         let source = routes_source_for(
-            r#"
+            r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = "get_kind", path = "/kinds/{type}", server = "public")]
 struct GetKind;
@@ -1244,7 +1319,7 @@ impl GetKind { #[process] fn respond(&self, #[route_parameter(from = "type")] ki
 
     #[test]
     fn orders_the_entries_of_a_server_like_its_paths_so_each_route_resolves_to_its_own_handler() {
-        let lib_source = "#[singleton]
+        let lib_source = "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_note\", path = \"/notes/{note}\", server = \"public\")]\nstruct GetNote;\nimpl GetNote {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"note\")] note: String) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Query, path = \"/archive\", server = \"public\")]\nstruct QueryArchive;\nimpl QueryArchive {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
         let routes = routes_source_for(lib_source);
@@ -1291,7 +1366,10 @@ impl GetKind { #[process] fn respond(&self, #[route_parameter(from = "type")] ki
     #[test]
     fn builds_the_url_of_a_literal_route_from_its_encoded_path() {
         let source = routes_source_for(
-            r#"
+            r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = "get_callback", path = "/oauth/{{callback}}", server = "public")]
 struct GetCallback;
@@ -1339,7 +1417,10 @@ impl GetCallback { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn borrows_the_origin_for_the_literal_routes_of_a_server_without_parameterized_routes() {
         let source = routes_source_for(
-            r#"
+            r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = "get_login", path = "/login", server = "identity")]
 struct GetLogin;
@@ -1377,7 +1458,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn injects_the_routes_reference_into_a_responder_by_type() {
         let source = source_for(
-            "use crate::margaret::routes::Routes;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse crate::margaret::routes::Routes;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, routes: &Routes) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1389,7 +1470,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn injects_a_fresh_asset_bag_into_a_responder_by_value() {
         let source = source_for(
-            "use margaret::framework::asset_bag::asset_bag::AssetBag;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::asset_bag::asset_bag::AssetBag;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/page\", server = \"public\")]\nstruct GetPage;\nimpl GetPage {\n    #[process]\n    fn respond(&self, asset_bag: AssetBag) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1405,7 +1486,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn injects_the_peer_spiffe_id_into_a_responder_by_type() {
         let source = source_for(
-            "use spiffe::spiffe_id::SpiffeId;\n\n#[singleton]
+            "use spiffe::spiffe_id::SpiffeId;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, peer: &SpiffeId) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1417,7 +1498,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn injects_the_scoped_forwarder_into_a_responder_by_type() {
         let source = source_for(
-            "use crate::margaret::forwarders::public::Forwarder;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse crate::margaret::forwarders::public::Forwarder;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {}\n}\n",
         );
 
@@ -1430,7 +1511,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn rejects_a_user_type_named_routes_that_shadows_the_injectable() {
         let message = error_for(
-            "mod app {\n    pub struct Routes;\n}\n\nuse crate::app::Routes;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nmod app {\n    pub struct Routes;\n}\n\nuse crate::app::Routes;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, routes: &Routes) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1440,7 +1521,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn rejects_a_forwarder_imported_from_a_foreign_server() {
         let message = error_for(
-            "use crate::margaret::forwarders::public::Forwarder;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse crate::margaret::forwarders::public::Forwarder;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1450,7 +1531,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn rejects_a_peer_spiffe_id_parameter_that_also_carries_a_marker() {
         let message = error_for(
-            "use spiffe::spiffe_id::SpiffeId;\n\n#[singleton]
+            "use spiffe::spiffe_id::SpiffeId;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x/{id}\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"id\")] peer: &SpiffeId) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1460,7 +1541,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn rejects_a_responder_with_multiple_peer_spiffe_id_parameters() {
         let message = error_for(
-            "use spiffe::spiffe_id::SpiffeId;\n\n#[singleton]
+            "use spiffe::spiffe_id::SpiffeId;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, first: &SpiffeId, second: &SpiffeId) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1470,7 +1551,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn rejects_a_route_name_that_is_not_an_identifier() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"not an identifier\", path = \"/x\", server = \"public\")]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1480,7 +1561,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn rejects_route_paths_that_conflict_on_the_same_server() {
         let rejection = rejection_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/articles/{article}\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/articles/{id}\", server = \"public\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
@@ -1498,7 +1579,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn rejects_two_responders_registering_the_same_method_and_path() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/articles\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/articles\", server = \"public\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
@@ -1509,7 +1590,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn accepts_the_same_route_path_with_different_methods() {
         let source = source_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/articles/{article}\", server = \"public\")]\nstruct Read;\nimpl Read {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Delete, path = \"/articles/{article}\", server = \"public\")]\nstruct Remove;\nimpl Remove {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
@@ -1525,7 +1606,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn accepts_the_same_route_path_on_different_servers() {
         let source = routes_source_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/articles/{article}\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/articles/{id}\", server = \"internal\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
@@ -1572,7 +1653,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn weaves_routes_into_a_routes_injecting_middleware_onion() {
         let source = source_for(
-            "use crate::margaret::routes::Routes;\nuse margaret::framework::http::next::Next;\nuse margaret::framework::http::request::Request;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::macros::middleware;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse crate::margaret::routes::Routes;\nuse margaret::framework::http::next::Next;\nuse margaret::framework::http::request::Request;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, request: &Request, next: Next, routes: &Routes) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         );
 
@@ -1605,7 +1686,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn awaits_a_responder_that_declares_an_asynchronous_process_method() {
         let source = source_for(
-            "#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    async fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    async fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(source.contains("responder.respond().await"));
@@ -1614,7 +1695,11 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     #[test]
     fn injects_distinct_route_parameter_value_types_into_the_responder() {
         let source = source_for(
-            r#"
+            r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::route_parameter_value;
+use margaret::framework::macros::singleton;
+
 #[route_parameter_value]
 struct ProjectSlug(String);
 
@@ -1649,7 +1734,7 @@ impl GetProject {
     #[test]
     fn rejects_a_route_parameter_taken_by_reference() {
         let message = error_for(
-            "#[route_parameter_value]\nstruct ProjectSlug(String);\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/projects/{slug}\", server = \"public\")]\nstruct GetProject;\nimpl GetProject {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"slug\")] slug: &ProjectSlug) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::route_parameter_value;\nuse margaret::framework::macros::singleton;\n#[route_parameter_value]\nstruct ProjectSlug(String);\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/projects/{slug}\", server = \"public\")]\nstruct GetProject;\nimpl GetProject {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"slug\")] slug: &ProjectSlug) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(message.contains("is taken by reference"));
@@ -1672,7 +1757,7 @@ impl GetProject {
     #[test]
     fn binds_a_current_request_parameter_without_its_declared_name() {
         let source = source_for(
-            "use margaret::framework::http::request::Request;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http::request::Request;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/echo\", server = \"public\")]\nstruct Echo;\n\nimpl Echo {\n    #[process]\n    fn respond(&self, incoming: &Request) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1684,7 +1769,7 @@ impl GetProject {
     #[test]
     fn keeps_the_request_binding_clear_of_a_route_parameter_named_request() {
         let source = source_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x/{request}\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"request\")] request: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1698,7 +1783,7 @@ impl GetProject {
     #[test]
     fn keeps_the_responder_binding_clear_of_a_route_parameter_named_responder() {
         let source = source_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x/{responder}\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"responder\")] responder: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1735,7 +1820,7 @@ impl GetProject {
     #[test]
     fn ignores_an_unrelated_trait_impl_when_resolving_the_binder_model() {
         let source = source_for(
-            "struct User;\n\ntrait Marker {}\n\n#[singleton]\n#[provides_route_parameter]\nstruct UserBinder;\n\nimpl Marker for UserBinder {}\n\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nstruct User;\n\ntrait Marker {}\n\n#[singleton]\n#[provides_route_parameter]\nstruct UserBinder;\n\nimpl Marker for UserBinder {}\n\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\n\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1744,7 +1829,9 @@ impl GetProject {
 
     #[test]
     fn reports_a_binder_without_a_model_associated_type() {
-        let message = error_for("#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n");
+        let message = error_for(
+            "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n",
+        );
 
         assert!(message.contains("type Model"));
     }
@@ -1752,7 +1839,7 @@ impl GetProject {
     #[test]
     fn reports_a_binder_with_a_non_struct_model() {
         let message = error_for(
-            "#[singleton]\n#[provides_route_parameter]\nstruct UnitBinder;\nimpl HttpRouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<()>> {}\n}\n",
+            "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[provides_route_parameter]\nstruct UnitBinder;\nimpl HttpRouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<()>> {}\n}\n",
         );
 
         assert!(message.contains("type Model"));
@@ -1761,7 +1848,7 @@ impl GetProject {
     #[test]
     fn reports_a_binder_whose_model_resolves_to_a_non_struct() {
         let message = error_for(
-            "trait Marker {}\n\n#[singleton]\n#[provides_route_parameter]\nstruct MarkerBinder;\nimpl HttpRouteParameterBinder for MarkerBinder {\n    type Model = Marker;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Marker>> {}\n}\n",
+            "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\ntrait Marker {}\n\n#[singleton]\n#[provides_route_parameter]\nstruct MarkerBinder;\nimpl HttpRouteParameterBinder for MarkerBinder {\n    type Model = Marker;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Marker>> {}\n}\n",
         );
 
         assert!(message.contains("type Model"));
@@ -1770,7 +1857,7 @@ impl GetProject {
     #[test]
     fn rejects_a_route_parameter_of_an_unknown_type() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/things/{thing}\", server = \"public\")]\nstruct GetThing;\nimpl GetThing {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"thing\")] thing: Unknown) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1780,7 +1867,7 @@ impl GetProject {
     #[test]
     fn propagates_malformed_route_parameter_arguments_instead_of_ignoring_them() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/things/{thing}\", server = \"public\")]\nstruct GetThing;\nimpl GetThing {\n    #[process]\n    fn respond(&self, #[route_parameter(= 5)] thing: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1790,7 +1877,7 @@ impl GetProject {
     #[test]
     fn rejects_two_binders_for_the_same_model() {
         let message = error_for(
-            "struct User;\n\n#[singleton]\n#[provides_route_parameter]\nstruct First;\nimpl HttpRouteParameterBinder for First {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct Second;\nimpl HttpRouteParameterBinder for Second {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n",
+            "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\nstruct User;\n\n#[singleton]\n#[provides_route_parameter]\nstruct First;\nimpl HttpRouteParameterBinder for First {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct Second;\nimpl HttpRouteParameterBinder for Second {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n",
         );
 
         assert!(message.contains("more than one route parameter binder"));
@@ -1799,7 +1886,7 @@ impl GetProject {
     #[test]
     fn rejects_a_non_struct_route_parameter_binder() {
         let message = error_for(
-            "struct User;\n\n#[provides_route_parameter]\nenum Binder {}\nimpl HttpRouteParameterBinder for Binder {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n",
+            "use margaret::framework::macros::provides_route_parameter;\nstruct User;\n\n#[provides_route_parameter]\nenum Binder {}\nimpl HttpRouteParameterBinder for Binder {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n",
         );
 
         assert!(message.contains("is only supported on structs"));
@@ -1808,7 +1895,7 @@ impl GetProject {
     #[test]
     fn rejects_a_model_parameter_without_a_binder() {
         let message = error_for(
-            "struct User;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nstruct User;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1818,7 +1905,7 @@ impl GetProject {
     #[test]
     fn rejects_a_responder_without_a_process_method() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Bare;\n",
         );
 
@@ -1828,7 +1915,7 @@ impl GetProject {
     #[test]
     fn rejects_an_unmarked_responder_parameter_since_every_input_must_be_explicit() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self, id: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1838,7 +1925,7 @@ impl GetProject {
     #[test]
     fn rejects_a_non_string_route_parameter_source() {
         let error = rejection_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self, #[route_parameter(from = 5)] id: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1859,7 +1946,7 @@ impl GetProject {
     #[test]
     fn rejects_a_route_parameter_without_from_since_names_are_never_inferred() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self, #[route_parameter] id: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1869,7 +1956,7 @@ impl GetProject {
     #[test]
     fn rejects_a_route_parameter_absent_from_the_path() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/users/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"slug\")] slug: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1879,7 +1966,7 @@ impl GetProject {
     #[test]
     fn rejects_a_malformed_route_path_so_the_router_never_fails_at_startup() {
         let rejection = rejection_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/users/{id\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -1903,7 +1990,7 @@ impl GetProject {
     #[test]
     fn rejects_responds_to_http_on_a_non_struct() {
         let message = error_for(
-            "#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nenum Bad {}\n",
+            "use margaret::framework::macros::responds_to_http;\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nenum Bad {}\n",
         );
 
         assert!(message.contains("#[responds_to_http]"));
@@ -1913,7 +2000,7 @@ impl GetProject {
     fn surfaces_unparseable_responder_arguments_instead_of_generating_routes() {
         assert!(
             error_for(
-                "#[singleton]
+                "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(= 5, server = \"public\")]\nstruct Bad;\n"
             )
             .contains("failed to index")
@@ -1923,7 +2010,7 @@ impl GetProject {
     #[test]
     fn propagates_a_method_argument_that_is_not_a_path() {
         let error = rejection_for(
-            "#[singleton]
+            "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = 5, path = \"/x\", server = \"public\")]\nstruct Bad;\n",
         );
 
@@ -1942,7 +2029,7 @@ impl GetProject {
     #[test]
     fn rejects_a_method_outside_the_routable_methods() {
         let error = rejection_for(
-            "#[singleton]
+            "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Options, path = \"/x\", server = \"public\")]\nstruct Bad;\n",
         );
 
@@ -1956,7 +2043,7 @@ impl GetProject {
     #[test]
     fn reads_a_method_named_through_an_imported_enum() {
         assert!(source_for(
-            "use margaret::framework::route_method::route_method::RouteMethod;\n\n#[singleton]\n#[responds_to_http(method = RouteMethod::Patch, path = \"/x\", server = \"public\")]\nstruct Edit;\nimpl Edit {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::route_method::route_method::RouteMethod;\n\n#[singleton]\n#[responds_to_http(method = RouteMethod::Patch, path = \"/x\", server = \"public\")]\nstruct Edit;\nimpl Edit {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .contains("margaret::framework::route_method::route_method::RouteMethod::Patch"));
     }
@@ -1964,7 +2051,7 @@ impl GetProject {
     #[test]
     fn reads_a_method_named_through_an_imported_variant() {
         assert!(source_for(
-            "use margaret::framework::route_method::route_method::RouteMethod::Delete;\n\n#[singleton]\n#[responds_to_http(method = Delete, path = \"/x\", server = \"public\")]\nstruct Remove;\nimpl Remove {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::route_method::route_method::RouteMethod::Delete;\n\n#[singleton]\n#[responds_to_http(method = Delete, path = \"/x\", server = \"public\")]\nstruct Remove;\nimpl Remove {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .contains("margaret::framework::route_method::route_method::RouteMethod::Delete"));
     }
@@ -1972,7 +2059,7 @@ impl GetProject {
     #[test]
     fn reads_a_method_named_through_a_re_exported_module() {
         assert!(source_for(
-            "mod prelude {\n    pub use margaret::framework::route_method::route_method;\n}\n\nuse crate::prelude::route_method;\n\n#[singleton]\n#[responds_to_http(method = route_method::RouteMethod::Put, path = \"/x\", server = \"public\")]\nstruct Replace;\nimpl Replace {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nmod prelude {\n    pub use margaret::framework::route_method::route_method;\n}\n\nuse crate::prelude::route_method;\n\n#[singleton]\n#[responds_to_http(method = route_method::RouteMethod::Put, path = \"/x\", server = \"public\")]\nstruct Replace;\nimpl Replace {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .contains("margaret::framework::route_method::route_method::RouteMethod::Put"));
     }
@@ -1981,7 +2068,7 @@ impl GetProject {
     fn rejects_a_same_named_variant_of_a_foreign_enum() {
         assert!(matches!(
             rejection_for(
-                "mod verbs {\n    pub enum RouteMethod {\n        Get,\n    }\n}\n\nuse crate::verbs::RouteMethod;\n\n#[singleton]\n#[responds_to_http(method = RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Bad;\n",
+                "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nmod verbs {\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\n    pub enum RouteMethod {\n        Get,\n    }\n}\n\nuse crate::verbs::RouteMethod;\n\n#[singleton]\n#[responds_to_http(method = RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Bad;\n",
             ),
             HttpCodegenError::UnknownHttpMethod { ref written, .. } if written == "RouteMethod :: Get"
         ));
@@ -1990,7 +2077,7 @@ impl GetProject {
     #[test]
     fn registers_a_query_method_responder_under_query_since_it_is_a_routable_method() {
         let source = source_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Query, path = \"/search\", server = \"public\")]\nstruct Search;\nimpl Search {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2003,7 +2090,7 @@ impl GetProject {
     fn rejects_a_responder_without_a_method_since_no_default_method_is_assumed() {
         assert!(
             error_for(
-                "#[singleton]
+                "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(path = \"/x\", server = \"public\")]\nstruct Bad;\n"
             )
             .contains("missing the 'method'")
@@ -2013,7 +2100,7 @@ impl GetProject {
     #[test]
     fn propagates_a_non_string_path_argument_so_the_error_names_the_bad_argument() {
         let error = rejection_for(
-            "#[singleton]
+            "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = 5, server = \"public\")]\nstruct Bad;\n",
         );
 
@@ -2033,7 +2120,7 @@ impl GetProject {
     fn rejects_a_responder_without_a_path_since_it_would_be_unreachable() {
         assert!(
             error_for(
-                "#[singleton]
+                "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, server = \"public\")]\nstruct Bad;\n"
             )
             .contains("missing the 'path'")
@@ -2042,15 +2129,18 @@ impl GetProject {
 
     #[test]
     fn rejects_http_middleware_on_a_non_struct() {
-        let message = error_for("#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n");
+        let message = error_for(
+            "use margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n",
+        );
 
         assert!(message.contains("#[handles_middleware_attribute]"));
     }
 
     #[test]
     fn rejects_a_middleware_without_a_process_method() {
-        let message =
-            error_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n");
+        let message = error_for(
+            "use margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n",
+        );
 
         assert!(message.contains("no #[process] method"));
     }
@@ -2058,7 +2148,7 @@ impl GetProject {
     #[test]
     fn rejects_an_unclassifiable_middleware_parameter_since_nothing_could_supply_it() {
         let message = error_for(
-            "#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         );
 
         assert!(message.contains("must be the current request, the next handler"));
@@ -2067,7 +2157,7 @@ impl GetProject {
     #[test]
     fn rejects_a_middleware_attribute_without_a_tag() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::middleware;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\n#[middleware]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2077,7 +2167,7 @@ impl GetProject {
     #[test]
     fn rejects_an_unknown_middleware_tag_since_no_handler_would_run_for_it() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::middleware;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\n#[middleware(missing)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2087,7 +2177,7 @@ impl GetProject {
     #[test]
     fn propagates_malformed_middleware_attribute_arguments_instead_of_ignoring_them() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::middleware;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\n#[middleware(= 5)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2108,7 +2198,10 @@ impl GetProject {
         );
     }
 
-    const NAMED_ROUTE: &str = r#"
+    const NAMED_ROUTE: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(
     method = margaret::framework::route_method::route_method::RouteMethod::Get,
@@ -2139,7 +2232,7 @@ impl GetGreeting {
     #[test]
     fn rejects_a_route_name_that_is_not_snake_case() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"getArticle\", path = \"/a\", server = \"public\")]\nstruct A;\nimpl A {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2149,7 +2242,7 @@ impl GetGreeting {
     #[test]
     fn rejects_a_server_name_that_is_not_snake_case() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/a\", server = \"PublicApi\")]\nstruct A;\nimpl A {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2159,7 +2252,7 @@ impl GetGreeting {
     #[test]
     fn disambiguates_server_names_that_derive_the_same_routes_type() {
         let source = routes_source_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"a1\")]\nstruct X;\nimpl X {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/y\", server = \"a_1\")]\nstruct Y;\nimpl Y {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
@@ -2171,7 +2264,7 @@ impl GetGreeting {
     #[test]
     fn names_the_routes_of_a_server_whose_name_starts_with_a_digit_after_its_underscore() {
         let source = routes_source_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_x\", path = \"/x\", server = \"_1\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2182,7 +2275,7 @@ impl GetGreeting {
     fn rejects_a_raw_server_name_to_keep_raw_syntax_out_of_generated_names() {
         assert!(matches!(
             rejection_for(
-                "#[singleton]
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
         #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"r#type\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
             ),
             HttpCodegenError::InvalidServerName { server, .. } if server == "r#type"
@@ -2192,7 +2285,7 @@ impl GetGreeting {
     #[test]
     fn disambiguates_a_route_named_origin_from_the_internal_origin_field() {
         let source = routes_source_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"origin\", path = \"/o\", server = \"public\")]\nstruct O;\nimpl O {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_x\", path = \"/x/{id}\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<Response> {}\n}\n",
         );
@@ -2209,7 +2302,7 @@ impl GetGreeting {
     #[test]
     fn disambiguates_a_route_named_new_from_the_generated_constructor() {
         let source = routes_source_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"new\", path = \"/n/{id}\", server = \"public\")]\nstruct New;\nimpl New {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2223,7 +2316,7 @@ impl GetGreeting {
     #[test]
     fn rejects_two_routes_sharing_a_name_since_the_name_must_address_one_route() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"shared\", path = \"/a\", server = \"public\")]\nstruct A;\nimpl A {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"shared\", path = \"/b\", server = \"public\")]\nstruct B;\nimpl B {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
@@ -2234,7 +2327,7 @@ impl GetGreeting {
     #[test]
     fn propagates_a_non_string_name_argument_so_the_error_names_the_bad_argument() {
         let error = rejection_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = crate::symbols::RouteName::Shared, path = \"/a\", server = \"public\")]\nstruct A;\nimpl A {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2253,7 +2346,7 @@ impl GetGreeting {
     #[test]
     fn wraps_the_responder_return_in_a_response_continuation() {
         let source = source_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2262,7 +2355,10 @@ impl GetGreeting {
         );
     }
 
-    const MULTIPLE_SERVERS: &str = r#"
+    const MULTIPLE_SERVERS: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/", server = "public")]
 struct GetIndex;
@@ -2285,7 +2381,7 @@ impl GetMetrics {
     #[test]
     fn rejects_a_route_without_a_server_since_no_default_server_is_assumed() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/\")]\nstruct GetIndex;\nimpl GetIndex {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2319,7 +2415,7 @@ impl GetMetrics {
     #[test]
     fn propagates_a_non_string_server_argument_so_the_error_names_the_bad_argument() {
         let error = rejection_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/\", server = ServerMarker)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2338,7 +2434,7 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_form_source() {
         let source = source_for(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
 #[responds_to_http(max_body_bytes = 1024, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2354,7 +2450,7 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_query_source() {
         let source = source_for(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Query)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2366,7 +2462,7 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_json_source() {
         let source = source_for(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
 #[responds_to_http(max_body_bytes = 2048, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Json)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2381,7 +2477,7 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_cookie_source() {
         let source = source_for(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Cookie)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2393,7 +2489,7 @@ impl GetMetrics {
     #[test]
     fn rejects_a_form_request_without_a_source() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2403,7 +2499,7 @@ impl GetMetrics {
     #[test]
     fn rejects_a_form_request_with_an_unknown_source() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Headers)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2413,7 +2509,7 @@ impl GetMetrics {
     #[test]
     fn rejects_an_argument_with_conflicting_markers_since_its_source_is_ambiguous() {
         let message = error_for(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] #[form_request(from = RequestInput::Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2423,7 +2519,7 @@ impl GetMetrics {
     #[test]
     fn rejects_a_non_path_form_request_source() {
         let error = rejection_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = 5)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2444,7 +2540,7 @@ impl GetMetrics {
     #[test]
     fn propagates_malformed_form_request_arguments_instead_of_ignoring_them() {
         let message = error_for(
-            "#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(= 5)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2454,7 +2550,7 @@ impl GetMetrics {
     #[test]
     fn injects_a_guarded_form_request_as_a_bare_model() {
         let source = source_for(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n\n#[singleton]
 #[responds_to_http(max_body_bytes = 1024, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] data: Data) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2469,7 +2565,12 @@ impl GetMetrics {
     #[test]
     fn weaves_views_into_a_views_injecting_middleware_onion() {
         let source = source_for_with_views(
-            r#"
+            r#"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::http::next::Next;
 
 #[singleton]
@@ -2501,7 +2602,12 @@ impl Tracer {
     #[test]
     fn rejects_middleware_view_injection_without_declared_views() {
         let message = error_for(
-            r#"
+            r#"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::http::next::Next;
 
 #[singleton]
@@ -2533,6 +2639,11 @@ impl Tracer {
             r#"
 use margaret::framework::http::next::Next;
 use spiffe::spiffe_id::SpiffeId;
+use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
 
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/x", server = "internal")]
@@ -2575,7 +2686,10 @@ impl Guard {
     #[test]
     fn rejects_the_next_handler_in_a_responder() {
         let message = error_for(
-            r#"
+            r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::http::next::Next;
 
 #[singleton]
@@ -2592,7 +2706,11 @@ impl GetX {
         assert!(message.contains("only available inside an HTTP middleware"));
     }
 
-    const CONSOLE_ARGUMENT_RESPONDER: &str = r#"
+    const CONSOLE_ARGUMENT_RESPONDER: &str = r#"use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/greeting", server = "public")]
 struct Greeting;
@@ -2618,7 +2736,12 @@ impl Greeting {
         assert!(source.contains("container.greeting()"));
     }
 
-    const CONSOLE_ARGUMENT_BINDER: &str = r#"
+    const CONSOLE_ARGUMENT_BINDER: &str = r#"use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::provides_route_parameter;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 struct User;
 
 #[singleton]
@@ -2653,7 +2776,13 @@ impl GetUser {
         assert!(!source.contains("serve_input_"));
     }
 
-    const CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
+    const CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -2694,6 +2823,10 @@ impl Guard {
 
     const CONSOLE_ARGUMENT_MIXED_CATEGORIES: &str = r#"
 use std::path::PathBuf;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
 
 #[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = "/configured", server = "public")]
@@ -2754,7 +2887,7 @@ impl Configured {
     fn accepts_uploads_on_a_server_with_an_upload_route() {
         assert_eq!(
             server_uploads_of(&format!(
-                "{UPLOADED_FILES_IMPORT}#[singleton]\n#[responds_to_http(max_body_bytes = 4096, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/files\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, files: UploadedFiles) -> anyhow::Result<Response> {{}}\n}}\n"
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n{UPLOADED_FILES_IMPORT}#[singleton]\n#[responds_to_http(max_body_bytes = 4096, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/files\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, files: UploadedFiles) -> anyhow::Result<Response> {{}}\n}}\n"
             )),
             [ServerUploads::Accepted]
         );
@@ -2764,7 +2897,7 @@ impl Configured {
     fn refuses_uploads_on_a_server_without_an_upload_route() {
         assert_eq!(
             server_uploads_of(
-                "#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n"
             ),
             [ServerUploads::Refused]
         );
@@ -2773,7 +2906,7 @@ impl Configured {
     #[test]
     fn reads_uploaded_files_after_the_head_bindings() {
         let source = source_for(&format!(
-            "{UPLOADED_FILES_IMPORT}#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n{UPLOADED_FILES_IMPORT}#[singleton]
 #[responds_to_http(max_body_bytes = 4096, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/files/{{name}}\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, files: UploadedFiles, #[route_parameter(from = \"name\")] name: String) -> anyhow::Result<Response> {{}}\n}}\n"
         ));
         let read = source
@@ -2790,7 +2923,7 @@ impl Configured {
     #[test]
     fn reads_form_fields_and_uploaded_files_from_one_multipart_body() {
         let source = source_for(&format!(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n{UPLOADED_FILES_IMPORT}#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n{UPLOADED_FILES_IMPORT}#[singleton]
 #[responds_to_http(max_body_bytes = 4096, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/files\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] form: Data, files: UploadedFiles) -> anyhow::Result<Response> {{}}\n}}\n"
         ));
 
@@ -2805,7 +2938,7 @@ impl Configured {
     #[test]
     fn opens_a_raw_body_stream_capped_by_the_declared_limit_instead_of_buffering_it() {
         let source = source_for(&format!(
-            "{REQUEST_BODY_STREAM_IMPORT}#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n{REQUEST_BODY_STREAM_IMPORT}#[singleton]
 #[responds_to_http(max_body_bytes = 1073741824, method = margaret::framework::route_method::route_method::RouteMethod::Put, path = \"/artifacts\", server = \"public\")]\nstruct Store;\nimpl Store {{\n    #[process]\n    async fn respond(&self, stream: RequestBodyStream) -> anyhow::Result<Response> {{}}\n}}\n"
         ));
 
@@ -2817,7 +2950,7 @@ impl Configured {
     #[test]
     fn registers_a_named_post_route_as_not_forwardable() {
         let source = source_for(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n#[singleton]
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n#[singleton]
 #[responds_to_http(max_body_bytes = 64, method = margaret::framework::route_method::route_method::RouteMethod::Post, name = \"post_note\", path = \"/notes\", server = \"public\")]\nstruct PostNote;\nimpl PostNote {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] note: Data) -> anyhow::Result<Response> {}\n}\n",
         );
 
@@ -2830,7 +2963,7 @@ impl Configured {
     #[test]
     fn rejects_a_get_route_that_reads_the_request_body() {
         let rejection = rejection_for(&format!(
-                "{UPLOADED_FILES_IMPORT}#[singleton]
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n{UPLOADED_FILES_IMPORT}#[singleton]
 #[responds_to_http(max_body_bytes = 64, method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/files\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, files: UploadedFiles) -> anyhow::Result<Response> {{}}\n}}\n"
             ));
 
@@ -2843,7 +2976,7 @@ impl Configured {
     #[test]
     fn rejects_a_route_that_reads_the_request_body_without_a_limit() {
         let rejection = rejection_for(&format!(
-                "{UPLOADED_FILES_IMPORT}#[singleton]
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n{UPLOADED_FILES_IMPORT}#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/files\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, files: UploadedFiles) -> anyhow::Result<Response> {{}}\n}}\n"
             ));
 
@@ -2856,7 +2989,7 @@ impl Configured {
     #[test]
     fn rejects_a_body_limit_on_a_route_that_reads_no_body() {
         let rejection = rejection_for(
-                "#[singleton]
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]
 #[responds_to_http(max_body_bytes = 64, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/ping\", server = \"public\")]\nstruct Ping;\nimpl Ping {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n"
             );
 
@@ -2869,7 +3002,7 @@ impl Configured {
     #[test]
     fn rejects_a_zero_body_limit_since_it_would_admit_no_content() {
         let rejection = rejection_for(&format!(
-                "{UPLOADED_FILES_IMPORT}#[singleton]
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n{UPLOADED_FILES_IMPORT}#[singleton]
         #[responds_to_http(max_body_bytes = 0, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/files\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, files: UploadedFiles) -> anyhow::Result<Response> {{}}\n}}\n"
             ));
 
@@ -2884,7 +3017,7 @@ impl Configured {
     #[test]
     fn rejects_a_route_that_reads_its_body_in_two_ways() {
         let rejection = rejection_for(&format!(
-                "use margaret::framework::http_validation::request_input::RequestInput;\n{REQUEST_BODY_STREAM_IMPORT}#[singleton]
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n{REQUEST_BODY_STREAM_IMPORT}#[singleton]
 #[responds_to_http(max_body_bytes = 64, method = margaret::framework::route_method::route_method::RouteMethod::Post, path = \"/notes\", server = \"public\")]\nstruct PostNote;\nimpl PostNote {{\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Json)] note: Data, stream: RequestBodyStream) -> anyhow::Result<Response> {{}}\n}}\n"
             ));
 
@@ -2898,7 +3031,12 @@ impl Configured {
     #[test]
     fn authenticates_the_user_before_reading_the_uploaded_files() {
         let source: String = source_for(
-            r#"
+            r#"use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::http_uploaded_file::uploaded_files::UploadedFiles;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 

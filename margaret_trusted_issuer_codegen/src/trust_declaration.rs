@@ -147,7 +147,7 @@ mod tests {
     fn rejects_a_trust_without_a_tag_since_bearer_tokens_name_their_issuer_by_it() {
         assert_eq!(
             rejection(
-                "#[verifies_tokens_from_issuer(audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             )
             .to_string(),
             "#[verifies_tokens_from_issuer] on 'crate::Partner' does not name a tag"
@@ -158,7 +158,7 @@ mod tests {
     fn rejects_a_tag_that_is_not_a_plain_name() {
         assert_eq!(
             rejection(
-                "#[verifies_tokens_from_issuer(partner::tag, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner::tag, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             )
             .to_string(),
             "#[verifies_tokens_from_issuer] on 'crate::Partner' names a tag that is not a single plain name"
@@ -169,7 +169,7 @@ mod tests {
     fn rejects_a_trust_without_an_audience_so_tokens_for_other_services_never_pass() {
         assert_eq!(
             rejection(
-                "#[verifies_tokens_from_issuer(partner, issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner, issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             )
             .to_string(),
             "#[verifies_tokens_from_issuer] on 'crate::Partner' does not declare the audience of the verified tokens"
@@ -180,7 +180,7 @@ mod tests {
     fn rejects_an_empty_audience_since_no_issued_token_can_be_addressed_to_it() {
         assert!(matches!(
             rejection(
-                "#[verifies_tokens_from_issuer(partner, audience = \"\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner, audience = \"\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::EmptyAudience { anchor }
                 if anchor == "crate::Partner"
@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn rejects_a_trust_without_an_issuer_since_tokens_must_be_bound_to_one_issuer() {
         assert_eq!(
-            rejection("#[verifies_tokens_from_issuer(partner, audience = \"a\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n")
+            rejection("use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner, audience = \"a\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n")
                 .to_string(),
             "#[verifies_tokens_from_issuer] on 'crate::Partner' does not declare the issuer of the verified tokens"
         );
@@ -200,7 +200,7 @@ mod tests {
     fn rejects_an_issuer_over_plain_http_so_issuer_traffic_is_never_unencrypted() {
         assert!(
             rejection(
-                "#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"http://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://ci.example/jwks\"))]\npub struct Ci;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"http://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://ci.example/jwks\"))]\npub struct Ci;\n"
             )
             .to_string()
             .starts_with("the issuer #[verifies_tokens_from_issuer] declares on 'crate::Ci' is malformed: ")
@@ -211,7 +211,7 @@ mod tests {
     fn rejects_a_trust_without_its_keys_since_signatures_could_not_be_verified() {
         assert!(matches!(
             rejection(
-                "#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\")]\npub struct Partner;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\")]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::MissingIssuerKeys { anchor } if anchor == "crate::Partner"
         ));
@@ -221,7 +221,7 @@ mod tests {
     fn rejects_keys_that_are_not_a_variant() {
         assert!(matches!(
             rejection(
-                "#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Rotated)]\npub struct Partner;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Rotated)]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::UnknownIssuerKeys { anchor, written }
                 if anchor == "crate::Partner"
@@ -233,7 +233,7 @@ mod tests {
     fn rejects_a_jwks_endpoint_trust_without_a_jwks_uri() {
         assert_eq!(
             rejection(
-                "#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published)]\npub struct Ci;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published)]\npub struct Ci;\n"
             )
             .to_string(),
             "#[verifies_tokens_from_issuer] on 'crate::Ci' publishes its keys without declaring their jwks_uri"
@@ -244,7 +244,7 @@ mod tests {
     fn rejects_a_plaintext_jwks_uri_so_signing_keys_cannot_be_swapped_in_transit() {
         assert_eq!(
             rejection(
-                "#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"http://ci.example/jwks\"))]\npub struct Ci;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"http://ci.example/jwks\"))]\npub struct Ci;\n"
             )
             .to_string(),
             "the jwks_uri #[verifies_tokens_from_issuer] declares on 'crate::Ci' is rejected: the url uses the 'http' scheme instead of https"
@@ -255,7 +255,7 @@ mod tests {
     fn rejects_a_jwks_uri_on_a_discovered_trust() {
         assert!(matches!(
             rejection(
-                "#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\", jwks_uri = \"https://issuer.example/jwks\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\", jwks_uri = \"https://issuer.example/jwks\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnrecognizedArgument { argument, .. }
@@ -267,7 +267,7 @@ mod tests {
     fn rejects_an_audience_that_is_not_a_string() {
         assert!(matches!(
             rejection(
-                "#[verifies_tokens_from_issuer(partner, audience = api, issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner, audience = api, issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnexpectedArgument { key, .. }
@@ -279,7 +279,7 @@ mod tests {
     fn rejects_an_issuer_that_is_not_a_string() {
         assert!(matches!(
             rejection(
-                "#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = 5, keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = 5, keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnexpectedArgument { key, .. }
@@ -291,7 +291,7 @@ mod tests {
     fn rejects_a_jwks_uri_that_is_not_a_string() {
         assert!(matches!(
             rejection(
-                "#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = jwks))]\npub struct Ci;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(ci, audience = \"a\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = jwks))]\npub struct Ci;\n"
             ),
             TrustedIssuerCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnexpectedArgument { key, .. }
@@ -303,7 +303,7 @@ mod tests {
     fn rejects_a_trust_anchored_by_a_singleton() {
         assert!(matches!(
             rejection(
-                "#[singleton]\n#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
+                "use margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n#[singleton]\n#[verifies_tokens_from_issuer(partner, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n"
             ),
             TrustedIssuerCodegenError::Anchor(DeclarationAnchorError::DeclaredAsSingleton { path, .. })
                 if path == "crate::Partner"
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn reports_unparseable_trust_arguments_naming_the_attribute_so_the_author_can_locate_them() {
         assert!(matches!(
-            rejection("#[verifies_tokens_from_issuer(= 5, keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published)]\npub struct Ci;\n"),
+            rejection("use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(= 5, keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published)]\npub struct Ci;\n"),
             TrustedIssuerCodegenError::Index(AttributeError::Arguments(
                 AttributeArgumentsError::Malformed { attribute_path, .. }
             )) if attribute_path == "verifies_tokens_from_issuer"

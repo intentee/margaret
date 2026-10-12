@@ -79,7 +79,7 @@ mod tests {
 
     const KEY: &str = "use margaret::framework::active_record::key::Key;\n";
 
-    const AUTHOR_MODEL: &str = "\
+    const AUTHOR_MODEL: &str = "use margaret::framework::macros::model;\n\
 use margaret::framework::active_record::key::Key;
 
 #[model(table = \"authors\")]
@@ -89,7 +89,7 @@ struct Author {
 }
 ";
 
-    const FRAGMENT_METADATA_MODEL: &str = "\
+    const FRAGMENT_METADATA_MODEL: &str = "use margaret::framework::macros::model;\n\
 use margaret::framework::active_record::key::Key;
 
 #[model(table = \"fragment_metadata\")]
@@ -148,7 +148,7 @@ struct FragmentMetadata {
 
     fn value_model(prelude: &str, value_type: &str) -> String {
         format!(
-            "{prelude}\n#[model(table = \"values\")]\nstruct Values {{\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    value: {value_type},\n}}\n"
+            "use margaret::framework::macros::model;\n{prelude}\n#[model(table = \"values\")]\nstruct Values {{\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    value: {value_type},\n}}\n"
         )
     }
 
@@ -186,7 +186,7 @@ struct FragmentMetadata {
     #[test]
     fn rejects_a_model_that_is_not_a_struct() {
         assert!(matches!(
-                rejection("#[model(table = \"e\")] enum E {}\n"),
+                rejection("use margaret::framework::macros::model;\n#[model(table = \"e\")] enum E {}\n"),
                 ModelCodegenError::ModelNotAStruct { ref model, .. } if model == "crate::E"
         ));
     }
@@ -194,7 +194,9 @@ struct FragmentMetadata {
     #[test]
     fn rejects_a_model_declared_more_than_once() {
         assert_eq!(
-            indexing_rejection("#[model(table = \"a\")]\n#[model(table = \"b\")]\nstruct S;\n"),
+            indexing_rejection(
+                "use margaret::framework::macros::model;\n#[model(table = \"a\")]\n#[model(table = \"b\")]\nstruct S;\n"
+            ),
             "attribute 'model' is repeated on 'crate::S' but a single occurrence was expected"
         );
     }
@@ -202,7 +204,7 @@ struct FragmentMetadata {
     #[test]
     fn rejects_a_model_without_a_table_since_tables_are_never_named_implicitly() {
         assert!(matches!(
-                rejection("#[model]\nstruct S;\n"),
+                rejection("use margaret::framework::macros::model;\n#[model]\nstruct S;\n"),
                 ModelCodegenError::MissingTable { ref model, .. } if model == "crate::S"
         ));
     }
@@ -210,7 +212,7 @@ struct FragmentMetadata {
     #[test]
     fn rejects_unparseable_model_arguments_naming_the_attribute_so_the_author_can_locate_them() {
         assert!(matches!(
-                rejection("#[model(= 5)]\nstruct S;\n"),
+                rejection("use margaret::framework::macros::model;\n#[model(= 5)]\nstruct S;\n"),
                 ModelCodegenError::Index {
                 source: AttributeError::Arguments(AttributeArgumentsError::Malformed {
                     ref attribute_path,
@@ -223,7 +225,7 @@ struct FragmentMetadata {
     #[test]
     fn rejects_a_non_string_table_name_since_tables_are_named_by_string_literals() {
         assert!(matches!(
-            rejection("#[model(table = 5)]\nstruct S;\n"),
+            rejection("use margaret::framework::macros::model;\n#[model(table = 5)]\nstruct S;\n"),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument {
                     ref key,
@@ -237,7 +239,7 @@ struct FragmentMetadata {
     #[test]
     fn rejects_a_table_name_that_is_not_snake_case() {
         assert!(matches!(
-                rejection("#[model(table = \"Articles\")]\nstruct S;\n"),
+                rejection("use margaret::framework::macros::model;\n#[model(table = \"Articles\")]\nstruct S;\n"),
                 ModelCodegenError::InvalidTableName { ref table, .. } if table == "Articles"
         ));
     }
@@ -246,7 +248,7 @@ struct FragmentMetadata {
     fn accepts_a_table_name_that_is_a_rust_keyword() {
         assert_eq!(
             tables(
-                "#[model(table = \"type\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"type\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n}\n"
             ),
             vec!["type".to_string()]
         );
@@ -255,7 +257,7 @@ struct FragmentMetadata {
     #[test]
     fn rejects_a_raw_identifier_table_name_since_raw_syntax_is_not_sql() {
         assert!(matches!(
-                rejection("#[model(table = \"r#type\")]\nstruct S;\n"),
+                rejection("use margaret::framework::macros::model;\n#[model(table = \"r#type\")]\nstruct S;\n"),
                 ModelCodegenError::InvalidTableName { ref table, .. } if table == "r#type"
         ));
     }
@@ -264,7 +266,7 @@ struct FragmentMetadata {
     fn names_the_column_of_a_raw_field_after_its_unraw_identifier() {
         assert_eq!(
             column(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    r#type: i64,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    r#type: i64,\n}\n",
                 "t",
                 "type"
             )
@@ -279,7 +281,7 @@ struct FragmentMetadata {
 
         assert!(matches!(
                 rejection(&format!(
-                    "#[model(table = \"{table}\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"{table}\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n"
                 )),
                 ModelCodegenError::TableNameTooLong { ref model, .. } if model == "crate::S"
         ));
@@ -289,7 +291,7 @@ struct FragmentMetadata {
     fn rejects_two_models_with_the_same_table() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"t\")]\nstruct A {\n    #[column(primary_key)]\n    id: i64,\n}\n\n#[model(table = \"t\")]\nstruct B {\n    #[column(primary_key)]\n    id: i64,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct A {\n    #[column(primary_key)]\n    id: i64,\n}\n\n#[model(table = \"t\")]\nstruct B {\n    #[column(primary_key)]\n    id: i64,\n}\n"
                 ),
                 ModelCodegenError::DuplicateTableName { ref table, .. } if table == "t"
         ));
@@ -298,7 +300,7 @@ struct FragmentMetadata {
     #[test]
     fn rejects_a_model_without_a_primary_key() {
         assert!(matches!(
-                rejection("#[model(table = \"t\")]\nstruct S {\n    #[column]\n    id: i64,\n}\n"),
+                rejection("use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column]\n    id: i64,\n}\n"),
                 ModelCodegenError::ModelRequiresPrimaryKey { ref model, .. } if model == "crate::S"
         ));
     }
@@ -306,7 +308,7 @@ struct FragmentMetadata {
     #[test]
     fn rejects_a_field_without_a_column_attribute() {
         assert!(matches!(
-                rejection("#[model(table = \"t\")]\nstruct S {\n    id: i64,\n}\n"),
+                rejection("use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    id: i64,\n}\n"),
                 ModelCodegenError::UnattributedField { ref field, .. } if field == "id"
         ));
     }
@@ -314,7 +316,7 @@ struct FragmentMetadata {
     #[test]
     fn rejects_a_positional_field_because_every_column_is_named_after_its_field() {
         assert!(matches!(
-            rejection("#[model(table = \"t\")]\nstruct S(#[column(primary_key)] i64);\n"),
+            rejection("use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S(#[column(primary_key)] i64);\n"),
             ModelCodegenError::ModelRequiresNamedFields { position: 0, ref model } if model == "crate::S"
         ));
     }
@@ -323,7 +325,7 @@ struct FragmentMetadata {
     fn rejects_a_field_name_that_is_not_snake_case() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    myId: i64,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    myId: i64,\n}\n"
                 ),
                 ModelCodegenError::FieldNameNotSnakeCase { ref field, .. } if field == "myId"
         ));
@@ -332,7 +334,7 @@ struct FragmentMetadata {
     #[test]
     fn rejects_unparseable_column_arguments_naming_the_attribute_so_the_author_can_locate_them() {
         assert!(matches!(
-                rejection("#[model(table = \"t\")]\nstruct S {\n    #[column(= 5)]\n    id: i64,\n}\n"),
+                rejection("use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(= 5)]\n    id: i64,\n}\n"),
                 ModelCodegenError::Index {
                 source: AttributeError::Arguments(AttributeArgumentsError::Malformed {
                     ref attribute_path,
@@ -346,7 +348,7 @@ struct FragmentMetadata {
     fn rejects_a_non_string_column_name_since_columns_are_named_by_string_literals() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column(name = 5)]\n    id: i64,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(name = 5)]\n    id: i64,\n}\n"
             ),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
@@ -358,7 +360,7 @@ struct FragmentMetadata {
     fn rejects_a_column_default_that_is_not_a_path() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, default = \"uuidv7()\")]\n    id: uuid::Uuid,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, default = \"uuidv7()\")]\n    id: uuid::Uuid,\n}\n"
             ),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
@@ -370,7 +372,7 @@ struct FragmentMetadata {
     fn rejects_a_quoted_precision_since_numeric_digits_are_integer_literals() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, precision = \"12\", scale = 2)]\n    value: rust_decimal::Decimal,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, precision = \"12\", scale = 2)]\n    value: rust_decimal::Decimal,\n}\n"
             ),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
@@ -382,7 +384,7 @@ struct FragmentMetadata {
     fn rejects_a_quoted_scale_since_numeric_digits_are_integer_literals() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, precision = 12, scale = \"2\")]\n    value: rust_decimal::Decimal,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, precision = 12, scale = \"2\")]\n    value: rust_decimal::Decimal,\n}\n"
             ),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
@@ -394,7 +396,7 @@ struct FragmentMetadata {
     fn rejects_a_column_name_that_is_not_snake_case() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, name = \"Id\")]\n    id: i64,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, name = \"Id\")]\n    id: i64,\n}\n"
                 ),
                 ModelCodegenError::InvalidColumnName { ref column, .. } if column == "Id"
         ));
@@ -404,7 +406,7 @@ struct FragmentMetadata {
     fn rejects_a_raw_identifier_column_name_since_raw_syntax_is_not_sql() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, name = \"r#id\")]\n    id: i64,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, name = \"r#id\")]\n    id: i64,\n}\n"
                 ),
                 ModelCodegenError::InvalidColumnName { ref column, .. } if column == "r#id"
         ));
@@ -416,7 +418,7 @@ struct FragmentMetadata {
 
         assert!(matches!(
                 rejection(&format!(
-                    "#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(name = \"{name}\")]\n    value: String,\n}}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(name = \"{name}\")]\n    value: String,\n}}\n"
                 )),
                 ModelCodegenError::ColumnNameTooLong { ref model, .. } if model == "crate::S"
         ));
@@ -426,7 +428,7 @@ struct FragmentMetadata {
     fn rejects_a_duplicate_column_name_since_a_table_holds_each_column_once() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, name = \"value\")]\n    a: i64,\n    #[column(name = \"value\")]\n    b: i64,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, name = \"value\")]\n    a: i64,\n    #[column(name = \"value\")]\n    b: i64,\n}\n"
                 ),
                 ModelCodegenError::DuplicateColumnName { ref column, .. } if column == "value"
         ));
@@ -436,7 +438,7 @@ struct FragmentMetadata {
     fn rejects_a_field_with_repeated_column_attributes() {
         assert_eq!(
             indexing_rejection(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[column]\n    id: i64,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[column]\n    id: i64,\n}\n"
             ),
             "attribute 'column' is repeated on 'crate::S::id' but a single occurrence was expected"
         );
@@ -638,7 +640,7 @@ struct FragmentMetadata {
     fn defaults_a_declared_uuid_primary_key_to_a_v7_identifier() {
         assert_eq!(
             column(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: uuid::Uuid,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: uuid::Uuid,\n}\n",
                 "values",
                 "id"
             )
@@ -651,7 +653,7 @@ struct FragmentMetadata {
     fn leaves_an_undeclared_uuid_primary_key_without_a_default() {
         assert_eq!(
             column(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
                 "values",
                 "id"
             )
@@ -664,7 +666,7 @@ struct FragmentMetadata {
     fn rejects_a_column_default_outside_the_column_default_enum_instead_of_guessing() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::Random)]\n    id: uuid::Uuid,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::Random)]\n    id: uuid::Uuid,\n}\n"
             ),
             ModelCodegenError::UnknownColumnDefault { ref default, ref field, .. }
                 if default == "margaret::framework::model::column_default::ColumnDefault::Random" && field == "id"
@@ -675,7 +677,7 @@ struct FragmentMetadata {
     fn rejects_a_v7_default_on_a_column_that_is_not_a_uuid() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: String,\n}\n"
             ),
             ModelCodegenError::ColumnDefaultRequiresUuidColumn { ref field, .. } if field == "id"
         ));
@@ -685,7 +687,7 @@ struct FragmentMetadata {
     fn rejects_a_column_default_outside_the_primary_key() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    correlation: uuid::Uuid,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    correlation: uuid::Uuid,\n}\n"
             ),
             ModelCodegenError::ColumnDefaultOutsidePrimaryKey { ref field, .. } if field == "correlation"
         ));
@@ -711,7 +713,7 @@ struct FragmentMetadata {
 
     #[test]
     fn leaves_a_uuid_column_of_a_composite_primary_key_without_a_default() {
-        let source = "#[model(table = \"values\")]\n#[primary_key(fields = [left, right])]\nstruct Values {\n    #[column]\n    left: uuid::Uuid,\n    #[column]\n    right: uuid::Uuid,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"values\")]\n#[primary_key(fields = [left, right])]\nstruct Values {\n    #[column]\n    left: uuid::Uuid,\n    #[column]\n    right: uuid::Uuid,\n}\n";
 
         assert!(
             model(source, "values")
@@ -722,7 +724,7 @@ struct FragmentMetadata {
 
     #[test]
     fn infers_a_text_column_from_a_unit_enum() {
-        let source = "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n}\n";
+        let source = "use margaret::framework::macros::model;\nenum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n}\n";
         let article = model(source, "articles");
 
         assert_eq!(article.fields[1].columns[0].column_type, ColumnType::Text);
@@ -738,14 +740,14 @@ struct FragmentMetadata {
 
     #[test]
     fn treats_an_optional_enum_as_a_nullable_text_column() {
-        let source = "enum ArticleStatus {\n    Draft,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: Option<ArticleStatus>,\n}\n";
+        let source = "use margaret::framework::macros::model;\nenum ArticleStatus {\n    Draft,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: Option<ArticleStatus>,\n}\n";
 
         assert!(column(source, "articles", "status").nullable);
     }
 
     #[test]
     fn validates_an_enum_shared_by_two_columns_only_once() {
-        let source = "enum ArticleStatus {\n    Draft,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n    #[column]\n    previous_status: ArticleStatus,\n}\n";
+        let source = "use margaret::framework::macros::model;\nenum ArticleStatus {\n    Draft,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n    #[column]\n    previous_status: ArticleStatus,\n}\n";
 
         assert_eq!(
             model(source, "articles").fields[2].value,
@@ -794,7 +796,7 @@ struct FragmentMetadata {
     fn infers_a_numeric_column_from_a_fully_qualified_decimal() {
         assert_eq!(
             column(
-                "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    unit_price: rust_decimal::Decimal,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    unit_price: rust_decimal::Decimal,\n}\n",
                 "line_items",
                 "unit_price"
             )
@@ -810,7 +812,7 @@ struct FragmentMetadata {
     fn infers_a_numeric_column_from_an_imported_decimal() {
         assert_eq!(
             column(
-                "use rust_decimal::Decimal;\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 4, scale = 4)]\n    rate: Decimal,\n}\n",
+                "use rust_decimal::Decimal;\nuse margaret::framework::macros::model;\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 4, scale = 4)]\n    rate: Decimal,\n}\n",
                 "line_items",
                 "rate"
             )
@@ -826,7 +828,7 @@ struct FragmentMetadata {
     fn treats_an_optional_decimal_as_a_nullable_numeric_column() {
         assert!(
             column(
-                "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    discount: Option<rust_decimal::Decimal>,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    discount: Option<rust_decimal::Decimal>,\n}\n",
                 "line_items",
                 "discount"
             )
@@ -846,7 +848,7 @@ struct FragmentMetadata {
     fn rejects_a_precision_and_scale_on_a_crate_local_decimal() {
         assert!(matches!(
                 rejection(
-                    "struct Decimal {}\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    unit_price: Decimal,\n}\n"
+                    "use margaret::framework::macros::model;\nstruct Decimal {}\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    unit_price: Decimal,\n}\n"
                 ),
                 ModelCodegenError::NumericDigitsOnNonNumericColumn { ref rust_type, .. } if rust_type == "Decimal"
         ));
@@ -856,7 +858,7 @@ struct FragmentMetadata {
     fn rejects_a_precision_and_scale_on_a_text_column() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    title: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    title: String,\n}\n"
                 ),
                 ModelCodegenError::NumericDigitsOnNonNumericColumn { ref rust_type, .. } if rust_type == "String"
         ));
@@ -866,7 +868,7 @@ struct FragmentMetadata {
     fn rejects_a_precision_and_scale_on_an_enum_column() {
         assert!(matches!(
                 rejection(
-                    "enum ArticleStatus {\n    Draft,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    status: ArticleStatus,\n}\n"
+                    "use margaret::framework::macros::model;\nenum ArticleStatus {\n    Draft,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    status: ArticleStatus,\n}\n"
                 ),
                 ModelCodegenError::NumericDigitsOnNonNumericColumn { ref rust_type, .. } if rust_type == "ArticleStatus"
         ));
@@ -897,7 +899,7 @@ struct FragmentMetadata {
     fn rejects_a_byte_length_that_is_not_an_unsigned_integer() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"fragments\")]\nstruct Fragment {\n    #[column(primary_key, byte_length = \"thirty two\")]\n    hash: Vec<u8>,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"fragments\")]\nstruct Fragment {\n    #[column(primary_key, byte_length = \"thirty two\")]\n    hash: Vec<u8>,\n}\n"
             ),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
@@ -909,7 +911,7 @@ struct FragmentMetadata {
     fn rejects_a_minimum_that_is_not_an_unsigned_integer() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"fragments\")]\nstruct Fragment {\n    #[column(primary_key, minimum = \"zero\")]\n    size_payload: i64,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"fragments\")]\nstruct Fragment {\n    #[column(primary_key, minimum = \"zero\")]\n    size_payload: i64,\n}\n"
             ),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
@@ -956,7 +958,7 @@ struct FragmentMetadata {
     #[test]
     fn derives_one_column_per_target_key_column_of_a_composite_key() {
         let source = format!(
-            "{KEY}#[model(table = \"orders\")]\n#[primary_key(fields = [region, number])]\nstruct Order {{\n    #[column]\n    region: String,\n    #[column]\n    number: i64,\n}}\n\n#[model(table = \"line_items\")]\nstruct LineItem {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    order: Key<Order>,\n}}\n"
+            "use margaret::framework::macros::model;\n{KEY}#[model(table = \"orders\")]\n#[primary_key(fields = [region, number])]\nstruct Order {{\n    #[column]\n    region: String,\n    #[column]\n    number: i64,\n}}\n\n#[model(table = \"line_items\")]\nstruct LineItem {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    order: Key<Order>,\n}}\n"
         );
         let line_items = model(&source, "line_items");
 
@@ -1112,7 +1114,7 @@ struct FragmentMetadata {
 
     #[test]
     fn resolves_a_key_target_imported_through_a_reexport() {
-        let source = "use margaret::framework::active_record::key::Key;\n\nmod metadata {\n    mod fragment {\n        #[model(table = \"fragment_metadata\")]\n        pub struct FragmentMetadata {\n            #[column(primary_key)]\n            pub hash: Vec<u8>,\n        }\n    }\n\n    pub use fragment::FragmentMetadata;\n}\n\nuse crate::metadata::FragmentMetadata;\n\n#[model(table = \"fragment\")]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    metadata: Key<FragmentMetadata>,\n}\n";
+        let source = "use margaret::framework::macros::model;\nuse margaret::framework::active_record::key::Key;\n\nmod metadata {\n    mod fragment {\nuse margaret::framework::macros::model;\n\n        #[model(table = \"fragment_metadata\")]\n        pub struct FragmentMetadata {\n            #[column(primary_key)]\n            pub hash: Vec<u8>,\n        }\n    }\n\n    pub use fragment::FragmentMetadata;\n}\n\nuse crate::metadata::FragmentMetadata;\n\n#[model(table = \"fragment\")]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    metadata: Key<FragmentMetadata>,\n}\n";
 
         assert_eq!(
             model(source, "fragment").foreign_keys[0].references_table,
@@ -1164,7 +1166,7 @@ struct FragmentMetadata {
     fn rejects_a_foreign_key_attribute_on_a_field_that_is_not_a_key() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = margaret::framework::model::on_delete::OnDelete::Cascade)]\n    author_id: uuid::Uuid,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = margaret::framework::model::on_delete::OnDelete::Cascade)]\n    author_id: uuid::Uuid,\n}\n"
                 ),
                 ModelCodegenError::ForeignKeyRequiresKeyField { ref field, .. } if field == "author_id"
         ));
@@ -1249,7 +1251,7 @@ struct FragmentMetadata {
     fn rejects_a_key_to_a_struct_that_is_not_a_model() {
         assert!(matches!(
             rejection(&format!(
-                "{KEY}struct Plain;\n\n#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    other: Key<Plain>,\n}}\n"
+                "use margaret::framework::macros::model;\n{KEY}struct Plain;\n\n#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    other: Key<Plain>,\n}}\n"
             )),
             ModelCodegenError::KeyTargetNotAModel { ref target, .. } if target == "crate::Plain"
         ));
@@ -1275,7 +1277,7 @@ struct FragmentMetadata {
     fn rejects_a_key_to_a_model_without_a_primary_key() {
         assert!(matches!(
                 rejection(&format!(
-                    "{KEY}#[model(table = \"authors\")]\nstruct Author {{\n    #[column]\n    name: String,\n}}\n\n#[model(table = \"articles\")]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    author: Key<Author>,\n}}\n"
+                    "use margaret::framework::macros::model;\n{KEY}#[model(table = \"authors\")]\nstruct Author {{\n    #[column]\n    name: String,\n}}\n\n#[model(table = \"articles\")]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    author: Key<Author>,\n}}\n"
                 )),
                 ModelCodegenError::ModelRequiresPrimaryKey { ref model, .. } if model == "crate::Author"
         ));
@@ -1319,7 +1321,7 @@ struct FragmentMetadata {
     fn rejects_a_nested_key_to_a_struct_that_is_not_a_model() {
         assert!(matches!(
             rejection(&format!(
-                "{KEY}struct Plain;\n\n#[model(table = \"notes\")]\nstruct Note {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    source: Key<Translation>,\n}}\n\n#[model(table = \"translations\")]\n#[primary_key(fields = [plain, locale])]\nstruct Translation {{\n    #[column]\n    plain: Key<Plain>,\n    #[column]\n    locale: String,\n}}\n"
+                "use margaret::framework::macros::model;\n{KEY}struct Plain;\n\n#[model(table = \"notes\")]\nstruct Note {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    source: Key<Translation>,\n}}\n\n#[model(table = \"translations\")]\n#[primary_key(fields = [plain, locale])]\nstruct Translation {{\n    #[column]\n    plain: Key<Plain>,\n    #[column]\n    locale: String,\n}}\n"
             )),
             ModelCodegenError::KeyTargetNotAModel { ref model, .. } if model == "crate::Translation"
         ));
@@ -1339,7 +1341,7 @@ struct FragmentMetadata {
     fn rejects_primary_keys_that_reference_each_other() {
         assert!(matches!(
                 rejection(&format!(
-                    "{KEY}#[model(table = \"alpha\")]\nstruct Alpha {{\n    #[column(primary_key)]\n    beta: Key<Beta>,\n}}\n\n#[model(table = \"beta\")]\nstruct Beta {{\n    #[column(primary_key)]\n    alpha: Key<Alpha>,\n}}\n"
+                    "use margaret::framework::macros::model;\n{KEY}#[model(table = \"alpha\")]\nstruct Alpha {{\n    #[column(primary_key)]\n    beta: Key<Beta>,\n}}\n\n#[model(table = \"beta\")]\nstruct Beta {{\n    #[column(primary_key)]\n    alpha: Key<Alpha>,\n}}\n"
                 )),
                 ModelCodegenError::PrimaryKeyReferenceCycle { ref model, .. } if model == "crate::Beta"
         ));
@@ -1369,7 +1371,7 @@ struct FragmentMetadata {
     fn orders_a_self_referencing_key_without_a_cycle() {
         assert_eq!(
             tables(&format!(
-                "{KEY}#[model(table = \"nodes\")]\nstruct Node {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    parent: Option<Key<Node>>,\n}}\n"
+                "use margaret::framework::macros::model;\n{KEY}#[model(table = \"nodes\")]\nstruct Node {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    parent: Option<Key<Node>>,\n}}\n"
             )),
             ["nodes"]
         );
@@ -1379,7 +1381,7 @@ struct FragmentMetadata {
     fn rejects_a_foreign_key_cycle_naming_its_path_since_no_table_order_satisfies_it() {
         assert!(matches!(
                 rejection(&format!(
-                    "{KEY}#[model(table = \"alpha\")]\nstruct Alpha {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    beta: Key<Beta>,\n}}\n\n#[model(table = \"beta\")]\nstruct Beta {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    alpha: Key<Alpha>,\n}}\n"
+                    "use margaret::framework::macros::model;\n{KEY}#[model(table = \"alpha\")]\nstruct Alpha {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    beta: Key<Beta>,\n}}\n\n#[model(table = \"beta\")]\nstruct Beta {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    alpha: Key<Alpha>,\n}}\n"
                 )),
                 ModelCodegenError::ForeignKeyCycle { ref path, .. } if path == "alpha -> beta -> alpha"
         ));
@@ -1387,7 +1389,7 @@ struct FragmentMetadata {
 
     #[test]
     fn resolves_a_composite_primary_key_in_the_declared_order() {
-        let source = "#[model(table = \"locks\")]\n#[primary_key(fields = [branch, repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [branch, repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n";
         let locks = model(source, "locks");
 
         assert_eq!(
@@ -1415,7 +1417,7 @@ struct FragmentMetadata {
     fn rejects_two_fields_flagged_as_the_primary_key() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    repository: String,\n    #[column(primary_key)]\n    branch: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    repository: String,\n    #[column(primary_key)]\n    branch: String,\n}\n"
                 ),
                 ModelCodegenError::CompositePrimaryKeyRequiresModelDeclaration { ref model, .. } if model == "crate::Lock"
         ));
@@ -1425,7 +1427,7 @@ struct FragmentMetadata {
     fn rejects_a_primary_key_declared_on_both_a_column_and_the_model() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column(primary_key)]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column(primary_key)]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
                 ),
                 ModelCodegenError::ConflictingPrimaryKeyDeclarations { ref model, .. } if model == "crate::Lock"
         ));
@@ -1435,7 +1437,7 @@ struct FragmentMetadata {
     fn rejects_more_than_one_model_primary_key() {
         assert_eq!(
             indexing_rejection(
-                "#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\n#[primary_key(fields = [branch, repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\n#[primary_key(fields = [branch, repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
             ),
             "attribute 'primary_key' is repeated on 'crate::Lock' but a single occurrence was expected"
         );
@@ -1445,7 +1447,7 @@ struct FragmentMetadata {
     fn rejects_a_model_primary_key_field_the_model_does_not_declare() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"locks\")]\n#[primary_key(fields = [repository, missing])]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, missing])]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
             ),
             ModelCodegenError::ModelDeclarationFieldNotDeclared { ref field, .. } if field == "missing"
         ));
@@ -1455,7 +1457,7 @@ struct FragmentMetadata {
     fn rejects_an_optional_primary_key_field_since_postgres_keys_are_never_null() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: Option<String>,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: Option<String>,\n}\n"
             ),
             ModelCodegenError::NullablePrimaryKeyField { ref field, .. } if field == "branch"
         ));
@@ -1465,7 +1467,7 @@ struct FragmentMetadata {
     fn rejects_a_model_primary_key_over_a_single_field() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\n#[primary_key(fields = [repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
                 ),
                 ModelCodegenError::ModelDeclarationRequiresSeveralFields { ref declaration, .. } if declaration == "primary_key"
         ));
@@ -1475,7 +1477,7 @@ struct FragmentMetadata {
     fn rejects_a_model_primary_key_with_an_empty_field_list() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"locks\")]\n#[primary_key(fields = [])]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [])]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
             ),
             ModelCodegenError::ModelDeclarationRequiresFields { ref declaration, .. } if declaration == "primary_key"
         ));
@@ -1485,7 +1487,7 @@ struct FragmentMetadata {
     fn rejects_a_model_primary_key_without_fields() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\n#[primary_key]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
                 ),
                 ModelCodegenError::ModelDeclarationRequiresFields { ref declaration, .. } if declaration == "primary_key"
         ));
@@ -1495,7 +1497,7 @@ struct FragmentMetadata {
     fn rejects_a_model_primary_key_that_repeats_a_field() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\n#[primary_key(fields = [repository, repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
                 ),
                 ModelCodegenError::ModelDeclarationRepeatsField { ref field, .. } if field == "repository"
         ));
@@ -1505,7 +1507,7 @@ struct FragmentMetadata {
     fn rejects_a_model_primary_key_naming_a_path() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\n#[primary_key(fields = [self::repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [self::repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
                 ),
                 ModelCodegenError::ModelDeclarationFieldIsNotAnIdentifier { ref field, .. } if field == "self::repository"
         ));
@@ -1515,7 +1517,7 @@ struct FragmentMetadata {
     fn rejects_malformed_model_primary_key_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\n#[primary_key(= 5)]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(= 5)]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
                 ),
                 ModelCodegenError::Index {
                 source: AttributeError::Arguments(AttributeArgumentsError::Malformed {
@@ -1530,7 +1532,7 @@ struct FragmentMetadata {
     fn rejects_a_primary_key_attribute_on_a_field() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\nstruct Lock {\n    #[column]\n    #[primary_key(fields = [repository, branch])]\n    repository: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\nstruct Lock {\n    #[column]\n    #[primary_key(fields = [repository, branch])]\n    repository: String,\n}\n"
                 ),
                 ModelCodegenError::PrimaryKeyIsNotAFieldAttribute { ref field, .. } if field == "repository"
         ));
@@ -1540,7 +1542,7 @@ struct FragmentMetadata {
     fn rejects_a_unique_attribute_on_a_field() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    #[unique(fields = [repository, branch])]\n    repository: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    #[unique(fields = [repository, branch])]\n    repository: String,\n}\n"
                 ),
                 ModelCodegenError::UniqueIsNotAFieldAttribute { ref field, .. } if field == "repository"
         ));
@@ -1548,7 +1550,7 @@ struct FragmentMetadata {
 
     #[test]
     fn resolves_a_unique_column_into_a_unique_index_named_like_the_constraint_postgres_creates() {
-        let source = "#[model(table = \"members\")]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: String,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"members\")]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: String,\n}\n";
         let members = model(source, "members");
 
         assert_eq!(members.indexes.secondary[0].kind, IndexKind::Unique);
@@ -1563,7 +1565,7 @@ struct FragmentMetadata {
     fn resolves_a_composite_unique_constraint_from_a_model_attribute() {
         assert_eq!(
             index_columns(
-                "#[model(table = \"members\")]\n#[unique(fields = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: String,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"members\")]\n#[unique(fields = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: String,\n}\n",
                 "members",
                 IndexKind::Unique
             ),
@@ -1575,7 +1577,7 @@ struct FragmentMetadata {
     fn rejects_an_optional_unique_column_since_postgres_lets_nulls_repeat_in_it() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"members\")]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: Option<String>,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"members\")]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: Option<String>,\n}\n"
             ),
             ModelCodegenError::NullableUniqueField { ref field, .. } if field == "email"
         ));
@@ -1585,7 +1587,7 @@ struct FragmentMetadata {
     fn rejects_an_optional_field_of_a_composite_unique_constraint() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"members\")]\n#[unique(fields = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: Option<String>,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"members\")]\n#[unique(fields = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: Option<String>,\n}\n"
             ),
             ModelCodegenError::NullableUniqueField { ref field, .. } if field == "label"
         ));
@@ -1595,7 +1597,7 @@ struct FragmentMetadata {
     fn rejects_a_model_unique_field_the_model_does_not_declare() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"members\")]\n#[unique(fields = [email, missing])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"members\")]\n#[unique(fields = [email, missing])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n}\n"
             ),
             ModelCodegenError::ModelDeclarationFieldNotDeclared { ref field, .. } if field == "missing"
         ));
@@ -1605,7 +1607,7 @@ struct FragmentMetadata {
     fn rejects_two_model_unique_constraints_over_the_same_fields() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"members\")]\n#[unique(fields = [email, label])]\n#[unique(fields = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"members\")]\n#[unique(fields = [email, label])]\n#[unique(fields = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: String,\n}\n"
                 ),
                 ModelCodegenError::DuplicateModelUniqueConstraint { ref fields, .. } if fields == "email, label"
         ));
@@ -1615,7 +1617,7 @@ struct FragmentMetadata {
     fn rejects_a_model_unique_over_a_single_field() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"members\")]\n#[unique(fields = [email])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"members\")]\n#[unique(fields = [email])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n}\n"
                 ),
                 ModelCodegenError::ModelDeclarationRequiresSeveralFields { ref declaration, .. } if declaration == "unique"
         ));
@@ -1625,7 +1627,7 @@ struct FragmentMetadata {
     fn rejects_malformed_model_unique_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"members\")]\n#[unique(= 5)]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"members\")]\n#[unique(= 5)]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n"
                 ),
                 ModelCodegenError::Index {
                 source: AttributeError::Arguments(AttributeArgumentsError::Malformed {
@@ -1638,7 +1640,7 @@ struct FragmentMetadata {
 
     #[test]
     fn derives_the_name_of_a_field_index() {
-        let source = "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    title: String,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    title: String,\n}\n";
 
         assert_eq!(
             model(source, "articles").indexes.secondary[0].name,
@@ -1648,7 +1650,7 @@ struct FragmentMetadata {
 
     #[test]
     fn keeps_the_explicit_name_of_a_field_index() {
-        let source = "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"articles_by_title\")]\n    title: String,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"articles_by_title\")]\n    title: String,\n}\n";
 
         assert_eq!(
             model(source, "articles").indexes.secondary[0].name,
@@ -1660,7 +1662,7 @@ struct FragmentMetadata {
     fn resolves_a_composite_index_from_a_model_attribute() {
         assert_eq!(
             index_columns(
-                "#[model(table = \"events\")]\n#[index(name = \"events_kind_label\", fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(name = \"events_kind_label\", fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n",
                 "events",
                 IndexKind::Plain
             ),
@@ -1670,7 +1672,7 @@ struct FragmentMetadata {
 
     #[test]
     fn orders_the_plain_indexes_by_name_so_generated_schemas_are_deterministic() {
-        let source = "#[model(table = \"events\")]\n#[index(name = \"events_a\", fields = [label, kind])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"events_b\")]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(name = \"events_a\", fields = [label, kind])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"events_b\")]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
 
         assert_eq!(
             model(source, "events")
@@ -1686,7 +1688,7 @@ struct FragmentMetadata {
     fn rejects_a_model_index_without_a_name() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"events\")]\n#[index(fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n"
                 ),
                 ModelCodegenError::ModelIndexRequiresName { ref model, .. } if model == "crate::Event"
         ));
@@ -1696,7 +1698,7 @@ struct FragmentMetadata {
     fn rejects_a_model_index_field_the_model_does_not_declare() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"events\")]\n#[index(name = \"events_kind_label\", fields = [kind, missing])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(name = \"events_kind_label\", fields = [kind, missing])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n}\n"
             ),
             ModelCodegenError::ModelDeclarationFieldNotDeclared { ref field, .. } if field == "missing"
         ));
@@ -1706,7 +1708,7 @@ struct FragmentMetadata {
     fn rejects_a_model_index_over_a_single_field() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"events\")]\n#[index(name = \"events_kind\", fields = [kind])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(name = \"events_kind\", fields = [kind])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n}\n"
                 ),
                 ModelCodegenError::ModelDeclarationRequiresSeveralFields { ref declaration, .. } if declaration == "index"
         ));
@@ -1716,7 +1718,7 @@ struct FragmentMetadata {
     fn rejects_a_model_index_name_that_is_not_a_string() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"events\")]\n#[index(name = 5, fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(name = 5, fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n"
             ),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
@@ -1728,7 +1730,7 @@ struct FragmentMetadata {
     fn rejects_a_model_index_name_that_is_not_snake_case() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"events\")]\n#[index(name = \"Events\", fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(name = \"Events\", fields = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n"
                 ),
                 ModelCodegenError::InvalidIndexName { ref index, .. } if index == "Events"
         ));
@@ -1738,7 +1740,7 @@ struct FragmentMetadata {
     fn rejects_malformed_model_index_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"events\")]\n#[index(= 5)]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(= 5)]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n"
                 ),
                 ModelCodegenError::Index {
                 source: AttributeError::Arguments(AttributeArgumentsError::Malformed {
@@ -1753,7 +1755,7 @@ struct FragmentMetadata {
     fn rejects_malformed_field_index_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index(= 5)]\n    value: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index(= 5)]\n    value: String,\n}\n"
                 ),
                 ModelCodegenError::Index {
                 source: AttributeError::Arguments(AttributeArgumentsError::Malformed {
@@ -1768,7 +1770,7 @@ struct FragmentMetadata {
     fn rejects_a_non_string_field_index_name() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index(name = 5)]\n    value: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index(name = 5)]\n    value: String,\n}\n"
             ),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
@@ -1780,7 +1782,7 @@ struct FragmentMetadata {
     fn rejects_a_field_index_that_names_fields() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(fields = [kind])]\n    kind: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(fields = [kind])]\n    kind: String,\n}\n"
                 ),
                 ModelCodegenError::FieldIndexCannotDeclareFields { ref field, .. } if field == "kind"
         ));
@@ -1792,7 +1794,7 @@ struct FragmentMetadata {
 
         assert!(matches!(
                 rejection(&format!(
-                    "#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index(name = \"{name}\")]\n    value: String,\n}}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index(name = \"{name}\")]\n    value: String,\n}}\n"
                 )),
                 ModelCodegenError::ExplicitIndexNameTooLong { ref model, .. } if model == "crate::S"
         ));
@@ -1804,7 +1806,7 @@ struct FragmentMetadata {
 
         assert!(matches!(
                 rejection(&format!(
-                    "#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index]\n    {field}: String,\n}}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index]\n    {field}: String,\n}}\n"
                 )),
                 ModelCodegenError::IndexNameTooLong { ref model, .. } if model == "crate::S"
         ));
@@ -1816,7 +1818,7 @@ struct FragmentMetadata {
 
         assert!(matches!(
                 rejection(&format!(
-                    "#[model(table = \"{table}\")]\nstruct S {{\n    #[column(primary_key)]\n    id: i64,\n}}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"{table}\")]\nstruct S {{\n    #[column(primary_key)]\n    id: i64,\n}}\n"
                 )),
                 ModelCodegenError::PrimaryKeyIndexNameTooLong { ref model, .. } if model == "crate::S"
         ));
@@ -1828,7 +1830,7 @@ struct FragmentMetadata {
 
         assert!(matches!(
                 rejection(&format!(
-                    "#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: i64,\n    #[column(unique)]\n    {field}: String,\n}}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: i64,\n    #[column(unique)]\n    {field}: String,\n}}\n"
                 )),
                 ModelCodegenError::UniqueIndexNameTooLong { ref model, .. } if model == "crate::S"
         ));
@@ -1838,7 +1840,7 @@ struct FragmentMetadata {
     fn rejects_an_index_on_the_primary_key_field() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    #[index]\n    id: i64,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    #[index]\n    id: i64,\n}\n"
                 ),
                 ModelCodegenError::RedundantIndexOnPrimaryKeyColumns { ref columns, .. } if columns == "id"
         ));
@@ -1848,7 +1850,7 @@ struct FragmentMetadata {
     fn rejects_an_index_on_the_leading_field_of_a_composite_primary_key() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    #[index]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    #[index]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
                 ),
                 ModelCodegenError::RedundantIndexOnPrimaryKeyColumns { ref columns, .. } if columns == "repository"
         ));
@@ -1856,7 +1858,7 @@ struct FragmentMetadata {
 
     #[test]
     fn accepts_an_index_on_a_trailing_field_of_a_composite_primary_key() {
-        let source = "#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    #[index]\n    branch: String,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    #[index]\n    branch: String,\n}\n";
 
         assert_eq!(
             index_columns(source, "locks", IndexKind::Plain),
@@ -1868,7 +1870,7 @@ struct FragmentMetadata {
     fn rejects_a_model_index_that_duplicates_the_primary_key() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\n#[index(name = \"locks_repository_branch\", fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\n#[index(name = \"locks_repository_branch\", fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
                 ),
                 ModelCodegenError::RedundantIndexOnPrimaryKeyColumns { ref columns, .. } if columns == "repository, branch"
         ));
@@ -1878,7 +1880,7 @@ struct FragmentMetadata {
     fn rejects_an_index_on_a_unique_field() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[index(name = \"solo\")]\n    email: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[index(name = \"solo\")]\n    email: String,\n}\n"
                 ),
                 ModelCodegenError::RedundantIndexOnUniqueColumns { ref columns, .. } if columns == "email"
         ));
@@ -1888,7 +1890,7 @@ struct FragmentMetadata {
     fn rejects_a_model_index_that_duplicates_a_unique_constraint() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"members\")]\n#[unique(fields = [email, label])]\n#[index(name = \"members_email_label\", fields = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"members\")]\n#[unique(fields = [email, label])]\n#[index(name = \"members_email_label\", fields = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: String,\n}\n"
                 ),
                 ModelCodegenError::RedundantIndexOnUniqueColumns { ref columns, .. } if columns == "email, label"
         ));
@@ -1898,7 +1900,7 @@ struct FragmentMetadata {
     fn rejects_an_index_that_extends_the_primary_key() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"events\")]\n#[index(name = \"events_id_kind\", fields = [id, kind])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"events\")]\n#[index(name = \"events_id_kind\", fields = [id, kind])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n}\n"
             ),
             ModelCodegenError::IndexExtendsUniqueKey { ref unique, .. } if unique == "id"
         ));
@@ -1908,7 +1910,7 @@ struct FragmentMetadata {
     fn rejects_a_unique_constraint_that_extends_a_unique_field() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"members\")]\n#[unique(fields = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: String,\n    #[column]\n    label: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"members\")]\n#[unique(fields = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: String,\n    #[column]\n    label: String,\n}\n"
             ),
             ModelCodegenError::IndexExtendsUniqueKey { ref unique, .. } if unique == "email"
         ));
@@ -1916,7 +1918,7 @@ struct FragmentMetadata {
 
     #[test]
     fn accepts_an_ordering_index_that_ends_with_the_primary_key() {
-        let source = "#[model(table = \"messages\")]\n#[index(name = \"messages_posted\", fields = [posted_at, id])]\nstruct Message {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    posted_at: i64,\n}\n";
+        let source = "use margaret::framework::macros::model;\n#[model(table = \"messages\")]\n#[index(name = \"messages_posted\", fields = [posted_at, id])]\nstruct Message {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    posted_at: i64,\n}\n";
 
         assert_eq!(
             index_columns(source, "messages", IndexKind::Plain),
@@ -1928,7 +1930,7 @@ struct FragmentMetadata {
     fn rejects_two_fields_that_share_an_index_name() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"events_pair\")]\n    kind: String,\n    #[column]\n    #[index(name = \"events_pair\")]\n    label: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"events_pair\")]\n    kind: String,\n    #[column]\n    #[index(name = \"events_pair\")]\n    label: String,\n}\n"
                 ),
                 ModelCodegenError::DuplicateIndexDeclaration { ref index, .. } if index == "events_pair"
         ));
@@ -1938,7 +1940,7 @@ struct FragmentMetadata {
     fn rejects_an_explicit_index_name_that_collides_with_a_derived_name() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    c: String,\n    #[column]\n    #[index(name = \"t_c_index\")]\n    d: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    c: String,\n    #[column]\n    #[index(name = \"t_c_index\")]\n    d: String,\n}\n"
                 ),
                 ModelCodegenError::DuplicateIndexDeclaration { ref index, .. } if index == "t_c_index"
         ));
@@ -1948,7 +1950,7 @@ struct FragmentMetadata {
     fn rejects_a_duplicate_index_name_across_tables() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"a\")]\nstruct A {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"shared\")]\n    x: String,\n}\n\n#[model(table = \"b\")]\nstruct B {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"shared\")]\n    y: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"a\")]\nstruct A {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"shared\")]\n    x: String,\n}\n\n#[model(table = \"b\")]\nstruct B {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"shared\")]\n    y: String,\n}\n"
                 ),
                 ModelCodegenError::DuplicateIndexName { ref name, .. } if name == "shared"
         ));
@@ -1968,7 +1970,7 @@ struct FragmentMetadata {
     fn rejects_a_derived_index_name_that_collides_with_a_table_name() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"articles_title_index\")]\nstruct Reserved {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    title: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"articles_title_index\")]\nstruct Reserved {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    title: String,\n}\n"
                 ),
                 ModelCodegenError::IndexNameCollidesWithTableName { ref name, .. } if name == "articles_title_index"
         ));
@@ -1978,7 +1980,7 @@ struct FragmentMetadata {
     fn rejects_a_constraint_index_name_that_collides_with_a_table_name() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"articles_pkey\")]\nstruct Reserved {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"articles_pkey\")]\nstruct Reserved {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n"
                 ),
                 ModelCodegenError::ConstraintIndexCollidesWithTableName { ref name, .. } if name == "articles_pkey"
         ));
@@ -1988,7 +1990,7 @@ struct FragmentMetadata {
     fn rejects_two_tables_that_derive_the_same_constraint_index_name() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"a\")]\nstruct First {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    b_c: String,\n}\n\n#[model(table = \"a_b\")]\nstruct Second {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    c: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"a\")]\nstruct First {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    b_c: String,\n}\n\n#[model(table = \"a_b\")]\nstruct Second {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    c: String,\n}\n"
                 ),
                 ModelCodegenError::DuplicateConstraintIndexName { ref name, .. } if name == "a_b_c_key"
         ));
@@ -1998,13 +2000,13 @@ struct FragmentMetadata {
     fn rejects_an_index_name_that_collides_with_a_constraint_index() {
         assert!(matches!(
                 rejection(
-                    "#[model(table = \"author\")]\nstruct Author {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"book\")]\nstruct Book {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"author_pkey\")]\n    title: String,\n}\n"
+                    "use margaret::framework::macros::model;\n#[model(table = \"author\")]\nstruct Author {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"book\")]\nstruct Book {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"author_pkey\")]\n    title: String,\n}\n"
                 ),
                 ModelCodegenError::IndexNameCollidesWithConstraintIndex { ref name, .. } if name == "author_pkey"
         ));
     }
 
-    const ARTICLE_MODEL: &str = "\
+    const ARTICLE_MODEL: &str = "use margaret::framework::macros::model;\n\
 use margaret::framework::active_record::key::Key;
 
 #[model(table = \"article_translations\")]
@@ -2118,7 +2120,7 @@ struct ArticleComment {
     #[test]
     fn rejects_a_has_many_relation_without_an_ordering_index() {
         let source = format!(
-            "{KEY}#[model(table = \"articles\")]\n#[has_many(name = \"tags\", model = Tag, key = article)]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n\n#[model(table = \"tags\")]\nstruct Tag {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    article: Key<Article>,\n}}\n"
+            "use margaret::framework::macros::model;\n{KEY}#[model(table = \"articles\")]\n#[has_many(name = \"tags\", model = Tag, key = article)]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n\n#[model(table = \"tags\")]\nstruct Tag {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    article: Key<Article>,\n}}\n"
         );
 
         assert!(matches!(
@@ -2130,7 +2132,7 @@ struct ArticleComment {
     #[test]
     fn rejects_a_has_many_relation_with_several_ordering_indexes() {
         let source = format!(
-            "{KEY}#[model(table = \"articles\")]\n#[has_many(name = \"tags\", model = Tag, key = article)]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n\n#[model(table = \"tags\")]\n#[index(name = \"tags_by_label\", fields = [article, label, id])]\n#[index(name = \"tags_by_id\", fields = [article, id])]\nstruct Tag {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    article: Key<Article>,\n    #[column]\n    label: String,\n}}\n"
+            "use margaret::framework::macros::model;\n{KEY}#[model(table = \"articles\")]\n#[has_many(name = \"tags\", model = Tag, key = article)]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n\n#[model(table = \"tags\")]\n#[index(name = \"tags_by_label\", fields = [article, label, id])]\n#[index(name = \"tags_by_id\", fields = [article, id])]\nstruct Tag {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    article: Key<Article>,\n    #[column]\n    label: String,\n}}\n"
         );
 
         assert!(matches!(
@@ -2246,7 +2248,7 @@ struct ArticleComment {
     #[test]
     fn rejects_a_relation_named_after_a_key_field() {
         let source = format!(
-            "{KEY}#[model(table = \"nodes\")]\n#[has_many(name = \"parent\", model = Node, key = parent)]\n#[index(name = \"nodes_children\", fields = [parent, id])]\nstruct Node {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    parent: Option<Key<Node>>,\n}}\n"
+            "use margaret::framework::macros::model;\n{KEY}#[model(table = \"nodes\")]\n#[has_many(name = \"parent\", model = Node, key = parent)]\n#[index(name = \"nodes_children\", fields = [parent, id])]\nstruct Node {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    parent: Option<Key<Node>>,\n}}\n"
         );
 
         assert!(matches!(
@@ -2293,7 +2295,7 @@ struct ArticleComment {
     fn records_the_canonical_path_of_the_model() {
         assert_eq!(
             model(
-                "mod blog {\n    #[model(table = \"posts\")]\n    pub struct Post {\n        #[column(primary_key)]\n        pub id: i64,\n    }\n}\n",
+                "use margaret::framework::macros::model;\nmod blog {\nuse margaret::framework::macros::model;\n\n    #[model(table = \"posts\")]\n    pub struct Post {\n        #[column(primary_key)]\n        pub id: i64,\n    }\n}\n",
                 "posts"
             )
             .path,
@@ -2313,7 +2315,7 @@ struct ArticleComment {
     fn rejects_a_byte_length_on_a_text_column() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key, byte_length = 32)]\n    name: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key, byte_length = 32)]\n    name: String,\n}\n"
             ),
             ModelCodegenError::ByteLengthOnNonByteaColumn { ref column, .. } if column == "name"
         ));
@@ -2323,7 +2325,7 @@ struct ArticleComment {
     fn rejects_both_a_byte_length_and_a_minimum() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, byte_length = 4, minimum = 0)]\n    value: i64,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, byte_length = 4, minimum = 0)]\n    value: i64,\n}\n"
             ),
             ModelCodegenError::ConflictingColumnChecks { ref field, .. } if field == "value"
         ));
@@ -2333,7 +2335,7 @@ struct ArticleComment {
     fn rejects_a_decimal_scale_without_a_precision_so_numeric_digits_stay_explicit() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column(scale = 2)]\n    value: rust_decimal::Decimal,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: i64,\n    #[column(scale = 2)]\n    value: rust_decimal::Decimal,\n}\n"
             ),
             ModelCodegenError::NumericPrecisionMissing { ref field, .. } if field == "value"
         ));
@@ -2343,7 +2345,7 @@ struct ArticleComment {
     fn rejects_field_index_fields_that_are_not_an_array() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(fields = \"kind\")]\n    kind: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(fields = \"kind\")]\n    kind: String,\n}\n"
             ),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
@@ -2355,7 +2357,7 @@ struct ArticleComment {
     fn rejects_model_declaration_fields_that_are_not_an_array() {
         assert!(matches!(
             rejection(
-                "#[model(table = \"locks\")]\n#[primary_key(fields = \"repository\")]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = \"repository\")]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n"
             ),
             ModelCodegenError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
@@ -2413,7 +2415,7 @@ struct ArticleComment {
     fn names_the_generated_module_after_the_canonical_path() {
         assert_eq!(
             model(
-                "mod blog {\n    #[model(table = \"posts\")]\n    pub struct Post {\n        #[column(primary_key)]\n        pub id: i64,\n    }\n}\n",
+                "use margaret::framework::macros::model;\nmod blog {\nuse margaret::framework::macros::model;\n\n    #[model(table = \"posts\")]\n    pub struct Post {\n        #[column(primary_key)]\n        pub id: i64,\n    }\n}\n",
                 "posts"
             )
             .module,

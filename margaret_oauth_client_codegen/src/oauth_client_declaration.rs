@@ -225,7 +225,7 @@ mod tests {
 
     fn rejection(arguments: &str) -> OAuthClientCodegenError {
         let indexed = IndexedSource::new(&format!(
-            "use margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;\n\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n\n#[oauth_client({arguments})]\npub struct Client;\n"
+            "use margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::oauth_scope;\nuse margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;\n\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n\n#[oauth_client({arguments})]\npub struct Client;\n"
         ));
 
         read_clients(&indexed.index)
@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn reads_a_client_that_authenticates_with_its_private_key() {
         let indexed = IndexedSource::new(
-            "#[oauth_client(blog, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"blog\", issuer = margaret)]\npub struct BlogClient;\n",
+            "use margaret::framework::macros::oauth_client;\n#[oauth_client(blog, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"blog\", issuer = margaret)]\npub struct BlogClient;\n",
         );
         let clients = read_clients(&indexed.index).expect("the client is read");
 
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn reads_the_scopes_a_client_signs_in_with() {
         let indexed = IndexedSource::new(&format!(
-            "use margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;\n\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n\n#[oauth_client({})]\npub struct Client;\n",
+            "use margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::oauth_scope;\nuse margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;\n\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n\n#[oauth_client({})]\npub struct Client;\n",
             signing_in("sign_in(scopes = [ProfileScope])")
         ));
         let clients = read_clients(&indexed.index).expect("the client is read");
@@ -304,7 +304,7 @@ mod tests {
     #[test]
     fn reads_a_client_of_the_own_provider_by_its_admitted_client() {
         let indexed = IndexedSource::new(
-            "#[oauth_client(blog, admitted_as = blog_app)]
+            "use margaret::framework::macros::oauth_client;\n#[oauth_client(blog, admitted_as = blog_app)]
 pub struct BlogClient;
 ",
         );
@@ -340,7 +340,7 @@ pub struct BlogClient;
     #[test]
     fn reads_the_environment_variable_of_a_client_secret() {
         let indexed = IndexedSource::new(
-            "#[oauth_client(google, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::ClientSecretBasic(client_secret_from = \"GOOGLE_CLIENT_SECRET\"), client_id = \"app.apps.googleusercontent.com\", issuer = google_accounts)]\npub struct GoogleClient;\n",
+            "use margaret::framework::macros::oauth_client;\n#[oauth_client(google, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::ClientSecretBasic(client_secret_from = \"GOOGLE_CLIENT_SECRET\"), client_id = \"app.apps.googleusercontent.com\", issuer = google_accounts)]\npub struct GoogleClient;\n",
         );
         let clients = read_clients(&indexed.index).expect("the client is read");
 
@@ -533,7 +533,7 @@ pub struct BlogClient;
     #[test]
     fn rejects_a_client_anchored_by_a_singleton() {
         let indexed = IndexedSource::new(
-            "#[singleton]\n#[oauth_client(blog, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"blog\", issuer = margaret)]\npub struct Client;\n",
+            "use margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[oauth_client(blog, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"blog\", issuer = margaret)]\npub struct Client;\n",
         );
 
         assert!(matches!(

@@ -250,7 +250,7 @@ struct User;
         .to_string()
     }
 
-    const SESSION_PROVIDER: &str = "\
+    const SESSION_PROVIDER: &str = "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n\
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
 struct SessionUserProvider;
@@ -279,7 +279,7 @@ impl SessionUserProvider {
     #[test]
     fn flags_only_a_provider_that_reads_the_peer_spiffe_id() {
         let peer_reading = registries_for(
-            "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, peer: &spiffe::spiffe_id::SpiffeId) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, peer: &spiffe::spiffe_id::SpiffeId) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         );
         let request_reading = registries_for(SESSION_PROVIDER);
 
@@ -299,7 +299,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_on_a_non_struct() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nenum Bad {}\n"
+                "use margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nenum Bad {}\n"
             )
             .contains("is only supported on structs")
         );
@@ -309,7 +309,7 @@ impl SessionUserProvider {
     fn rejects_a_repeated_provider_attribute_while_indexing_so_no_occurrence_wins() {
         assert_eq!(
             IndexedSource::try_new(&provider_source(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
+                "use margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
             ))
             .err()
             .expect("the repeated provider attribute is rejected while indexing")
@@ -321,7 +321,7 @@ impl SessionUserProvider {
     #[test]
     fn rejects_a_provider_that_is_not_a_singleton() {
         assert!(
-            rejection_for("#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n")
+            rejection_for("use margaret::framework::macros::infers_authenticated_user;\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n")
                 .contains("must also be declared as a #[singleton]")
         );
     }
@@ -329,7 +329,7 @@ impl SessionUserProvider {
     #[test]
     fn rejects_a_provider_without_a_user_model() {
         assert!(
-            rejection_for("#[singleton]\n#[infers_authenticated_user]\nstruct Bad;\n")
+            rejection_for("use margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user]\nstruct Bad;\n")
                 .contains("is missing `user_model")
         );
     }
@@ -338,7 +338,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_whose_user_model_is_not_a_path() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = \"User\")]\nstruct Bad;\n"
+                "use margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = \"User\")]\nstruct Bad;\n"
             )
             .contains("is not a path")
         );
@@ -348,7 +348,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_whose_user_model_matches_no_struct() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = Ghost)]\nstruct Bad;\n"
+                "use margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = Ghost)]\nstruct Bad;\n"
             )
             .contains("matches no struct")
         );
@@ -357,7 +357,7 @@ impl SessionUserProvider {
     #[test]
     fn reports_unparseable_provider_arguments_as_a_parse_failure_of_the_attribute_syntax() {
         assert!(
-            rejection_for("#[singleton]\n#[infers_authenticated_user(= 5)]\nstruct Bad;\n")
+            rejection_for("use margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(= 5)]\nstruct Bad;\n")
                 .contains("could not be parsed")
         );
     }
@@ -366,7 +366,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_without_an_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
+                "use margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
             )
             .contains("no #[infer_from_request] method")
         );
@@ -376,7 +376,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_with_more_than_one_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn first(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n\n    #[infer_from_request]\n    fn second(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn first(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n\n    #[infer_from_request]\n    fn second(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
             )
             .contains("more than one #[infer_from_request] method")
         );
@@ -385,7 +385,7 @@ impl SessionUserProvider {
     #[test]
     fn orders_the_providers_by_the_struct_that_declares_them() {
         let registries = registries_for(
-            "struct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct SecondProvider;\n\nimpl SecondProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct FirstProvider;\n\nimpl FirstProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\nstruct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct SecondProvider;\n\nimpl SecondProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct FirstProvider;\n\nimpl FirstProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         );
         let providers = registries.providers();
 
@@ -405,7 +405,7 @@ impl SessionUserProvider {
     fn rejects_two_providers_for_the_same_user_model() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct First;\n\nimpl First {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Second;\n\nimpl Second {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct First;\n\nimpl First {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Second;\n\nimpl Second {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
             )
             .contains("has more than one authenticated user provider")
         );
@@ -415,7 +415,7 @@ impl SessionUserProvider {
     fn rejects_the_next_handler_in_an_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, next: Next) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, next: Next) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
             )
             .contains("only available inside an HTTP middleware")
         );
@@ -425,7 +425,7 @@ impl SessionUserProvider {
     fn rejects_a_route_parameter_in_an_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
             )
             .contains("has no route path to bind from")
         );
@@ -435,7 +435,7 @@ impl SessionUserProvider {
     fn rejects_an_authenticated_user_in_an_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[authenticated_user] user: User) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[authenticated_user] user: User) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
             )
             .contains("only available in an HTTP responder")
         );
@@ -445,7 +445,7 @@ impl SessionUserProvider {
     fn rejects_an_unmarked_parameter_in_an_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, flag: bool) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, flag: bool) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
             )
             .contains("must be the current request, a form request")
         );
@@ -502,7 +502,7 @@ impl SessionUserProvider {
         primary_key: RouteModelKey,
     ) -> Result<Vec<BoundParameter>, RequestBindingError> {
         let indexed = IndexedSource::new(
-            "struct Article;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] article: Article) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::macros::process;\nstruct Article;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] article: Article) -> anyhow::Result<Response> {}\n}\n",
         );
         let index = &indexed.index;
         let registries = BindingRegistries::collect(
@@ -587,7 +587,7 @@ impl SessionUserProvider {
     fn binds_a_plain_authenticated_user_as_required_so_the_handler_always_gets_one() {
         assert_eq!(
             authenticated_user_requirements(
-                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {}\n}\n"
             ),
             vec![AuthenticatedUserRequirement::Required]
         );
@@ -597,7 +597,7 @@ impl SessionUserProvider {
     fn binds_an_option_authenticated_user_as_optional_so_anonymous_requests_proceed() {
         assert_eq!(
             authenticated_user_requirements(
-                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: Option<User>) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: Option<User>) -> anyhow::Result<Response> {}\n}\n"
             ),
             vec![AuthenticatedUserRequirement::Optional]
         );
@@ -607,7 +607,7 @@ impl SessionUserProvider {
     fn rejects_a_user_defined_option_as_an_optional_authenticated_user() {
         assert!(
             responder_rejection(
-                "struct Option<Inner>(Inner);\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: Option<User>) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Option<Inner>(Inner);\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: Option<User>) -> anyhow::Result<Response> {}\n}\n"
             )
             .contains("requests the authenticated user 'crate::Option'")
         );
@@ -617,7 +617,7 @@ impl SessionUserProvider {
     fn binds_an_authenticated_user_alongside_the_current_request() {
         assert_eq!(
             authenticated_user_requirements(
-                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, request: &Request, #[authenticated_user] user: User) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, request: &Request, #[authenticated_user] user: User) -> anyhow::Result<Response> {}\n}\n"
             ),
             vec![AuthenticatedUserRequirement::Required]
         );
@@ -627,7 +627,7 @@ impl SessionUserProvider {
     fn rejects_a_form_request_source_named_after_a_local_struct() {
         assert!(
             responder_rejection(
-                "struct Cookie;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookie)] cookie: Cookie) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Cookie;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookie)] cookie: Cookie) -> anyhow::Result<Response> {}\n}\n"
             )
             .contains("unknown request input source 'Cookie'")
         );
@@ -637,7 +637,7 @@ impl SessionUserProvider {
     fn rejects_a_form_request_source_from_a_foreign_enum() {
         assert!(
             responder_rejection(
-                "use crate::inputs::RequestInput;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Query)] filters: Filters) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nuse crate::inputs::RequestInput;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Query)] filters: Filters) -> anyhow::Result<Response> {}\n}\n"
             )
             .contains("unknown request input source 'RequestInput :: Query'")
         );
@@ -648,7 +648,7 @@ impl SessionUserProvider {
         assert!(
             responder_binding(
                 "Page",
-                "use margaret::framework::http_validation::request_input::RequestInput;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Query)] filters: Filters) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nuse margaret::framework::http_validation::request_input::RequestInput;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Query)] filters: Filters) -> anyhow::Result<Response> {}\n}\n"
             )
             .is_ok()
         );
@@ -659,7 +659,7 @@ impl SessionUserProvider {
         assert!(
             responder_binding(
                 "Page",
-                "use margaret::framework::http_validation::request_input::RequestInput::Cookie;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookie)] cookie: Filters) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nuse margaret::framework::http_validation::request_input::RequestInput::Cookie;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookie)] cookie: Filters) -> anyhow::Result<Response> {}\n}\n"
             )
             .is_ok()
         );
@@ -670,7 +670,7 @@ impl SessionUserProvider {
         assert!(
             responder_binding(
                 "Page",
-                "mod prelude {\n    pub use margaret::framework::http_validation::request_input;\n}\n\nuse crate::prelude::request_input;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = request_input::RequestInput::Form)] form: Filters) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nmod prelude {\n    pub use margaret::framework::http_validation::request_input;\n}\n\nuse crate::prelude::request_input;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = request_input::RequestInput::Form)] form: Filters) -> anyhow::Result<Response> {}\n}\n"
             )
             .is_ok()
         );
@@ -679,7 +679,7 @@ impl SessionUserProvider {
     #[test]
     fn resolves_a_user_model_imported_through_a_reexport() {
         let registries = registries_for(
-            "mod accounts {\n    mod member {\n        pub struct Member;\n    }\n\n    pub use member::Member;\n}\n\nuse crate::accounts::Member;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Member)]\nstruct MemberProvider;\n\nimpl MemberProvider {\n    #[infer_from_request]\n    fn infer(&self, request: &Request) -> anyhow::Result<AuthenticatedUserOutcome<Member>> {}\n}\n",
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\nmod accounts {\n    mod member {\n        pub struct Member;\n    }\n\n    pub use member::Member;\n}\n\nuse crate::accounts::Member;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Member)]\nstruct MemberProvider;\n\nimpl MemberProvider {\n    #[infer_from_request]\n    fn infer(&self, request: &Request) -> anyhow::Result<AuthenticatedUserOutcome<Member>> {}\n}\n",
         );
 
         assert_eq!(
@@ -692,7 +692,7 @@ impl SessionUserProvider {
     fn rejects_an_authenticated_user_taken_by_reference() {
         assert!(
             responder_rejection(
-                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: &User) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: &User) -> anyhow::Result<Response> {}\n}\n"
             )
             .contains("must be taken by value")
         );
@@ -702,7 +702,7 @@ impl SessionUserProvider {
     fn rejects_an_authenticated_user_model_that_matches_no_struct() {
         assert!(
             responder_rejection(
-                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: (u8, u8)) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: (u8, u8)) -> anyhow::Result<Response> {}\n}\n"
             )
             .contains("which matches no struct")
         );
@@ -712,7 +712,7 @@ impl SessionUserProvider {
     fn rejects_an_authenticated_user_model_without_a_provider() {
         assert!(
             responder_rejection(
-                "struct Admin;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Admin;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {}\n}\n"
             )
             .contains("which no #[infers_authenticated_user] provides")
         );
@@ -722,7 +722,7 @@ impl SessionUserProvider {
     fn rejects_an_authenticated_user_that_also_carries_a_route_parameter() {
         assert!(
             responder_rejection(
-                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] #[route_parameter(from = \"x\")] user: User) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] #[route_parameter(from = \"x\")] user: User) -> anyhow::Result<Response> {}\n}\n"
             )
             .contains("an argument may use at most one")
         );
@@ -732,7 +732,7 @@ impl SessionUserProvider {
     fn rejects_the_same_authenticated_user_requested_twice() {
         assert!(
             responder_rejection(
-                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] first: User, #[authenticated_user] second: Option<User>) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] first: User, #[authenticated_user] second: Option<User>) -> anyhow::Result<Response> {}\n}\n"
             )
             .contains("more than once")
         );
@@ -742,7 +742,7 @@ impl SessionUserProvider {
     fn rejects_the_same_route_parameter_bound_twice() {
         assert!(
             responder_rejection(
-                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] first: String, #[route_parameter(from = \"x\")] second: String) -> anyhow::Result<Response> {}\n}\n"
+                "use margaret::framework::macros::process;\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] first: String, #[route_parameter(from = \"x\")] second: String) -> anyhow::Result<Response> {}\n}\n"
             )
             .contains("requests route parameter 'x' more than once")
         );
@@ -752,7 +752,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_that_renders_views_this_crate_does_not_generate() {
         let rejection = collect_registries(
             &IndexedSource::new(&provider_source(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+                "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
             )).index,
             ViewsAvailability::Unavailable,
         )
@@ -763,7 +763,7 @@ impl SessionUserProvider {
         assert!(rejection.contains("requests the views, but this crate generates none"));
     }
 
-    const CONSOLE_ARGUMENT_PROVIDER: &str = "\
+    const CONSOLE_ARGUMENT_PROVIDER: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n\
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
 struct SessionUserProvider;
@@ -836,7 +836,7 @@ impl SessionUserProvider {
     #[test]
     fn awaits_a_provider_that_declares_an_asynchronous_inference_method() {
         let registries = registries_for(
-            "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    async fn infer(&self, request: &Request) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    async fn infer(&self, request: &Request) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         );
         let source: String = render_authenticated_user_wrappers(&registries.providers())
             .into_iter()
@@ -851,7 +851,7 @@ impl SessionUserProvider {
     #[test]
     fn renders_a_wrapper_that_carries_the_routes_and_views_it_infers_from() {
         let registries = registries_for(
-            "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, routes: &crate::margaret::routes::Routes, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, routes: &crate::margaret::routes::Routes, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         );
         let source: String = render_authenticated_user_wrappers(&registries.providers())
             .into_iter()
@@ -868,7 +868,7 @@ impl SessionUserProvider {
     #[test]
     fn renders_a_wrapper_that_interrupts_a_failed_form_request() {
         let registries = registries_for(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n\nstruct Cookie;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, #[form_request(from = RequestInput::Cookie)] cookie: Cookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n\nstruct Cookie;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, #[form_request(from = RequestInput::Cookie)] cookie: Cookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         );
         let source: String = render_authenticated_user_wrappers(&registries.providers())
             .into_iter()
@@ -883,7 +883,7 @@ impl SessionUserProvider {
         ));
     }
 
-    const PARTNER_ISSUER: &str = "\
+    const PARTNER_ISSUER: &str = "use margaret::framework::macros::verifies_tokens_from_issuer;\n\
 use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 
@@ -894,6 +894,13 @@ struct Claims;
 ";
 
     fn bearer_provider(parameters: &str) -> String {
+        format!(
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n{}",
+            bearer_provider_declaration(parameters)
+        )
+    }
+
+    fn bearer_provider_declaration(parameters: &str) -> String {
         format!(
             "{PARTNER_ISSUER}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameters}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )
@@ -926,7 +933,7 @@ struct Claims;
     const PARTNER_TOKEN: &str =
         "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>";
 
-    const PARTNER_CLIENTS: &str = "\
+    const PARTNER_CLIENTS: &str = "use margaret::framework::macros::oauth_client;\n\
 use margaret::framework::token_introspection::introspected_token::IntrospectedToken;
 
 #[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]
@@ -1088,7 +1095,7 @@ struct SecondClient;
     #[test]
     fn resolves_the_bearer_token_type_and_claims_through_use_statements() {
         let source = wrapper_source(&registries_for(
-            "use margaret::framework::jwt_verification::access_token_profile;\nuse margaret::framework::jwt_verification::verified_jwt;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<verified_jwt::VerifiedJwt<Claims, access_token_profile::AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\nuse margaret::framework::jwt_verification::access_token_profile;\nuse margaret::framework::jwt_verification::verified_jwt;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<verified_jwt::VerifiedJwt<Claims, access_token_profile::AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         ));
 
         assert!(source.contains(
@@ -1099,7 +1106,7 @@ struct SecondClient;
     #[test]
     fn resolves_the_introspected_token_type_and_claims_through_use_statements() {
         let source = wrapper_source(&registries_for(
-            "use margaret::framework::token_introspection::introspected_token;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(client = partner_client)] token: Option<introspected_token::IntrospectedToken<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\nuse margaret::framework::token_introspection::introspected_token;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(client = partner_client)] token: Option<introspected_token::IntrospectedToken<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         ));
 
         assert!(source.contains(
@@ -1115,7 +1122,7 @@ struct SecondClient;
                 bearer_provider(
                     "#[bearer_token(client = partner_client)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
                 ),
-                "#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n"
+                "use margaret::framework::macros::oauth_client;\n#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n"
             ))
             .ends_with("a VerifiedJwt names `issuer = <tag>` or `resource = <tag>`, an IntrospectedToken names `client = <tag>`")
         );
@@ -1268,7 +1275,7 @@ struct SecondClient;
     fn rejects_a_bearer_token_outside_an_inference_method() {
         assert!(
             responder_rejection(&format!(
-                "{PARTNER_ISSUER}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, {PARTNER_TOKEN}) -> anyhow::Result<Response> {{}}\n}}\n"
+                "use margaret::framework::macros::process;\n{PARTNER_ISSUER}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, {PARTNER_TOKEN}) -> anyhow::Result<Response> {{}}\n}}\n"
             ))
             .contains("which is only available in an #[infer_from_request] method")
         );
@@ -1296,7 +1303,7 @@ struct SecondClient;
     #[test]
     fn challenges_a_required_user_of_a_bearer_provider_for_bearer_credentials() {
         let indexed = IndexedSource::new(&provider_source(&format!(
-            "{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: User) -> anyhow::Result<Response> {{}}\n}}\n",
+            "use margaret::framework::macros::process;\n{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: User) -> anyhow::Result<Response> {{}}\n}}\n",
             bearer_provider(PARTNER_TOKEN)
         )));
         let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
@@ -1337,7 +1344,7 @@ struct SecondClient;
     #[test]
     fn binds_a_parameter_to_a_local_named_after_its_position() {
         let indexed = IndexedSource::new(&provider_source(&format!(
-            "{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] _caller: User) -> anyhow::Result<Response> {{}}\n}}\n",
+            "use margaret::framework::macros::process;\n{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] _caller: User) -> anyhow::Result<Response> {{}}\n}}\n",
             bearer_provider(PARTNER_TOKEN)
         )));
         let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
@@ -1366,7 +1373,7 @@ struct SecondClient;
     #[test]
     fn refuses_to_inject_a_trusted_issuer_into_a_handshake() {
         let indexed = IndexedSource::new(
-            "struct Room;\n\nimpl Room {\n    #[process]\n    fn build(trusted_issuer: std::sync::Arc<crate::margaret::trusted_issuers::partner::TrustedIssuer>) -> anyhow::Result<Self> {}\n}\n",
+            "use margaret::framework::macros::process;\nstruct Room;\n\nimpl Room {\n    #[process]\n    fn build(trusted_issuer: std::sync::Arc<crate::margaret::trusted_issuers::partner::TrustedIssuer>) -> anyhow::Result<Self> {}\n}\n",
         );
         let item = indexed.item("Room");
         let route_path = admitted_path("/room");
@@ -1398,8 +1405,8 @@ struct SecondClient;
     fn rejects_a_site_that_infers_two_users_from_the_bearer_token() {
         assert_eq!(
             responder_rejection(&format!(
-                "{}\nstruct Runner;\n\nstruct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct AdminProvider;\n\nimpl AdminProvider {{\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {{}}\n}}\n\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: Runner, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {{}}\n}}\n",
-                bearer_provider(PARTNER_TOKEN).replace("User", "Runner")
+                "use margaret::framework::macros::process;\n{}\nstruct Runner;\n\nstruct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct AdminProvider;\n\nimpl AdminProvider {{\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {{}}\n}}\n\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: Runner, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {{}}\n}}\n",
+                bearer_provider_declaration(PARTNER_TOKEN).replace("User", "Runner")
             )),
             "responder 'Page' infers more than one authenticated user from the bearer token; a request presents one bearer credential, so exactly one #[infers_authenticated_user] provider verifies it"
         );
@@ -1408,7 +1415,7 @@ struct SecondClient;
     #[test]
     fn collects_the_console_arguments_of_the_trusted_issuer_a_bearer_provider_verifies() {
         let index = IndexedSource::new(&provider_source(&format!(
-            "use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;\nuse margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\n\nstruct Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[singleton]\nstruct PartnerSettings;\n\nimpl PartnerSettings {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+            "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\nuse margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;\nuse margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\n\nstruct Claims;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct PartnerIssuer;\n\n#[singleton]\nstruct PartnerSettings;\n\nimpl PartnerSettings {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )))
         .index;
         let tags = collected_tags(&index);
@@ -1455,13 +1462,13 @@ struct SecondClient;
     fn rejects_a_provider_that_reads_the_request_body() {
         assert!(
             rejection_for(
-                "use margaret::framework::http_uploaded_file::uploaded_files::UploadedFiles;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, files: UploadedFiles) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_uploaded_file::uploaded_files::UploadedFiles;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, files: UploadedFiles) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
             )
             .contains("which only an HTTP responder receives")
         );
     }
 
-    const ISSUED_SESSIONS: &str = "\
+    const ISSUED_SESSIONS: &str = "use margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\n\
 use margaret::framework::sessions::session::Session;
 
 #[issues_tokens(provider, issuer = \"https://issuer.example\")]
@@ -1471,7 +1478,7 @@ struct ProviderIssuance;
 struct BrowserSessions;
 ";
 
-    const CONSUMED_SESSIONS: &str = "\
+    const CONSUMED_SESSIONS: &str = "use margaret::framework::macros::consumes_sessions;\n\
 use margaret::framework::sessions::session::Session;
 
 #[consumes_sessions(issuer = partner, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]
@@ -1482,7 +1489,7 @@ struct PartnerSessions;
 
     fn reader_provider(declarations: &str, parameters: &str) -> String {
         format!(
-            "{declarations}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct ReaderProvider;\n\nimpl ReaderProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameters}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n{declarations}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct ReaderProvider;\n\nimpl ReaderProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameters}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )
     }
 
@@ -1557,7 +1564,7 @@ struct PartnerSessions;
     #[test]
     fn renders_the_session_user_of_a_responder_with_its_cookie_changes() {
         let indexed = IndexedSource::new(&provider_source(&format!(
-            "{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] reader: User) -> anyhow::Result<Response> {{}}\n}}\n",
+            "use margaret::framework::macros::process;\n{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] reader: User) -> anyhow::Result<Response> {{}}\n}}\n",
             reader_provider(ISSUED_SESSIONS, ISSUED_SESSION)
         )));
         let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
@@ -1610,7 +1617,7 @@ struct PartnerSessions;
     fn rejects_a_session_outside_an_inference_method() {
         assert!(
             responder_rejection(&format!(
-                "{ISSUED_SESSIONS}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, {ISSUED_SESSION}) -> anyhow::Result<Response> {{}}\n}}\n"
+                "use margaret::framework::macros::process;\n{ISSUED_SESSIONS}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, {ISSUED_SESSION}) -> anyhow::Result<Response> {{}}\n}}\n"
             ))
             .ends_with("carries #[session], which is only available in an #[infer_from_request] method of an #[infers_authenticated_user] provider")
         );
@@ -1722,7 +1729,7 @@ struct PartnerSessions;
     fn rejects_two_session_users_of_one_responder() {
         let second = "#[singleton]\n#[infers_authenticated_user(user_model = Editor)]\nstruct EditorProvider;\n\nimpl EditorProvider {\n    #[infer_from_request]\n    fn infer(&self, #[session(issuer = provider)] session: Option<Session>) -> anyhow::Result<AuthenticatedUserOutcome<Editor>> {}\n}\nstruct Editor;\n";
         let index = IndexedSource::new(&provider_source(&format!(
-            "{}{second}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] reader: User, #[authenticated_user] editor: Editor) -> anyhow::Result<Response> {{}}\n}}\n",
+            "use margaret::framework::macros::process;\n{}{second}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] reader: User, #[authenticated_user] editor: Editor) -> anyhow::Result<Response> {{}}\n}}\n",
             reader_provider(ISSUED_SESSIONS, ISSUED_SESSION)
         )))
         .index;

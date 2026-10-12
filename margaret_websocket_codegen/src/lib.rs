@@ -80,6 +80,11 @@ mod tests {
 
     const FULL_SESSION: &str = r#"
 use std::sync::Arc;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;
 
@@ -232,7 +237,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     fn session_path_rejection(responders: &str, session_path: &str) -> Option<String> {
         let index = IndexedSource::new(&format!(
-            "{responders}\n#[websocket_session(path = \"{session_path}\", server = \"public\")]\nstruct Chat;\n\nimpl Chat {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n"
+            "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::websocket_session;\n{responders}\n#[websocket_session(path = \"{session_path}\", server = \"public\")]\nstruct Chat;\n\nimpl Chat {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n"
         ))
         .index;
         let registries = registries_for(&index);
@@ -254,7 +259,7 @@ impl RespondsToWebSocketNotification for Typist {
         .map(|rejection| rejection.to_string())
     }
 
-    const GREETING_RESPONDER: &str = "#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/greeting/{name}\", server = \"public\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"name\")] name: String) -> anyhow::Result<Response> {}\n}\n";
+    const GREETING_RESPONDER: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/greeting/{name}\", server = \"public\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"name\")] name: String) -> anyhow::Result<Response> {}\n}\n";
 
     #[test]
     fn rejects_a_session_at_the_path_of_a_responder_since_one_path_has_one_handler() {
@@ -296,7 +301,12 @@ impl RespondsToWebSocketNotification for Typist {
         );
     }
 
-    const CONSOLE_ARGUMENT_HANDLER: &str = r#"
+    const CONSOLE_ARGUMENT_HANDLER: &str = r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[websocket_session(path = "/room", server = "public")]
@@ -335,7 +345,12 @@ impl RespondsToWebSocketMessage for Chatter {
         assert!(!source.contains("serve_input_"));
     }
 
-    const CONSOLE_ARGUMENT_NOTIFICATION_HANDLER: &str = r#"
+    const CONSOLE_ARGUMENT_NOTIFICATION_HANDLER: &str = r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;
 
 #[websocket_session(path = "/room", server = "public")]
@@ -372,7 +387,9 @@ impl RespondsToWebSocketNotification for Typist {
         assert!(!source.contains("serve_input_"));
     }
 
-    const NON_STRUCT_HANDLER: &str = r#"
+    const NON_STRUCT_HANDLER: &str = r#"use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[websocket_message(request, method = "chat", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
@@ -400,7 +417,8 @@ impl RespondsToWebSocketMessage for Chatter {
         );
     }
 
-    const COLLIDING_HANDLER_FIELD: &str = r#"
+    const COLLIDING_HANDLER_FIELD: &str = r#"use margaret::framework::macros::websocket_message;
+
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[websocket_message(request, method = "chat", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]
@@ -408,6 +426,9 @@ struct Chat;
 
 mod a {
     pub mod b {
+        use margaret::framework::macros::constructor;
+        use margaret::framework::macros::singleton;
+
         #[singleton]
         pub struct Handler;
 
@@ -419,6 +440,7 @@ mod a {
 }
 
 mod a_b {
+    use margaret::framework::macros::singleton;
     use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
     #[singleton]
@@ -440,7 +462,11 @@ mod a_b {
         assert_eq!(handlers[0].handler_field, "a_b_handler_2");
     }
 
-    const COLLIDING_DISPATCH_METHODS: &str = r#"
+    const COLLIDING_DISPATCH_METHODS: &str = r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[websocket_session(path = "/room", server = "public")]
@@ -482,7 +508,12 @@ impl RespondsToWebSocketMessage for SecondHandler {
         assert!(source.contains("structSayHi2Dispatch"));
     }
 
-    const SESSION_WITH_MIDDLEWARE: &str = r#"
+    const SESSION_WITH_MIDDLEWARE: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -504,7 +535,12 @@ impl Guard {
 }
 "#;
 
-    const SESSION_WITH_ROUTES_MIDDLEWARE: &str = r#"
+    const SESSION_WITH_ROUTES_MIDDLEWARE: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::websocket_session;
+
 use crate::margaret::routes::Routes;
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
@@ -529,6 +565,10 @@ impl Tracer {
 
     const INJECTED_ONLY_SESSION: &str = r#"
 use std::sync::Arc;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_session;
 
 #[singleton]
 struct SystemClock;
@@ -591,7 +631,14 @@ impl Room {
         assert!(!source.contains("GatedWebSocketUpgrade"));
     }
 
-    const SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
+    const SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -630,7 +677,7 @@ impl Guard {
     fn rejects_a_session_with_an_unknown_middleware_tag() {
         assert!(
             error(
-                "#[websocket_session(path = \"/room\", server = \"public\")]\n#[middleware(missing)]\nstruct Room;\n\nimpl Room {\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {}\n}\n"
+                "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::middleware;\nuse margaret::framework::macros::websocket_session;\n#[websocket_session(path = \"/room\", server = \"public\")]\n#[middleware(missing)]\nstruct Room;\n\nimpl Room {\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {}\n}\n"
             )
             .to_string()
             .contains("which no middleware handler declares")
@@ -731,30 +778,38 @@ impl Guard {
     #[test]
     fn rejects_a_message_that_is_not_a_struct() {
         assert!(
-            error(r"#[websocket_message(response)] enum Bad {}")
-                .to_string()
-                .contains("carries #[websocket_message]")
+            error(
+                r"use margaret::framework::macros::websocket_message;
+#[websocket_message(response)] enum Bad {}"
+            )
+            .to_string()
+            .contains("carries #[websocket_message]")
         );
     }
 
     #[test]
     fn rejects_a_message_without_a_kind_instead_of_guessing_how_it_is_dispatched() {
         assert!(
-            error(r#"#[websocket_message(method = "x")] struct Bad;"#)
-                .to_string()
-                .contains("must declare a message kind")
+            error(
+                r#"use margaret::framework::macros::websocket_message;
+#[websocket_message(method = "x")] struct Bad;"#
+            )
+            .to_string()
+            .contains("must declare a message kind")
         );
     }
 
     #[test]
     fn rejects_a_message_with_multiple_kinds_so_its_dispatch_is_never_ambiguous() {
-        assert!(error(r#"#[websocket_message(request, response, method = "x", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#).to_string().contains("more than one message kind"));
+        assert!(error(r#"use margaret::framework::macros::websocket_message;
+#[websocket_message(request, response, method = "x", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#).to_string().contains("more than one message kind"));
     }
 
     #[test]
     fn rejects_a_request_without_a_method_since_requests_are_dispatched_by_it() {
         assert!(
-            error(r"#[websocket_message(request, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
+            error(r"use margaret::framework::macros::websocket_message;
+#[websocket_message(request, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
                 .to_string()
                 .contains("missing the required 'method'")
         );
@@ -763,7 +818,8 @@ impl Guard {
     #[test]
     fn rejects_a_request_without_a_cardinality_instead_of_assuming_a_single_reply() {
         assert!(
-            error(r#"#[websocket_message(request, method = "x")] struct Bad;"#)
+            error(r#"use margaret::framework::macros::websocket_message;
+#[websocket_message(request, method = "x")] struct Bad;"#)
                 .to_string()
                 .contains("must declare its response as a variant of margaret::framework::websocket::web_socket_response::WebSocketResponse")
         );
@@ -772,7 +828,8 @@ impl Guard {
     #[test]
     fn rejects_a_request_with_an_unknown_cardinality() {
         assert!(
-            error(r#"#[websocket_message(request, method = "x", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Burst)] struct Bad;"#)
+            error(r#"use margaret::framework::macros::websocket_message;
+#[websocket_message(request, method = "x", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Burst)] struct Bad;"#)
                 .to_string()
                 .contains("declares the response 'margaret :: framework :: websocket :: web_socket_response :: WebSocketResponse :: Burst', which is not a variant")
         );
@@ -781,7 +838,7 @@ impl Guard {
     #[test]
     fn rejects_a_cardinality_of_a_foreign_enum() {
         assert!(
-            error("mod local {\n    pub enum WebSocketResponse {\n        Single,\n    }\n}\n\nuse crate::local::WebSocketResponse;\n\n#[websocket_message(request, method = \"x\", response = WebSocketResponse::Single)] struct Bad;\n")
+            error("use margaret::framework::macros::websocket_message;\nmod local {\nuse margaret::framework::macros::websocket_message;\n\n    pub enum WebSocketResponse {\n        Single,\n    }\n}\n\nuse crate::local::WebSocketResponse;\n\n#[websocket_message(request, method = \"x\", response = WebSocketResponse::Single)] struct Bad;\n")
                 .to_string()
                 .contains("declares the response 'WebSocketResponse :: Single', which is not a variant")
         );
@@ -806,24 +863,31 @@ impl Guard {
 
     #[test]
     fn rejects_a_non_snake_case_method_so_wire_method_names_follow_one_convention() {
-        assert!(error(r#"#[websocket_message(request, method = "NotSnake", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#).to_string().contains("has method"));
+        assert!(error(r#"use margaret::framework::macros::websocket_message;
+#[websocket_message(request, method = "NotSnake", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#).to_string().contains("has method"));
     }
 
     #[test]
     fn rejects_a_response_without_a_method_since_clients_identify_responses_by_it() {
         assert!(
-            error(r"#[websocket_message(response)] struct Bad;")
-                .to_string()
-                .contains("missing the required 'method'")
+            error(
+                r"use margaret::framework::macros::websocket_message;
+#[websocket_message(response)] struct Bad;"
+            )
+            .to_string()
+            .contains("missing the required 'method'")
         );
     }
 
     #[test]
     fn rejects_a_non_snake_case_response_method() {
         assert!(
-            error(r#"#[websocket_message(response, method = "NotSnake")] struct Bad;"#)
-                .to_string()
-                .contains("has method")
+            error(
+                r#"use margaret::framework::macros::websocket_message;
+#[websocket_message(response, method = "NotSnake")] struct Bad;"#
+            )
+            .to_string()
+            .contains("has method")
         );
     }
 
@@ -831,7 +895,7 @@ impl Guard {
     fn rejects_two_responses_that_share_a_method() {
         assert!(
             error(
-                "#[websocket_message(response, method = \"dup\")] struct First;\n#[websocket_message(response, method = \"dup\")] struct Second;\n"
+                "use margaret::framework::macros::websocket_message;\n#[websocket_message(response, method = \"dup\")] struct First;\n#[websocket_message(response, method = \"dup\")] struct Second;\n"
             )
             .to_string()
             .contains("declared more than once")
@@ -842,7 +906,8 @@ impl Guard {
     fn rejects_a_notification_that_declares_a_cardinality() {
         assert!(
             error(
-                r#"#[websocket_message(notification, method = "x", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#
+                r#"use margaret::framework::macros::websocket_message;
+#[websocket_message(notification, method = "x", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;"#
             )
             .to_string()
             .contains("declares a response cardinality but is not a request")
@@ -853,7 +918,8 @@ impl Guard {
     fn rejects_a_notification_whose_response_argument_is_not_a_path() {
         assert!(
             error(
-                r#"#[websocket_message(notification, method = "x", response = "single")] struct Bad;"#
+                r#"use margaret::framework::macros::websocket_message;
+#[websocket_message(notification, method = "x", response = "single")] struct Bad;"#
             )
             .to_string()
             .contains("is not a path")
@@ -863,18 +929,24 @@ impl Guard {
     #[test]
     fn rejects_a_session_that_is_not_a_struct() {
         assert!(
-            error(r#"#[websocket_session(path = "/x", server = "public")] enum Bad {}"#)
-                .to_string()
-                .contains("carries #[websocket_session]")
+            error(
+                r#"use margaret::framework::macros::websocket_session;
+#[websocket_session(path = "/x", server = "public")] enum Bad {}"#
+            )
+            .to_string()
+            .contains("carries #[websocket_session]")
         );
     }
 
     #[test]
     fn rejects_a_session_without_a_path_since_clients_could_never_reach_it() {
         assert!(
-            error(r#"#[websocket_session(server = "public")] struct Bad;"#)
-                .to_string()
-                .contains("missing the required 'path'")
+            error(
+                r#"use margaret::framework::macros::websocket_session;
+#[websocket_session(server = "public")] struct Bad;"#
+            )
+            .to_string()
+            .contains("missing the required 'path'")
         );
     }
 
@@ -882,7 +954,9 @@ impl Guard {
     fn rejects_a_session_whose_path_no_request_can_reach() {
         assert!(matches!(
             error(
-                r#"#[websocket_session(path = "/rooms/../admin", server = "public")]
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+#[websocket_session(path = "/rooms/../admin", server = "public")]
 struct Room;
 
 impl Room {
@@ -903,27 +977,36 @@ impl Room {
     #[test]
     fn rejects_a_session_without_a_server_instead_of_guessing_where_it_is_served() {
         assert!(
-            error(r#"#[websocket_session(path = "/x")] struct Bad;"#)
-                .to_string()
-                .contains("missing the required 'server'")
+            error(
+                r#"use margaret::framework::macros::websocket_session;
+#[websocket_session(path = "/x")] struct Bad;"#
+            )
+            .to_string()
+            .contains("missing the required 'server'")
         );
     }
 
     #[test]
     fn rejects_a_session_with_a_non_snake_case_server() {
         assert!(
-            error(r#"#[websocket_session(path = "/x", server = "Public")] struct Bad;"#)
-                .to_string()
-                .contains("has server")
+            error(
+                r#"use margaret::framework::macros::websocket_session;
+#[websocket_session(path = "/x", server = "Public")] struct Bad;"#
+            )
+            .to_string()
+            .contains("has server")
         );
     }
 
     #[test]
     fn rejects_a_session_without_a_build_for_session_method() {
         assert!(
-            error(r#"#[websocket_session(path = "/x", server = "public")] struct Bad;"#)
-                .to_string()
-                .contains("has no #[build_for_session] method")
+            error(
+                r#"use margaret::framework::macros::websocket_session;
+#[websocket_session(path = "/x", server = "public")] struct Bad;"#
+            )
+            .to_string()
+            .contains("has no #[build_for_session] method")
         );
     }
 
@@ -931,7 +1014,9 @@ impl Room {
     fn rejects_a_session_with_two_build_for_session_methods() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
@@ -953,7 +1038,9 @@ impl Bad {
     fn rejects_a_route_parameter_without_a_from() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/x/{id}", server = "public")]
 struct Bad;
 
@@ -972,7 +1059,9 @@ impl Bad {
     fn rejects_a_route_parameter_missing_from_the_path() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
@@ -991,7 +1080,9 @@ impl Bad {
     fn rejects_an_unsupported_session_parameter_shape_since_nothing_could_supply_it() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
@@ -1012,6 +1103,8 @@ impl Bad {
             r#"
 use std::sync::Arc;
 
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
 use crate::TrustedIssuer;
 
 #[websocket_session(path = "/x", server = "public")]
@@ -1064,6 +1157,8 @@ impl Bad {
             error(
                 r#"
 use std::sync::Arc;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
 
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
@@ -1079,7 +1174,13 @@ impl Bad {
         );
     }
 
-    const AUTHENTICATED_HANDSHAKE: &str = r#"use margaret::framework::http_validation::request_input::RequestInput;
+    const AUTHENTICATED_HANDSHAKE: &str = r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
+use margaret::framework::http_validation::request_input::RequestInput;
 
 
 use margaret::framework::http::request::Request;
@@ -1119,7 +1220,15 @@ impl RespondsToWebSocketMessage for Chatter {
 }
 "#;
 
-    const SESSION_HANDSHAKE: &str = r#"
+    const SESSION_HANDSHAKE: &str = r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::issues_sessions;
+use margaret::framework::macros::issues_tokens;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::sessions::session::Session;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
@@ -1249,7 +1358,13 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn hands_the_routes_to_a_handshake_authenticated_user_provider() {
         let source = generated(
-            r#"
+            r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
@@ -1291,7 +1406,14 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn keeps_a_captured_provider_clear_of_a_session_parameter_that_takes_its_name() {
         let source = generated(
-            r#"
+            r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
@@ -1342,7 +1464,14 @@ impl RespondsToWebSocketMessage for Chatter {
         assert!(source.contains("self.session.as_ref()"));
     }
 
-    const CONSOLE_ARGUMENT_PROVIDER: &str = r#"
+    const CONSOLE_ARGUMENT_PROVIDER: &str = r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
@@ -1402,7 +1531,13 @@ impl RespondsToWebSocketMessage for Chatter {
     fn rejects_a_middleware_that_renders_the_views_on_a_session() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::process;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::http::next::Next;
 
 #[singleton]
@@ -1433,7 +1568,12 @@ impl Room {
     fn rejects_an_authenticated_user_whose_provider_renders_the_views() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_session;
+
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
 struct User;
@@ -1465,7 +1605,9 @@ impl Room {
     fn rejects_the_views_in_a_session_builder() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
@@ -1484,7 +1626,12 @@ impl Bad {
     fn rejects_an_authenticated_user_whose_provider_reads_the_request_body() {
         assert!(
             error(
-                r#"use margaret::framework::http_validation::request_input::RequestInput;
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_session;
+use margaret::framework::http_validation::request_input::RequestInput;
 
 
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
@@ -1520,6 +1667,12 @@ impl Room {
 
 
 use std::sync::Arc;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::provides_route_parameter;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
@@ -1617,7 +1770,9 @@ impl RespondsToWebSocketMessage for Poster {
     fn rejects_a_form_body_request_in_a_session() {
         assert!(
             error(
-                r#"use margaret::framework::http_validation::request_input::RequestInput;
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+use margaret::framework::http_validation::request_input::RequestInput;
 
 
 #[websocket_session(path = "/x", server = "public")]
@@ -1640,7 +1795,9 @@ impl Bad {
     fn rejects_a_json_body_request_in_a_session() {
         assert!(
             error(
-                r#"use margaret::framework::http_validation::request_input::RequestInput;
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+use margaret::framework::http_validation::request_input::RequestInput;
 
 
 #[websocket_session(path = "/x", server = "public")]
@@ -1663,7 +1820,9 @@ impl Bad {
     fn rejects_a_forwarder_in_a_session_since_a_websocket_cannot_forward_a_request() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
@@ -1681,7 +1840,10 @@ impl Bad {
     #[test]
     fn extracts_a_route_parameter_value_type_during_the_handshake() {
         let source = generated(
-            r#"
+            r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::route_parameter_value;
+use margaret::framework::macros::websocket_session;
+
 #[route_parameter_value]
 struct RoomSlug(String);
 
@@ -1704,7 +1866,9 @@ impl Room {
     fn rejects_a_bound_route_parameter_without_a_binder() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/x/{item}", server = "public")]
 struct Bad;
 
@@ -1725,7 +1889,10 @@ impl Bad {
     fn propagates_a_route_parameter_binder_error_so_a_broken_binder_fails_codegen() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::provides_route_parameter;
+use margaret::framework::macros::websocket_session;
+
 #[provides_route_parameter]
 enum Bad {}
 
@@ -1746,7 +1913,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_that_is_not_a_singleton() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = Missing;\n    type Message = M;\n}}\n"
+            "use margaret::framework::macros::websocket_message;\n{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = Missing;\n    type Message = M;\n}}\n"
         );
 
         assert!(error(&source).to_string().contains("is not a #[singleton]"));
@@ -1755,7 +1922,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_missing_an_associated_type() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Message = M;\n}}\n"
+            "use margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\n{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Message = M;\n}}\n"
         );
 
         assert!(error(&source).to_string().contains("associated type"));
@@ -1764,7 +1931,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_whose_session_is_not_a_session() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\nstruct NotASession;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = NotASession;\n    type Message = M;\n}}\n"
+            "use margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\n{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\nstruct NotASession;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = NotASession;\n    type Message = M;\n}}\n"
         );
 
         assert!(
@@ -1777,7 +1944,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_whose_message_is_not_a_message() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\nstruct NotAMessage;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = NotAMessage;\n}}\n"
+            "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_session;\n{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\nstruct NotAMessage;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = NotAMessage;\n}}\n"
         );
 
         assert!(
@@ -1790,7 +1957,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_whose_message_is_a_response() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(response, method = \"r\")]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
+            "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\nuse margaret::framework::macros::websocket_session;\n{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(response, method = \"r\")]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
         );
 
         assert!(
@@ -1803,7 +1970,7 @@ impl Room {
     #[test]
     fn rejects_a_request_handler_bound_to_a_notification() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(notification, method = \"n\")]\nstruct N;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = N;\n}}\n"
+            "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\nuse margaret::framework::macros::websocket_session;\n{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(notification, method = \"n\")]\nstruct N;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = N;\n}}\n"
         );
 
         assert!(
@@ -1816,7 +1983,7 @@ impl Room {
     #[test]
     fn rejects_a_notification_handler_bound_to_a_request() {
         let source = format!(
-            "{NOTIFICATION_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"r\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketNotification for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
+            "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\nuse margaret::framework::macros::websocket_session;\n{NOTIFICATION_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"r\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketNotification for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
         );
 
         assert!(
@@ -1826,7 +1993,10 @@ impl Room {
         );
     }
 
-    const REUSABLE_MESSAGES: &str = r#"
+    const REUSABLE_MESSAGES: &str = r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/first", server = "public")]
 struct FirstSession;
 
@@ -1850,6 +2020,8 @@ struct SharedRequest;
 struct SharedNotification;
 
 mod first_request {
+    use margaret::framework::macros::singleton;
+
     #[singleton]
     pub struct Handler;
 
@@ -1860,6 +2032,8 @@ mod first_request {
 }
 
 mod second_request {
+    use margaret::framework::macros::singleton;
+
     #[singleton]
     pub struct Handler;
 
@@ -1870,6 +2044,8 @@ mod second_request {
 }
 
 mod first_notification {
+    use margaret::framework::macros::singleton;
+
     #[singleton]
     pub struct Handler;
 
@@ -1880,6 +2056,8 @@ mod first_notification {
 }
 
 mod second_notification {
+    use margaret::framework::macros::singleton;
+
     #[singleton]
     pub struct Handler;
 
@@ -1916,7 +2094,7 @@ mod second_notification {
     #[test]
     fn rejects_two_handlers_for_the_same_message() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\n#[singleton]\nstruct First;\n\nimpl RespondsToWebSocketMessage for First {{\n    type Session = S;\n    type Message = M;\n}}\n\n#[singleton]\nstruct Second;\n\nimpl RespondsToWebSocketMessage for Second {{\n    type Session = S;\n    type Message = M;\n}}\n"
+            "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\nuse margaret::framework::macros::websocket_session;\n{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n\n#[singleton]\nstruct First;\n\nimpl RespondsToWebSocketMessage for First {{\n    type Session = S;\n    type Message = M;\n}}\n\n#[singleton]\nstruct Second;\n\nimpl RespondsToWebSocketMessage for Second {{\n    type Session = S;\n    type Message = M;\n}}\n"
         );
 
         assert!(
@@ -1928,7 +2106,7 @@ mod second_notification {
 
     #[test]
     fn rejects_a_message_without_a_handler_so_no_declared_message_goes_unanswered() {
-        let source = "#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n";
+        let source = "use margaret::framework::macros::websocket_message;\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct M;\n";
 
         assert!(error(source).to_string().contains("has no handler"));
     }
@@ -1936,7 +2114,9 @@ mod second_notification {
     #[test]
     fn generates_a_module_declaration_for_each_session() {
         let source = generated(
-            r#"
+            r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/a", server = "public")]
 struct AlphaSession;
 
@@ -1962,16 +2142,20 @@ impl BetaSession {
     #[test]
     fn propagates_a_non_path_cardinality_instead_of_generating_the_message() {
         assert!(
-            error(r#"#[websocket_message(request, method = "m", response = 5)] struct Bad;"#)
-                .to_string()
-                .contains("failed to read")
+            error(
+                r#"use margaret::framework::macros::websocket_message;
+#[websocket_message(request, method = "m", response = 5)] struct Bad;"#
+            )
+            .to_string()
+            .contains("failed to read")
         );
     }
 
     #[test]
     fn propagates_a_non_string_request_method_instead_of_generating_the_message() {
         assert!(
-            error(r"#[websocket_message(request, method = 5, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
+            error(r"use margaret::framework::macros::websocket_message;
+#[websocket_message(request, method = 5, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
                 .to_string()
                 .contains("failed to read")
         );
@@ -1980,16 +2164,20 @@ impl BetaSession {
     #[test]
     fn rejects_a_notification_without_a_method_since_notifications_dispatch_by_it() {
         assert!(
-            error(r"#[websocket_message(notification)] struct Bad;")
-                .to_string()
-                .contains("missing the required 'method'")
+            error(
+                r"use margaret::framework::macros::websocket_message;
+#[websocket_message(notification)] struct Bad;"
+            )
+            .to_string()
+            .contains("missing the required 'method'")
         );
     }
 
     #[test]
     fn rejects_a_response_that_declares_a_cardinality() {
         assert!(
-            error(r"#[websocket_message(response, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
+            error(r"use margaret::framework::macros::websocket_message;
+#[websocket_message(response, response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)] struct Bad;")
                 .to_string()
                 .contains("declares a response cardinality but is not a request")
         );
@@ -1998,45 +2186,60 @@ impl BetaSession {
     #[test]
     fn propagates_a_non_string_response_method_instead_of_generating_the_message() {
         assert!(
-            error(r"#[websocket_message(response, method = 5)] struct Bad;")
-                .to_string()
-                .contains("failed to read")
+            error(
+                r"use margaret::framework::macros::websocket_message;
+#[websocket_message(response, method = 5)] struct Bad;"
+            )
+            .to_string()
+            .contains("failed to read")
         );
     }
 
     #[test]
     fn surfaces_unparseable_message_arguments_instead_of_generating_the_message() {
         assert!(
-            error(r"#[websocket_message(= 5)] struct Bad;")
-                .to_string()
-                .contains("failed to read")
+            error(
+                r"use margaret::framework::macros::websocket_message;
+#[websocket_message(= 5)] struct Bad;"
+            )
+            .to_string()
+            .contains("failed to read")
         );
     }
 
     #[test]
     fn surfaces_unparseable_session_arguments_instead_of_generating_the_session() {
         assert!(
-            error(r"#[websocket_session(= 5)] struct Bad;")
-                .to_string()
-                .contains("failed to read")
+            error(
+                r"use margaret::framework::macros::websocket_session;
+#[websocket_session(= 5)] struct Bad;"
+            )
+            .to_string()
+            .contains("failed to read")
         );
     }
 
     #[test]
     fn propagates_a_non_string_session_path_instead_of_generating_the_session() {
         assert!(
-            error(r#"#[websocket_session(path = 5, server = "public")] struct Bad;"#)
-                .to_string()
-                .contains("failed to read")
+            error(
+                r#"use margaret::framework::macros::websocket_session;
+#[websocket_session(path = 5, server = "public")] struct Bad;"#
+            )
+            .to_string()
+            .contains("failed to read")
         );
     }
 
     #[test]
     fn propagates_a_non_string_session_server_instead_of_generating_the_session() {
         assert!(
-            error(r#"#[websocket_session(path = "/x", server = 5)] struct Bad;"#)
-                .to_string()
-                .contains("failed to read")
+            error(
+                r#"use margaret::framework::macros::websocket_session;
+#[websocket_session(path = "/x", server = 5)] struct Bad;"#
+            )
+            .to_string()
+            .contains("failed to read")
         );
     }
 
@@ -2044,7 +2247,9 @@ impl BetaSession {
     fn propagates_malformed_route_parameter_arguments_instead_of_building_the_session() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/x/{id}", server = "public")]
 struct Bad;
 
@@ -2063,7 +2268,9 @@ impl Bad {
     fn propagates_a_non_string_route_parameter_from() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
+
 #[websocket_session(path = "/x/{id}", server = "public")]
 struct Bad;
 
@@ -2081,7 +2288,7 @@ impl Bad {
     #[test]
     fn rejects_a_handler_missing_the_message_associated_type() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n}}\n"
+            "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_session;\n{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n}}\n"
         );
 
         assert!(error(&source).to_string().contains("associated type"));
@@ -2095,7 +2302,7 @@ impl Bad {
     #[test]
     fn rejects_two_methods_that_collide_in_a_session() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct First;\n\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct Second;\n\n#[singleton]\nstruct HandlerOne;\n\nimpl RespondsToWebSocketMessage for HandlerOne {{\n    type Session = S;\n    type Message = First;\n}}\n\n#[singleton]\nstruct HandlerTwo;\n\nimpl RespondsToWebSocketMessage for HandlerTwo {{\n    type Session = S;\n    type Message = Second;\n}}\n"
+            "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\nuse margaret::framework::macros::websocket_session;\n{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct First;\n\n#[websocket_message(request, method = \"m\", response = margaret::framework::websocket::web_socket_response::WebSocketResponse::Single)]\nstruct Second;\n\n#[singleton]\nstruct HandlerOne;\n\nimpl RespondsToWebSocketMessage for HandlerOne {{\n    type Session = S;\n    type Message = First;\n}}\n\n#[singleton]\nstruct HandlerTwo;\n\nimpl RespondsToWebSocketMessage for HandlerTwo {{\n    type Session = S;\n    type Message = Second;\n}}\n"
         );
 
         assert!(error(&source).to_string().contains("more than once"));
@@ -2121,6 +2328,8 @@ impl Bad {
         let policies = transport_policies(
             r#"
 use spiffe::spiffe_id::SpiffeId;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
 
 #[websocket_session(path = "/peer", server = "mesh")]
 struct PeerSession;
@@ -2155,6 +2364,11 @@ impl Room {
             r#"
 use margaret::framework::http::next::Next;
 use spiffe::spiffe_id::SpiffeId;
+use margaret::framework::macros::process;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::websocket_session;
 
 #[websocket_session(path = "/peer", server = "mesh")]
 #[middleware(verified)]
@@ -2186,6 +2400,8 @@ impl Verifier {
         let policies = transport_policies(
             r#"
 use spiffe::spiffe_id::SpiffeId;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
 
 #[websocket_session(path = "/open", server = "mesh")]
 struct OpenSession;

@@ -229,18 +229,7 @@ impl ModuleWalker {
 
         let items = items
             .into_iter()
-            .map(|item| {
-                item.resolve(|module_path, path| {
-                    resolver.resolve_path(module_path, path).unwrap_or_else(|| {
-                        CanonicalPath::new(
-                            path.segments
-                                .iter()
-                                .map(|segment| segment.ident.to_string())
-                                .collect(),
-                        )
-                    })
-                })
-            })
+            .map(|item| item.resolve(|module_path, path| resolver.resolve_path(module_path, path)))
             .collect::<Result<Vec<IndexedItem>, AttributeError>>()?;
 
         Ok(WalkOutput { items, resolver })
@@ -258,26 +247,23 @@ impl ModuleWalker {
             kind,
             variants,
         } = recordable;
-        let mut segments = module_path.to_vec();
-        segments.push(identifier.to_string());
-
-        let canonical_path = CanonicalPath::new(segments);
-
-        if self.seen_paths.contains(&canonical_path) {
-            return Err(AttributeError::DuplicateCanonicalPath {
-                path: canonical_path.to_string(),
-            });
-        }
-
-        self.seen_paths.insert(canonical_path.clone());
-        self.items.push(ScannedItem::new(
+        let item = ScannedItem::new(
             kind,
             identifier.to_string(),
-            canonical_path,
+            module_path.to_vec(),
             attributes.to_vec(),
             fields,
             variants,
-        ));
+        );
+
+        if self.seen_paths.contains(item.canonical_path()) {
+            return Err(AttributeError::DuplicateCanonicalPath {
+                path: item.canonical_path().to_string(),
+            });
+        }
+
+        self.seen_paths.insert(item.canonical_path().clone());
+        self.items.push(item);
 
         Ok(())
     }
@@ -410,10 +396,17 @@ impl ModuleWalker {
                 check_use(item_use, file_path)?;
 
                 for import in flatten_use_tree(&item_use.tree, module_path) {
-                    self.imports
+                    let module_imports = self
+                        .imports
                         .entry(CanonicalPath::new(module_path.to_vec()))
-                        .or_default()
-                        .insert(import.name, import.path);
+                        .or_default();
+
+                    if !module_imports.insert(import.name.clone(), import.path) {
+                        return Err(AttributeError::DuplicateImport {
+                            module: module_path.join("::"),
+                            name: import.name,
+                        });
+                    }
                 }
 
                 None

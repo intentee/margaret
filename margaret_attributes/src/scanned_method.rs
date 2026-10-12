@@ -56,7 +56,7 @@ impl ScannedMethod {
     pub(crate) fn resolve(
         self,
         owner: &CanonicalPath,
-        resolve: impl Copy + Fn(&[String], &Path) -> CanonicalPath,
+        resolve: impl Copy + Fn(&[String], &Path) -> Option<CanonicalPath>,
     ) -> Result<IndexedMethod, AttributeError> {
         let resolve_path = |path: &Path| resolve(&self.module_path, path);
         let method = format!("{owner}::{}", self.identifier);

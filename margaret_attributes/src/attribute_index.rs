@@ -14,13 +14,6 @@ use crate::matched_attribute::MatchedAttribute;
 use crate::name_allocator::NameAllocator;
 use crate::path_resolver::PathResolver;
 
-fn module_of(item: &IndexedItem) -> &[String] {
-    item.canonical_path()
-        .segments()
-        .split_last()
-        .map_or(&[], |(_, module)| module)
-}
-
 fn allocate_identifiers(items: &[IndexedItem]) -> HashMap<CanonicalPath, Identifier> {
     let mut paths: Vec<&CanonicalPath> = items
         .iter()
@@ -103,12 +96,12 @@ impl AttributeIndex {
 
     #[must_use]
     pub fn resolve_item_path(&self, item: &IndexedItem, path: &Path) -> Option<CanonicalPath> {
-        self.resolve_module_path(module_of(item), path)
+        self.resolve_module_path(item.module_path(), path)
     }
 
     #[must_use]
     pub fn resolve_item_type(&self, item: &IndexedItem, declared: &Type) -> Option<CanonicalPath> {
-        self.resolve_module_type(module_of(item), declared)
+        self.resolve_module_type(item.module_path(), declared)
     }
 
     #[must_use]

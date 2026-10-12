@@ -1,9 +1,18 @@
 use std::sync::Arc;
 
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
+
 use crate::stores::Store;
 
 mod stores {
+    use margaret::framework::macros::constructor;
+    use margaret::framework::macros::singleton;
+
     mod store {
+    use margaret::framework::macros::constructor;
+    use margaret::framework::macros::singleton;
+
         #[singleton]
         pub struct Store;
     }

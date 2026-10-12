@@ -21,6 +21,7 @@ pub(crate) struct ScannedItem {
     identifier: String,
     kind: ItemKind,
     methods: Vec<ScannedMethod>,
+    module_path: Vec<String>,
     trait_impls: Vec<IndexedTraitImpl>,
     variants: Vec<IndexedVariant>,
 }
@@ -29,18 +30,25 @@ impl ScannedItem {
     pub(crate) fn new(
         kind: ItemKind,
         identifier: String,
-        canonical_path: CanonicalPath,
+        module_path: Vec<String>,
         attributes: Vec<Attribute>,
         fields: Vec<ScannedField>,
         variants: Vec<IndexedVariant>,
     ) -> Self {
         Self {
             attributes: ScannedAttribute::scan_all(attributes),
-            canonical_path,
+            canonical_path: CanonicalPath::new(
+                module_path
+                    .iter()
+                    .cloned()
+                    .chain([identifier.clone()])
+                    .collect(),
+            ),
             fields,
             identifier,
             kind,
             methods: Vec::new(),
+            module_path,
             trait_impls: Vec::new(),
             variants,
         }
@@ -60,15 +68,11 @@ impl ScannedItem {
 
     pub(crate) fn resolve(
         mut self,
-        resolve: impl Copy + Fn(&[String], &Path) -> CanonicalPath,
+        resolve: impl Copy + Fn(&[String], &Path) -> Option<CanonicalPath>,
     ) -> Result<IndexedItem, AttributeError> {
         self.methods
             .sort_by(|left, right| left.identifier().cmp(right.identifier()));
-        let module_path = self
-            .canonical_path
-            .segments()
-            .split_last()
-            .map_or(&[][..], |(_, module)| module);
+        let module_path = &self.module_path;
         let resolve_item_path = |path: &Path| resolve(module_path, path);
         let owner = &self.canonical_path;
         let attributes = ScannedAttribute::resolve_all(
@@ -98,6 +102,7 @@ impl ScannedItem {
             is_copy,
             kind: self.kind,
             methods,
+            module_path: self.module_path,
             trait_impls: self.trait_impls,
             variants: self.variants,
         }))

@@ -83,7 +83,10 @@ mod tests {
     }
 
     fn bindings() -> ContainerBindings {
-        let index = IndexedSource::new("#[singleton]\nstruct Config;\n").index;
+        let index = IndexedSource::new(
+            "use margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n",
+        )
+        .index;
 
         render_container(
             &index,

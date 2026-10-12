@@ -1,3 +1,5 @@
+use margaret_macros::process;
+
 struct Twice;
 
 impl Twice {

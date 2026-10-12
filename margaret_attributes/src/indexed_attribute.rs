@@ -21,13 +21,13 @@ pub struct IndexedAttribute {
 }
 
 impl IndexedAttribute {
-    pub(crate) fn from_canonical(attribute: &Attribute, canonical_path: &CanonicalPath) -> Self {
+    pub(crate) fn from_resolution(attribute: &Attribute, resolved: Option<&CanonicalPath>) -> Self {
         let args = match AttributeArgs::from_attribute(attribute) {
             Ok(args) => IndexedAttributeArgs::Parsed(args),
             Err(rejected) => IndexedAttributeArgs::Rejected(rejected),
         };
 
-        let framework_attribute = FrameworkAttribute::recognize(attribute.path(), canonical_path);
+        let framework_attribute = FrameworkAttribute::recognize(attribute.path(), resolved);
 
         Self {
             args,
@@ -38,16 +38,26 @@ impl IndexedAttribute {
 
     #[must_use]
     pub fn new(attribute: &Attribute) -> Self {
-        let canonical_path = CanonicalPath::new(
-            attribute
-                .path()
-                .segments
-                .iter()
-                .map(|segment| segment.ident.to_string())
-                .collect(),
-        );
+        Self::from_resolution(attribute, None)
+    }
 
-        Self::from_canonical(attribute, &canonical_path)
+    #[cfg(test)]
+    pub(crate) fn resolving_to_margaret_macro(attribute: &Attribute) -> Self {
+        let name = attribute
+            .path()
+            .get_ident()
+            .expect("a margaret macro is named by one identifier")
+            .to_string();
+
+        Self::from_resolution(
+            attribute,
+            Some(&CanonicalPath::new(vec![
+                "margaret".to_string(),
+                "framework".to_string(),
+                "macros".to_string(),
+                name,
+            ])),
+        )
     }
 
     /// # Errors

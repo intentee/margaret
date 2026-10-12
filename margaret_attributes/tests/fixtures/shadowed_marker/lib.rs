@@ -1,3 +1,5 @@
+use margaret::framework::macros::model;
+
 pub fn index() {}
 
 #[model(table = "notes")]

@@ -73,7 +73,7 @@ mod tests {
             .join("\n")
     }
 
-    const VALID_VIEW: &str = "\
+    const VALID_VIEW: &str = "use margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n\
 #[renders_view(name = \"the_card\")]
 #[singleton]
 struct CardLayout;
@@ -89,7 +89,7 @@ struct CardLayout;
         assert!(source.contains("the_card: container.card_layout()"));
     }
 
-    const CONSOLE_ARGUMENT_VIEW: &str = "\
+    const CONSOLE_ARGUMENT_VIEW: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n\
 #[renders_view(name = \"banner\")]
 #[singleton]
 struct Banner;
@@ -118,7 +118,7 @@ impl Banner {
     #[test]
     fn rejects_a_view_that_is_not_a_struct() {
         assert!(
-            rejection("#[renders_view(name = \"bad\")]\n#[singleton]\nenum Bad {}\n")
+            rejection("use margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n#[renders_view(name = \"bad\")]\n#[singleton]\nenum Bad {}\n")
                 .contains("is not a struct")
         );
     }
@@ -126,7 +126,7 @@ impl Banner {
     #[test]
     fn accepts_a_view_without_a_singleton_since_the_container_still_provides_it() {
         let source =
-            formatted(generated("#[renders_view(name = \"plain\")]\nstruct Plain;\n").modules);
+            formatted(generated("use margaret::framework::macros::renders_view;\n#[renders_view(name = \"plain\")]\nstruct Plain;\n").modules);
 
         assert!(source.contains("pub plain: ::std::sync::Arc<crate::Plain>"));
         assert!(source.contains("plain: container.plain()"));
@@ -136,7 +136,7 @@ impl Banner {
     fn rejects_a_struct_declaring_more_than_one_view() {
         assert_eq!(
             IndexedSource::try_new(
-                "#[renders_view(name = \"one\")]\n#[renders_view(name = \"two\")]\n#[singleton]\nstruct Bad;\n"
+                "use margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n#[renders_view(name = \"one\")]\n#[renders_view(name = \"two\")]\n#[singleton]\nstruct Bad;\n"
             )
             .err()
             .expect("the repeated view is rejected while indexing")
@@ -148,7 +148,7 @@ impl Banner {
     #[test]
     fn rejects_a_view_without_a_name_since_the_views_field_needs_one() {
         assert!(
-            rejection("#[renders_view]\n#[singleton]\nstruct Bad;\n")
+            rejection("use margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n#[renders_view]\n#[singleton]\nstruct Bad;\n")
                 .contains("is missing the 'name' argument")
         );
     }
@@ -156,7 +156,7 @@ impl Banner {
     #[test]
     fn rejects_a_view_name_that_is_not_snake_case() {
         assert!(
-            rejection("#[renders_view(name = \"CardLayout\")]\n#[singleton]\nstruct Bad;\n")
+            rejection("use margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n#[renders_view(name = \"CardLayout\")]\n#[singleton]\nstruct Bad;\n")
                 .contains("must be a snake_case identifier")
         );
     }
@@ -165,7 +165,7 @@ impl Banner {
     fn rejects_two_views_with_the_same_name() {
         assert!(
             rejection(
-                "#[renders_view(name = \"card\")]\n#[singleton]\nstruct First;\n\n#[renders_view(name = \"card\")]\n#[singleton]\nstruct Second;\n"
+                "use margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n#[renders_view(name = \"card\")]\n#[singleton]\nstruct First;\n\n#[renders_view(name = \"card\")]\n#[singleton]\nstruct Second;\n"
             )
             .contains("each view name may identify at most one view")
         );
@@ -174,14 +174,16 @@ impl Banner {
     #[test]
     fn surfaces_unparseable_view_arguments_instead_of_generating_the_view() {
         assert!(
-            rejection("#[renders_view(= 5)]\n#[singleton]\nstruct Bad;\n")
+            rejection("use margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n#[renders_view(= 5)]\n#[singleton]\nstruct Bad;\n")
                 .contains("failed to index the crate")
         );
     }
 
     #[test]
     fn propagates_a_non_string_view_name_so_the_error_names_the_bad_argument() {
-        let error = rejection_for("#[renders_view(name = 5)]\n#[singleton]\nstruct Bad;\n");
+        let error = rejection_for(
+            "use margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n#[renders_view(name = 5)]\n#[singleton]\nstruct Bad;\n",
+        );
 
         assert!(matches!(
             error,
@@ -209,7 +211,7 @@ impl Banner {
     fn supports_same_struct_name_views_in_different_modules() {
         let source = formatted(
             generated(
-                "mod a {\n#[renders_view(name = \"a_card\")]\n#[singleton]\nstruct Card;\n}\n\nmod b {\n#[renders_view(name = \"b_card\")]\n#[singleton]\nstruct Card;\n}\n",
+                "mod a {\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n\n#[renders_view(name = \"a_card\")]\n#[singleton]\nstruct Card;\n}\n\nmod b {\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\n\n#[renders_view(name = \"b_card\")]\n#[singleton]\nstruct Card;\n}\n",
             )
             .modules,
         );

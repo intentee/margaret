@@ -195,9 +195,9 @@ mod tests {
     use crate::declared_trusts::DeclaredTrusts;
     use crate::own_trust::OwnTrust;
 
-    const SHARED_ISSUER: &str = "#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n";
+    const SHARED_ISSUER: &str = "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n";
 
-    const JWKS_ENDPOINT: &str = "#[verifies_tokens_from_issuer(ci, audience = \"deploy\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://ci.example/jwks\"))]\npub struct Ci;\n";
+    const JWKS_ENDPOINT: &str = "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(ci, audience = \"deploy\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://ci.example/jwks\"))]\npub struct Ci;\n";
 
     fn module_source(lib_source: &str, name: &str) -> String {
         rendered_source(lib_source, &[], name)
@@ -277,7 +277,7 @@ mod tests {
     fn names_the_module_of_a_raw_identifier_tag_without_its_prefix() {
         assert_eq!(
             module_source(
-                "#[verifies_tokens_from_issuer(r#async, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Async;\n",
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(r#async, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Async;\n",
                 "trusted_issuers"
             ),
             "pub mod r#async;\n"

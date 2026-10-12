@@ -754,7 +754,7 @@ mod tests {
     use crate::codegen_error::CodegenError;
     use crate::generated_code::GeneratedCode;
 
-    const WEB_CRATE: &str = "\
+    const WEB_CRATE: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -768,7 +768,7 @@ impl Page {
 }
 ";
 
-    const PLAIN_CRATE: &str = "\
+    const PLAIN_CRATE: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -785,7 +785,7 @@ impl Config {
 }
 ";
 
-    const COMMAND_ITEMS: &str = "
+    const COMMAND_ITEMS: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n
 #[singleton]
 #[console_command(name = \"greet\")]
 struct Greet;
@@ -796,7 +796,7 @@ impl Greet {
 }
 ";
 
-    const DATABASE_CRATE: &str = "\
+    const DATABASE_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -818,7 +818,7 @@ impl ListArticles {
 struct ApplicationDatabase;
 ";
 
-    const MODELS_CRATE: &str = "\
+    const MODELS_CRATE: &str = "use margaret::framework::macros::model;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -829,7 +829,7 @@ struct Widget {
 }
 ";
 
-    const WEBSOCKET_CRATE: &str = "\
+    const WEBSOCKET_CRATE: &str = "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\nuse margaret::framework::macros::websocket_session;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -863,7 +863,7 @@ impl RespondsToWebSocketMessage for Chatter {
 }
 ";
 
-    const INVALID_WEBSOCKET_CRATE: &str = "\
+    const INVALID_WEBSOCKET_CRATE: &str = "use margaret::framework::macros::websocket_session;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -873,7 +873,7 @@ struct Room;
 
     fn bearer_route(tag: &str) -> String {
         format!(
-            "mod {tag}_caller {{\n    use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n    use margaret::framework::jwt_verification::id_token_profile::IdTokenProfile;\n    use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\n\n    pub struct Claims;\n\n    pub struct Caller;\n\n    #[singleton]\n    #[infers_authenticated_user(user_model = Caller)]\n    pub struct CallerProvider;\n\n    impl CallerProvider {{\n        #[infer_from_request]\n        fn infer(&self, #[bearer_token(issuer = {tag})] token: Option<VerifiedJwt<Claims, IdTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<Caller>> {{}}\n    }}\n\n    #[singleton]\n    #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/{tag}\", server = \"public\")]\n    pub struct CallerPage;\n\n    impl CallerPage {{\n        #[process]\n        fn respond(&self, #[authenticated_user] caller: Caller) -> anyhow::Result<Response> {{}}\n    }}\n}}\n"
+            "mod {tag}_caller {{\n    use margaret::framework::macros::infer_from_request;\n    use margaret::framework::macros::infers_authenticated_user;\n    use margaret::framework::macros::process;\n    use margaret::framework::macros::responds_to_http;\n    use margaret::framework::macros::singleton;\n    use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n    use margaret::framework::jwt_verification::id_token_profile::IdTokenProfile;\n    use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\n\n    pub struct Claims;\n\n    pub struct Caller;\n\n    #[singleton]\n    #[infers_authenticated_user(user_model = Caller)]\n    pub struct CallerProvider;\n\n    impl CallerProvider {{\n        #[infer_from_request]\n        fn infer(&self, #[bearer_token(issuer = {tag})] token: Option<VerifiedJwt<Claims, IdTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<Caller>> {{}}\n    }}\n\n    #[singleton]\n    #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/{tag}\", server = \"public\")]\n    pub struct CallerPage;\n\n    impl CallerPage {{\n        #[process]\n        fn respond(&self, #[authenticated_user] caller: Caller) -> anyhow::Result<Response> {{}}\n    }}\n}}\n"
         )
     }
 
@@ -965,7 +965,7 @@ struct Room;
         assert!(!has_module(&code, "asset_bag"));
     }
 
-    const ASSET_MACRO_CRATE: &str = "\
+    const ASSET_MACRO_CRATE: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1004,7 +1004,7 @@ impl Config {
         assert!(!has_module(&code, "asset_bag/asset_responder"));
     }
 
-    const ASSET_RESPONDER_CRATE: &str = "\
+    const ASSET_RESPONDER_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1143,7 +1143,7 @@ impl AssetRoute {
         assert!(message.contains("failed to generate the asset bag"));
     }
 
-    const JWKS_ROLLER_CRATE: &str = "\
+    const JWKS_ROLLER_CRATE: &str = "use margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1155,7 +1155,7 @@ struct GetJwks;
 struct ApplicationDatabase;
 ";
 
-    const JWKS_MULTI_CLIENT_CRATE: &str = "\
+    const JWKS_MULTI_CLIENT_CRATE: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1180,7 +1180,7 @@ impl GetVerify {
 }
 ";
 
-    const JWKS_SERVER_STORE_CRATE: &str = "\
+    const JWKS_SERVER_STORE_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1210,6 +1210,11 @@ struct ApplicationDatabase;
 use reqwest::Client;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
+
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::service;
+use margaret::framework::macros::singleton;
 
 #[singleton]
 struct OutboundCaller {
@@ -1281,6 +1286,11 @@ impl Worker {
 use reqwest::Client;
 use std::sync::Arc;
 
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 struct OutboundCaller {
     client: Client,
@@ -1335,6 +1345,11 @@ impl CallRoute {
 use reqwest::Client;
 use spiffe::spiffe_id::SpiffeId;
 use std::sync::Arc;
+
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
 
 #[singleton]
 struct OutboundCaller {
@@ -1397,7 +1412,7 @@ impl GetIdentity {
     #[test]
     fn rejects_a_spiffe_http_client_marker_with_arguments() {
         let error = generate(
-            "use reqwest::Client;\n\n#[singleton]\nstruct Bad {\n    client: Client,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client(extra)] client: Client) -> anyhow::Result<Self> {}\n}\n",
+            "use reqwest::Client;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\nstruct Bad {\n    client: Client,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client(extra)] client: Client) -> anyhow::Result<Self> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -1408,7 +1423,7 @@ impl GetIdentity {
     #[test]
     fn rejects_a_parameter_that_is_both_a_spiffe_http_client_and_a_console_argument() {
         let error = generate(
-            "#[singleton]\nstruct Bad {\n    endpoint: String,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client] #[console_argument(from = \"endpoint\")] endpoint: String) -> anyhow::Result<Self> {}\n}\n",
+            "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Bad {\n    endpoint: String,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client] #[console_argument(from = \"endpoint\")] endpoint: String) -> anyhow::Result<Self> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -1419,7 +1434,7 @@ impl GetIdentity {
     #[test]
     fn rejects_a_console_command_that_injects_the_spiffe_http_client() {
         let error = generate(
-            "use reqwest::Client;\nuse std::sync::Arc;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use reqwest::Client;\nuse std::sync::Arc;\nuse margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -1430,7 +1445,7 @@ impl GetIdentity {
     #[test]
     fn allows_a_serve_input_named_after_the_spiffe_http_client() {
         let code = generate(
-            "use reqwest::Client;\nuse std::sync::Arc;\nuse tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct IdentityClient {\n    client: Client,\n}\n\nimpl IdentityClient {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct Labeled {\n    label: String,\n}\n\nimpl Labeled {\n    #[constructor]\n    fn create(#[console_argument(from = \"spiffe_http_client\")] label: String) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    client: Arc<IdentityClient>,\n    labeled: Arc<Labeled>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(client: Arc<IdentityClient>, labeled: Arc<Labeled>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
+            "use reqwest::Client;\nuse std::sync::Arc;\nuse tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::service;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\nstruct IdentityClient {\n    client: Client,\n}\n\nimpl IdentityClient {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct Labeled {\n    label: String,\n}\n\nimpl Labeled {\n    #[constructor]\n    fn create(#[console_argument(from = \"spiffe_http_client\")] label: String) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    client: Arc<IdentityClient>,\n    labeled: Arc<Labeled>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(client: Arc<IdentityClient>, labeled: Arc<Labeled>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
         )
         .expect("the framework binding and a console argument of the same name coexist");
 
@@ -1442,7 +1457,7 @@ impl GetIdentity {
     fn rejects_a_singleton_that_injects_the_jwks_roller_it_could_restart() {
         assert_eq!(
             generate(&format!(
-                "{JWKS_ROLLER_CRATE}#[singleton]\n#[console_command(name = \"roll\")]\nstruct Roll {{\n    roller: std::sync::Arc<crate::margaret::jwks::JwksRoller>,\n}}\n\nimpl Roll {{\n    #[constructor]\n    fn create(roller: std::sync::Arc<crate::margaret::jwks::JwksRoller>) -> anyhow::Result<Self> {{}}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {{}}\n}}\n"
+                "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n{JWKS_ROLLER_CRATE}#[singleton]\n#[console_command(name = \"roll\")]\nstruct Roll {{\n    roller: std::sync::Arc<crate::margaret::jwks::JwksRoller>,\n}}\n\nimpl Roll {{\n    #[constructor]\n    fn create(roller: std::sync::Arc<crate::margaret::jwks::JwksRoller>) -> anyhow::Result<Self> {{}}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {{}}\n}}\n"
             ))
             .expect_err("only the framework runs the jwks roller")
             .to_string(),
@@ -1454,7 +1469,7 @@ impl GetIdentity {
     fn rejects_a_singleton_that_injects_the_signing_keys_of_the_framework() {
         assert_eq!(
             generate(&format!(
-                "{JWKS_ROLLER_CRATE}#[singleton]\n#[console_command(name = \"sign\")]\nstruct Sign {{\n    secrets: std::sync::Arc<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder>,\n}}\n\nimpl Sign {{\n    #[constructor]\n    fn create(secrets: std::sync::Arc<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder>) -> anyhow::Result<Self> {{}}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {{}}\n}}\n"
+                "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n{JWKS_ROLLER_CRATE}#[singleton]\n#[console_command(name = \"sign\")]\nstruct Sign {{\n    secrets: std::sync::Arc<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder>,\n}}\n\nimpl Sign {{\n    #[constructor]\n    fn create(secrets: std::sync::Arc<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder>) -> anyhow::Result<Self> {{}}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {{}}\n}}\n"
             ))
             .expect_err("only the framework holds the signing keys")
             .to_string(),
@@ -1574,11 +1589,12 @@ impl GetIdentity {
         assert!(construction.contains("crate::margaret::token_issuance::TOKEN_ISSUANCE,"));
     }
 
-    const OIDC_ISSUERS_CRATE: &str = "\
+    const OIDC_ISSUERS_CRATE: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
 mod first {
+    use margaret::framework::macros::verifies_tokens_from_issuer;
 
     #[verifies_tokens_from_issuer(first, audience = \"api\", issuer = \"https://first.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]
     pub struct Issuer;
@@ -1586,6 +1602,7 @@ mod first {
 }
 
 mod second {
+    use margaret::framework::macros::verifies_tokens_from_issuer;
 
     #[verifies_tokens_from_issuer(second, audience = \"api\", issuer = \"https://second.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]
     pub struct Issuer;
@@ -1627,7 +1644,7 @@ impl Page {
         ));
     }
 
-    const OAUTH_CLIENT_CRATE: &str = "\
+    const OAUTH_CLIENT_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1685,7 +1702,7 @@ impl Page {
 }
 ";
 
-    const SIGN_IN_CRATE: &str = "\
+    const SIGN_IN_CRATE: &str = "use margaret::framework::macros::admits_sign_in;\nuse margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::oauth_scope;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_sign_in;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1735,7 +1752,7 @@ impl margaret::framework::oidc_sign_in::admits_sign_in::AdmitsSignIn for Partner
 struct ApplicationDatabase;
 ";
 
-    const OIDC_PROVIDER_CRATE: &str = "\
+    const OIDC_PROVIDER_CRATE: &str = "use margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::exchanges_tokens_from;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::oauth_scope;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::provides_userinfo_claims;\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2189,7 +2206,7 @@ struct ApplicationDatabase;
     #[test]
     fn rejects_an_oidc_provider_of_an_application_without_routes() {
         let error = generate(
-            "\
+            "use margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2214,7 +2231,7 @@ struct SpaClient;
     #[test]
     fn rejects_a_provider_route_of_an_application_that_admits_no_client() {
         let error = generate(
-            "\
+            "use margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2317,7 +2334,7 @@ struct GetDiscovery;
     #[test]
     fn reports_two_responders_of_one_route_as_an_http_failure_since_it_is_ambiguous() {
         assert_eq!(
-            generate("#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n")
+            generate("use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n")
                 .expect_err("two responders answer the same route")
                 .to_string(),
             "failed to generate the http server: responder 'crate::Second' registers 'Get /x' on server 'public', which is already registered by responder 'crate::First'"
@@ -2327,7 +2344,7 @@ struct GetDiscovery;
     #[test]
     fn reports_an_empty_resource_audience_as_an_issuance_failure_since_it_names_no_one() {
         assert_eq!(
-            generate("#[rustfmt::skip]\npub mod margaret;\n\n#[issues_tokens(provider, issuer = \"https://issuer.fixture\")]\nstruct Issuer;\n#[issues_resource_tokens(reports, audience = \"\")]\nstruct ReportsResource;\n")
+            generate("use margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\n#[rustfmt::skip]\npub mod margaret;\n\n#[issues_tokens(provider, issuer = \"https://issuer.fixture\")]\nstruct Issuer;\n#[issues_resource_tokens(reports, audience = \"\")]\nstruct ReportsResource;\n")
                 .expect_err("the resource audience is empty")
                 .to_string(),
             "failed to read the token issuance: #[issues_resource_tokens] on 'crate::ReportsResource' declares an empty audience"
@@ -2411,7 +2428,7 @@ struct GetDiscovery;
         ));
     }
 
-    const OWN_SIGN_IN: &str = "#[admits_oauth_client(blog_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Implicit, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::Rsa, redirect_routes = [GetBlogCallback], scopes = [margaret::framework::oauth_vocabulary::openid_scope::OpenidScope, ProfileScope]), client_id = \"blog\", resources = [reports])]\nstruct BlogApp;\n#[oauth_scope(name = \"profile\")]\nstruct ProfileScope;\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/blog/sign-in\", server = \"public\")]\n#[serves_sign_in(margaret::framework::oidc_sign_in::sign_in_endpoint::SignInEndpoint::Start, client = blog)]\nstruct GetBlogSignIn;\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/blog/callback\", server = \"public\")]\n#[serves_sign_in(margaret::framework::oidc_sign_in::sign_in_endpoint::SignInEndpoint::Callback(landing_route = Caller), client = blog)]\nstruct GetBlogCallback;\n#[singleton]\n#[admits_sign_in(client = blog)]\nstruct BlogReaders;\n\nimpl margaret::framework::oidc_sign_in::admits_sign_in::AdmitsSignIn for BlogReaders {}\n#[oauth_client(blog, admitted_as = blog_app)]\nstruct BlogClient;\n";
+    const OWN_SIGN_IN: &str = "use margaret::framework::macros::admits_sign_in;\nuse margaret::framework::macros::serves_sign_in;\n#[admits_oauth_client(blog_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Implicit, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::Rsa, redirect_routes = [GetBlogCallback], scopes = [margaret::framework::oauth_vocabulary::openid_scope::OpenidScope, ProfileScope]), client_id = \"blog\", resources = [reports])]\nstruct BlogApp;\n#[oauth_scope(name = \"profile\")]\nstruct ProfileScope;\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/blog/sign-in\", server = \"public\")]\n#[serves_sign_in(margaret::framework::oidc_sign_in::sign_in_endpoint::SignInEndpoint::Start, client = blog)]\nstruct GetBlogSignIn;\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/blog/callback\", server = \"public\")]\n#[serves_sign_in(margaret::framework::oidc_sign_in::sign_in_endpoint::SignInEndpoint::Callback(landing_route = Caller), client = blog)]\nstruct GetBlogCallback;\n#[singleton]\n#[admits_sign_in(client = blog)]\nstruct BlogReaders;\n\nimpl margaret::framework::oidc_sign_in::admits_sign_in::AdmitsSignIn for BlogReaders {}\n#[oauth_client(blog, admitted_as = blog_app)]\nstruct BlogClient;\n";
 
     #[test]
     fn signs_the_own_client_in_through_the_route_its_admitted_client_redirects_to() {
@@ -2457,7 +2474,7 @@ struct GetDiscovery;
     fn rejects_an_oauth_client_of_an_issuer_without_discovery() {
         assert!(matches!(
             generate(
-                "#[rustfmt::skip]\npub mod margaret;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://partner.example/jwks\"))]\nstruct Endpoint;\n\n#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n"
+                "use margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n#[rustfmt::skip]\npub mod margaret;\n\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://partner.example/jwks\"))]\nstruct Endpoint;\n\n#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n"
             ),
             Err(CodegenError::Tag {
                 source: TagError::OAuthClientIssuerNotDiscovered { ref issuer, .. }
@@ -2469,7 +2486,7 @@ struct GetDiscovery;
     fn rejects_a_subject_token_exchanger_of_an_undeclared_issuer() {
         assert!(matches!(
             generate(
-                "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[exchanges_tokens_from(issuer = ci)]\nstruct CiExchanger;\n"
+                "use margaret::framework::macros::exchanges_tokens_from;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[exchanges_tokens_from(issuer = ci)]\nstruct CiExchanger;\n"
             ),
             Err(CodegenError::Tag {
                 source: TagError::UnknownTag { ref tag, .. }
@@ -2477,7 +2494,7 @@ struct GetDiscovery;
         ));
     }
 
-    const OIDC_BEARER_CRATE: &str = "\
+    const OIDC_BEARER_CRATE: &str = "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2530,7 +2547,7 @@ impl RunnerPage {
     #[test]
     fn rejects_the_trusted_issuer_injected_by_path() {
         let error = generate(
-            "\
+            "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2556,7 +2573,7 @@ impl Consumer {
         assert!(error.contains("which only the framework may inject"));
     }
 
-    const OWN_BEARER_CRATE: &str = "\
+    const OWN_BEARER_CRATE: &str = "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2633,7 +2650,7 @@ impl HolderPage {
         );
     }
 
-    const JWKS_BEARER_CRATE: &str = "\
+    const JWKS_BEARER_CRATE: &str = "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2681,7 +2698,7 @@ impl HolderPage {
         ));
     }
 
-    const JWKS_NAME_COLLISION_CRATE: &str = "\
+    const JWKS_NAME_COLLISION_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2725,11 +2742,13 @@ struct ApplicationDatabase;
         ));
     }
 
-    const JWKS_FIELD_COLLISION_CRATE: &str = "\
+    const JWKS_FIELD_COLLISION_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
 pub mod margaret_jwks {
+    use margaret::framework::macros::singleton;
+
     #[singleton]
     pub struct JwksRoller;
 }
@@ -2795,7 +2814,7 @@ struct ApplicationDatabase;
         assert!(message.contains("references the tag 'missing', which no trusted issuer declares"));
     }
 
-    const JWKS_DUPLICATE_ENDPOINT_TAG_CRATE: &str = "\
+    const JWKS_DUPLICATE_ENDPOINT_TAG_CRATE: &str = "use margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2836,7 +2855,7 @@ struct SecondEndpoint;
     fn rejects_a_singleton_nothing_consumes_so_no_unused_service_is_constructed() {
         assert_eq!(
             generate(
-                "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create() -> anyhow::Result<Self> {}\n}\n"
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create() -> anyhow::Result<Self> {}\n}\n"
             )
             .expect_err("nothing consumes the singleton")
             .to_string(),
@@ -2866,7 +2885,7 @@ struct SecondEndpoint;
         );
     }
 
-    const MIDDLEWARE_CRATE: &str = "\
+    const MIDDLEWARE_CRATE: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::macros::middleware;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2907,7 +2926,7 @@ impl RequestLog {
         assert!(concatenated(&code).contains("super::super::middleware::RequestLog"));
     }
 
-    const AUTHENTICATED_USER_CRATE: &str = "\
+    const AUTHENTICATED_USER_CRATE: &str = "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2965,7 +2984,7 @@ impl GetProfile {
     fn rejects_an_authenticated_user_provider_no_served_request_uses() {
         assert_eq!(
             generate(
-                "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+                "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
             )
             .expect_err("no served request authenticates its user")
             .to_string(),
@@ -2976,7 +2995,7 @@ impl GetProfile {
     #[test]
     fn reports_a_user_provider_naming_no_user_model_since_nothing_says_what_it_infers() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[infers_authenticated_user]\nstruct Bad;\n",
+            "use margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[infers_authenticated_user]\nstruct Bad;\n",
         )
         .expect_err("the invalid provider is rejected")
         .to_string();
@@ -2992,7 +3011,7 @@ impl GetProfile {
         assert!(!has_module(&code, "middleware"));
     }
 
-    const WEBSOCKET_MIDDLEWARE_CRATE: &str = "\
+    const WEBSOCKET_MIDDLEWARE_CRATE: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::macros::middleware;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\nuse margaret::framework::macros::websocket_session;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3049,7 +3068,7 @@ impl RequestLog {
     #[test]
     fn reports_a_middleware_parameter_it_cannot_supply_since_no_value_could_be_bound() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\n#[rustfmt::skip]\npub mod margaret;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         )
         .expect_err("the invalid middleware handler is rejected")
         .to_string();
@@ -3110,14 +3129,14 @@ impl RequestLog {
     #[test]
     fn reports_a_singleton_enum_as_a_container_failure_since_only_structs_are_constructed() {
         let message =
-            generate("#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nenum Bad {}\n")
+            generate("use margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nenum Bad {}\n")
                 .expect_err("the build fails")
                 .to_string();
 
         assert!(message.contains("failed to generate the dependency container"));
     }
 
-    const RECEIVER_CONSTRUCTOR_CRATE: &str = "\
+    const RECEIVER_CONSTRUCTOR_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3142,7 +3161,7 @@ impl Config {
     #[test]
     fn reports_a_route_without_a_method_as_an_http_failure_since_no_request_could_match_it() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(path = \"/x\")]\nstruct Bad;\n\nimpl Bad {\n    #[constructor]\n    fn create() -> anyhow::Result<Self> {}\n}\n",
+            "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(path = \"/x\")]\nstruct Bad;\n\nimpl Bad {\n    #[constructor]\n    fn create() -> anyhow::Result<Self> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -3153,7 +3172,7 @@ impl Config {
     #[test]
     fn reports_a_nameless_console_command_as_a_console_failure_since_it_cannot_be_invoked() {
         let message =
-            generate("#[rustfmt::skip]\npub mod margaret;\n\n#[console_command]\nstruct Bad;\n")
+            generate("use margaret::framework::macros::console_command;\n#[rustfmt::skip]\npub mod margaret;\n\n#[console_command]\nstruct Bad;\n")
                 .expect_err("the build fails")
                 .to_string();
 
@@ -3162,14 +3181,14 @@ impl Config {
 
     #[test]
     fn reports_a_service_lacking_a_process_method_as_a_services_failure_since_nothing_runs() {
-        let message = generate("#[rustfmt::skip]\npub mod margaret;\n\n#[service]\nstruct Bad;\n")
+        let message = generate("use margaret::framework::macros::service;\n#[rustfmt::skip]\npub mod margaret;\n\n#[service]\nstruct Bad;\n")
             .expect_err("the build fails")
             .to_string();
 
         assert!(message.contains("failed to generate the services"));
     }
 
-    const POSITIONAL_OUTSIDE_COMMAND_CRATE: &str = "\
+    const POSITIONAL_OUTSIDE_COMMAND_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3191,7 +3210,7 @@ impl Bad {
         assert!(message.contains("failed to read the serve inputs"));
     }
 
-    const CONFLICTING_SERVE_INPUT_CRATE: &str = "\
+    const CONFLICTING_SERVE_INPUT_CRATE: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::service;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3226,7 +3245,7 @@ impl Page {
         assert!(message.contains("a shared serve input must be declared identically everywhere"));
     }
 
-    const VIEWS_CRATE: &str = "\
+    const VIEWS_CRATE: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3255,7 +3274,7 @@ impl GetCard {
         assert!(concatenated(&code).contains("super::views::build::build(container)"));
     }
 
-    const WEBSOCKET_ONLY_VIEW_CRATE: &str = "\
+    const WEBSOCKET_ONLY_VIEW_CRATE: &str = "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\nuse margaret::framework::macros::websocket_session;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3298,7 +3317,7 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn reports_a_non_snake_case_view_name_as_a_views_failure_since_it_names_a_views_accessor() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[renders_view(name = \"CardLayout\")]\nstruct Card;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[renders_view(name = \"CardLayout\")]\nstruct Card;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -3309,7 +3328,7 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn reports_mutually_dependent_singletons_as_a_cycle_since_neither_builds_first() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nuse std::sync::Arc;\n\n#[singleton]\nstruct A;\n\nimpl A {\n    #[constructor]\n    fn create(b: Arc<B>) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct B;\n\nimpl B {\n    #[constructor]\n    fn create(a: Arc<A>) -> anyhow::Result<Self> {}\n}\n",
+            "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\nuse std::sync::Arc;\n\n#[singleton]\nstruct A;\n\nimpl A {\n    #[constructor]\n    fn create(b: Arc<B>) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct B;\n\nimpl B {\n    #[constructor]\n    fn create(a: Arc<A>) -> anyhow::Result<Self> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -3320,7 +3339,7 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn awaits_an_async_constructor_in_the_container() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Page {\n    pool: std::sync::Arc<Pool>,\n}\n\nimpl Page {\n    #[constructor]\n    fn create(pool: std::sync::Arc<Pool>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct Page {\n    pool: std::sync::Arc<Pool>,\n}\n\nimpl Page {\n    #[constructor]\n    fn create(pool: std::sync::Arc<Pool>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect("the async build succeeds");
 
@@ -3332,7 +3351,7 @@ impl RespondsToWebSocketMessage for Chatter {
         assert!(serve.contains("super::http::server_public::server_public(container,"));
     }
 
-    const MULTI_SERVER_CRATE: &str = "\
+    const MULTI_SERVER_CRATE: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3379,7 +3398,7 @@ impl Metrics {
     #[test]
     fn rejects_a_server_named_by_a_path_since_servers_are_named_by_string_literals() {
         let error = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect_err("the build fails");
 
@@ -3396,7 +3415,7 @@ impl Metrics {
     #[test]
     fn supports_same_struct_name_route_handlers_in_different_modules() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n}\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n}\n\nmod endpoints {\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n}\n",
         )
         .expect("two `Page` handlers in different modules coexist");
 
@@ -3409,7 +3428,7 @@ impl Metrics {
         assert!(http.contains("crate::endpoints::Page"));
     }
 
-    const FRAMEWORK_NAMED_CRATE: &str = "\
+    const FRAMEWORK_NAMED_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3487,7 +3506,7 @@ impl New {
         assert!(has_module(&code, "models/widget/record"));
     }
 
-    const ROUTE_MODEL_CRATE: &str = "\
+    const ROUTE_MODEL_CRATE: &str = "use margaret::framework::macros::eager_load;\nuse margaret::framework::macros::model;\nuse margaret::framework::macros::postgres_database;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3518,7 +3537,7 @@ struct ApplicationDatabase;
 
     fn route_model_responder(parameter: &str) -> String {
         format!(
-            "{ROUTE_MODEL_CRATE}\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/items/{{item}}\", server = \"public\")]\nstruct GetItem;\n\nimpl GetItem {{\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"item\")] item: {parameter}) -> anyhow::Result<Response> {{}}\n}}\n"
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n{ROUTE_MODEL_CRATE}\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/items/{{item}}\", server = \"public\")]\nstruct GetItem;\n\nimpl GetItem {{\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"item\")] item: {parameter}) -> anyhow::Result<Response> {{}}\n}}\n"
         )
     }
 
@@ -3555,7 +3574,7 @@ struct ApplicationDatabase;
     #[test]
     fn generates_the_shapes_of_a_crate_that_declares_them() {
         let code = generate(&format!(
-            "{MODELS_CRATE}\n#[eager_load(model = Widget)]\nstruct LoadedWidget {{\n    #[base]\n    widget: Widget,\n}}\n"
+            "use margaret::framework::macros::eager_load;\n{MODELS_CRATE}\n#[eager_load(model = Widget)]\nstruct LoadedWidget {{\n    #[base]\n    widget: Widget,\n}}\n"
         ))
         .expect("the build succeeds");
 
@@ -3567,7 +3586,7 @@ struct ApplicationDatabase;
     #[test]
     fn reports_a_modelless_eager_load_shape_as_a_shapes_failure_since_it_has_nothing_to_load() {
         assert!(matches!(
-            generate(&format!("{MODELS_CRATE}\n#[eager_load]\nstruct LoadedWidget {{}}\n")),
+            generate(&format!("use margaret::framework::macros::eager_load;\n{MODELS_CRATE}\n#[eager_load]\nstruct LoadedWidget {{}}\n")),
             Err(CodegenError::Shapes {
                 source: ActiveRecordCodegenError::EagerLoadRequiresModel { shape }
             }) if shape == "crate::LoadedWidget"
@@ -3617,7 +3636,7 @@ struct ApplicationDatabase;
     fn rejects_a_postgres_database_nothing_uses_so_no_unused_pool_is_opened() {
         assert!(matches!(
             generate(
-                "#[rustfmt::skip]\npub mod margaret;\n\n#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]\nstruct ApplicationDatabase;\n",
+                "use margaret::framework::macros::postgres_database;\n#[rustfmt::skip]\npub mod margaret;\n\n#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]\nstruct ApplicationDatabase;\n",
             ),
             Err(CodegenError::Container {
                 source: ContainerError::UnconsumedDeclaration { path },
@@ -3629,7 +3648,7 @@ struct ApplicationDatabase;
     fn reports_a_postgres_database_without_url_from_as_a_database_failure_as_it_cannot_connect() {
         assert!(matches!(
             generate(
-                "#[rustfmt::skip]\npub mod margaret;\n\n#[postgres_database]\nstruct ApplicationDatabase;\n",
+                "use margaret::framework::macros::postgres_database;\n#[rustfmt::skip]\npub mod margaret;\n\n#[postgres_database]\nstruct ApplicationDatabase;\n",
             ),
             Err(CodegenError::Database {
                 source: DatabaseCodegenError::MissingUrlSource { anchor },
@@ -3640,7 +3659,7 @@ struct ApplicationDatabase;
     #[test]
     fn reports_token_issuance_lacking_an_issuer_since_every_token_must_name_its_iss() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[issues_tokens(provider)]\nstruct Issuer;\n",
+            "use margaret::framework::macros::issues_tokens;\n#[rustfmt::skip]\npub mod margaret;\n\n#[issues_tokens(provider)]\nstruct Issuer;\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -3651,7 +3670,7 @@ struct ApplicationDatabase;
     #[test]
     fn reports_a_trusted_issuer_without_an_audience_since_tokens_must_name_ours() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[verifies_tokens_from_issuer(partner, issuer = \"https://partner.fixture\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct Partner;\n",
+            "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[rustfmt::skip]\npub mod margaret;\n\n#[verifies_tokens_from_issuer(partner, issuer = \"https://partner.fixture\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct Partner;\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -3662,7 +3681,7 @@ struct ApplicationDatabase;
     #[test]
     fn reports_an_oauth_client_without_authentication_since_it_could_not_get_tokens() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[oauth_client(partner_client, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n",
+            "use margaret::framework::macros::oauth_client;\n#[rustfmt::skip]\npub mod margaret;\n\n#[oauth_client(partner_client, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -3674,7 +3693,7 @@ struct ApplicationDatabase;
     fn reports_a_nameless_oauth_scope_since_no_client_could_ever_request_it() {
         assert_eq!(
             generate(
-                "#[rustfmt::skip]\npub mod margaret;\n\n#[oauth_scope]\nstruct ProfileScope;\n"
+                "use margaret::framework::macros::oauth_scope;\n#[rustfmt::skip]\npub mod margaret;\n\n#[oauth_scope]\nstruct ProfileScope;\n"
             )
             .expect_err("the build fails")
             .to_string(),
@@ -3685,7 +3704,7 @@ struct ApplicationDatabase;
     #[test]
     fn reports_an_unrouted_oidc_endpoint_as_a_provider_failure_naming_the_fix() {
         assert_eq!(
-            generate("#[rustfmt::skip]\npub mod margaret;\n\n#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::Jwks)]\nstruct GetJwks;\n")
+            generate("use margaret::framework::macros::serves_oidc_endpoint;\n#[rustfmt::skip]\npub mod margaret;\n\n#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::Jwks)]\nstruct GetJwks;\n")
                 .expect_err("the build fails")
                 .to_string(),
             "failed to derive the openid connect provider endpoints: #[serves_oidc_endpoint] on 'crate::GetJwks' serves an endpoint, but 'crate::GetJwks' responds to no HTTP request; route it with #[responds_to_http]"
@@ -3695,7 +3714,7 @@ struct ApplicationDatabase;
     #[test]
     fn reports_two_userinfo_claims_providers_since_the_endpoint_answers_with_one() {
         assert_eq!(
-            generate("#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[provides_userinfo_claims]\nstruct First;\n\n#[singleton]\n#[provides_userinfo_claims]\nstruct Second;\n")
+            generate("use margaret::framework::macros::provides_userinfo_claims;\nuse margaret::framework::macros::singleton;\n#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[provides_userinfo_claims]\nstruct First;\n\n#[singleton]\n#[provides_userinfo_claims]\nstruct Second;\n")
                 .expect_err("the build fails")
                 .to_string(),
             "failed to derive the openid connect provider endpoints: #[provides_userinfo_claims] is declared by both 'crate::First' and 'crate::Second'; the userinfo endpoint answers with the claims of one provider"
@@ -3705,7 +3724,7 @@ struct ApplicationDatabase;
     #[test]
     fn reports_a_u64_column_as_a_models_failure_since_no_sql_type_maps_it() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[model(table = \"widgets\")]\nstruct Widget {\n    #[column]\n    id: u64,\n}\n",
+            "use margaret::framework::macros::model;\n#[rustfmt::skip]\npub mod margaret;\n\n#[model(table = \"widgets\")]\nstruct Widget {\n    #[column]\n    id: u64,\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -3713,7 +3732,7 @@ struct ApplicationDatabase;
         assert!(message.contains("failed to generate the models"));
     }
 
-    const CONSOLE_ARGUMENT_RESPONDER_CRATE: &str = "\
+    const CONSOLE_ARGUMENT_RESPONDER_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3746,7 +3765,7 @@ impl Page {
         assert!(run.contains(r#"clap::Arg::new("greeting")"#));
     }
 
-    const CONSOLE_ARGUMENT_VIEW_CRATE: &str = "\
+    const CONSOLE_ARGUMENT_VIEW_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3781,7 +3800,7 @@ impl Page {
         assert!(serve.contains("super::views::build::build(container)"));
     }
 
-    const CONSOLE_ARGUMENT_WEBSOCKET_CRATE: &str = "\
+    const CONSOLE_ARGUMENT_WEBSOCKET_CRATE: &str = "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\nuse margaret::framework::macros::websocket_session;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3825,7 +3844,7 @@ impl RespondsToWebSocketMessage for Chatter {
         assert!(!serve.contains("server_public(container,&serve_input_0"));
     }
 
-    const CONSOLE_ARGUMENT_SESSION_DEPENDENCY_CRATE: &str = "\
+    const CONSOLE_ARGUMENT_SESSION_DEPENDENCY_CRATE: &str = "use margaret::framework::macros::build_for_session;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::websocket_message;\nuse margaret::framework::macros::websocket_session;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3878,7 +3897,7 @@ impl RespondsToWebSocketMessage for Chatter {
         assert!(!serve.contains("server_public(container,&serve_input_0"));
     }
 
-    const ISSUED_SESSIONS_CRATE: &str = "\
+    const ISSUED_SESSIONS_CRATE: &str = "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_session_endpoint;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -3974,7 +3993,7 @@ struct PostSignOut;
     #[test]
     fn consumes_sessions_through_the_trusted_issuer_and_the_spiffe_issuer_request_client() {
         let source = collapsed(&concatenated(
-            &generate("\
+            &generate("use margaret::framework::macros::consumes_sessions;\nuse margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -4021,7 +4040,7 @@ impl GetWelcome {
     #[test]
     fn reports_sessions_without_an_issuer_tag_as_a_sessions_failure_since_they_belong_to_one() {
         assert_eq!(
-            generate("#[rustfmt::skip]\npub mod margaret;\n\n#[issues_sessions(audience = \"browser\")]\nstruct BrowserSessions;\n")
+            generate("use margaret::framework::macros::issues_sessions;\n#[rustfmt::skip]\npub mod margaret;\n\n#[issues_sessions(audience = \"browser\")]\nstruct BrowserSessions;\n")
                 .expect_err("the build fails")
                 .to_string(),
             "failed to read the sessions: 'crate::BrowserSessions' declares sessions without the `issuer` tag they belong to"
@@ -4031,7 +4050,7 @@ impl GetWelcome {
     #[test]
     fn reports_an_unrouted_session_endpoint_as_a_session_failure_naming_the_fix() {
         assert_eq!(
-            generate("#[rustfmt::skip]\npub mod margaret;\n\n#[serves_session_endpoint(margaret::framework::sessions::session_endpoint::SessionEndpoint::Refresh)]\nstruct PostSessionRefresh;\n")
+            generate("use margaret::framework::macros::serves_session_endpoint;\n#[rustfmt::skip]\npub mod margaret;\n\n#[serves_session_endpoint(margaret::framework::sessions::session_endpoint::SessionEndpoint::Refresh)]\nstruct PostSessionRefresh;\n")
                 .expect_err("the build fails")
                 .to_string(),
             "failed to read the session endpoints: #[serves_session_endpoint] on 'crate::PostSessionRefresh' serves an endpoint, but 'crate::PostSessionRefresh' responds to no HTTP request; route it with #[responds_to_http]"

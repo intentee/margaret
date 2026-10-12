@@ -187,7 +187,7 @@ mod tests {
     use crate::route_parameter_binder::RouteParameterBinder;
     use crate::route_parameter_resolution::RouteParameterResolution;
 
-    const BINDER: &str = "struct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n";
+    const BINDER: &str = "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n";
 
     #[derive(Debug, Eq, PartialEq)]
     enum ResolvedBy {
@@ -299,7 +299,7 @@ mod tests {
     fn resolves_a_value_struct_as_a_value() {
         assert_eq!(
             resolved_by(
-                "#[route_parameter_value]\nstruct ArticleSlug(String);\n",
+                "use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\nstruct ArticleSlug(String);\n",
                 &["crate", "ArticleSlug"]
             ),
             ResolvedBy::Value
@@ -310,7 +310,7 @@ mod tests {
     fn resolves_a_value_enum_as_a_value() {
         assert_eq!(
             resolved_by(
-                "#[route_parameter_value]\nenum ArticleStatus {\n    Draft,\n    Published,\n}\n",
+                "use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\nenum ArticleStatus {\n    Draft,\n    Published,\n}\n",
                 &["crate", "ArticleStatus"]
             ),
             ResolvedBy::Value
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn rejects_a_value_declaration_on_something_that_is_neither_a_struct_nor_an_enum() {
         assert!(
-            rejection_for("#[route_parameter_value]\ntrait ArticleSlug {}\n")
+            rejection_for("use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\ntrait ArticleSlug {}\n")
                 .contains("is only supported on structs and enums")
         );
     }
@@ -337,7 +337,7 @@ mod tests {
     fn rejects_a_binder_whose_model_is_already_declared_as_a_value() {
         assert!(
             rejection_for(
-                "#[route_parameter_value]\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
+                "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::route_parameter_value;\nuse margaret::framework::macros::singleton;\n#[route_parameter_value]\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
             )
             .contains("is both a #[route_parameter_value] and the model")
         );
@@ -347,7 +347,7 @@ mod tests {
     fn rejects_a_value_declaration_for_a_type_that_a_binder_already_provides() {
         assert!(
             rejection_for(
-                "#[route_parameter_value]\nstruct Zebra;\n\n#[singleton]\n#[provides_route_parameter]\nstruct AardvarkStore;\n\nimpl HttpRouteParameterBinder for AardvarkStore {\n    type Model = Zebra;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Zebra>> {}\n}\n"
+                "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::route_parameter_value;\nuse margaret::framework::macros::singleton;\n#[route_parameter_value]\nstruct Zebra;\n\n#[singleton]\n#[provides_route_parameter]\nstruct AardvarkStore;\n\nimpl HttpRouteParameterBinder for AardvarkStore {\n    type Model = Zebra;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Zebra>> {}\n}\n"
             )
             .contains("is both a #[route_parameter_value] and the model")
         );
@@ -357,7 +357,7 @@ mod tests {
     fn rejects_two_binders_for_the_same_model() {
         assert!(
             rejection_for(
-                "struct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct First;\n\nimpl HttpRouteParameterBinder for First {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct Second;\n\nimpl HttpRouteParameterBinder for Second {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
+                "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct First;\n\nimpl HttpRouteParameterBinder for First {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct Second;\n\nimpl HttpRouteParameterBinder for Second {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
             )
             .contains("has more than one route parameter binder")
         );
@@ -367,7 +367,7 @@ mod tests {
     fn rejects_a_binder_that_is_not_a_struct() {
         assert!(
             rejection_for(
-                "struct Article;\n\n#[provides_route_parameter]\nenum ArticleStore {}\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
+                "use margaret::framework::macros::provides_route_parameter;\nstruct Article;\n\n#[provides_route_parameter]\nenum ArticleStore {}\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
             )
             .contains("is only supported on structs")
         );
@@ -377,7 +377,7 @@ mod tests {
     fn rejects_a_binder_that_is_not_a_singleton() {
         assert!(
             rejection_for(
-                "struct Article;\n\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
+                "use margaret::framework::macros::provides_route_parameter;\nstruct Article;\n\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
             )
             .contains("must also be declared as a #[singleton]")
         );
@@ -386,7 +386,7 @@ mod tests {
     #[test]
     fn rejects_a_binder_without_a_model_that_resolves_to_a_struct() {
         assert!(
-            rejection_for("#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n")
+            rejection_for("use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n")
                 .contains("has no `type Model = <struct>` associated type")
         );
     }
@@ -428,7 +428,7 @@ mod tests {
     fn rejects_a_value_declaration_for_a_model_bound_by_its_primary_key() {
         assert!(matches!(
             model_resolutions_for(
-                "#[route_parameter_value]\nstruct Article;\n",
+                "use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\nstruct Article;\n",
                 RouteModelKey::Single,
                 &database()
             ),

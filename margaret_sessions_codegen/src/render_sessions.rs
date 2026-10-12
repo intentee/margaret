@@ -98,7 +98,7 @@ mod tests {
     fn renders_the_issued_sessions_with_their_audience_and_served_endpoints() {
         assert_eq!(
             rendered(
-                "#[issues_sessions(issuer = provider, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n",
+                "use margaret::framework::macros::issues_sessions;\n#[issues_sessions(issuer = provider, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n",
                 &[
                     SessionsItem::SessionRefreshEndpoint,
                     SessionsItem::SessionSignOutEndpoint
@@ -119,7 +119,7 @@ mod tests {
     fn renders_consumed_sessions_as_a_lone_reexport_without_an_audience_of_their_own() {
         assert_eq!(
             rendered(
-                "#[consumes_sessions(issuer = partner, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]\nstruct PartnerSessions;\n",
+                "use margaret::framework::macros::consumes_sessions;\n#[consumes_sessions(issuer = partner, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]\nstruct PartnerSessions;\n",
                 &[],
             ),
             ["sessions:pubusemargaret::framework::sessions::consumed_sessions::ConsumedSessions;"]

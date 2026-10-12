@@ -1,5 +1,10 @@
 use std::sync::Arc;
 
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::scheduled_with_tick_timer;
+use margaret::framework::macros::service;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 struct Config;
 

@@ -1,3 +1,7 @@
+use margaret::framework::macros::console_command;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 struct EnglishGreeter;
 

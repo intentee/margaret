@@ -50,7 +50,7 @@ mod tests {
     #[test]
     fn implements_the_declared_scope_of_each_scope_item() {
         assert_eq!(
-            rendered("#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n"),
+            rendered("use margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n"),
             vec![
                 "implmargaret::framework::oauth_vocabulary::declared_scope::DeclaredScopeforcrate::ProfileScope{constNAME:&'staticstr=\"profile\";}".to_string()
             ]

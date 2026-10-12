@@ -154,7 +154,7 @@ mod tests {
     use crate::oauth_vocabulary_codegen_error::OAuthVocabularyCodegenError;
     use crate::scope_resolution::ScopeResolution;
 
-    const PROFILE: &str = "#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n";
+    const PROFILE: &str = "use margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n";
 
     fn read(source: &str) -> Result<Vec<String>, OAuthVocabularyCodegenError> {
         DeclaredScopes::read(&IndexedSource::new(source).index).map(|declared| {
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn rejects_a_declaration_without_a_name_since_a_scope_is_requested_by_its_name() {
         assert!(matches!(
-            read("#[oauth_scope]\npub struct ProfileScope;\n"),
+            read("use margaret::framework::macros::oauth_scope;\n#[oauth_scope]\npub struct ProfileScope;\n"),
             Err(OAuthVocabularyCodegenError::MissingScopeName { anchor }) if anchor == "crate::ProfileScope"
         ));
     }
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn rejects_a_scope_name_that_is_not_a_string() {
         assert!(matches!(
-            read("#[oauth_scope(name = profile)]\npub struct ProfileScope;\n"),
+            read("use margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = profile)]\npub struct ProfileScope;\n"),
             Err(OAuthVocabularyCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnexpectedArgument { key, .. }
             )) if key == "name"
@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn rejects_arguments_that_do_not_parse_naming_the_attribute_so_it_can_be_located() {
         assert!(matches!(
-            read("#[oauth_scope(= 5)]\npub struct ProfileScope;\n"),
+            read("use margaret::framework::macros::oauth_scope;\n#[oauth_scope(= 5)]\npub struct ProfileScope;\n"),
             Err(OAuthVocabularyCodegenError::Index(AttributeError::Arguments(
                 AttributeArgumentsError::Malformed { attribute_path, .. }
             ))) if attribute_path == "oauth_scope"
@@ -219,7 +219,7 @@ mod tests {
     #[test]
     fn rejects_a_scope_declared_on_a_singleton() {
         assert!(matches!(
-            read("#[singleton]\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n"),
+            read("use margaret::framework::macros::oauth_scope;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n"),
             Err(OAuthVocabularyCodegenError::Anchor(DeclarationAnchorError::DeclaredAsSingleton { path, .. }))
                 if path == "crate::ProfileScope"
         ));
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn rejects_a_malformed_scope_name_since_a_space_would_split_it_into_two_scopes() {
         assert!(matches!(
-            read("#[oauth_scope(name = \"two words\")]\npub struct ProfileScope;\n"),
+            read("use margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = \"two words\")]\npub struct ProfileScope;\n"),
             Err(OAuthVocabularyCodegenError::MalformedScopeName { anchor, .. }) if anchor == "crate::ProfileScope"
         ));
     }
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn rejects_a_redeclared_openid_scope_since_the_framework_already_declares_it() {
         assert!(matches!(
-            read("#[oauth_scope(name = \"openid\")]\npub struct OpenidScope;\n"),
+            read("use margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = \"openid\")]\npub struct OpenidScope;\n"),
             Err(OAuthVocabularyCodegenError::RedeclaredOpenidScope { anchor }) if anchor == "crate::OpenidScope"
         ));
     }
@@ -253,7 +253,7 @@ mod tests {
     fn resolves_a_declared_scope_imported_through_a_use_statement() {
         assert!(matches!(
             resolved(
-                "mod auth {\n    #[oauth_scope(name = \"profile\")]\n    pub struct ProfileScope;\n}\nuse crate::auth::ProfileScope;\npub struct Client;\n",
+                "use margaret::framework::macros::oauth_scope;\nmod auth {\nuse margaret::framework::macros::oauth_scope;\n\n    #[oauth_scope(name = \"profile\")]\n    pub struct ProfileScope;\n}\nuse crate::auth::ProfileScope;\npub struct Client;\n",
                 &parse_quote!(ProfileScope),
             ),
             ScopeResolution::Declared(scope) if scope.as_str() == "profile"

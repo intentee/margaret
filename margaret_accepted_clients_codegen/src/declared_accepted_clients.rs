@@ -106,7 +106,7 @@ mod tests {
     use super::DeclaredAcceptedClients;
     use crate::accepted_clients_codegen_error::AcceptedClientsCodegenError;
 
-    const ISSUANCE: &str = "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n#[issues_resource_tokens(reports, audience = \"reports\")]\npub struct Reports;\n";
+    const ISSUANCE: &str = "use margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n#[issues_resource_tokens(reports, audience = \"reports\")]\npub struct Reports;\n";
 
     fn rejection(source: &str) -> AcceptedClientsCodegenError {
         let indexed = IndexedSource::new(source);
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn orders_the_clients_by_their_anchor_paths_so_generated_code_is_deterministic() {
         let indexed = IndexedSource::new(&format!(
-            "{ISSUANCE}#[admits_oauth_client(zeta_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"zeta\", resources = [artifacts])]\npub struct Alpha;\n#[admits_oauth_client(alpha_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"alpha\", resources = [artifacts])]\npub struct Zeta;\n"
+            "use margaret::framework::macros::admits_oauth_client;\n{ISSUANCE}#[admits_oauth_client(zeta_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"zeta\", resources = [artifacts])]\npub struct Alpha;\n#[admits_oauth_client(alpha_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"alpha\", resources = [artifacts])]\npub struct Zeta;\n"
         ));
         let issuance = DeclaredTokenIssuance::read(&indexed.index).expect("the issuance is read");
         let accepted = DeclaredAcceptedClients::read(
@@ -152,7 +152,7 @@ mod tests {
     fn rejects_a_client_accepted_without_a_token_issuance() {
         assert!(matches!(
             rejection(
-                "#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"spa\", resources = [artifacts])]\npub struct Spa;\n"
+                "use margaret::framework::macros::admits_oauth_client;\n#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"spa\", resources = [artifacts])]\npub struct Spa;\n"
             ),
             AcceptedClientsCodegenError::AcceptedWithoutTokenIssuance { anchor } if anchor == "crate::Spa"
         ));
@@ -162,7 +162,7 @@ mod tests {
     fn rejects_a_client_id_accepted_by_two_declarations_so_each_id_means_one_client() {
         assert!(matches!(
             rejection(&format!(
-                "{ISSUANCE}#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"spa\", resources = [artifacts])]\npub struct First;\n#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"spa\", resources = [reports])]\npub struct Second;\n"
+                "use margaret::framework::macros::admits_oauth_client;\n{ISSUANCE}#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"spa\", resources = [artifacts])]\npub struct First;\n#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"spa\", resources = [reports])]\npub struct Second;\n"
             )),
             AcceptedClientsCodegenError::DuplicateClientId { client_id, first, second }
                 if client_id == "spa" && first == "crate::First" && second == "crate::Second"
@@ -173,7 +173,7 @@ mod tests {
     fn rejects_clients_sharing_a_jwks_uri_so_neither_can_impersonate_the_other() {
         assert!(matches!(
             rejection(&format!(
-                "{ISSUANCE}#[admits_oauth_client(first_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Published(jwks_uri = \"https://keys.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)), client_id = \"first\", resources = [artifacts])]\npub struct First;\n#[admits_oauth_client(second_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Published(jwks_uri = \"https://KEYS.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)), client_id = \"second\", resources = [artifacts])]\npub struct Second;\n"
+                "use margaret::framework::macros::admits_oauth_client;\n{ISSUANCE}#[admits_oauth_client(first_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Published(jwks_uri = \"https://keys.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)), client_id = \"first\", resources = [artifacts])]\npub struct First;\n#[admits_oauth_client(second_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Published(jwks_uri = \"https://KEYS.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)), client_id = \"second\", resources = [artifacts])]\npub struct Second;\n"
             )),
             AcceptedClientsCodegenError::SharedClientJwksUri { jwks_uri, .. }
                 if jwks_uri == "https://keys.example/jwks.json"
@@ -184,7 +184,7 @@ mod tests {
     fn rejects_a_client_anchored_by_a_singleton() {
         assert!(matches!(
             rejection(&format!(
-                "{ISSUANCE}#[singleton]\n#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"spa\", resources = [artifacts])]\npub struct Spa;\n"
+                "use margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::singleton;\n{ISSUANCE}#[singleton]\n#[admits_oauth_client(spa_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"spa\", resources = [artifacts])]\npub struct Spa;\n"
             )),
             AcceptedClientsCodegenError::Anchor(DeclarationAnchorError::DeclaredAsSingleton { path, .. })
                 if path == "crate::Spa"

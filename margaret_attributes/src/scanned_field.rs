@@ -27,7 +27,7 @@ impl ScannedField {
     pub(crate) fn resolve(
         self,
         owner: &CanonicalPath,
-        resolve: impl Copy + Fn(&Path) -> CanonicalPath,
+        resolve: impl Copy + Fn(&Path) -> Option<CanonicalPath>,
     ) -> Result<IndexedField, AttributeError> {
         let attributes = ScannedAttribute::resolve_all(
             self.attributes,

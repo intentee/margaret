@@ -787,9 +787,9 @@ mod tests {
     use crate::tag_pool::TagPool;
     use crate::trusted_issuer_kind::TrustedIssuerKind;
 
-    const PARTNER_TRUST: &str = "#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct Issuer;\n";
+    const PARTNER_TRUST: &str = "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct Issuer;\n";
 
-    const JWKS_TRUST: &str = "#[verifies_tokens_from_issuer(jwks, audience = \"api\", issuer = \"https://jwks.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://jwks.example/keys\"))]\nstruct JwksEndpoint;\n";
+    const JWKS_TRUST: &str = "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(jwks, audience = \"api\", issuer = \"https://jwks.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://jwks.example/keys\"))]\nstruct JwksEndpoint;\n";
 
     fn tag(name: &str) -> Tag {
         let path: Path = parse_str(name).expect("the tag path parses");
@@ -851,7 +851,7 @@ mod tests {
 
     fn oauth_client_source() -> String {
         format!(
-            "{PARTNER_TRUST}\n{}",
+            "use margaret::framework::macros::oauth_client;\n{PARTNER_TRUST}\n{}",
             oauth_client("partner_client", "partner", "partner", "PartnerClient")
         )
     }
@@ -883,13 +883,13 @@ mod tests {
 
     fn own_provider_admitting(keys: &str) -> String {
         format!(
-            "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::{keys}), client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n"
+            "use margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::{keys}), client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n"
         )
     }
 
     fn own_provider_granting(redirects: &str) -> String {
         format!(
-            "#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\nmod routes {{\n    pub struct Callback;\n    pub struct Landing;\n}}\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Implicit, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::Rsa, {redirects}, scopes = [margaret::framework::oauth_vocabulary::openid_scope::OpenidScope, ProfileScope]), client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n{}",
+            "use margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\nmod routes {{\n    pub struct Callback;\n    pub struct Landing;\n}}\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(portal_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt(keys = margaret::framework::accepted_clients::client_keys::ClientKeys::Own), authorization_code(consent = margaret::framework::accepted_clients::consent_policy::ConsentPolicy::Implicit, id_token_signing = margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning::Rsa, {redirects}, scopes = [margaret::framework::oauth_vocabulary::openid_scope::OpenidScope, ProfileScope]), client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n{}",
             own_client("portal", "portal_app", "PortalClient")
         )
     }
@@ -915,7 +915,7 @@ mod tests {
     fn binds_an_oauth_client_of_the_own_provider_to_its_admitted_client() {
         assert!(with_bindings(
             &format!(
-                "{}{}",
+                "use margaret::framework::macros::oauth_client;\n{}{}",
                 own_provider_admitting("Own"),
                 own_client("portal", "portal_app", "PortalClient")
             ),
@@ -936,7 +936,7 @@ mod tests {
     fn binds_the_sign_in_an_external_client_declares() {
         assert!(with_bindings(
             &format!(
-                "#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n{PARTNER_TRUST}#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner, sign_in(scopes = [ProfileScope]))]\nstruct PartnerClient;\n"
+                "use margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n{PARTNER_TRUST}#[oauth_client(partner_client, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::PrivateKeyJwt, client_id = \"partner\", issuer = partner, sign_in(scopes = [ProfileScope]))]\nstruct PartnerClient;\n"
             ),
             |bindings| matches!(
                 bindings.as_deref(),
@@ -998,7 +998,7 @@ mod tests {
     fn binds_no_sign_in_for_an_own_client_whose_admitted_client_grants_no_code() {
         assert!(with_bindings(
             &format!(
-                "{}{}",
+                "use margaret::framework::macros::oauth_client;\n{}{}",
                 own_provider_admitting("Own"),
                 own_client("portal", "portal_app", "PortalClient")
             ),
@@ -1040,7 +1040,10 @@ mod tests {
     #[test]
     fn rejects_an_oauth_client_of_the_own_provider_without_token_issuance() {
         assert!(matches!(
-            oauth_client_rejection(&own_client("portal", "portal_app", "PortalClient")),
+            oauth_client_rejection(&format!(
+                "use margaret::framework::macros::oauth_client;\n{}",
+                own_client("portal", "portal_app", "PortalClient")
+            )),
             TagError::UnknownTag { ref tag, kind: TagExpectation::AdmittedClient, .. } if tag == "portal_app"
         ));
     }
@@ -1049,7 +1052,7 @@ mod tests {
     fn rejects_an_oauth_client_of_an_undeclared_admitted_client() {
         assert!(matches!(
             oauth_client_rejection(&format!(
-                "{}{}",
+                "use margaret::framework::macros::oauth_client;\n{}{}",
                 own_provider_admitting("Own"),
                 own_client("portal", "kiosk_app", "PortalClient")
             )),
@@ -1061,7 +1064,7 @@ mod tests {
     fn rejects_an_oauth_client_of_an_admitted_client_with_published_keys() {
         assert_eq!(
             oauth_client_rejection(&format!(
-                "{}{}",
+                "use margaret::framework::macros::oauth_client;\n{}{}",
                 own_provider_admitting(
                     "Published(jwks_uri = \"https://portal.example/jwks.json\", signing = margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm::Es256)"
                 ),
@@ -1076,7 +1079,7 @@ mod tests {
     fn rejects_two_oauth_clients_acting_as_one_admitted_client() {
         assert_eq!(
             oauth_client_rejection(&format!(
-                "{}{}{}",
+                "use margaret::framework::macros::oauth_client;\n{}{}{}",
                 own_provider_admitting("Own"),
                 own_client("first", "portal_app", "FirstClient"),
                 own_client("second", "portal_app", "SecondClient")
@@ -1121,7 +1124,7 @@ mod tests {
     fn rejects_an_oauth_client_of_an_issuer_without_discovery() {
         assert_eq!(
             oauth_client_rejection(&format!(
-                "{JWKS_TRUST}\n{}",
+                "use margaret::framework::macros::oauth_client;\n{JWKS_TRUST}\n{}",
                 oauth_client("partner_client", "partner", "jwks", "PartnerClient")
             ))
             .to_string(),
@@ -1132,11 +1135,9 @@ mod tests {
     #[test]
     fn rejects_an_oauth_client_of_an_undeclared_issuer() {
         assert!(matches!(
-            oauth_client_rejection(&oauth_client(
-                "partner_client",
-                "partner",
-                "partner",
-                "PartnerClient"
+            oauth_client_rejection(&format!(
+                "use margaret::framework::macros::oauth_client;\n{}",
+                oauth_client("partner_client", "partner", "partner", "PartnerClient")
             )),
             TagError::UnknownTag { ref tag, kind: TagExpectation::TrustedIssuer, .. } if tag == "partner"
         ));
@@ -1146,7 +1147,7 @@ mod tests {
     fn rejects_an_oauth_client_whose_issuer_is_another_oauth_client() {
         assert_eq!(
             oauth_client_rejection(&format!(
-                "{}{}",
+                "use margaret::framework::macros::oauth_client;\n{}{}",
                 oauth_client("first_client", "first", "second_client", "FirstClient"),
                 oauth_client("second_client", "second", "first_client", "SecondClient")
             ))
@@ -1159,7 +1160,7 @@ mod tests {
     fn rejects_two_clients_of_one_issuer_with_one_client_identifier() {
         assert_eq!(
             oauth_client_rejection(&format!(
-                "{PARTNER_TRUST}#[verifies_tokens_from_issuer(partner_api, audience = \"other\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct ApiIssuer;\n{}{}",
+                "use margaret::framework::macros::oauth_client;\n{PARTNER_TRUST}#[verifies_tokens_from_issuer(partner_api, audience = \"other\", issuer = \"https://partner.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct ApiIssuer;\n{}{}",
                 oauth_client("first_client", "shared", "partner", "FirstClient"),
                 oauth_client("second_client", "shared", "partner_api", "SecondClient")
             ))
@@ -1172,7 +1173,7 @@ mod tests {
     fn binds_one_client_identifier_at_two_issuers() {
         assert!(with_bindings(
             &format!(
-                "{PARTNER_TRUST}#[verifies_tokens_from_issuer(other, audience = \"api\", issuer = \"https://other.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct OtherIssuer;\n{}{}",
+                "use margaret::framework::macros::oauth_client;\n{PARTNER_TRUST}#[verifies_tokens_from_issuer(other, audience = \"api\", issuer = \"https://other.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct OtherIssuer;\n{}{}",
                 oauth_client("first_client", "shared", "partner", "FirstClient"),
                 oauth_client("second_client", "shared", "other", "SecondClient")
             ),
@@ -1184,7 +1185,7 @@ mod tests {
     fn rejects_a_tag_declared_by_a_trust_and_an_oauth_client() {
         assert_eq!(
             error_for(&format!(
-                "{PARTNER_TRUST}{}",
+                "use margaret::framework::macros::oauth_client;\n{PARTNER_TRUST}{}",
                 oauth_client("partner", "partner", "partner", "PartnerClient")
             )),
             "the tag 'partner' is declared more than once: by 'crate::Issuer' and by 'crate::PartnerClient'"
@@ -1194,7 +1195,7 @@ mod tests {
     #[test]
     fn resolves_a_middleware_tag_to_its_handler() {
         let indexed = IndexedSource::new(
-            "#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n",
+            "use margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n",
         );
         let pool = pool(&indexed);
 
@@ -1210,7 +1211,7 @@ mod tests {
     #[test]
     fn lists_middleware_handlers_with_their_tags_in_a_stable_order() {
         let indexed = IndexedSource::new(&format!(
-            "#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\n\n#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n\n{JWKS_TRUST}"
+            "use margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\n\n#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n\n{JWKS_TRUST}"
         ));
         let pool = pool(&indexed);
         let handlers: Vec<String> = pool
@@ -1302,7 +1303,7 @@ mod tests {
     fn rejects_a_tag_declared_by_both_a_jwks_endpoint_and_a_middleware() {
         assert_eq!(
             error_for(&format!(
-                "{JWKS_TRUST}\n#[handles_middleware_attribute(attribute = jwks)]\nstruct Handler;\n"
+                "use margaret::framework::macros::handles_middleware_attribute;\n{JWKS_TRUST}\n#[handles_middleware_attribute(attribute = jwks)]\nstruct Handler;\n"
             )),
             "the tag 'jwks' is declared more than once: by 'crate::JwksEndpoint' and by 'crate::Handler'"
         );
@@ -1312,7 +1313,7 @@ mod tests {
     fn rejects_a_tag_declared_by_two_trusts() {
         assert_eq!(
             error_for(
-                "#[verifies_tokens_from_issuer(shared, audience = \"a\", issuer = \"https://a.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct First;\n#[verifies_tokens_from_issuer(shared, audience = \"b\", issuer = \"https://b.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct Second;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(shared, audience = \"a\", issuer = \"https://a.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct First;\n#[verifies_tokens_from_issuer(shared, audience = \"b\", issuer = \"https://b.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\nstruct Second;\n"
             ),
             "the tag 'shared' is declared more than once: by 'crate::First' and by 'crate::Second'"
         );
@@ -1321,7 +1322,7 @@ mod tests {
     #[test]
     fn rejects_a_middleware_handler_without_a_tag() {
         assert!(
-            error_for("#[handles_middleware_attribute]\nstruct RequestLog;\n")
+            error_for("use margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute]\nstruct RequestLog;\n")
                 .contains("does not name a tag")
         );
     }
@@ -1329,7 +1330,7 @@ mod tests {
     #[test]
     fn rejects_a_middleware_tag_that_is_not_a_plain_name() {
         assert!(
-            error_for("#[handles_middleware_attribute(attribute = tags::guard)]\nstruct Guard;\n")
+            error_for("use margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = tags::guard)]\nstruct Guard;\n")
                 .contains("not a single plain name")
         );
     }
@@ -1337,7 +1338,7 @@ mod tests {
     #[test]
     fn reports_a_non_path_middleware_tag_argument() {
         let error = rejection_for(
-            "#[handles_middleware_attribute(attribute = \"logged\")]\nstruct RequestLog;\n",
+            "use margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = \"logged\")]\nstruct RequestLog;\n",
         );
 
         assert!(matches!(
@@ -1355,12 +1356,12 @@ mod tests {
     #[test]
     fn surfaces_unparseable_middleware_attribute_arguments_instead_of_collecting_its_tag() {
         assert!(
-            error_for("#[handles_middleware_attribute(= 5)]\nstruct RequestLog;\n")
+            error_for("use margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(= 5)]\nstruct RequestLog;\n")
                 .contains("failed to index")
         );
     }
 
-    const EXCHANGING_PROVIDER: &str = "#[oauth_scope(name = \"deploy\")]\npub struct DeployScope;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct ExchangeIssuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ExchangedArtifacts;\n#[admits_oauth_client(deployer_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"deployer\", resources = [artifacts], token_exchange(scopes = [DeployScope]))]\nstruct Deployer;\n";
+    const EXCHANGING_PROVIDER: &str = "use margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = \"deploy\")]\npub struct DeployScope;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct ExchangeIssuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct ExchangedArtifacts;\n#[admits_oauth_client(deployer_app, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"deployer\", resources = [artifacts], token_exchange(scopes = [DeployScope]))]\nstruct Deployer;\n";
 
     fn bindings_of_exchangers(lib_source: &str) -> Result<Vec<String>, TagError> {
         let indexed = IndexedSource::new(lib_source);
@@ -1391,7 +1392,7 @@ mod tests {
     fn rejects_a_subject_token_exchanger_no_admitted_client_exchanges_with() {
         assert_eq!(
             bindings_of_exchangers(&format!(
-                "{JWKS_TRUST}\n#[exchanges_tokens_from(issuer = jwks)]\nstruct CiExchanger;\n"
+                "use margaret::framework::macros::exchanges_tokens_from;\n{JWKS_TRUST}\n#[exchanges_tokens_from(issuer = jwks)]\nstruct CiExchanger;\n"
             ))
             .expect_err("nothing exchanges a subject token")
             .to_string(),
@@ -1413,7 +1414,7 @@ mod tests {
     fn binds_a_subject_token_exchanger_to_its_issuer() {
         assert_eq!(
             exchanger_bindings(&format!(
-                "{JWKS_TRUST}\n#[exchanges_tokens_from(issuer = jwks)]\nstruct CiExchanger;\n"
+                "use margaret::framework::macros::exchanges_tokens_from;\n{JWKS_TRUST}\n#[exchanges_tokens_from(issuer = jwks)]\nstruct CiExchanger;\n"
             ))
             .expect("the exchanger names a trusted issuer"),
             vec!["jwks=crate::CiExchanger".to_string()]
@@ -1423,7 +1424,7 @@ mod tests {
     #[test]
     fn rejects_a_subject_token_exchanger_without_an_issuer() {
         assert!(matches!(
-            exchanger_bindings("#[exchanges_tokens_from]\nstruct CiExchanger;\n"),
+            exchanger_bindings("use margaret::framework::macros::exchanges_tokens_from;\n#[exchanges_tokens_from]\nstruct CiExchanger;\n"),
             Err(TagError::MalformedSubjectTokenExchangerIssuer { ref concrete })
                 if concrete == "crate::CiExchanger"
         ));
@@ -1432,7 +1433,7 @@ mod tests {
     #[test]
     fn reports_a_subject_token_exchanger_issuer_that_is_not_a_path() {
         assert!(matches!(
-            exchanger_bindings("#[exchanges_tokens_from(issuer = \"ci\")]\nstruct CiExchanger;\n"),
+            exchanger_bindings("use margaret::framework::macros::exchanges_tokens_from;\n#[exchanges_tokens_from(issuer = \"ci\")]\nstruct CiExchanger;\n"),
             Err(TagError::AttributeArguments {
                 source: AttributeArgumentsError::UnexpectedArgument { ref key, .. }
             }) if key == "issuer"
@@ -1442,7 +1443,7 @@ mod tests {
     #[test]
     fn reports_unparseable_exchanger_arguments_naming_the_attribute_to_fix() {
         assert!(matches!(
-            exchanger_bindings("#[exchanges_tokens_from(= 5)]\nstruct CiExchanger;\n"),
+            exchanger_bindings("use margaret::framework::macros::exchanges_tokens_from;\n#[exchanges_tokens_from(= 5)]\nstruct CiExchanger;\n"),
             Err(TagError::Index {
                 source: AttributeError::Arguments(AttributeArgumentsError::Malformed {
                     ref attribute_path,
@@ -1455,7 +1456,7 @@ mod tests {
     #[test]
     fn rejects_a_subject_token_exchanger_of_an_undeclared_issuer() {
         assert!(matches!(
-            exchanger_bindings("#[exchanges_tokens_from(issuer = ci)]\nstruct CiExchanger;\n"),
+            exchanger_bindings("use margaret::framework::macros::exchanges_tokens_from;\n#[exchanges_tokens_from(issuer = ci)]\nstruct CiExchanger;\n"),
             Err(TagError::UnknownTag { ref tag, kind: TagExpectation::TrustedIssuer, .. })
                 if tag == "ci"
         ));
@@ -1465,7 +1466,7 @@ mod tests {
     fn rejects_a_subject_token_exchanger_of_an_oauth_client() {
         assert_eq!(
             exchanger_bindings(&format!(
-                "{}\n#[exchanges_tokens_from(issuer = partner_client)]\nstruct Exchanger;\n",
+                "use margaret::framework::macros::exchanges_tokens_from;\n{}\n#[exchanges_tokens_from(issuer = partner_client)]\nstruct Exchanger;\n",
                 oauth_client_source()
             ))
             .expect_err("an oauth client is not a trusted issuer")
@@ -1478,7 +1479,7 @@ mod tests {
     fn rejects_a_second_subject_token_exchanger_of_an_issuer() {
         assert_eq!(
             exchanger_bindings(&format!(
-                "{JWKS_TRUST}\n#[exchanges_tokens_from(issuer = jwks)]\nstruct First;\n\n#[exchanges_tokens_from(issuer = jwks)]\nstruct Second;\n"
+                "use margaret::framework::macros::exchanges_tokens_from;\n{JWKS_TRUST}\n#[exchanges_tokens_from(issuer = jwks)]\nstruct First;\n\n#[exchanges_tokens_from(issuer = jwks)]\nstruct Second;\n"
             ))
             .expect_err("an issuer has one exchanger")
             .to_string(),
@@ -1488,11 +1489,11 @@ mod tests {
 
     fn bearer_source(declarations: &str, parameter: &str) -> String {
         format!(
-            "{declarations}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameter}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n{declarations}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameter}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )
     }
 
-    const OWN_TOKENS: &str = "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(attachments, audience = \"attachments\")]\nstruct Attachments;\n";
+    const OWN_TOKENS: &str = "use margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(attachments, audience = \"attachments\")]\nstruct Attachments;\n";
 
     #[test]
     fn verifies_resource_tokens_only_for_the_resources_bearer_tokens_name() {
@@ -1517,11 +1518,11 @@ mod tests {
         ));
     }
 
-    const OWN_ISSUANCE: &str = "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct ProviderIssuance;\n";
+    const OWN_ISSUANCE: &str = "use margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct ProviderIssuance;\n";
 
-    const OWN_SESSIONS: &str = "#[issues_sessions(issuer = provider, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n";
+    const OWN_SESSIONS: &str = "use margaret::framework::macros::issues_sessions;\n#[issues_sessions(issuer = provider, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n";
 
-    const PARTNER_SESSIONS: &str = "#[consumes_sessions(issuer = partner, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]\nstruct PartnerSessions;\n";
+    const PARTNER_SESSIONS: &str = "use margaret::framework::macros::consumes_sessions;\n#[consumes_sessions(issuer = partner, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]\nstruct PartnerSessions;\n";
 
     fn session_source_of(declarations: &str) -> Option<SessionSource> {
         let indexed = IndexedSource::new(&bearer_source(
@@ -1641,7 +1642,7 @@ mod tests {
     fn rejects_issued_sessions_of_a_trusted_issuer() {
         assert_eq!(
             error_for(&format!(
-                "{OWN_ISSUANCE}{PARTNER_TRUST}#[issues_sessions(issuer = partner, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n"
+                "use margaret::framework::macros::issues_sessions;\n{OWN_ISSUANCE}{PARTNER_TRUST}#[issues_sessions(issuer = partner, audience = \"browser\", cookies = margaret::framework::sessions::session_cookies::SessionCookies::HostOnly)]\nstruct BrowserSessions;\n"
             )),
             "#[issues_sessions] on 'crate::BrowserSessions' references the tag 'partner', which is a trusted issuer with discovered keys, not a token issuance"
         );
@@ -1651,7 +1652,7 @@ mod tests {
     fn rejects_consumed_sessions_of_the_own_issuance() {
         assert_eq!(
             error_for(&format!(
-                "{OWN_ISSUANCE}#[consumes_sessions(issuer = provider, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]\nstruct ProviderSessions;\n"
+                "use margaret::framework::macros::consumes_sessions;\n{OWN_ISSUANCE}#[consumes_sessions(issuer = provider, cookie_domain_from = \"SESSION_COOKIE_DOMAIN\", refresh_url_from = \"SESSION_REFRESH_URL\")]\nstruct ProviderSessions;\n"
             )),
             "#[consumes_sessions] on 'crate::ProviderSessions' references the tag 'provider', which is a token issuance, not a trusted issuer"
         );
@@ -1685,7 +1686,7 @@ mod tests {
         assert_eq!(
             error_for(&bearer_source(
                 &format!(
-                    "{}{}",
+                    "use margaret::framework::macros::oauth_client;\n{}{}",
                     own_provider_admitting("Own"),
                     own_client("portal", "portal_app", "PortalClient")
                 ),
@@ -1727,7 +1728,7 @@ mod tests {
     #[test]
     fn rejects_a_bearer_token_of_a_middleware_tag() {
         assert!(error_for(&bearer_source(
-            "#[singleton]\n#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n",
+            "use margaret::framework::macros::handles_middleware_attribute;\n#[singleton]\n#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n",
             "#[bearer_token(issuer = logged)] token: Option<Token>",
         ))
         .ends_with(
@@ -1791,7 +1792,7 @@ mod tests {
     #[test]
     fn reports_a_token_issuance_tag_where_a_trusted_issuer_is_expected() {
         let indexed = IndexedSource::new(
-            "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n",
+            "use margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n",
         );
 
         assert_eq!(
@@ -1808,7 +1809,7 @@ mod tests {
     fn rejects_a_token_issuance_that_shares_the_tag_of_a_trusted_issuer() {
         assert_eq!(
             error_for(&format!(
-                "{PARTNER_TRUST}#[issues_tokens(partner, issuer = \"https://issuer.example\")]\nstruct OwnIssuer;\n"
+                "use margaret::framework::macros::issues_tokens;\n{PARTNER_TRUST}#[issues_tokens(partner, issuer = \"https://issuer.example\")]\nstruct OwnIssuer;\n"
             )),
             "the tag 'partner' is declared more than once: by 'crate::Issuer' and by 'crate::OwnIssuer'"
         );
@@ -1818,7 +1819,7 @@ mod tests {
     fn rejects_a_resource_that_shares_the_tag_of_the_token_issuance() {
         assert_eq!(
             error_for(
-                "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(provider, audience = \"artifacts\")]\nstruct Artifacts;\n"
+                "use margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(provider, audience = \"artifacts\")]\nstruct Artifacts;\n"
             ),
             "the tag 'provider' is declared more than once: by 'crate::Issuer' and by 'crate::Artifacts'"
         );
@@ -1828,7 +1829,7 @@ mod tests {
     fn rejects_an_admitted_client_that_shares_the_tag_of_a_resource() {
         assert_eq!(
             error_for(
-                "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(artifacts, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n"
+                "use margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\nstruct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\nstruct Artifacts;\n#[admits_oauth_client(artifacts, authentication = margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod::None, client_id = \"portal\", resources = [artifacts])]\nstruct Portal;\n"
             ),
             "the tag 'artifacts' is declared more than once: by 'crate::Artifacts' and by 'crate::Portal'"
         );

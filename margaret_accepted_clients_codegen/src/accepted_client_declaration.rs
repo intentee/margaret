@@ -585,7 +585,7 @@ mod tests {
     use crate::declared_token_exchange::DeclaredTokenExchange;
 
     const ANCHOR: &str = "crate::Client";
-    const ISSUANCE: &str = "use margaret::framework::accepted_clients::client_keys::ClientKeys;\nuse margaret::framework::accepted_clients::consent_policy::ConsentPolicy;\nuse margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm;\nuse margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning;\nuse margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;\nuse margaret::framework::oauth_vocabulary::openid_scope::OpenidScope;\nuse crate::routes::Callback;\n\n#[oauth_scope(name = \"artifacts:read\")]\npub struct ArtifactsReadScope;\n#[oauth_scope(name = \"deploy\")]\npub struct DeployScope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n\nmod routes {\n    pub struct Callback;\n    pub struct Other;\n}\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n#[issues_resource_tokens(reports, audience = \"reports\")]\npub struct Reports;\n";
+    const ISSUANCE: &str = "use margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_scope;\nuse margaret::framework::accepted_clients::client_keys::ClientKeys;\nuse margaret::framework::accepted_clients::consent_policy::ConsentPolicy;\nuse margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm;\nuse margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning;\nuse margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;\nuse margaret::framework::oauth_vocabulary::openid_scope::OpenidScope;\nuse crate::routes::Callback;\n\n#[oauth_scope(name = \"artifacts:read\")]\npub struct ArtifactsReadScope;\n#[oauth_scope(name = \"deploy\")]\npub struct DeployScope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n\nmod routes {\n    pub struct Callback;\n    pub struct Other;\n}\n\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n#[issues_resource_tokens(reports, audience = \"reports\")]\npub struct Reports;\n";
     const PRIVATE_KEY_JWT: &str = "authentication = ClientAuthenticationMethod::PrivateKeyJwt(client_credentials(scopes = [ArtifactsReadScope]), introspection, keys = ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = JwsAlgorithm::Es256))";
     const AUTHORIZATION_CODE: &str = "authorization_code(consent = ConsentPolicy::Prompted, id_token_signing = IdTokenSigning::Rsa, redirect_uris = [\"https://portal.example/callback\"], scopes = [OpenidScope, ProfileScope], refresh_token)";
 
@@ -594,7 +594,7 @@ mod tests {
         outcome: impl FnOnce(Result<DeclaredAcceptedClients, AcceptedClientsCodegenError>) -> TOutcome,
     ) -> TOutcome {
         let indexed = IndexedSource::new(&format!(
-            "{ISSUANCE}#[admits_oauth_client(admitted_app, {arguments})]\npub struct Client;\n"
+            "use margaret::framework::macros::admits_oauth_client;\n{ISSUANCE}#[admits_oauth_client(admitted_app, {arguments})]\npub struct Client;\n"
         ));
         let issuance = DeclaredTokenIssuance::read(&indexed.index).expect("the issuance is read");
 
@@ -609,7 +609,7 @@ mod tests {
 
     fn declaration_rejection(attribute_arguments: &str) -> AcceptedClientsCodegenError {
         let indexed = IndexedSource::new(&format!(
-            "{ISSUANCE}#[admits_oauth_client({attribute_arguments})]\npub struct Client;\n"
+            "use margaret::framework::macros::admits_oauth_client;\n{ISSUANCE}#[admits_oauth_client({attribute_arguments})]\npub struct Client;\n"
         ));
         let issuance = DeclaredTokenIssuance::read(&indexed.index).expect("the issuance is read");
 

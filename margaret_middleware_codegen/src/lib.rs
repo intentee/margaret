@@ -51,7 +51,12 @@ mod tests {
     }
 
     fn empty_bindings() -> ContainerBindings {
-        bindings_for(&IndexedSource::new("#[singleton]\nstruct Config;\n").index)
+        bindings_for(
+            &IndexedSource::new(
+                "use margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n",
+            )
+            .index,
+        )
     }
 
     fn registries_for(index: &AttributeIndex) -> BindingRegistries {
@@ -115,13 +120,15 @@ mod tests {
     fn rejects_a_middleware_reference_that_names_a_jwks_endpoint() {
         assert!(
             layers_error_for(
-                "#[verifies_tokens_from_issuer(auth, audience = \"api\", issuer = \"https://auth.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://auth.example/jwks\"))]\nstruct Endpoint;\n\n#[middleware(auth)]\nstruct Site;\n"
+                "use margaret::framework::macros::middleware;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(auth, audience = \"api\", issuer = \"https://auth.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://auth.example/jwks\"))]\nstruct Endpoint;\n\n#[middleware(auth)]\nstruct Site;\n"
             )
             .contains("which is a trusted issuer with published keys, not a middleware handler")
         );
     }
 
-    const GUARD: &str = r"
+    const GUARD: &str = r"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -150,7 +157,9 @@ impl Guard {
     #[test]
     fn awaits_a_middleware_that_declares_an_asynchronous_process_method() {
         let source = wrappers_for(
-            r"
+            r"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -170,7 +179,7 @@ impl Guard {
     #[test]
     fn injects_the_routes_reference_into_the_wrapper() {
         let source = wrappers_for(
-            "use crate::margaret::routes::Routes;\nuse margaret::framework::http::next::Next;\nuse margaret::framework::http::request::Request;\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, request: &Request, next: Next, routes: &Routes) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse crate::margaret::routes::Routes;\nuse margaret::framework::http::next::Next;\nuse margaret::framework::http::request::Request;\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, request: &Request, next: Next, routes: &Routes) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         );
 
         assert!(source.contains(
@@ -182,7 +191,7 @@ impl Guard {
     #[test]
     fn omits_the_request_from_a_wrapper_that_only_delegates() {
         let source = wrappers_for(
-            "use margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         );
 
         assert!(source.contains(
@@ -194,7 +203,7 @@ impl Guard {
     #[test]
     fn omits_the_next_handler_from_a_short_circuiting_wrapper() {
         let source = wrappers_for(
-            "use margaret::framework::http::request::Request;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, request: &Request) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::http::request::Request;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, request: &Request) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         );
 
         assert!(source.contains(
@@ -206,7 +215,7 @@ impl Guard {
     #[test]
     fn disambiguates_wrappers_that_derive_the_same_name() {
         let source = wrappers_for(
-            "use margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = one)]\nstruct V2;\nimpl V2 {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n\n#[handles_middleware_attribute(attribute = two)]\nstruct V_2;\nimpl V_2 {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = one)]\nstruct V2;\nimpl V2 {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n\n#[handles_middleware_attribute(attribute = two)]\nstruct V_2;\nimpl V_2 {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         );
 
         assert!(source.contains("pubstructV2{pubinner:std::sync::Arc<crate::V2>,}"));
@@ -216,7 +225,7 @@ impl Guard {
     #[test]
     fn rejects_a_handler_on_a_non_struct() {
         assert!(
-            plans_error_for("#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n")
+            plans_error_for("use margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n")
                 .contains("#[handles_middleware_attribute]")
         );
     }
@@ -224,7 +233,7 @@ impl Guard {
     #[test]
     fn rejects_a_handler_without_a_process_method() {
         assert!(
-            plans_error_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n")
+            plans_error_for("use margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n")
                 .contains("no #[process] method")
         );
     }
@@ -233,7 +242,7 @@ impl Guard {
     fn rejects_an_unclassifiable_handler_parameter_since_no_value_could_be_bound_to_it() {
         assert!(
             plans_error_for(
-                "#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n"
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n"
             )
             .contains("must be the current request, the next handler")
         );
@@ -242,7 +251,7 @@ impl Guard {
     #[test]
     fn resolves_the_layers_in_declaration_order_so_the_author_controls_nesting() {
         let layers = layers_for(
-            "use margaret::framework::http::next::Next;\n\n#[middleware(first)]\n#[middleware(second)]\nstruct Site;\n\n#[handles_middleware_attribute(attribute = first)]\nstruct First;\nimpl First {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n\n#[handles_middleware_attribute(attribute = second)]\nstruct Second;\nimpl Second {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::macros::middleware;\nuse margaret::framework::http::next::Next;\n\n#[middleware(first)]\n#[middleware(second)]\nstruct Site;\n\n#[handles_middleware_attribute(attribute = first)]\nstruct First;\nimpl First {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n\n#[handles_middleware_attribute(attribute = second)]\nstruct Second;\nimpl Second {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         )
         .expect("the layers resolve");
 
@@ -254,28 +263,35 @@ impl Guard {
     #[test]
     fn rejects_a_middleware_attribute_without_a_tag() {
         assert!(
-            layers_error_for("#[middleware]\nstruct Site;\n")
-                .contains("must reference exactly one tag")
+            layers_error_for(
+                "use margaret::framework::macros::middleware;\n#[middleware]\nstruct Site;\n"
+            )
+            .contains("must reference exactly one tag")
         );
     }
 
     #[test]
     fn rejects_an_unknown_middleware_tag_so_a_typo_never_skips_a_layer() {
         assert!(
-            layers_error_for("#[middleware(missing)]\nstruct Site;\n")
+            layers_error_for("use margaret::framework::macros::middleware;\n#[middleware(missing)]\nstruct Site;\n")
                 .contains("which no middleware handler declares")
         );
     }
 
     #[test]
     fn propagates_malformed_middleware_arguments_so_no_layer_is_silently_dropped() {
-        assert!(layers_error_for("#[middleware(= 5)]\nstruct Site;\n").contains("failed to index"));
+        assert!(
+            layers_error_for(
+                "use margaret::framework::macros::middleware;\n#[middleware(= 5)]\nstruct Site;\n"
+            )
+            .contains("failed to index")
+        );
     }
 
     #[test]
     fn reports_a_handler_that_has_no_plan() {
         let index = IndexedSource::new(
-            "#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\n#[middleware(guard)]\nstruct Site;\n",
+            "use margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::macros::middleware;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\n#[middleware(guard)]\nstruct Site;\n",
         ).index;
         let tags = collected_tags(&index);
         let site = index
@@ -381,7 +397,12 @@ impl Guard {
         assert!(tracer < guard);
     }
 
-    const CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
+    const CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"use margaret::framework::macros::process;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::macros::middleware;
+use margaret::framework::macros::singleton;
+
 use margaret::framework::http::next::Next;
 
 #[singleton]
@@ -420,7 +441,9 @@ struct Site;
     #[test]
     fn extracts_a_validation_result_form_request_in_a_middleware() {
         let source = wrappers_for(
-            r"use margaret::framework::http_validation::request_input::RequestInput;
+            r"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::http_validation::request_input::RequestInput;
 
 
 use margaret::framework::http::next::Next;
@@ -448,7 +471,9 @@ impl Guard {
     #[test]
     fn extracts_a_bare_model_form_request_in_a_middleware() {
         let source = wrappers_for(
-            r"use margaret::framework::http_validation::request_input::RequestInput;
+            r"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::http_validation::request_input::RequestInput;
 
 
 #[handles_middleware_attribute(attribute = guard)]
@@ -478,7 +503,9 @@ impl Guard {
     #[test]
     fn extracts_a_form_request_alongside_the_request_and_next_in_a_middleware() {
         let source = wrappers_for(
-            r"use margaret::framework::http_validation::request_input::RequestInput;
+            r"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::http_validation::request_input::RequestInput;
 
 
 use margaret::framework::http::next::Next;
@@ -506,7 +533,9 @@ impl Guard {
     #[test]
     fn injects_the_views_reference_into_the_wrapper() {
         let source = wrappers_for(
-            r"
+            r"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+
 use margaret::framework::http::next::Next;
 
 #[handles_middleware_attribute(attribute = traced)]
@@ -528,7 +557,9 @@ impl Tracer {
     #[test]
     fn keeps_the_wrapper_bindings_clear_of_parameters_named_request_and_next() {
         let source = wrappers_for(
-            r"use margaret::framework::http_validation::request_input::RequestInput;
+            r"use margaret::framework::macros::process;
+use margaret::framework::macros::handles_middleware_attribute;
+use margaret::framework::http_validation::request_input::RequestInput;
 
 
 use margaret::framework::http::next::Next;
@@ -558,7 +589,7 @@ impl Guard {
     fn rejects_a_middleware_with_multiple_next_handlers() {
         assert!(
             plans_error_for(
-                "use margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, first: Next, second: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n"
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, first: Next, second: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n"
             )
             .contains("declares more than one next handler")
         );
@@ -568,7 +599,7 @@ impl Guard {
     fn rejects_a_route_parameter_in_a_middleware() {
         assert!(
             plans_error_for(
-                "#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<ResponseContinuation> {}\n}\n"
+                "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<ResponseContinuation> {}\n}\n"
             )
             .contains("has no route path to bind from")
         );
@@ -576,7 +607,7 @@ impl Guard {
     #[test]
     fn rejects_a_form_body_in_a_middleware() {
         let rejection = plans_rejection_for(
-            "use margaret::framework::http_validation::request_input::RequestInput;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, #[form_request(from = RequestInput::Form)] data: Data) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::http_validation::request_input::RequestInput;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, #[form_request(from = RequestInput::Form)] data: Data) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         );
 
         assert!(matches!(
@@ -590,7 +621,7 @@ impl Guard {
     #[test]
     fn rejects_a_raw_body_stream_in_a_middleware() {
         let rejection = plans_rejection_for(
-            "use margaret::framework::http::request_body_stream::RequestBodyStream;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, stream: RequestBodyStream) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::handles_middleware_attribute;\nuse margaret::framework::http::request_body_stream::RequestBodyStream;\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, stream: RequestBodyStream) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         );
 
         assert!(matches!(

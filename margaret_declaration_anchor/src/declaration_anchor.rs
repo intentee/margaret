@@ -71,7 +71,7 @@ mod tests {
     #[test]
     fn anchors_a_declaration_on_a_plain_struct_with_its_allocated_generated_identifier() {
         assert_eq!(
-            anchored("#[issues_tokens]\npub struct Issuer;\n").expect("the struct anchors"),
+            anchored("use margaret::framework::macros::issues_tokens;\n#[issues_tokens]\npub struct Issuer;\n").expect("the struct anchors"),
             "Issuer issuer"
         );
     }
@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn rejects_a_declaration_on_an_enum_since_only_structs_get_a_generated_identifier() {
         assert!(matches!(
-            anchored("#[issues_tokens]\npub enum Issuer { Only }\n"),
+            anchored("use margaret::framework::macros::issues_tokens;\n#[issues_tokens]\npub enum Issuer { Only }\n"),
             Err(DeclarationAnchorError::NotAStruct { attribute: "issues_tokens", path })
                 if path == "crate::Issuer"
         ));
@@ -88,7 +88,9 @@ mod tests {
     #[test]
     fn rejects_a_declaration_on_a_singleton_since_declarations_need_a_plain_struct() {
         assert!(matches!(
-            anchored("#[singleton]\n#[issues_tokens]\npub struct Issuer;\n"),
+            anchored(
+                "use margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[issues_tokens]\npub struct Issuer;\n"
+            ),
             Err(DeclarationAnchorError::DeclaredAsSingleton {
                 attribute: "issues_tokens",
                 ..
@@ -99,7 +101,7 @@ mod tests {
     #[test]
     fn rejects_one_struct_anchoring_two_declarations_as_they_would_share_its_identifier() {
         assert!(matches!(
-            anchored("#[issues_tokens]\n#[verifies_tokens_from_issuer(auth)]\npub struct Issuer;\n"),
+            anchored("use margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n#[issues_tokens]\n#[verifies_tokens_from_issuer(auth)]\npub struct Issuer;\n"),
             Err(DeclarationAnchorError::SharedAnchor { declarations, path })
                 if declarations == 2 && path == "crate::Issuer"
         ));

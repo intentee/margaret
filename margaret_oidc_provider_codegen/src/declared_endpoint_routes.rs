@@ -173,11 +173,11 @@ mod tests {
     use crate::oidc_provider_codegen_error::OidcProviderCodegenError;
     use crate::provider_endpoint::ProviderEndpoint;
 
-    const CONSENT_VIEW: &str = "use margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint;\nuse margaret::framework::route_method::route_method::RouteMethod;\nuse crate::views::ConsentView;\n\nmod views {\n    #[renders_view(name = \"consent_view\")]\n    #[singleton]\n    pub struct ConsentView;\n\n    pub struct ConsentLayout;\n}\n\n";
+    const CONSENT_VIEW: &str = "use margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint;\nuse margaret::framework::route_method::route_method::RouteMethod;\nuse crate::views::ConsentView;\n\nmod views {\n    use margaret::framework::macros::renders_view;\n    use margaret::framework::macros::singleton;\n\n    #[renders_view(name = \"consent_view\")]\n    #[singleton]\n    pub struct ConsentView;\n\n    pub struct ConsentLayout;\n}\n\n";
 
     fn consent_route(endpoint: &str) -> String {
         format!(
-            "{CONSENT_VIEW}#[responds_to_http(max_body_bytes = 1_024, method = RouteMethod::Post, path = \"/consent\", server = \"identity\")]\n#[serves_oidc_endpoint({endpoint})]\nstruct PostConsent;\n"
+            "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\n{CONSENT_VIEW}#[responds_to_http(max_body_bytes = 1_024, method = RouteMethod::Post, path = \"/consent\", server = \"identity\")]\n#[serves_oidc_endpoint({endpoint})]\nstruct PostConsent;\n"
         )
     }
 
@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn reads_an_endpoint_named_through_an_imported_enum() {
         let read = read(
-            "use margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint;\nuse margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(max_body_bytes = 1_024, method = RouteMethod::Post, path = \"/token\", server = \"identity\")]\n#[serves_oidc_endpoint(OidcEndpoint::Token)]\nstruct PostToken;\n",
+            "use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint;\nuse margaret::framework::route_method::route_method::RouteMethod;\n\n#[responds_to_http(max_body_bytes = 1_024, method = RouteMethod::Post, path = \"/token\", server = \"identity\")]\n#[serves_oidc_endpoint(OidcEndpoint::Token)]\nstruct PostToken;\n",
         )
         .expect("the endpoint route is read");
 
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn rejects_a_declaration_without_an_endpoint_since_it_cannot_say_what_it_serves() {
         assert!(matches!(
-            read("#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/jwks\", server = \"identity\")]\n#[serves_oidc_endpoint]\nstruct GetJwks;\n"),
+            read("use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/jwks\", server = \"identity\")]\n#[serves_oidc_endpoint]\nstruct GetJwks;\n"),
             Err(OidcProviderCodegenError::MissingOidcEndpoint { anchor }) if anchor == "crate::GetJwks"
         ));
     }
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn rejects_a_variant_of_a_foreign_enum() {
         assert!(matches!(
-            read("enum OidcEndpoint { Jwks }\n\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/jwks\", server = \"identity\")]\n#[serves_oidc_endpoint(OidcEndpoint::Jwks)]\nstruct GetJwks;\n"),
+            read("use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nenum OidcEndpoint { Jwks }\n\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/jwks\", server = \"identity\")]\n#[serves_oidc_endpoint(OidcEndpoint::Jwks)]\nstruct GetJwks;\n"),
             Err(OidcProviderCodegenError::UnknownOidcEndpoint { anchor, written })
                 if anchor == "crate::GetJwks" && written == "OidcEndpoint::Jwks"
         ));
@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn rejects_an_endpoint_that_responds_to_no_request() {
         assert!(matches!(
-            read("#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::Jwks)]\nstruct GetJwks;\n"),
+            read("use margaret::framework::macros::serves_oidc_endpoint;\n#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::Jwks)]\nstruct GetJwks;\n"),
             Err(OidcProviderCodegenError::UnroutedOidcEndpoint { anchor }) if anchor == "crate::GetJwks"
         ));
     }
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn rejects_an_endpoint_declared_on_a_singleton() {
         assert!(matches!(
-            read("#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/jwks\", server = \"identity\")]\n#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::Jwks)]\nstruct GetJwks;\n"),
+            read("use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/jwks\", server = \"identity\")]\n#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::Jwks)]\nstruct GetJwks;\n"),
             Err(OidcProviderCodegenError::Anchor(DeclarationAnchorError::DeclaredAsSingleton { path, .. }))
                 if path == "crate::GetJwks"
         ));
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn rejects_arguments_that_do_not_parse_naming_the_attribute_so_it_can_be_located() {
         assert!(matches!(
-            read("#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/jwks\", server = \"identity\")]\n#[serves_oidc_endpoint(= 5)]\nstruct GetJwks;\n"),
+            read("use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/jwks\", server = \"identity\")]\n#[serves_oidc_endpoint(= 5)]\nstruct GetJwks;\n"),
             Err(OidcProviderCodegenError::Index(AttributeError::Arguments(
                 AttributeArgumentsError::Malformed { attribute_path, .. }
             ))) if attribute_path == "serves_oidc_endpoint"
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn rejects_an_endpoint_routed_by_a_method_it_does_not_admit() {
         assert!(matches!(
-            read("#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Put, path = \"/authorize\", server = \"identity\")]\n#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::Authorization)]\nstruct PutAuthorize;\n"),
+            read("use margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Put, path = \"/authorize\", server = \"identity\")]\n#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::Authorization)]\nstruct PutAuthorize;\n"),
             Err(OidcProviderCodegenError::EndpointRouteMethod { endpoint, method, path })
                 if endpoint == ProviderEndpoint::Authorization
                     && method == RouteMethod::Put

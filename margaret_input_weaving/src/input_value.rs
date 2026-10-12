@@ -117,7 +117,9 @@ mod tests {
     }
 
     fn from_declared(declared: &Type) -> Result<InputValue, InputWeavingError> {
-        let indexed = IndexedSource::new("#[singleton]\nstruct Config;\n");
+        let indexed = IndexedSource::new(
+            "use margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n",
+        );
 
         InputValue::from_declared(&indexed.index, indexed.item("Config"), declared, &site())
     }

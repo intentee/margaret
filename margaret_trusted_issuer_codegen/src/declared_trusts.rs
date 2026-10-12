@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn reads_a_trust_of_a_discovered_issuer() {
         let indexed = IndexedSource::new(
-            "#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example/tenant\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n",
+            "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(partner, audience = \"api\", issuer = \"https://partner.example/tenant\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Partner;\n",
         );
         let trusts = DeclaredTrusts::read(&indexed.index).expect("the trust is read");
 
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn reads_a_trust_of_a_jwks_endpoint_issuer() {
         let indexed = IndexedSource::new(
-            "#[verifies_tokens_from_issuer(ci, audience = \"deploy\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://ci.example/jwks\"))]\npub struct Ci;\n",
+            "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(ci, audience = \"deploy\", issuer = \"https://ci.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://ci.example/jwks\"))]\npub struct Ci;\n",
         );
         let trusts = DeclaredTrusts::read(&indexed.index).expect("the trust is read");
 
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn groups_the_trusts_of_one_issuer_led_by_the_first_tag() {
         let indexed = IndexedSource::new(
-            "#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n",
+            "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n",
         );
         let trusts = DeclaredTrusts::read(&indexed.index).expect("the trusts are read");
 
@@ -174,7 +174,7 @@ mod tests {
     fn rejects_two_trusts_of_one_issuer_for_one_audience() {
         assert_eq!(
             rejection(
-                "#[verifies_tokens_from_issuer(first, audience = \"api\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct First;\n#[verifies_tokens_from_issuer(second, audience = \"api\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Second;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(first, audience = \"api\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct First;\n#[verifies_tokens_from_issuer(second, audience = \"api\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Second;\n"
             ),
             "the issuer 'https://issuer.example' is trusted for the audience 'api' by both 'crate::First' and 'crate::Second', so its tokens have no single addressee"
         );
@@ -184,7 +184,7 @@ mod tests {
     fn rejects_a_discovered_trust_of_a_jwks_endpoint_issuer() {
         assert_eq!(
             rejection(
-                "#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://issuer.example/jwks\"))]\npub struct Alpha;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://issuer.example/jwks\"))]\npub struct Alpha;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n"
             ),
             "the issuer 'https://issuer.example' is trusted through a jwks endpoint by 'crate::Alpha' and by 'crate::Beta' as well, so its key set has no single source"
         );
@@ -194,7 +194,7 @@ mod tests {
     fn rejects_a_jwks_endpoint_trust_of_a_discovered_issuer() {
         assert_eq!(
             rejection(
-                "#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://issuer.example/jwks\"))]\npub struct Beta;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Published(jwks_uri = \"https://issuer.example/jwks\"))]\npub struct Beta;\n"
             ),
             "the issuer 'https://issuer.example' is trusted through a jwks endpoint by 'crate::Alpha' and by 'crate::Beta' as well, so its key set has no single source"
         );
@@ -204,7 +204,7 @@ mod tests {
     fn rejects_distinct_issuers_that_share_a_discovery_location() {
         assert_eq!(
             rejection(
-                "#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example/\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n"
+                "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example/\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n"
             ),
             "the issuers 'https://issuer.example' and 'https://issuer.example/' publish their metadata at the same discovery location 'https://issuer.example/.well-known/openid-configuration', so at most one of them can match it"
         );
@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn binds_a_tag_to_its_trust_and_issuer() {
         let indexed = IndexedSource::new(
-            "#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n",
+            "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n",
         );
         let trusts = DeclaredTrusts::read(&indexed.index).expect("the trusts are read");
         let beta = syn::parse_str("beta").expect("the tag parses");
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn binds_no_trust_to_an_undeclared_tag() {
         let indexed = IndexedSource::new(
-            "#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n",
+            "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://issuer.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n",
         );
         let trusts = DeclaredTrusts::read(&indexed.index).expect("the trust is read");
         let missing = syn::parse_str("missing").expect("the tag parses");
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn lists_the_binding_of_every_trust_by_issuer() {
         let indexed = IndexedSource::new(
-            "#[verifies_tokens_from_issuer(gamma, audience = \"g\", issuer = \"https://first.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Gamma;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://second.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://first.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n",
+            "use margaret::framework::macros::verifies_tokens_from_issuer;\n#[verifies_tokens_from_issuer(gamma, audience = \"g\", issuer = \"https://first.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Gamma;\n#[verifies_tokens_from_issuer(beta, audience = \"b\", issuer = \"https://second.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Beta;\n#[verifies_tokens_from_issuer(alpha, audience = \"a\", issuer = \"https://first.example\", keys = margaret::framework::trusted_issuer::issuer_keys::IssuerKeys::Discovered)]\npub struct Alpha;\n",
         );
         let trusts = DeclaredTrusts::read(&indexed.index).expect("the trusts are read");
 

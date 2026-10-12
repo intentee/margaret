@@ -24,6 +24,6 @@ fn canonicalizes_method_attributes_at_the_impl_site() {
 
     assert!(
         constructor.has_framework_attribute(FrameworkAttribute::Constructor),
-        "the alias imported where the impl is declared resolves to #[constructor]",
+        "use margaret::framework::macros::constructor;\nthe alias imported where the impl is declared resolves to #[constructor]",
     );
 }

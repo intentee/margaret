@@ -87,8 +87,7 @@ mod tests {
     use crate::declared_token_issuance::DeclaredTokenIssuance;
     use crate::token_issuance_codegen_error::TokenIssuanceCodegenError;
 
-    const ISSUANCE: &str =
-        "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n";
+    const ISSUANCE: &str = "use margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n";
 
     fn read<TOutcome>(
         source: &str,
@@ -111,7 +110,7 @@ mod tests {
     fn finds_a_resource_by_its_tag_so_clients_naming_it_resolve_to_its_audience() {
         read(
             &format!(
-                "{ISSUANCE}#[issues_resource_tokens(attachments, audience = \"attachments\")]\npub struct Attachments;\n"
+                "use margaret::framework::macros::issues_resource_tokens;\n{ISSUANCE}#[issues_resource_tokens(attachments, audience = \"attachments\")]\npub struct Attachments;\n"
             ),
             |read| {
                 let resources = read.expect("the resources are read");
@@ -134,7 +133,7 @@ mod tests {
     #[test]
     fn rejects_a_resource_without_a_tag_since_clients_name_resources_by_tag() {
         assert!(matches!(
-            rejection("#[issues_resource_tokens(audience = \"attachments\")]\npub struct Attachments;\n"),
+            rejection("use margaret::framework::macros::issues_resource_tokens;\n#[issues_resource_tokens(audience = \"attachments\")]\npub struct Attachments;\n"),
             TokenIssuanceCodegenError::MissingResourceTag { anchor } if anchor == "crate::Attachments"
         ));
     }
@@ -142,7 +141,7 @@ mod tests {
     #[test]
     fn rejects_a_tag_that_is_not_a_plain_name() {
         assert!(matches!(
-            rejection("#[issues_resource_tokens(files::attachments, audience = \"attachments\")]\npub struct Attachments;\n"),
+            rejection("use margaret::framework::macros::issues_resource_tokens;\n#[issues_resource_tokens(files::attachments, audience = \"attachments\")]\npub struct Attachments;\n"),
             TokenIssuanceCodegenError::MalformedResourceTag { anchor } if anchor == "crate::Attachments"
         ));
     }
@@ -150,7 +149,7 @@ mod tests {
     #[test]
     fn rejects_a_resource_without_an_audience_since_no_server_could_accept_its_tokens() {
         assert!(matches!(
-            rejection("#[issues_resource_tokens(attachments)]\npub struct Attachments;\n"),
+            rejection("use margaret::framework::macros::issues_resource_tokens;\n#[issues_resource_tokens(attachments)]\npub struct Attachments;\n"),
             TokenIssuanceCodegenError::MissingResourceAudience { anchor } if anchor == "crate::Attachments"
         ));
     }
@@ -158,7 +157,7 @@ mod tests {
     #[test]
     fn rejects_an_empty_resource_audience_since_no_resource_server_could_accept_its_tokens() {
         assert!(matches!(
-            rejection("#[issues_resource_tokens(attachments, audience = \"\")]\npub struct Attachments;\n"),
+            rejection("use margaret::framework::macros::issues_resource_tokens;\n#[issues_resource_tokens(attachments, audience = \"\")]\npub struct Attachments;\n"),
             TokenIssuanceCodegenError::EmptyResourceAudience { anchor } if anchor == "crate::Attachments"
         ));
     }
@@ -166,7 +165,7 @@ mod tests {
     #[test]
     fn rejects_an_audience_that_is_not_a_string() {
         assert!(matches!(
-            rejection("#[issues_resource_tokens(attachments, audience = 5)]\npub struct Attachments;\n"),
+            rejection("use margaret::framework::macros::issues_resource_tokens;\n#[issues_resource_tokens(attachments, audience = 5)]\npub struct Attachments;\n"),
             TokenIssuanceCodegenError::AttributeArguments(
                 AttributeArgumentsError::UnexpectedArgument { key, .. }
             ) if key == "audience"
@@ -176,7 +175,7 @@ mod tests {
     #[test]
     fn rejects_unparseable_resource_arguments_naming_the_attribute_to_locate_them() {
         assert!(matches!(
-            rejection("#[issues_resource_tokens(= 5)]\npub struct Attachments;\n"),
+            rejection("use margaret::framework::macros::issues_resource_tokens;\n#[issues_resource_tokens(= 5)]\npub struct Attachments;\n"),
             TokenIssuanceCodegenError::Index(AttributeError::Arguments(
                 AttributeArgumentsError::Malformed { attribute_path, .. }
             )) if attribute_path == "issues_resource_tokens"
@@ -186,7 +185,7 @@ mod tests {
     #[test]
     fn rejects_a_resource_that_is_not_anchored_by_a_struct() {
         assert!(matches!(
-            rejection("#[issues_resource_tokens(attachments, audience = \"attachments\")]\npub enum Attachments { Only }\n"),
+            rejection("use margaret::framework::macros::issues_resource_tokens;\n#[issues_resource_tokens(attachments, audience = \"attachments\")]\npub enum Attachments { Only }\n"),
             TokenIssuanceCodegenError::Anchor(DeclarationAnchorError::NotAStruct { path, .. })
                 if path == "crate::Attachments"
         ));
@@ -195,7 +194,7 @@ mod tests {
     #[test]
     fn rejects_resource_tokens_without_the_token_issuance() {
         read(
-            "#[issues_resource_tokens(attachments, audience = \"attachments\")]\npub struct Attachments;\n",
+            "use margaret::framework::macros::issues_resource_tokens;\n#[issues_resource_tokens(attachments, audience = \"attachments\")]\npub struct Attachments;\n",
             |read| {
                 assert!(matches!(
                     read,
@@ -209,7 +208,7 @@ mod tests {
     #[test]
     fn rejects_a_resource_addressed_like_the_issuer() {
         assert_eq!(
-            rejection("#[issues_resource_tokens(attachments, audience = \"https://issuer.example\")]\npub struct Attachments;\n")
+            rejection("use margaret::framework::macros::issues_resource_tokens;\n#[issues_resource_tokens(attachments, audience = \"https://issuer.example\")]\npub struct Attachments;\n")
                 .to_string(),
             "#[issues_resource_tokens] on 'crate::Attachments' declares the audience 'https://issuer.example', which names the issuer, so its tokens would pass where the issuer is addressed"
         );
@@ -218,7 +217,7 @@ mod tests {
     #[test]
     fn rejects_two_resources_sharing_an_audience_so_tokens_reach_exactly_one_resource() {
         assert!(matches!(
-            rejection("#[issues_resource_tokens(attachments, audience = \"files\")]\npub struct Attachments;\n#[issues_resource_tokens(uploads, audience = \"files\")]\npub struct Uploads;\n"),
+            rejection("use margaret::framework::macros::issues_resource_tokens;\n#[issues_resource_tokens(attachments, audience = \"files\")]\npub struct Attachments;\n#[issues_resource_tokens(uploads, audience = \"files\")]\npub struct Uploads;\n"),
             TokenIssuanceCodegenError::DuplicateResourceAudience { audience, first, second }
                 if audience == "files" && first == "crate::Attachments" && second == "crate::Uploads"
         ));

@@ -33,7 +33,7 @@ mod tests {
     #[test]
     fn renders_the_token_issuance_as_a_constant() {
         let indexed = IndexedSource::new(
-            "#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n",
+            "use margaret::framework::macros::issues_tokens;\n#[issues_tokens(provider, issuer = \"https://issuer.example\")]\npub struct Issuer;\n",
         );
         let declared =
             DeclaredTokenIssuance::read(&indexed.index).expect("the token issuance is read");

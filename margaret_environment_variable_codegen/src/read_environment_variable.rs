@@ -66,7 +66,9 @@ mod tests {
         attribute: &Attribute,
         declared: &Type,
     ) -> Result<EnvironmentVariable, EnvironmentVariableCodegenError> {
-        let indexed = IndexedSource::new("#[singleton]\nstruct Config;\n");
+        let indexed = IndexedSource::new(
+            "use margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n",
+        );
 
         read_environment_variable(
             &indexed.index,

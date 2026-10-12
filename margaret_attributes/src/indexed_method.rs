@@ -1,4 +1,3 @@
-use syn::Attribute;
 use syn::FnArg;
 use syn::Signature;
 
@@ -29,7 +28,11 @@ impl IndexedMethod {
     }
 
     #[must_use]
-    pub fn new(identifier: String, attributes: Vec<Attribute>, signature: Signature) -> Self {
+    pub fn new(
+        identifier: String,
+        attributes: Vec<IndexedAttribute>,
+        signature: Signature,
+    ) -> Self {
         let parameters = signature
             .inputs
             .iter()
@@ -46,10 +49,7 @@ impl IndexedMethod {
             .collect();
 
         Self {
-            attributes: attributes
-                .into_iter()
-                .map(|attribute| IndexedAttribute::new(&attribute))
-                .collect(),
+            attributes,
             identifier,
             parameters,
             signature: Box::new(signature),
@@ -95,12 +95,15 @@ mod tests {
 
     use super::IndexedMethod;
     use crate::framework_attribute::FrameworkAttribute;
+    use crate::indexed_attribute::IndexedAttribute;
 
     #[test]
     fn indexes_the_declared_attributes_and_skips_the_receiver() {
         let method = IndexedMethod::new(
             "run".to_string(),
-            parse_quote!(#[process]),
+            vec![IndexedAttribute::resolving_to_margaret_macro(
+                &parse_quote!(#[process]),
+            )],
             parse_quote!(fn run(&self, #[route_parameter(from = "id")] id: String)),
         );
 

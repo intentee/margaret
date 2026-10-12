@@ -1,3 +1,7 @@
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::postgres_database;
+use margaret::framework::macros::singleton;
+
 #[singleton]
 struct Consumer {
     roller: std::sync::Arc<crate::KeyRoller>,

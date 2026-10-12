@@ -114,7 +114,6 @@ impl FrameworkAttribute {
 
     fn macro_at(canonical: &CanonicalPath) -> Option<Self> {
         let name = match canonical.segments() {
-            [name] => name.as_str(),
             [crate_name, name] if crate_name == "margaret_macros" => name.as_str(),
             [crate_name, framework, macros, name]
                 if crate_name == "margaret" && framework == "framework" && macros == "macros" =>
@@ -130,7 +129,7 @@ impl FrameworkAttribute {
     }
 
     #[must_use]
-    pub fn recognize(written: &Path, canonical: &CanonicalPath) -> Option<Self> {
+    pub fn recognize(written: &Path, resolved: Option<&CanonicalPath>) -> Option<Self> {
         written
             .get_ident()
             .and_then(|identifier| {
@@ -138,7 +137,7 @@ impl FrameworkAttribute {
                     .into_iter()
                     .find(|attribute| attribute.is_marker() && identifier == attribute.name())
             })
-            .or_else(|| Self::macro_at(canonical))
+            .or_else(|| resolved.and_then(Self::macro_at))
     }
 
     #[must_use]
@@ -264,15 +263,27 @@ mod tests {
             let name = attribute.name();
 
             for canonical in [
-                path(&[name]),
                 path(&["margaret_macros", name]),
                 path(&["margaret", "framework", "macros", name]),
             ] {
                 assert_eq!(
-                    FrameworkAttribute::recognize(&written(name), &canonical),
+                    FrameworkAttribute::recognize(&written(name), Some(&canonical)),
                     Some(attribute)
                 );
             }
+        }
+    }
+
+    #[test]
+    fn ignores_an_unresolved_macro_name_since_only_paths_resolving_to_margaret_count() {
+        for attribute in FrameworkAttribute::ALL
+            .into_iter()
+            .filter(|attribute| !attribute.is_marker())
+        {
+            assert_eq!(
+                FrameworkAttribute::recognize(&written(attribute.name()), None),
+                None
+            );
         }
     }
 
@@ -283,7 +294,7 @@ mod tests {
             .filter(|attribute| attribute.is_marker())
         {
             assert_eq!(
-                FrameworkAttribute::recognize(&written(attribute.name()), &shadowing_item()),
+                FrameworkAttribute::recognize(&written(attribute.name()), Some(&shadowing_item())),
                 Some(attribute)
             );
         }
@@ -294,7 +305,7 @@ mod tests {
         assert_eq!(
             FrameworkAttribute::recognize(
                 &written("margaret::framework::macros::column"),
-                &path(&["margaret", "framework", "macros", "column"]),
+                Some(&path(&["margaret", "framework", "macros", "column"])),
             ),
             None
         );
@@ -303,7 +314,7 @@ mod tests {
     #[test]
     fn ignores_a_macro_name_that_resolves_to_another_item() {
         assert_eq!(
-            FrameworkAttribute::recognize(&written("singleton"), &shadowing_item()),
+            FrameworkAttribute::recognize(&written("singleton"), Some(&shadowing_item())),
             None
         );
     }
@@ -313,7 +324,7 @@ mod tests {
         assert_eq!(
             FrameworkAttribute::recognize(
                 &written("other::singleton"),
-                &path(&["other", "singleton"])
+                Some(&path(&["other", "singleton"]))
             ),
             None
         );

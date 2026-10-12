@@ -1,5 +1,9 @@
 use std::path::PathBuf;
 
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
 #[singleton]

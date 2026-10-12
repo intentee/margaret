@@ -135,7 +135,7 @@ mod tests {
     fn value_table(value_type: &str) -> String {
         application_table(
             &format!(
-                "#[model(table = \"values\")]\nstruct Values {{\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    value: {value_type},\n}}\n"
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {{\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    value: {value_type},\n}}\n"
             ),
             "values",
         )
@@ -143,7 +143,7 @@ mod tests {
 
     fn with_author(referencing: &str) -> String {
         format!(
-            "{KEY}#[model(table = \"authors\")]\nstruct Author {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n\n{referencing}"
+            "use margaret::framework::macros::model;\n{KEY}#[model(table = \"authors\")]\nstruct Author {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n\n{referencing}"
         )
     }
 
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn places_the_table_in_the_module_of_its_model() {
         let indexed = IndexedSource::new(
-            "mod blog {\n    #[model(table = \"posts\")]\n    pub struct Post {\n        #[column(primary_key)]\n        pub id: i64,\n    }\n}\n",
+            "use margaret::framework::macros::model;\nmod blog {\nuse margaret::framework::macros::model;\n\n    #[model(table = \"posts\")]\n    pub struct Post {\n        #[column(primary_key)]\n        pub id: i64,\n    }\n}\n",
         );
 
         assert_eq!(
@@ -193,7 +193,7 @@ mod tests {
     fn renders_the_framework_namespace_so_the_table_is_created_in_the_framework_schema() {
         assert!(
             table_source(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n}\n",
                 "values",
                 TableNamespace::Framework,
             )
@@ -207,7 +207,7 @@ mod tests {
     fn renders_a_uuid_primary_key_with_its_declared_v7_default() {
         assert!(
             application_table(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: uuid::Uuid,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, default = margaret::framework::model::column_default::ColumnDefault::UuidV7)]\n    id: uuid::Uuid,\n}\n",
                 "values"
             )
             .contains(
@@ -289,7 +289,7 @@ mod tests {
     fn renders_a_decimal_field_as_a_numeric_column_with_its_declared_precision_and_scale() {
         assert!(
             application_table(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    value: rust_decimal::Decimal,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n    #[column(precision = 12, scale = 2)]\n    value: rust_decimal::Decimal,\n}\n",
                 "values"
             )
             .contains(
@@ -302,7 +302,7 @@ mod tests {
     fn renders_a_byte_length_check_so_postgres_rejects_bytes_of_another_length() {
         assert!(
             application_table(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, byte_length = 32)]\n    hash: Vec<u8>,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, byte_length = 32)]\n    hash: Vec<u8>,\n}\n",
                 "values"
             )
             .contains(
@@ -315,7 +315,7 @@ mod tests {
     fn renders_a_minimum_check_so_postgres_rejects_a_value_below_the_declared_minimum() {
         assert!(
             application_table(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, minimum = 0)]\n    amount: i64,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key, minimum = 0)]\n    amount: i64,\n}\n",
                 "values"
             )
             .contains(
@@ -372,7 +372,7 @@ mod tests {
 
     fn value_table_with_index() -> String {
         application_table(
-            "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index]\n    value: String,\n}\n",
+            "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n    #[column]\n    #[index]\n    value: String,\n}\n",
             "values",
         )
     }
@@ -381,7 +381,7 @@ mod tests {
     fn renders_a_unique_column_as_a_unique_constraint_so_postgres_rejects_duplicate_values() {
         assert!(
             application_table(
-                "#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n    #[column(unique)]\n    value: String,\n}\n",
+                "use margaret::framework::macros::model;\n#[model(table = \"values\")]\nstruct Values {\n    #[column(primary_key)]\n    id: i64,\n    #[column(unique)]\n    value: String,\n}\n",
                 "values"
             )
             .contains(
