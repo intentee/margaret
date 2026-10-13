@@ -50,6 +50,7 @@ pub mod resolve_injectable;
 mod resolve_preparation;
 mod reverse_serve_input_weaver;
 pub mod serve_input_binding;
+mod served_container;
 pub mod singleton_declaration;
 pub mod slotted_serve_input;
 mod topological_order;

@@ -150,7 +150,7 @@ struct Config {
 
         generated(&host).expect("the crate generates");
 
-        assert!(read_generated(&host, "container.rs").contains("struct Container"));
+        assert!(read_generated(&host, "container.rs").contains("pub mod build;"));
         assert!(read_generated(&host, "mod.rs").contains("pub mod container;"));
     }
 
@@ -209,7 +209,7 @@ struct Config {
         generated(&host).expect("the first generation succeeds");
         generated(&host).expect("the second generation succeeds");
 
-        assert!(read_generated(&host, "container.rs").contains("struct Container"));
+        assert!(read_generated(&host, "container.rs").contains("pub mod build;"));
     }
 
     #[test]

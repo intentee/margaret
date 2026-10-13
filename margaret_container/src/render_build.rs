@@ -29,6 +29,7 @@ use crate::planned_field::PlannedField;
 use crate::planned_provider::PlannedProvider;
 use crate::planned_url::PlannedUrl;
 use crate::reverse_serve_input_weaver::ReverseServeInputWeaver;
+use crate::served_container::ServedContainer;
 use crate::slotted_serve_input::SlottedServeInput;
 use crate::unify_serve_inputs::unify_serve_inputs;
 
@@ -480,13 +481,17 @@ struct RootBuilder {
 
 pub(crate) fn render_build(
     plan: &ContainerPlan,
-    served_roots: &[&PlannedProvider],
+    served: &ServedContainer,
     builder_roots: &[&PlannedProvider],
 ) -> Vec<GeneratedModuleTokens> {
+    let served_builder = match served {
+        ServedContainer::Served { roots } => Some(serve_builder(plan, roots)),
+        ServedContainer::Unserved => None,
+    };
     let builders = builder_roots
         .iter()
         .map(|root| root_builder(root, plan))
-        .chain([serve_builder(plan, served_roots)])
+        .chain(served_builder)
         .collect::<Vec<RootBuilder>>();
     let module_declarations = builders.iter().map(|builder| {
         let function = &builder.function;

@@ -425,7 +425,6 @@ fn render_role_modules(
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
     let service_plan = ServicePlan::build(index, framework_services, bindings, serving_roots)?;
-    let service_roots = service_plan.roots().to_vec();
 
     let serve = if features.contains(GeneratedFeature::Serves) {
         modules.extend(render_services(
@@ -460,7 +459,10 @@ fn render_role_modules(
     Ok(RoleModules {
         console_roots,
         modules,
-        service_roots,
+        service_roots: match serve {
+            ServeDispatch::Served(_) => service_plan.roots().to_vec(),
+            ServeDispatch::Unserved => Vec::new(),
+        },
     })
 }
 
@@ -969,6 +971,14 @@ struct Room;
         assert!(!module(&code, "mod").contains("pub mod http;"));
         assert!(!has_module(&code, "http"));
         assert!(module(&code, "run").contains("\"greet\""));
+    }
+
+    #[test]
+    fn omits_the_served_container_of_an_application_that_serves_nothing() {
+        let code = generate(PLAIN_CRATE).expect("the build succeeds");
+
+        assert!(!module(&code, "container").contains("struct Container"));
+        assert!(!has_module(&code, "container/build/serve"));
     }
 
     #[test]
@@ -1604,6 +1614,43 @@ impl GetIdentity {
             .collect();
         assert!(construction.contains("crate::margaret::jwks::JwksSecretStore::create("));
         assert!(construction.contains("crate::margaret::token_issuance::TOKEN_ISSUANCE,"));
+    }
+
+    const JWKS_CONSOLE_STORE_CRATE: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[issues_tokens(provider, issuer = \"https://issuer.fixture\")]
+struct Issuer;
+
+#[singleton]
+#[console_command(name = \"audit\")]
+struct Audit {
+    store: std::sync::Arc<crate::margaret::jwks::JwksSecretStore>,
+}
+
+impl Audit {
+    #[constructor]
+    fn create(store: std::sync::Arc<crate::margaret::jwks::JwksSecretStore>) -> anyhow::Result<Self> {}
+
+    #[process]
+    fn run(&self) -> anyhow::Result<CommandOutcome> {}
+}
+
+#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]
+struct ApplicationDatabase;
+";
+
+    #[test]
+    fn omits_the_served_container_of_a_console_command_reaching_a_framework_runner() {
+        let code = generate(JWKS_CONSOLE_STORE_CRATE).expect("the build succeeds");
+        let construction: String = module(&code, "container/build/construct_audit")
+            .split_whitespace()
+            .collect();
+
+        assert!(construction.contains("crate::margaret::jwks::JwksRoller::create("));
+        assert!(!module(&code, "container").contains("struct Container"));
+        assert!(!has_module(&code, "container/build/serve"));
     }
 
     const OIDC_ISSUERS_CRATE: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
@@ -2864,7 +2911,6 @@ struct SecondEndpoint;
         assert!(!module(&code, "mod").contains("pub mod routes;"));
         assert!(!has_module(&code, "http"));
         assert!(!has_module(&code, "routes"));
-        assert!(module(&code, "container").contains("struct Container"));
     }
 
     #[test]

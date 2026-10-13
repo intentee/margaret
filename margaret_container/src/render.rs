@@ -8,6 +8,7 @@ use crate::field_ident::field_ident;
 use crate::field_type::field_type;
 use crate::planned_provider::PlannedProvider;
 use crate::provider::Provider;
+use crate::served_container::ServedContainer;
 
 fn field_declaration(position: usize, provider: &Provider) -> TokenStream {
     let name = container_field_ident(position);
@@ -28,7 +29,7 @@ fn accessor(position: usize, provider: &Provider) -> TokenStream {
     }
 }
 
-pub(crate) fn render(served_roots: &[&PlannedProvider]) -> TokenStream {
+fn container_declaration(served_roots: &[&PlannedProvider]) -> TokenStream {
     let fields = served_roots
         .iter()
         .enumerate()
@@ -44,22 +45,28 @@ pub(crate) fn render(served_roots: &[&PlannedProvider]) -> TokenStream {
         })
         .collect();
     let accessors = accessors.values();
-    let accessor_impl = (!served_roots.is_empty()).then(|| {
-        quote! {
-            impl Container {
-                #(#accessors)*
-            }
+
+    quote! {
+        pub struct Container {
+            #(#fields,)*
         }
-    });
+
+        impl Container {
+            #(#accessors)*
+        }
+    }
+}
+
+pub(crate) fn render(served: &ServedContainer) -> TokenStream {
+    let container = match served {
+        ServedContainer::Served { roots } => container_declaration(roots),
+        ServedContainer::Unserved => TokenStream::new(),
+    };
 
     quote! {
         #[rustfmt::skip]
         pub mod build;
 
-        pub struct Container {
-            #(#fields,)*
-        }
-
-        #accessor_impl
+        #container
     }
 }
