@@ -7,7 +7,7 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::scheduled_with_tick_timer;
 
 use crate::config::deployment_environment::DeploymentEnvironment;
-use crate::constants::sweep_interval::SWEEP_INTERVAL;
+use crate::constants::SWEEP_INTERVAL;
 use crate::singletons::metrics::Metrics;
 
 #[scheduled_with_tick_timer(interval = SWEEP_INTERVAL, behavior = MissedTickBehavior::Delay)]

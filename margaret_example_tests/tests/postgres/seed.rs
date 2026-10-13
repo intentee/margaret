@@ -9,7 +9,7 @@ use margaret::framework::route_parameter_binding::route_parameter_binding_outcom
 use margaret::framework::sessions::issued_sessions::IssuedSessions;
 use margaret_database_tests::started_database::StartedDatabase;
 use margaret_example::commands::seed::Seed;
-use margaret_example::constants::featured_article_id::FEATURED_ARTICLE_ID;
+use margaret_example::constants::FEATURED_ARTICLE_ID;
 use margaret_example::margaret::schema::SCHEMA;
 use margaret_example::margaret::sessions::session_audience::SESSION_AUDIENCE;
 use margaret_example::repositories::article_repository::ArticleRepository;

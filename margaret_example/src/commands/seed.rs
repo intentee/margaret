@@ -16,7 +16,7 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::singleton;
 use margaret::framework::sessions::started_session::StartedSession;
 
-use crate::constants::featured_article_id::FEATURED_ARTICLE_ID;
+use crate::constants::FEATURED_ARTICLE_ID;
 use crate::enums::article_status::ArticleStatus;
 use crate::margaret::sessions::IssuedSessions;
 use crate::models::article::Article;

@@ -17,7 +17,7 @@ use margaret::framework::database::database::Database;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::singleton;
 
-use crate::constants::article_batch::ARTICLE_BATCH;
+use crate::constants::ARTICLE_BATCH;
 use crate::enums::article_status::ArticleStatus;
 use crate::margaret::models::models_article_article::draft::Draft;
 use crate::models::article::Article;

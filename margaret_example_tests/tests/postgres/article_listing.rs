@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use margaret_example::constants::featured_article_id::FEATURED_ARTICLE_ID;
+use margaret_example::constants::FEATURED_ARTICLE_ID;
 use margaret_example::models::article::Article;
 use margaret_example::repositories::article_repository::ArticleRepository;
 use margaret_example_tests::seeded_blog::seeded_blog;

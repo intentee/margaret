@@ -4,7 +4,7 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
-use crate::constants::featured_article_id::FEATURED_ARTICLE_ID;
+use crate::constants::FEATURED_ARTICLE_ID;
 use crate::margaret::forwarders::public::Forwarder;
 
 #[singleton]

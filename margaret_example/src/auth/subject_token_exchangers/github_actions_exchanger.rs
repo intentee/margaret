@@ -13,7 +13,7 @@ use margaret::framework::subject_token_exchange::subject_token_exchange::Subject
 
 use crate::auth::claims::github_actions_claims::GithubActionsClaims;
 use crate::auth::policies::trusted_workflow::TrustedWorkflow;
-use crate::constants::ci_publisher::CI_PUBLISHER;
+use crate::constants::CI_PUBLISHER;
 
 #[singleton]
 #[exchanges_tokens_from(issuer = github_actions)]
