@@ -1,5 +1,6 @@
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UrlSegment {
-    CatchAllParameter(String),
-    Literal(String),
-    Parameter(String),
+    CatchAllParameter { name: String, prefix: String },
+    Literal { decoded: String, encoded: String },
+    Parameter { name: String, prefix: String },
 }

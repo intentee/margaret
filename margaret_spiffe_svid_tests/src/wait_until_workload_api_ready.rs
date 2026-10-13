@@ -50,7 +50,7 @@ mod tests {
     use super::wait_until_workload_api_ready;
 
     #[tokio::test]
-    async fn errors_when_socket_does_not_exist() {
+    async fn errors_when_the_socket_does_not_exist_so_waiting_for_the_agent_is_bounded() {
         let nonexistent = PathBuf::from("/nonexistent/agent.sock");
 
         let result = wait_until_workload_api_ready(&nonexistent, Duration::from_millis(50)).await;

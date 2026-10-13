@@ -7,7 +7,6 @@ autotests = false
 
 [dependencies]
 anyhow = { workspace = true }
-libc = { workspace = true }
 margaret_peer_identity = { workspace = true }
 margaret_spiffe_svid = { workspace = true }
 margaret_sync_holder = { workspace = true }
@@ -20,6 +19,7 @@ tokio = { workspace = true, features = ["fs", "macros", "net", "process", "rt-mu
 
 [dev-dependencies]
 futures-util = { workspace = true }
+margaret_process_tests = { path = "../margaret_process_tests" }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
 

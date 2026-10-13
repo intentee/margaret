@@ -8,9 +8,9 @@ use tokio_util::sync::CancellationToken;
 use trzcina::ServiceManager;
 use trzcina::ServiceShutdownOptions;
 
+use margaret_spiffe_svid::register_services::register_services;
 use margaret_spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams;
 use margaret_spiffe_svid_bundle::svid_bundle::SvidBundle;
-use margaret_spiffe_svid_tests::install_crypto_provider::install_crypto_provider;
 use margaret_spiffe_svid_tests::pump_tls_handshake::pump_tls_handshake;
 use margaret_spiffe_svid_tests::spire_test_cluster::SpireTestCluster;
 use margaret_spiffe_svid_tests::spire_test_cluster_params::SpireTestClusterParams;
@@ -18,8 +18,6 @@ use margaret_sync_holder::sync_holder_presence::SyncHolderPresence;
 
 #[tokio::test]
 async fn completes_mtls_with_a_real_spire_issued_svid() {
-    install_crypto_provider();
-
     let cluster = SpireTestCluster::start(
         tempfile::tempdir().unwrap(),
         SpireTestClusterParams::default(),
@@ -32,14 +30,15 @@ async fn completes_mtls_with_a_real_spire_issued_svid() {
     let svid_bundle = SvidBundle::new(SvidServiceBundleParams {
         spiffe_trust_domain: cluster.spiffe_trust_domain().to_string(),
         spire_agent_addr,
-    });
+    })
+    .expect("the svid side is configured");
 
     let server_config = Arc::new(svid_bundle.server_config());
     let client_config = Arc::new(svid_bundle.client_config());
     let mut client_readiness = svid_bundle.client_readiness();
 
     let mut service_manager = ServiceManager::default();
-    service_manager.register_bundle(svid_bundle).await.unwrap();
+    register_services(&mut service_manager, svid_bundle.into_services());
 
     let cancellation_token = CancellationToken::new();
     let cancellation_token_for_manager = cancellation_token.clone();

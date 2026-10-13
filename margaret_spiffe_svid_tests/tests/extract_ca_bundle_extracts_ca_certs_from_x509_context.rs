@@ -8,7 +8,7 @@ use margaret_spiffe_svid_tests::build_workload_svid::build_workload_svid;
 use margaret_spiffe_svid_tests::ca_der::CA_DER;
 
 #[test]
-fn extracts_ca_certs_from_x509_context() {
+fn extracts_the_svid_trust_domain_cas_from_the_context_so_peers_can_be_verified() {
     let svid = build_workload_svid();
     let trust_domain = TrustDomain::new("example.org").unwrap();
     let bundle = X509Bundle::from_x509_authorities(trust_domain, &[CA_DER]).unwrap();

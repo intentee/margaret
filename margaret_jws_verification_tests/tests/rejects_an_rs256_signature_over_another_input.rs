@@ -1,5 +1,6 @@
 use serde_json::json;
 
+use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 use margaret_jws_verification::accepted_key_set_document::AcceptedKeySetDocument;
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
@@ -29,6 +30,9 @@ fn rejects_an_rs256_signature_over_another_input() {
 
     assert!(matches!(
         key_set.verify(&jws),
-        JwsVerification::Rejected(JwsRejection::RsaSignatureMismatch { .. })
+        JwsVerification::Rejected(JwsRejection::SignatureMismatch {
+            algorithm: JwsAlgorithm::Rs256,
+            ..
+        })
     ));
 }

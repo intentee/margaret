@@ -6,7 +6,7 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::struct_shape::StructShape;
 
 #[test]
-fn indexes_enum_variant_identifiers_and_shapes() {
+fn indexes_enum_variant_identifiers_and_shapes_so_enum_columns_can_be_validated() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/field_crate");
     let index = AttributeIndexBuilder::new()
         .index_crate(&CrateRoot::new("field_crate", &directory))

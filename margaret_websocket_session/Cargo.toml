@@ -16,5 +16,8 @@ margaret_http = { workspace = true }
 margaret_route_parameter_binding = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+cookie = { workspace = true }
+
 [lints]
 workspace = true

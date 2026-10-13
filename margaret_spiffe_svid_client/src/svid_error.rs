@@ -4,8 +4,11 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum SvidError {
-    #[error("the default rustls crypto provider is not installed")]
-    CryptoProviderNotInstalled,
+    #[error("the svid crypto provider supports none of the safe default tls versions: {source}")]
+    ProtocolVersions {
+        #[source]
+        source: rustls::Error,
+    },
 
     #[error("the reqwest client could not be built from the svid client configuration: {source}")]
     ReqwestClient {

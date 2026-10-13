@@ -1,10 +1,7 @@
-use margaret_registered_claims::audience::Audience;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
+use crate::expected_audience::ExpectedAudience;
 
-use crate::type_header_expectation::TypeHeaderExpectation;
-
+#[derive(Clone, Copy)]
 pub struct JwtExpectation<'expectation> {
-    pub audience: &'expectation Audience,
-    pub issuer: &'expectation IssuerIdentifier,
-    pub token_type: TypeHeaderExpectation,
+    pub audience: ExpectedAudience<'expectation>,
+    pub issuer: &'expectation str,
 }

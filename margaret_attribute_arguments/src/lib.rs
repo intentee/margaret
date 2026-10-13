@@ -4,3 +4,4 @@ pub mod attribute_arguments_reader;
 pub mod format_path;
 
 mod named_argument;
+mod named_assignment;

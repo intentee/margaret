@@ -82,22 +82,22 @@ mod tests {
     }
 
     #[test]
-    fn peels_arc_of_concrete() {
+    fn peels_an_arc_of_a_concrete_type_so_the_container_resolves_the_inner_type() {
         assert_eq!(label("Arc<Config>"), "single");
     }
 
     #[test]
-    fn peels_rc_of_concrete() {
+    fn peels_an_rc_of_a_concrete_type_so_the_container_resolves_the_inner_type() {
         assert_eq!(label("Rc<Config>"), "single");
     }
 
     #[test]
-    fn peels_arc_of_trait_object() {
+    fn peels_an_arc_of_a_trait_object_so_the_container_resolves_the_trait() {
         assert_eq!(label("Arc<dyn Greeter>"), "single");
     }
 
     #[test]
-    fn rejects_bare_type() {
+    fn rejects_a_bare_type_because_the_container_shares_dependencies_only_through_pointers() {
         assert_eq!(label("Config"), "none");
     }
 
@@ -107,17 +107,17 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unknown_wrapper() {
+    fn rejects_a_box_because_only_arc_and_rc_share_one_provided_instance() {
         assert_eq!(label("Box<Config>"), "none");
     }
 
     #[test]
-    fn rejects_reference() {
+    fn rejects_a_reference_because_the_container_hands_out_owned_shared_pointers() {
         assert_eq!(label("&Config"), "none");
     }
 
     #[test]
-    fn rejects_arc_of_tuple() {
+    fn rejects_an_arc_of_a_tuple_because_it_names_no_single_provided_type() {
         assert_eq!(label("Arc<(Config, Logger)>"), "none");
     }
 
@@ -132,7 +132,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_arc_of_multi_trait_object() {
+    fn rejects_an_arc_of_two_traits_because_it_names_no_single_provided_type() {
         assert_eq!(label("Arc<dyn Greeter + Plugin>"), "none");
     }
 
@@ -142,17 +142,17 @@ mod tests {
     }
 
     #[test]
-    fn rejects_arc_without_arguments() {
+    fn rejects_an_arc_without_arguments_because_it_names_no_provided_type() {
         assert_eq!(label("Arc"), "none");
     }
 
     #[test]
-    fn rejects_arc_with_multiple_arguments() {
+    fn rejects_an_arc_with_two_arguments_because_it_names_no_single_provided_type() {
         assert_eq!(label("Arc<Config, Logger>"), "none");
     }
 
     #[test]
-    fn rejects_arc_with_lifetime_argument() {
+    fn rejects_an_arc_of_only_a_lifetime_because_it_names_no_provided_type() {
         assert_eq!(label("Arc<'static>"), "none");
     }
 }

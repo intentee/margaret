@@ -42,7 +42,7 @@ pub async fn dispatch_request<Handler>(
     Handler: RespondsToWebSocketMessage,
     Handler::Message: DeserializeOwned + Validate,
 {
-    match validate_json::<Handler::Message>(Some(&params)) {
+    match validate_json::<Handler::Message>(&params) {
         ValidationResult::Valid(message) => {
             let envelope = Handler::Message::envelope(id.clone(), message);
             let error_socket = socket.clone();

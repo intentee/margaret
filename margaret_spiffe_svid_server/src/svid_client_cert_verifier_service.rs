@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use rustls::RootCertStore;
+use rustls::crypto::CryptoProvider;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service;
 
@@ -12,6 +13,7 @@ use crate::svid_client_cert_verifier::SvidClientCertVerifier;
 use crate::svid_client_cert_verifier_facade::SvidClientCertVerifierFacade;
 
 pub struct SvidClientCertVerifierService {
+    pub crypto_provider: Arc<CryptoProvider>,
     pub root_cert_store_holder: RootCertStoreHolder,
     pub spiffe_trust_domain: String,
     pub svid_client_cert_verifier_facade: Arc<SvidClientCertVerifierFacade>,
@@ -20,7 +22,11 @@ pub struct SvidClientCertVerifierService {
 impl SvidClientCertVerifierService {
     fn update_client_cert_verifier(&self, root_cert_store: Option<RootCertStore>) -> Result<()> {
         if let Some(root_store) = root_cert_store {
-            let verifier = SvidClientCertVerifier::new(root_store, &self.spiffe_trust_domain)?;
+            let verifier = SvidClientCertVerifier::new(
+                root_store,
+                &self.spiffe_trust_domain,
+                Arc::clone(&self.crypto_provider),
+            )?;
 
             self.svid_client_cert_verifier_facade
                 .update_internal_verifier(Arc::new(verifier));

@@ -10,7 +10,7 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
-margaret_registered_claims = { workspace = true }
+margaret_jwt_verification = { workspace = true }
 
 [lints]
 workspace = true

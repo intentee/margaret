@@ -11,10 +11,10 @@ use margaret_environment_variable_codegen::read_environment_variable::read_envir
 use margaret_injection_codegen::parameters::parameters;
 use margaret_input_weaving::constructor_parameter::ConstructorParameter;
 
+use crate::declared_serve_input_source::DeclaredServeInputSource;
 use crate::declared_serve_inputs::DeclaredServeInputs;
 use crate::serve_input::ServeInput;
 use crate::serve_input_codegen_error::ServeInputCodegenError;
-use crate::serve_input_source::DeclaredServeInputSource;
 use crate::serve_input_source::serve_input_source;
 
 fn console_argument_scope(item: &IndexedItem) -> ConsoleArgumentScope {
@@ -51,7 +51,7 @@ fn scan_item(
     for view in parameters(constructor) {
         let site = ConstructorParameter {
             owner: owner.clone(),
-            parameter: view.holder.to_string(),
+            parameter: view.name.to_string(),
         };
         let Some(DeclaredServeInputSource {
             attribute,
@@ -145,7 +145,11 @@ mod tests {
                 requiredness(variable.value.required),
                 variable.value.value_type
             ),
-            ServeInput::SpiffeHttpClient => "spiffe_http_client".to_string(),
+            ServeInput::Prepared(_)
+            | ServeInput::RouteUrl(_)
+            | ServeInput::Routes
+            | ServeInput::SpiffeHttpClient
+            | ServeInput::SpiffeIssuerRequestClient => input.name(),
         }
     }
 
@@ -160,10 +164,10 @@ mod tests {
     }
 
     #[test]
-    fn scans_a_required_named_console_argument() {
+    fn scans_a_named_console_argument_of_a_plain_type_as_required_so_it_must_be_given() {
         assert_eq!(
             describe(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"label\")] label: String) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"label\")] label: String) -> Self {}\n}\n",
                 "Config",
                 0,
             ),
@@ -172,10 +176,10 @@ mod tests {
     }
 
     #[test]
-    fn scans_a_boolean_console_flag() {
+    fn scans_a_boolean_console_argument_as_a_flag_so_its_presence_alone_sets_it() {
         assert_eq!(
             describe(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"loud\")] loud: bool) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"loud\")] loud: bool) -> Self {}\n}\n",
                 "Config",
                 0,
             ),
@@ -187,7 +191,7 @@ mod tests {
     fn scans_a_positional_console_argument_on_a_command() {
         assert_eq!(
             describe(
-                "#[singleton]\n#[console_command(name = \"greet\")]\nstruct Greet;\n\nimpl Greet {\n    #[constructor]\n    fn create(#[console_argument(positional)] name: String) -> Self {}\n}\n",
+                "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"greet\")]\nstruct Greet;\n\nimpl Greet {\n    #[constructor]\n    fn create(#[console_argument(positional)] name: String) -> Self {}\n}\n",
                 "Greet",
                 0,
             ),
@@ -196,10 +200,10 @@ mod tests {
     }
 
     #[test]
-    fn scans_a_required_environment_variable() {
+    fn scans_an_environment_variable_of_a_plain_type_as_required_so_it_must_be_set() {
         assert_eq!(
             describe(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[environment_variable(from = \"DATABASE_URL\")] url: String) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[environment_variable(from = \"DATABASE_URL\")] url: String) -> Self {}\n}\n",
                 "Config",
                 0,
             ),
@@ -208,10 +212,10 @@ mod tests {
     }
 
     #[test]
-    fn scans_an_optional_environment_variable() {
+    fn scans_an_option_environment_variable_as_optional_so_it_may_be_left_unset() {
         assert_eq!(
             describe(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[environment_variable(from = \"WORKER_COUNT\")] workers: Option<u16>) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[environment_variable(from = \"WORKER_COUNT\")] workers: Option<u16>) -> Self {}\n}\n",
                 "Config",
                 0,
             ),
@@ -223,7 +227,7 @@ mod tests {
     fn scans_a_boolean_environment_variable_as_a_parsed_value() {
         assert_eq!(
             describe(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[environment_variable(from = \"WORKER_DEBUG\")] debug: bool) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[environment_variable(from = \"WORKER_DEBUG\")] debug: bool) -> Self {}\n}\n",
                 "Config",
                 0,
             ),
@@ -232,10 +236,10 @@ mod tests {
     }
 
     #[test]
-    fn scans_a_spiffe_http_client_injection() {
+    fn scans_a_spiffe_http_client_injection_so_serving_supplies_the_client() {
         assert_eq!(
             describe(
-                "#[singleton]\nstruct Caller;\n\nimpl Caller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Caller;\n\nimpl Caller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> Self {}\n}\n",
                 "Caller",
                 0,
             ),
@@ -244,9 +248,9 @@ mod tests {
     }
 
     #[test]
-    fn ignores_a_plain_dependency_parameter() {
+    fn ignores_a_plain_dependency_parameter_since_the_container_injects_it_instead() {
         let declared = scanned(
-            "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(dependency: std::sync::Arc<Other>) -> Self {}\n}\n",
+            "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(dependency: std::sync::Arc<Other>) -> Self {}\n}\n",
         )
         .expect("the crate scans");
 
@@ -254,8 +258,10 @@ mod tests {
     }
 
     #[test]
-    fn ignores_an_item_without_a_constructor() {
-        let declared = scanned("#[singleton]\nstruct Config;\n").expect("the crate scans");
+    fn ignores_an_item_without_a_constructor_since_it_has_no_parameters_to_feed() {
+        let declared =
+            scanned("use margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n")
+                .expect("the crate scans");
 
         assert!(declared.input(&owner("Config"), 0).is_none());
     }
@@ -263,7 +269,7 @@ mod tests {
     #[test]
     fn ignores_an_item_with_more_than_one_constructor() {
         let declared = scanned(
-            "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"a\")] a: String) -> Self {}\n\n    #[constructor]\n    fn make(#[console_argument(from = \"b\")] b: String) -> Self {}\n}\n",
+            "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"a\")] a: String) -> Self {}\n\n    #[constructor]\n    fn make(#[console_argument(from = \"b\")] b: String) -> Self {}\n}\n",
         )
         .expect("the crate scans");
 
@@ -274,7 +280,7 @@ mod tests {
     fn rejects_a_parameter_that_declares_two_serve_inputs() {
         assert!(
             error_message(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"label\")] #[environment_variable(from = \"LABEL\")] label: String) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"label\")] #[environment_variable(from = \"LABEL\")] label: String) -> Self {}\n}\n",
             )
             .contains("a constructor parameter is fed by exactly one serve input")
         );
@@ -284,7 +290,7 @@ mod tests {
     fn rejects_a_spiffe_http_client_that_carries_arguments() {
         assert!(
             error_message(
-                "#[singleton]\nstruct Caller;\n\nimpl Caller {\n    #[constructor]\n    fn create(#[spiffe_http_client(pooled)] client: reqwest::Client) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Caller;\n\nimpl Caller {\n    #[constructor]\n    fn create(#[spiffe_http_client(pooled)] client: reqwest::Client) -> Self {}\n}\n",
             )
             .contains("the injected client takes no arguments")
         );
@@ -294,7 +300,7 @@ mod tests {
     fn rejects_a_positional_console_argument_outside_a_command() {
         assert!(
             error_message(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(positional)] name: String) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(positional)] name: String) -> Self {}\n}\n",
             )
             .contains("positional arguments are only allowed on console commands")
         );
@@ -304,17 +310,17 @@ mod tests {
     fn rejects_an_environment_variable_with_a_malformed_name() {
         assert!(
             error_message(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[environment_variable(from = \"DATABASE-URL\")] url: String) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[environment_variable(from = \"DATABASE-URL\")] url: String) -> Self {}\n}\n",
             )
             .contains("is not a usable environment variable name")
         );
     }
 
     #[test]
-    fn reports_unparseable_attribute_arguments() {
+    fn reports_an_unparseable_console_argument_attribute_as_an_indexing_failure_of_the_crate() {
         assert!(
             error_message(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(= 5)] value: String) -> Self {}\n}\n",
+                "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(= 5)] value: String) -> Self {}\n}\n",
             )
             .contains("failed to index the crate")
         );

@@ -1,0 +1,16 @@
+use std::path::Path;
+
+use margaret_attributes::attribute_error::AttributeError;
+use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+use margaret_attributes::crate_root::CrateRoot;
+
+#[test]
+fn rejects_a_module_found_in_both_its_file_and_mod_rs_because_the_source_is_ambiguous() {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/module_collision");
+    let error = AttributeIndexBuilder::new()
+        .index_crate(&CrateRoot::new("module_collision", &directory))
+        .err()
+        .expect("a module resolvable to both foo.rs and foo/mod.rs must be rejected");
+
+    assert!(matches!(error, AttributeError::ModuleFileCollision { .. }));
+}

@@ -1,0 +1,28 @@
+[package]
+name = "margaret_authorization_grants"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "The authorization codes, refresh token families and pending consents an application stores for the Margaret OpenID Connect provider."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono = { workspace = true, features = ["serde"] }
+futures-util = { workspace = true }
+margaret = { package = "margaret_model_facade", path = "../margaret_model_facade", version = "0.1.0" }
+margaret_oauth_vocabulary = { workspace = true }
+margaret_registered_claims = { workspace = true }
+margaret_token_digest = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+url = { workspace = true, features = ["serde"] }
+uuid = { workspace = true, features = ["serde"] }
+
+[build-dependencies]
+margaret_codegen = { workspace = true }
+
+[lints]
+workspace = true

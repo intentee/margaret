@@ -1,0 +1,14 @@
+[package]
+name = "margaret_raw_identifier_model_fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+margaret = { workspace = true, features = ["runtime"] }
+
+[build-dependencies]
+margaret = { workspace = true, default-features = false, features = ["codegen"] }
+
+[lints]
+workspace = true

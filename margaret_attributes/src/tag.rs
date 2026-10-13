@@ -4,7 +4,6 @@ use std::fmt::Result;
 
 use proc_macro2::Ident;
 use syn::Path;
-use syn::PathArguments;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Tag {
@@ -19,22 +18,12 @@ impl Tag {
 
     #[must_use]
     pub fn from_path(path: &Path) -> Option<Self> {
-        if path.leading_colon.is_some() {
-            return None;
-        }
+        path.get_ident().map(|name| Self { name: name.clone() })
+    }
 
-        let mut segments = path.segments.iter();
-        let (Some(segment), None) = (segments.next(), segments.next()) else {
-            return None;
-        };
-
-        if !matches!(segment.arguments, PathArguments::None) {
-            return None;
-        }
-
-        Some(Self {
-            name: segment.ident.clone(),
-        })
+    #[must_use]
+    pub fn ident(&self) -> &Ident {
+        &self.name
     }
 }
 
@@ -53,31 +42,31 @@ mod tests {
     use crate::tag::Tag;
 
     #[test]
-    fn reads_a_single_segment_tag() {
+    fn reads_a_single_segment_tag_so_a_bare_identifier_can_name_a_tag() {
         let tag = Tag::from_path(&parse_quote!(jwks)).expect("a single-segment tag");
 
         assert_eq!(tag.to_string(), "jwks");
     }
 
     #[test]
-    fn builds_a_tag_from_an_identifier() {
+    fn builds_a_tag_from_an_identifier_so_it_matches_the_tag_read_from_a_path() {
         let tag = Tag::from_ident(Ident::new("jwks", Span::call_site()));
 
         assert_eq!(tag, Tag::from_path(&parse_quote!(jwks)).expect("a tag"));
     }
 
     #[test]
-    fn rejects_a_multi_segment_path() {
+    fn rejects_a_multi_segment_path_because_a_tag_is_a_bare_identifier() {
         assert!(Tag::from_path(&parse_quote!(endpoints::jwks)).is_none());
     }
 
     #[test]
-    fn rejects_a_leading_colon_path() {
+    fn rejects_a_leading_colon_path_because_a_tag_is_a_bare_identifier() {
         assert!(Tag::from_path(&parse_quote!(::jwks)).is_none());
     }
 
     #[test]
-    fn rejects_a_generic_path() {
+    fn rejects_a_path_with_generic_arguments_because_a_tag_is_a_bare_identifier() {
         assert!(Tag::from_path(&parse_quote!(jwks<Token>)).is_none());
     }
 
@@ -90,7 +79,7 @@ mod tests {
     }
 
     #[test]
-    fn tags_with_different_names_differ() {
+    fn tags_with_different_names_differ_so_each_tag_identifies_its_own_declaration() {
         assert_ne!(
             Tag::from_path(&parse_quote!(jwks)).expect("a tag"),
             Tag::from_path(&parse_quote!(logged)).expect("a tag"),

@@ -87,7 +87,7 @@ mod tests {
             value: value(true, WeavingKind::BorrowedPath, &["std", "path", "PathBuf"]),
         };
 
-        assert_eq!(collapsed(&named.field_type()), "std::path::PathBuf");
+        assert_eq!(collapsed(&named.field_type()), "::std::path::PathBuf");
         assert_eq!(named.name(), "config");
         assert_eq!(named.weaving(), WeavingKind::BorrowedPath);
         assert!(named.is_shareable());

@@ -16,12 +16,14 @@ clap = { workspace = true }
 margaret_console = { workspace = true }
 margaret_http = { workspace = true }
 margaret_http_uploaded_file = { workspace = true }
+rustls = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "signal"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
 [dev-dependencies]
 libc = { workspace = true }
+margaret_http_tests = { path = "../margaret_http_tests" }
 
 [lints]
 workspace = true

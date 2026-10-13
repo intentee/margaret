@@ -3,7 +3,7 @@ use margaret_spiffe_svid_tests::spire_test_cluster::SpireTestCluster;
 use margaret_spiffe_svid_tests::spire_test_cluster_params::SpireTestClusterParams;
 
 #[tokio::test]
-async fn errors_when_bundle_show_cli_rejected() {
+async fn errors_when_the_bundle_show_cli_is_rejected_instead_of_starting_without_trust() {
     let result = SpireTestCluster::start(
         tempfile::tempdir().unwrap(),
         SpireTestClusterParams {

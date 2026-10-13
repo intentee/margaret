@@ -1,3 +1,4 @@
+pub mod get_diamond;
 pub mod microservices_map;
 pub mod microservices_map_provider;
 pub mod retry_child;

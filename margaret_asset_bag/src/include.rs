@@ -31,7 +31,7 @@ mod tests {
     use crate::asset_href::AssetHref;
 
     #[test]
-    fn renders_a_module_script_tag() {
+    fn renders_a_script_include_as_an_async_module_script_so_its_imports_resolve() {
         assert_eq!(
             Include::Script(AssetHref::Local("assets/app_ABC12345.js"))
                 .render()
@@ -41,7 +41,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_stylesheet_link_tag() {
+    fn renders_a_stylesheet_include_as_a_root_relative_link_so_any_page_resolves_it() {
         assert_eq!(
             Include::Stylesheet(AssetHref::Local("assets/app_ABC12345.css"))
                 .render()

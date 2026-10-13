@@ -12,13 +12,13 @@ pub(crate) fn console_argument_arguments(
         let named = reader.take_string("from")?;
         let positional = reader.take_flag("positional");
 
-        match (named, positional) {
-            (Some(key), false) => Ok(ConsoleArgumentForm::Named { key }),
-            (None, true) => Ok(ConsoleArgumentForm::Positional),
-            (Some(_), true) => {
+        match named {
+            Some(_) if positional => {
                 Err(ConsoleArgumentCodegenError::NamedAndPositional { site: site.clone() })
             }
-            (None, false) => {
+            Some(key) => Ok(ConsoleArgumentForm::Named { key }),
+            None if positional => Ok(ConsoleArgumentForm::Positional),
+            None => {
                 Err(ConsoleArgumentCodegenError::NeitherNamedNorPositional { site: site.clone() })
             }
         }
@@ -58,7 +58,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_named_form() {
+    fn reads_a_from_key_as_a_named_argument_so_its_value_is_taken_from_that_option() {
         assert_eq!(
             describe(&parse_quote!(#[console_argument(from = "label")])),
             "named:label"
@@ -66,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_positional_form() {
+    fn reads_the_positional_flag_as_a_positional_argument_so_its_value_is_taken_by_order() {
         assert_eq!(
             describe(&parse_quote!(#[console_argument(positional)])),
             "positional"

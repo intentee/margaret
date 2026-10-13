@@ -1,0 +1,27 @@
+[package]
+name = "margaret_token_issuance_codegen"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Reads the token issuance a Margaret application declares and generates it as a constant."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+margaret_attribute_arguments = { workspace = true }
+margaret_attributes = { workspace = true }
+margaret_declaration_anchor = { workspace = true }
+margaret_generated_module = { workspace = true }
+margaret_registered_claims = { workspace = true }
+margaret_umbrella_path = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+margaret_attributes_tests = { path = "../margaret_attributes_tests" }
+
+[lints]
+workspace = true

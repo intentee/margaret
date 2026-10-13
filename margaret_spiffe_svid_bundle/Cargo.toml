@@ -10,13 +10,12 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
-anyhow = { workspace = true }
-async-trait = { workspace = true }
 margaret_spiffe_svid = { workspace = true }
 margaret_spiffe_svid_client = { workspace = true }
 margaret_spiffe_svid_server = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
+thiserror = { workspace = true }
 trzcina = { workspace = true }
 
 [lints]

@@ -2,7 +2,7 @@ use url::Url;
 
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
-const WELL_KNOWN_OPENID_CONFIGURATION: &str = "/.well-known/openid-configuration";
+use crate::oidc_discovery_path::OIDC_DISCOVERY_PATH;
 
 #[must_use]
 pub fn oidc_discovery_url(issuer: &IssuerIdentifier) -> Url {
@@ -11,7 +11,7 @@ pub fn oidc_discovery_url(issuer: &IssuerIdentifier) -> Url {
         Some(stripped) => stripped,
         None => url.path(),
     };
-    let discovery_path = format!("{issuer_path}{WELL_KNOWN_OPENID_CONFIGURATION}");
+    let discovery_path = format!("{issuer_path}{OIDC_DISCOVERY_PATH}");
 
     url.set_path(&discovery_path);
 

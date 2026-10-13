@@ -1,0 +1,43 @@
+[package]
+name = "margaret_active_record_tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Models that exercise the Margaret active record against Postgres."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
+autotests = false
+
+[features]
+tests_that_use_postgres = []
+
+[dependencies]
+chrono = { workspace = true }
+margaret = { package = "margaret_model_facade", path = "../margaret_model_facade" }
+rust_decimal = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+uuid = { workspace = true }
+
+[build-dependencies]
+margaret_codegen = { workspace = true }
+
+[dev-dependencies]
+futures-util = { workspace = true }
+margaret_database_tests = { path = "../margaret_database_tests" }
+margaret_route_parameter_binding = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+trybuild = { workspace = true }
+zeroize = { workspace = true }
+
+[[test]]
+name = "compile_fail"
+path = "tests/compile_fail/main.rs"
+
+[[test]]
+name = "postgres"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

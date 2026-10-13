@@ -1,17 +1,21 @@
-use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
+use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::struct_shape::StructShape;
 
 use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
+use crate::declared_constructor_outcome::declared_constructor_outcome;
 
 pub(crate) fn resolve_construction<'index>(
-    methods: &'index [IndexedMethod],
-    concrete_path: &CanonicalPath,
+    index: &AttributeIndex,
+    item: &'index IndexedItem,
     shape: StructShape,
 ) -> Result<ConstructionSource<'index>, ContainerError> {
-    let mut found: Vec<&IndexedMethod> = methods
+    let concrete_path = item.canonical_path();
+    let mut found: Vec<&IndexedMethod> = item
+        .methods()
         .iter()
         .filter(|method| method.has_framework_attribute(FrameworkAttribute::Constructor))
         .collect();
@@ -28,7 +32,10 @@ pub(crate) fn resolve_construction<'index>(
     }
 
     if let Some(method) = found.pop() {
-        Ok(ConstructionSource::Constructor(method))
+        Ok(ConstructionSource::Constructor {
+            method,
+            outcome: declared_constructor_outcome(index, item, method),
+        })
     } else {
         let field_count = match shape {
             StructShape::Unit => 0,

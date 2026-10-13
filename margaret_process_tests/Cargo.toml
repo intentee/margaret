@@ -1,0 +1,11 @@
+[package]
+name = "margaret_process_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

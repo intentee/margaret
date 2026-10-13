@@ -4,7 +4,7 @@ use margaret_spiffe_svid::ca_bundle::CaBundle;
 use margaret_spiffe_svid_tests::ca_der::CA_DER;
 
 #[test]
-fn converts_single_ca_to_root_store() {
+fn converts_a_single_ca_to_a_root_store_of_one_so_its_peers_are_trusted() {
     let bundle = CaBundle {
         ca_certs: vec![CertificateDer::from(CA_DER.to_vec())],
     };

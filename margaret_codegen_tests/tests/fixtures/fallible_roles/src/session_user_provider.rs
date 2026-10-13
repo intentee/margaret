@@ -1,5 +1,6 @@
 use failures::Result as InferenceResult;
 
+use margaret::framework::http::request::Request;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::macros::infer_from_request;
 use margaret::framework::macros::infers_authenticated_user;
@@ -16,7 +17,10 @@ impl SessionUserProvider {
     ///
     /// Returns an error propagated from the work it performs.
     #[infer_from_request]
-    pub fn infer(&self) -> InferenceResult<AuthenticatedUserOutcome<User>> {
-        Ok(AuthenticatedUserOutcome::Anonymous)
+    pub fn infer(&self, request: &Request) -> InferenceResult<AuthenticatedUserOutcome<User>> {
+        Ok(match request.inputs.query.get("user") {
+            Some(name) => AuthenticatedUserOutcome::Authenticated(User { name: name.clone() }),
+            None => AuthenticatedUserOutcome::Anonymous,
+        })
     }
 }

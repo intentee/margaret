@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-
-use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::name_allocator::NameAllocator;
 
 use crate::discovered_handler::DiscoveredHandler;
@@ -17,22 +14,24 @@ fn handler_method<'message>(
     message: &'message WebSocketMessage,
     handler: &str,
 ) -> Result<&'message str, WebSocketCodegenError> {
-    match (handler_kind, &message.kind) {
-        (HandlerKind::Request, MessageKind::Request { method, .. })
-        | (HandlerKind::Notification, MessageKind::Notification { method }) => Ok(method),
-        (HandlerKind::Request, MessageKind::Notification { .. }) => {
-            Err(WebSocketCodegenError::HandlerMessageNotARequest {
+    match &message.kind {
+        MessageKind::Request { method, .. } => match handler_kind {
+            HandlerKind::Request => Ok(method),
+            HandlerKind::Notification => {
+                Err(WebSocketCodegenError::HandlerMessageNotANotification {
+                    handler: handler.to_string(),
+                    message: message.path.to_string(),
+                })
+            }
+        },
+        MessageKind::Notification { method } => match handler_kind {
+            HandlerKind::Notification => Ok(method),
+            HandlerKind::Request => Err(WebSocketCodegenError::HandlerMessageNotARequest {
                 handler: handler.to_string(),
                 message: message.path.to_string(),
-            })
-        }
-        (HandlerKind::Notification, MessageKind::Request { .. }) => {
-            Err(WebSocketCodegenError::HandlerMessageNotANotification {
-                handler: handler.to_string(),
-                message: message.path.to_string(),
-            })
-        }
-        (_, MessageKind::Response { .. }) => Err(WebSocketCodegenError::HandlerMessageIsResponse {
+            }),
+        },
+        MessageKind::Response { .. } => Err(WebSocketCodegenError::HandlerMessageIsResponse {
             handler: handler.to_string(),
         }),
     }
@@ -40,7 +39,6 @@ fn handler_method<'message>(
 
 pub(crate) struct SessionHandlerPlan {
     dispatch_idents: NameAllocator,
-    handler_by_method: HashMap<String, (CanonicalPath, String)>,
     notification_handlers: Vec<HandlerBinding>,
     request_handlers: Vec<HandlerBinding>,
     session: WebSocketSession,
@@ -50,7 +48,6 @@ impl SessionHandlerPlan {
     pub(crate) fn new(session: WebSocketSession) -> Self {
         Self {
             dispatch_idents: NameAllocator::new(),
-            handler_by_method: HashMap::new(),
             notification_handlers: Vec::new(),
             request_handlers: Vec::new(),
             session,
@@ -65,11 +62,16 @@ impl SessionHandlerPlan {
         let handler_name = handler.handler_path.to_string();
         let method = handler_method(&handler.kind, message, &handler_name)?;
 
-        if let Some((first_message, first_handler)) = self.handler_by_method.get(method) {
-            if first_message == &message.path {
+        if let Some(first) = self
+            .request_handlers
+            .iter()
+            .chain(&self.notification_handlers)
+            .find(|bound| bound.method == method)
+        {
+            if first.message_path == message.path {
                 return Err(WebSocketCodegenError::DuplicateHandlerForMessage {
                     message: message.path.to_string(),
-                    first: first_handler.clone(),
+                    first: first.handler_path.to_string(),
                     second: handler_name,
                 });
             }
@@ -77,7 +79,7 @@ impl SessionHandlerPlan {
             return Err(WebSocketCodegenError::DuplicateMethodInSession {
                 session: self.session.session_path.to_string(),
                 method: method.to_string(),
-                first: first_handler.clone(),
+                first: first.handler_path.to_string(),
                 second: handler_name,
             });
         }
@@ -91,11 +93,9 @@ impl SessionHandlerPlan {
             dispatch_ident,
             handler_field: handler.handler_field.clone(),
             handler_path: handler.handler_path.clone(),
-            method: method.clone(),
+            message_path: message.path.clone(),
+            method,
         };
-
-        self.handler_by_method
-            .insert(method, (message.path.clone(), handler_name));
 
         match handler.kind {
             HandlerKind::Notification => self.notification_handlers.push(binding),

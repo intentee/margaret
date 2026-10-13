@@ -5,23 +5,22 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
-use super::asset_path::AssetPath;
 use crate::margaret::asset_bag::asset_responder::AssetResponder;
+use crate::route_parameters::asset_path::AssetPath;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/assets/{*asset_path}", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/assets/{*asset_path}", server = "public")]
 pub struct GetAsset {
     asset_responder: Arc<AssetResponder>,
 }
 
 impl GetAsset {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(asset_responder: Arc<AssetResponder>) -> anyhow::Result<Self> {
-        Ok(Self { asset_responder })
+    pub fn create(asset_responder: Arc<AssetResponder>) -> Self {
+        Self { asset_responder }
     }
 
     /// # Errors

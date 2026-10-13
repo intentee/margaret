@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use margaret_http::handler_error::HandlerError;
+use margaret_handler_error::handler_error::HandlerError;
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::next::Next;
 use margaret_http::request::Request;

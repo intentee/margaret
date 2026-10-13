@@ -1,23 +1,62 @@
-use serde::de::DeserializeOwned;
+use std::iter;
+
 use uuid::Uuid;
 
-use margaret_jose_parameters::curve::Curve;
 use margaret_jws_verification::key_id::KeyId;
 use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
-use margaret_jwt_verification::jwt_verification::JwtVerification;
-use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 use crate::ec_signing_key::EcSigningKey;
 use crate::jwk_pair::JwkPair;
 use crate::jwks_key_error::JwksKeyError;
-use crate::jwks_secret_verification_result::JwksSecretVerificationResult;
-use crate::previous_key::PreviousKey;
+use crate::jwks_secret_parts::JwksSecretParts;
+use crate::key_entry::KeyEntry;
+use crate::key_retention::KeyRetention;
+use crate::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
 use crate::public_jwks::PublicJwks;
+use crate::retired_key::RetiredKey;
+use crate::rsa_jwk_pair::RsaJwkPair;
+use crate::rsa_key_ring::RsaKeyRing;
+use crate::signing_curve::SigningCurve;
+use crate::signing_keys_generation::SigningKeysGeneration;
 
-fn random_pair(curve: Curve) -> Result<JwkPair, JwksKeyError> {
+fn assembled(entries: &[KeyEntry]) -> Result<VerificationKeySet, JwksKeyError> {
+    match VerificationKeySet::assemble(
+        entries
+            .iter()
+            .map(|entry| entry.verification_key.clone())
+            .collect(),
+    ) {
+        KeySetAssembly::Assembled(key_set) => Ok(key_set),
+        KeySetAssembly::DuplicateKeyId(duplicate) => {
+            Err(JwksKeyError::DuplicateKeyId { duplicate })
+        }
+    }
+}
+
+fn pair_entry(pair: &JwkPair) -> KeyEntry<'_> {
+    KeyEntry {
+        public_jwk: pair.public_jwk(),
+        verification_key: pair.verification_key(),
+    }
+}
+
+fn rsa_pair_entry(pair: &RsaJwkPair) -> KeyEntry<'_> {
+    KeyEntry {
+        public_jwk: pair.public_jwk(),
+        verification_key: pair.verification_key(),
+    }
+}
+
+fn retired_entry(retired: &RetiredKey) -> KeyEntry<'_> {
+    KeyEntry {
+        public_jwk: retired.public_jwk(),
+        verification_key: retired.verification_key(),
+    }
+}
+
+fn random_pair(curve: SigningCurve) -> Result<JwkPair, JwksKeyError> {
     EcSigningKey::generate(curve)
         .and_then(|signing_key| JwkPair::new(KeyId::new(Uuid::new_v4().to_string()), signing_key))
 }
@@ -25,54 +64,89 @@ fn random_pair(curve: Curve) -> Result<JwkPair, JwksKeyError> {
 #[derive(Clone)]
 pub struct JwksSecret {
     current: JwkPair,
-    key_set: VerificationKeySet,
+    generation: SigningKeysGeneration,
     next: JwkPair,
-    previous: PreviousKey,
     public_jwks: PublicJwks,
+    published_key_set: VerificationKeySet,
+    retention: KeyRetention,
+    retired: Vec<RetiredKey>,
+    rolled_at: NumericDate,
+    rsa: RsaKeyRing,
+    token_key_set: VerificationKeySet,
 }
 
 impl JwksSecret {
-    /// # Errors
-    ///
-    /// Returns `JwksKeyError` when a key cannot be generated or the keys do not form a key set.
-    pub fn fresh(curve: Curve) -> Result<Self, JwksKeyError> {
-        random_pair(curve).and_then(|current| {
-            random_pair(curve).and_then(|next| Self::from_pairs(current, next, PreviousKey::Absent))
+    pub(crate) fn assembled(
+        JwksSecretParts {
+            current,
+            generation,
+            next,
+            retention,
+            retired,
+            rolled_at,
+            rsa,
+        }: JwksSecretParts,
+    ) -> Result<Self, JwksKeyError> {
+        let retired: Vec<RetiredKey> = retired
+            .into_iter()
+            .filter(|retired| retired.outlives(retention.token, rolled_at))
+            .collect();
+        let token_entries: Vec<KeyEntry> = [pair_entry(&current), pair_entry(&next)]
+            .into_iter()
+            .chain(retired.iter().map(retired_entry))
+            .collect();
+        let published_entries: Vec<KeyEntry> = token_entries
+            .iter()
+            .copied()
+            .chain([rsa_pair_entry(rsa.current()), rsa_pair_entry(rsa.next())])
+            .chain(rsa.retired().iter().map(retired_entry))
+            .collect();
+        let token_key_set = assembled(&token_entries)?;
+        let published_key_set = assembled(&published_entries)?;
+        let public_jwks = PublicJwks::new(
+            published_entries
+                .iter()
+                .map(|entry| entry.public_jwk.clone())
+                .collect(),
+        );
+
+        Ok(Self {
+            current,
+            generation,
+            next,
+            public_jwks,
+            published_key_set,
+            retention,
+            retired,
+            rolled_at,
+            rsa,
+            token_key_set,
         })
     }
 
     /// # Errors
     ///
-    /// Returns `JwksKeyError::DuplicateKeyId` when two of the keys share a key id.
-    pub fn from_pairs(
-        current: JwkPair,
-        next: JwkPair,
-        previous: PreviousKey,
+    /// Returns `JwksKeyError` when a key cannot be generated or the keys do not form a key set.
+    pub fn fresh(
+        curve: SigningCurve,
+        rsa_keys: &dyn ProvidesRsaSigningKeys,
+        retention: KeyRetention,
+        now: NumericDate,
     ) -> Result<Self, JwksKeyError> {
-        let mut published = vec![current.public_jwk().clone()];
-        let mut verification_keys = vec![current.verification_key()];
-
-        if let PreviousKey::Retired(retired) = &previous {
-            published.push(retired.public_jwk().clone());
-            verification_keys.push(retired.verification_key());
-        }
-
-        published.push(next.public_jwk().clone());
-        verification_keys.push(next.verification_key());
-
-        let key_set = match VerificationKeySet::assemble(verification_keys) {
-            KeySetAssembly::Assembled(key_set) => key_set,
-            KeySetAssembly::DuplicateKeyId(duplicate) => {
-                return Err(JwksKeyError::DuplicateKeyId { duplicate });
-            }
-        };
-
-        Ok(Self {
-            current,
-            key_set,
-            next,
-            previous,
-            public_jwks: PublicJwks::new(published),
+        random_pair(curve).and_then(|current| {
+            random_pair(curve).and_then(|next| {
+                RsaKeyRing::fresh(rsa_keys).and_then(|rsa| {
+                    Self::assembled(JwksSecretParts {
+                        current,
+                        generation: SigningKeysGeneration::FIRST,
+                        next,
+                        retention,
+                        retired: Vec::new(),
+                        rolled_at: now,
+                        rsa,
+                    })
+                })
+            })
         })
     }
 
@@ -82,13 +156,13 @@ impl JwksSecret {
     }
 
     #[must_use]
-    pub fn next(&self) -> &JwkPair {
-        &self.next
+    pub fn generation(&self) -> SigningKeysGeneration {
+        self.generation
     }
 
     #[must_use]
-    pub fn previous(&self) -> &PreviousKey {
-        &self.previous
+    pub fn next(&self) -> &JwkPair {
+        &self.next
     }
 
     #[must_use]
@@ -96,39 +170,62 @@ impl JwksSecret {
         &self.public_jwks
     }
 
+    #[must_use]
+    pub fn published_key_set(&self) -> &VerificationKeySet {
+        &self.published_key_set
+    }
+
+    #[must_use]
+    pub fn retired(&self) -> &[RetiredKey] {
+        &self.retired
+    }
+
     /// # Errors
     ///
-    /// Returns `JwksKeyError` when the next key cannot be generated or the keys do not form a key set.
-    pub fn rotate(&self) -> Result<Self, JwksKeyError> {
+    /// Returns `JwksKeyError` when no generation follows this one, the next keys cannot be
+    /// generated, or the keys do not form a key set.
+    pub fn rolled(
+        &self,
+        rsa_keys: &dyn ProvidesRsaSigningKeys,
+        now: NumericDate,
+    ) -> Result<Self, JwksKeyError> {
+        let generation = self.generation.successor()?;
+
         random_pair(self.current.signing_key().curve()).and_then(|next| {
-            Self::from_pairs(
-                self.next.clone(),
-                next,
-                PreviousKey::Retired(Box::new(self.current.clone())),
-            )
+            self.rsa
+                .rolled(rsa_keys, self.retention, now)
+                .and_then(|rsa| {
+                    Self::assembled(JwksSecretParts {
+                        current: self.next.clone(),
+                        generation,
+                        next,
+                        retention: self.retention,
+                        retired: iter::once(RetiredKey::new(
+                            self.current.public_jwk().clone(),
+                            self.current.verification_key().clone(),
+                            now,
+                        ))
+                        .chain(self.retired.iter().cloned())
+                        .collect(),
+                        rolled_at: now,
+                        rsa,
+                    })
+                })
         })
     }
 
     #[must_use]
-    pub fn verify_jwt<TClaims: DeserializeOwned>(
-        &self,
-        token: &str,
-        expectation: &JwtExpectation,
-        now: NumericDate,
-    ) -> JwksSecretVerificationResult<TClaims> {
-        let verified = match verify_serialized_jwt(&self.key_set, token, expectation, now) {
-            JwtVerification::Rejected(rejection) => {
-                return JwksSecretVerificationResult::Rejected(rejection);
-            }
-            JwtVerification::Verified(verified) => verified,
-        };
+    pub fn rolled_at(&self) -> NumericDate {
+        self.rolled_at
+    }
 
-        if &verified.kid == self.current.kid() {
-            JwksSecretVerificationResult::SignedWithCurrent(verified)
-        } else if self.previous.is_retired_key(&verified.kid) {
-            JwksSecretVerificationResult::SignedWithPrevious(verified)
-        } else {
-            JwksSecretVerificationResult::SignedWithNextKey
-        }
+    #[must_use]
+    pub fn rsa(&self) -> &RsaKeyRing {
+        &self.rsa
+    }
+
+    #[must_use]
+    pub fn token_key_set(&self) -> &VerificationKeySet {
+        &self.token_key_set
     }
 }

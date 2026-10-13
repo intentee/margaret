@@ -4,6 +4,7 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::client_async;
 use tokio_tungstenite::tungstenite::Message;
 
+use margaret_websocket_tests::cookie_setting_session_factory::CookieSettingSessionFactory;
 use margaret_websocket_tests::failing_session_factory::FailingSessionFactory;
 use margaret_websocket_tests::raw_http_exchange::raw_http_exchange;
 use margaret_websocket_tests::redirecting_session_factory::RedirectingSessionFactory;
@@ -45,7 +46,30 @@ async fn upgrades_a_connection_and_serves_a_request() {
 }
 
 #[tokio::test]
-async fn rejects_a_handshake_missing_the_key() {
+async fn sets_the_cookies_the_session_factory_changes_on_the_upgrade() {
+    let server = RunningWebSocketServer::start_with(CookieSettingSessionFactory).await;
+    let url = format!("ws://{}/ws", server.address());
+    let tcp = TcpStream::connect(server.address())
+        .await
+        .expect("the client connects to the server");
+    let (socket, response) = client_async(url, tcp)
+        .await
+        .expect("the websocket handshake succeeds");
+
+    assert_eq!(
+        response
+            .headers()
+            .get("set-cookie")
+            .expect("the upgrade sets a cookie"),
+        "session-access=refreshed"
+    );
+
+    drop(socket);
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn rejects_a_handshake_missing_the_key_since_no_accept_header_can_be_derived() {
     let server = RunningWebSocketServer::start().await;
 
     let response = raw_http_exchange(
@@ -107,7 +131,7 @@ async fn rejects_a_handshake_with_an_unsupported_version() {
 }
 
 #[tokio::test]
-async fn upgrades_when_the_query_form_validates() {
+async fn upgrades_when_the_query_form_validates_so_sessions_start_with_checked_input() {
     let server = RunningWebSocketServer::start_with(ValidatingSessionFactory).await;
     let url = format!("ws://{}/ws?label=here", server.address());
     let tcp = TcpStream::connect(server.address())

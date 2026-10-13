@@ -1,0 +1,7 @@
+error[E0609]: no field `translations` on type `ArticleWithAuthor`
+ --> compile_fail/reads_an_undeclared_relation.rs:4:12
+  |
+4 |     loaded.translations.records.len()
+  |            ^^^^^^^^^^^^ unknown field
+  |
+  = note: available fields are: `article`, `author`

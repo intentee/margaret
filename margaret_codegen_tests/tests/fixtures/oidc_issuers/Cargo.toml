@@ -9,6 +9,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 margaret = { workspace = true, features = ["runtime"] }
+serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }

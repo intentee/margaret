@@ -1,0 +1,5 @@
+error[E0599]: no method named `load` found for struct `Key<Referenced>` in the current scope
+ --> compile_fail/loads_through_a_key.rs:5:28
+  |
+5 |     let _ = article.author.load(database).await;
+  |                            ^^^^ method not found in `Key<Author>`

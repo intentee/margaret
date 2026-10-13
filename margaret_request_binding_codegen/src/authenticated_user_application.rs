@@ -3,12 +3,14 @@ use proc_macro2::Ident;
 use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
+use crate::inference_shape::InferenceShape;
 
 #[derive(Clone)]
 pub struct AuthenticatedUserApplication {
     pub challenge: AuthenticatedUserChallenge,
     pub concrete: CanonicalPath,
     pub field: String,
+    pub inference: InferenceShape,
     pub injects_peer_spiffe_id: bool,
     pub injects_routes: bool,
     pub injects_views: bool,

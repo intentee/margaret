@@ -19,12 +19,12 @@ use crate::svid_server_cert_verifier::SvidServerCertVerifier;
 
 #[derive(Debug, Default)]
 pub struct SvidServerCertVerifierFacade {
-    current_verifier: SyncHolder<Arc<SvidServerCertVerifier>>,
+    current_verifier: SyncHolder<Option<Arc<SvidServerCertVerifier>>>,
 }
 
 impl SvidServerCertVerifierFacade {
     #[must_use]
-    pub fn subscribe(&self) -> SyncHolderSubscription<Arc<SvidServerCertVerifier>> {
+    pub fn subscribe(&self) -> SyncHolderSubscription<Option<Arc<SvidServerCertVerifier>>> {
         self.current_verifier.subscribe()
     }
 

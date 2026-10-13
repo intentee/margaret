@@ -4,6 +4,7 @@ use rustls::ClientConfig;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::PrivateKeyDer;
 
+use margaret_spiffe_svid::svid_crypto_provider::svid_crypto_provider;
 use margaret_spiffe_svid_client::svid_server_cert_verifier::SvidServerCertVerifier;
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 
@@ -19,11 +20,17 @@ pub fn build_mtls_client_config(
     let cert_chain = vec![CertificateDer::from(leaf_der.to_vec())];
     let private_key = PrivateKeyDer::try_from(leaf_key_der.to_vec()).unwrap();
 
-    ClientConfig::builder()
+    ClientConfig::builder_with_provider(svid_crypto_provider())
+        .with_safe_default_protocol_versions()
+        .expect("the provider supports the safe default protocol versions")
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(
-            SvidServerCertVerifier::new(build_root_cert_store_with_ca(), spiffe_trust_domain)
-                .unwrap(),
+            SvidServerCertVerifier::new(
+                build_root_cert_store_with_ca(),
+                spiffe_trust_domain,
+                svid_crypto_provider(),
+            )
+            .unwrap(),
         ))
         .with_client_auth_cert(cert_chain, private_key)
         .unwrap()

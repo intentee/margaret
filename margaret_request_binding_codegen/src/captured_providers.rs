@@ -27,14 +27,20 @@ fn provider_kind(binding: &RequestBinding) -> Option<CapturedProviderKind> {
         }),
         RequestBinding::AssetBag
         | RequestBinding::CurrentRequest
+        | RequestBinding::FormContent { .. }
         | RequestBinding::FormRequest { .. }
         | RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }
+        | RequestBinding::JsonContent { .. }
         | RequestBinding::Next
         | RequestBinding::BearerToken { .. }
+        | RequestBinding::IntrospectedBearerToken { .. }
         | RequestBinding::PeerSpiffeId
+        | RequestBinding::RequestBodyStream
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
+        | RequestBinding::Session { .. }
+        | RequestBinding::UploadedFiles
         | RequestBinding::Views => None,
     }
 }

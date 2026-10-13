@@ -32,7 +32,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_single_plain_tag() {
+    fn reads_a_single_plain_tag_so_the_site_names_one_declaration() {
         let tag = read_reference_tag(&args(&parse_quote!(#[middleware(logged)])), "the site")
             .expect("the tag is read");
 
@@ -40,7 +40,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_reference_without_a_tag() {
+    fn rejects_a_reference_without_a_tag_since_it_names_nothing_to_attach() {
         assert!(read_reference_tag(&args(&parse_quote!(#[middleware])), "the site").is_err());
     }
 

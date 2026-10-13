@@ -3,7 +3,7 @@ use std::path::Path;
 use margaret_container_tests::generate_container_source::generate_container_source;
 
 #[test]
-fn weaves_console_arguments_through_dependencies() {
+fn weaves_console_arguments_through_dependencies_so_roots_receive_every_input_below() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/serve_input_propagation");
     let source: String = generate_container_source("crate", &directory)

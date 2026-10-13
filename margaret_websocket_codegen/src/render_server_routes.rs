@@ -1,3 +1,4 @@
+use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
@@ -22,7 +23,6 @@ pub(crate) fn render_server_routes(
         format_ident!("_routes")
     };
     let entries = sessions.iter().map(|session_plan| {
-        let path = &session_plan.session.path;
         let module = format_ident!("{}", session_plan.session.module_name);
         let routes_argument = session_plan
             .session
@@ -42,21 +42,20 @@ pub(crate) fn render_server_routes(
         };
         quote! {
             margaret::framework::http::route_entry::RouteEntry::web_socket(
-                #path,
                 #upgrade_call,
                 #middleware,
             ),
         }
     });
+    let session_count = Literal::usize_unsuffixed(sessions.len());
 
-    let list = quote! { ::std::vec::Vec::from([#(#entries)*]) };
     quote! {
         #[must_use]
         pub fn #function(
             container: &super::super::container::Container,
             #routes_name: &::std::sync::Arc<super::super::routes::Routes>,
-        ) -> ::std::vec::Vec<margaret::framework::http::route_entry::RouteEntry> {
-            #list
+        ) -> [margaret::framework::http::route_entry::RouteEntry; #session_count] {
+            [#(#entries)*]
         }
     }
 }

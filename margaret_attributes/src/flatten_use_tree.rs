@@ -3,11 +3,6 @@ use syn::UseTree;
 use crate::canonical_path::CanonicalPath;
 use crate::flattened_import::FlattenedImport;
 
-struct UseTreeAnchor<'tree> {
-    prefix: Vec<String>,
-    tree: &'tree UseTree,
-}
-
 fn resolve_anchor<'tree>(tree: &'tree UseTree, module_path: &[String]) -> UseTreeAnchor<'tree> {
     let mut base = module_path.to_vec();
     let mut current = tree;
@@ -57,6 +52,7 @@ fn flatten(tree: &UseTree, prefix: Vec<String>) -> Vec<FlattenedImport> {
                 path: CanonicalPath::new(segments),
             }]
         }
+        UseTree::Rename(use_rename) if use_rename.rename == "_" => Vec::new(),
         UseTree::Rename(use_rename) => {
             let mut segments = prefix;
             segments.push(use_rename.ident.to_string());
@@ -73,6 +69,11 @@ fn flatten(tree: &UseTree, prefix: Vec<String>) -> Vec<FlattenedImport> {
             .collect(),
         UseTree::Glob(_) => Vec::new(),
     }
+}
+
+struct UseTreeAnchor<'tree> {
+    prefix: Vec<String>,
+    tree: &'tree UseTree,
 }
 
 pub(crate) fn flatten_use_tree(tree: &UseTree, module_path: &[String]) -> Vec<FlattenedImport> {
@@ -179,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn flattens_a_rename_under_its_alias() {
+    fn flattens_a_rename_under_its_alias_so_the_local_name_resolves_to_the_original() {
         assert_eq!(
             entries(
                 &parse_quote!(
@@ -192,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn flattens_a_group() {
+    fn flattens_each_group_member_under_the_shared_prefix_like_a_separate_import() {
         assert_eq!(
             entries(
                 &parse_quote!(
@@ -205,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn skips_the_self_group_member() {
+    fn skips_the_self_group_member_so_no_import_binds_the_self_keyword() {
         assert_eq!(
             entries(
                 &parse_quote!(
@@ -218,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_a_glob() {
+    fn flattens_a_glob_to_no_entry_because_it_binds_no_name_of_its_own() {
         assert!(
             entries(
                 &parse_quote!(

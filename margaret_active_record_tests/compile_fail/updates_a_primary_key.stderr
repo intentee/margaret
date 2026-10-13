@@ -1,0 +1,7 @@
+error[E0609]: no field `id` on type `margaret_active_record_tests::margaret::models::models_article_article::columns::Columns<Assigning>`
+  --> compile_fail/updates_a_primary_key.rs:11:45
+   |
+11 |         .update(database, |columns| columns.id.to(Uuid::nil()))
+   |                                             ^^ unknown field
+   |
+   = note: available fields are: `title`, `price`, `status`, `cover`, `tags`, `author`

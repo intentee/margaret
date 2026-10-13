@@ -27,7 +27,7 @@ mod tests {
     use super::ConstructionError;
 
     #[test]
-    fn passes_a_successful_outcome_through_unchanged() {
+    fn passes_a_successful_outcome_through_unchanged_so_wrapping_only_affects_failures() {
         let outcome: anyhow::Result<u8> = Ok(7);
 
         assert_eq!(

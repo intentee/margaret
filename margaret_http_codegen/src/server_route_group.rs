@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
-use matchit::InsertError;
-use matchit::Router;
-
+use margaret_route_method::route_method::RouteMethod;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
 use crate::http_codegen_error::HttpCodegenError;
@@ -11,14 +9,12 @@ use crate::http_route::HttpRoute;
 use crate::route_group::RouteGroup;
 
 pub(crate) struct ServerRouteGroup {
-    matcher: Router<()>,
     paths: BTreeMap<String, RouteGroup>,
 }
 
 impl ServerRouteGroup {
     pub(crate) fn new() -> Self {
         Self {
-            matcher: Router::new(),
             paths: BTreeMap::new(),
         }
     }
@@ -27,38 +23,17 @@ impl ServerRouteGroup {
         &mut self,
         server: &str,
         path: RoutePath,
-        method: String,
+        method: RouteMethod,
         route: HttpRoute,
     ) -> Result<(), HttpCodegenError> {
         let responder = route.responder_path.to_string();
         let pattern = path.pattern().to_owned();
-
         let group = match self.paths.entry(pattern.clone()) {
             Entry::Occupied(occupied) => occupied.into_mut(),
-            Entry::Vacant(vacant) => {
-                self.matcher
-                    .insert(pattern.clone(), ())
-                    .map_err(|source| match source {
-                        InsertError::Conflict {
-                            with: conflicting_path,
-                        } => HttpCodegenError::ConflictingRoutePaths {
-                            conflicting_path,
-                            path: pattern.clone(),
-                            responder: responder.clone(),
-                            server: server.to_owned(),
-                        },
-                        source => HttpCodegenError::InvalidRoutePath {
-                            path: pattern.clone(),
-                            responder: responder.clone(),
-                            source,
-                        },
-                    })?;
-
-                vacant.insert(RouteGroup::new(path))
-            }
+            Entry::Vacant(vacant) => vacant.insert(RouteGroup::new(path)),
         };
 
-        match group.take_method(method.clone(), route) {
+        match group.take_method(method, route) {
             Some(existing) => Err(HttpCodegenError::DuplicateRoute {
                 existing_responder: existing.responder_path.to_string(),
                 method,

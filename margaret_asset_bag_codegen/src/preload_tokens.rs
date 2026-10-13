@@ -44,7 +44,7 @@ mod tests {
     }
 
     #[test]
-    fn classifies_a_module_preload() {
+    fn classifies_a_js_output_as_a_module_preload_so_it_is_fetched_as_a_module_script() {
         assert_eq!(
             preload_tokens("assets/chunk_ABC12345.js").to_string(),
             expected("Module", "assets/chunk_ABC12345.js")
@@ -52,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    fn classifies_a_style_preload() {
+    fn classifies_a_css_output_as_a_style_preload_so_it_is_fetched_as_a_stylesheet() {
         assert_eq!(
             preload_tokens("assets/page_ABC12345.css").to_string(),
             expected("Style", "assets/page_ABC12345.css")
@@ -60,7 +60,7 @@ mod tests {
     }
 
     #[test]
-    fn classifies_a_font_preload() {
+    fn classifies_a_woff2_output_as_a_font_preload_so_it_is_fetched_as_a_font() {
         assert_eq!(
             preload_tokens("assets/inter_ABC12345.woff2").to_string(),
             expected("Font", "assets/inter_ABC12345.woff2")
@@ -68,7 +68,7 @@ mod tests {
     }
 
     #[test]
-    fn classifies_an_image_preload() {
+    fn classifies_a_png_output_as_an_image_preload_so_it_is_fetched_as_an_image() {
         assert_eq!(
             preload_tokens("assets/logo_ABC12345.png").to_string(),
             expected("Image", "assets/logo_ABC12345.png")

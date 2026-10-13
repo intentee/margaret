@@ -40,18 +40,18 @@ mod tests {
     use syn::Attribute;
     use syn::parse_quote;
 
-    use crate::canonical_path::CanonicalPath;
+    use crate::indexed_attribute::IndexedAttribute;
     use crate::indexed_item::IndexedItem;
     use crate::item_kind::ItemKind;
     use crate::matched_attribute::MatchedAttribute;
     use crate::struct_shape::StructShape;
 
-    fn item_bearing(attribute: Attribute) -> IndexedItem {
+    fn item_bearing(attribute: &Attribute) -> IndexedItem {
         IndexedItem::new(
             ItemKind::Struct(StructShape::Unit),
             "Service".to_string(),
-            CanonicalPath::new(vec!["crate".to_string(), "Service".to_string()]),
-            vec![attribute],
+            vec!["crate".to_string()],
+            vec![IndexedAttribute::new(attribute)],
             Vec::new(),
             Vec::new(),
             false,
@@ -59,24 +59,24 @@ mod tests {
     }
 
     #[test]
-    fn path_is_the_attributes_written_path() {
-        let item = item_bearing(parse_quote!(#[ns::tagged]));
+    fn path_is_the_attributes_written_path_so_it_matches_what_the_source_declares() {
+        let item = item_bearing(&parse_quote!(#[ns::tagged]));
         let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
 
         assert_eq!(matched.path(), "ns::tagged");
     }
 
     #[test]
-    fn args_parse_the_matched_attribute() {
-        let item = item_bearing(parse_quote!(#[singleton]));
+    fn args_parse_the_matched_attribute_so_interpreters_read_its_own_arguments() {
+        let item = item_bearing(&parse_quote!(#[singleton]));
         let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
 
         assert!(matched.args().expect("the arguments parse").is_empty());
     }
 
     #[test]
-    fn args_are_parsed_once_and_reused() {
-        let item = item_bearing(parse_quote!(#[responds_to_http(method = "get")]));
+    fn args_are_parsed_once_and_reused_so_repeated_reads_never_reparse_the_attribute() {
+        let item = item_bearing(&parse_quote!(#[responds_to_http(method = RouteMethod::Get)]));
         let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
 
         let first = matched.args().expect("the arguments parse");

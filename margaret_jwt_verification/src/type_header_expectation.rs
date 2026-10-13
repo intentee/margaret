@@ -7,24 +7,33 @@ use crate::type_rejection::TypeRejection;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TypeHeaderExpectation {
-    Optional(JwtType),
     Required(JwtType),
+    UntypedOr(&'static [JwtType]),
 }
 
 impl TypeHeaderExpectation {
     pub(crate) fn check(self, typ: Option<&HeaderType>) -> ControlFlow<TypeRejection> {
-        let (Self::Optional(expected) | Self::Required(expected)) = self;
-
-        match typ {
-            None => match self {
-                Self::Optional(_) => ControlFlow::Continue(()),
-                Self::Required(_) => ControlFlow::Break(TypeRejection::Missing { expected }),
+        match self {
+            Self::Required(expected) => match typ {
+                None => ControlFlow::Break(TypeRejection::Missing { expected }),
+                Some(HeaderType::Supported(found)) if *found == expected => {
+                    ControlFlow::Continue(())
+                }
+                Some(found) => ControlFlow::Break(TypeRejection::Mismatch {
+                    expected,
+                    found: found.clone(),
+                }),
             },
-            Some(HeaderType::Supported(found)) if *found == expected => ControlFlow::Continue(()),
-            Some(found) => ControlFlow::Break(TypeRejection::Mismatch {
-                expected,
-                found: found.clone(),
-            }),
+            Self::UntypedOr(accepted) => match typ {
+                None => ControlFlow::Continue(()),
+                Some(HeaderType::Supported(found)) if accepted.contains(found) => {
+                    ControlFlow::Continue(())
+                }
+                Some(found) => ControlFlow::Break(TypeRejection::Unaccepted {
+                    accepted,
+                    found: found.clone(),
+                }),
+            },
         }
     }
 }

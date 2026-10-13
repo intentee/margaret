@@ -84,7 +84,7 @@ mod tests {
                 name: "config".to_string(),
                 value: value(true, &["std", "path", "PathBuf"]),
             }),
-            r#".arg(clap::Arg::new("config").long("config").required(true).value_parser(clap::value_parser!(std::path::PathBuf)),)"#
+            r#".arg(clap::Arg::new("config").long("config").required(true).value_parser(clap::value_parser!(::std::path::PathBuf)),)"#
         );
     }
 
@@ -106,7 +106,7 @@ mod tests {
                 id: "name".to_string(),
                 value: value(true, &["std", "string", "String"]),
             }),
-            r#".arg(clap::Arg::new("name").required(true).value_parser(clap::value_parser!(std::string::String)),)"#
+            r#".arg(clap::Arg::new("name").required(true).value_parser(clap::value_parser!(::std::string::String)),)"#
         );
     }
 }

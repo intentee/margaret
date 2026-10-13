@@ -1,0 +1,24 @@
+[package]
+name = "margaret_codegen_oauth_clients_fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
+margaret = { workspace = true, features = ["runtime"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
+validator = { workspace = true, features = ["derive"] }
+zeroize = { workspace = true }
+
+[build-dependencies]
+margaret = { workspace = true, default-features = false, features = ["codegen"] }
+
+[lints]
+workspace = true

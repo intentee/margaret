@@ -1,5 +1,6 @@
 pub mod blocking_middleware;
 pub mod conversation_message;
+pub mod cookie_setting_session_factory;
 pub mod driver_harness;
 pub mod failing_chunk;
 pub mod failing_dispatch;

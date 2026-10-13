@@ -8,16 +8,11 @@ use crate::field_base::field_base;
 use crate::framework_attribute::FrameworkAttribute;
 use crate::identifier::Identifier;
 use crate::indexed_item::IndexedItem;
+use crate::indexed_struct::IndexedStruct;
+use crate::item_kind::ItemKind;
 use crate::matched_attribute::MatchedAttribute;
 use crate::name_allocator::NameAllocator;
 use crate::path_resolver::PathResolver;
-
-fn module_of(item: &IndexedItem) -> &[String] {
-    item.canonical_path()
-        .segments()
-        .split_last()
-        .map_or(&[], |(_, module)| module)
-}
 
 fn allocate_identifiers(items: &[IndexedItem]) -> HashMap<CanonicalPath, Identifier> {
     let mut paths: Vec<&CanonicalPath> = items
@@ -57,6 +52,20 @@ impl AttributeIndex {
     }
 
     #[must_use]
+    pub fn indexed_struct<'index>(
+        &'index self,
+        item: &'index IndexedItem,
+    ) -> Option<IndexedStruct<'index>> {
+        match item.kind() {
+            ItemKind::Struct(shape) => self
+                .identifiers
+                .get(item.canonical_path())
+                .map(|identifier| IndexedStruct { identifier, shape }),
+            ItemKind::Enum | ItemKind::Function | ItemKind::Module | ItemKind::Trait => None,
+        }
+    }
+
+    #[must_use]
     pub fn is_imported(&self, target: &CanonicalPath) -> bool {
         self.resolver.is_imported(target)
     }
@@ -87,12 +96,12 @@ impl AttributeIndex {
 
     #[must_use]
     pub fn resolve_item_path(&self, item: &IndexedItem, path: &Path) -> Option<CanonicalPath> {
-        self.resolve_module_path(module_of(item), path)
+        self.resolve_module_path(item.module_path(), path)
     }
 
     #[must_use]
     pub fn resolve_item_type(&self, item: &IndexedItem, declared: &Type) -> Option<CanonicalPath> {
-        self.resolve_module_type(module_of(item), declared)
+        self.resolve_module_type(item.module_path(), declared)
     }
 
     #[must_use]

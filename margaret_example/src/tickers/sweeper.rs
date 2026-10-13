@@ -6,9 +6,9 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::scheduled_with_tick_timer;
 
-use crate::deployment_environment::DeploymentEnvironment;
-use crate::metrics::Metrics;
-use crate::sweep_interval::SWEEP_INTERVAL;
+use crate::config::deployment_environment::DeploymentEnvironment;
+use crate::constants::sweep_interval::SWEEP_INTERVAL;
+use crate::singletons::metrics::Metrics;
 
 #[scheduled_with_tick_timer(interval = SWEEP_INTERVAL, behavior = MissedTickBehavior::Delay)]
 pub struct Sweeper {
@@ -17,18 +17,16 @@ pub struct Sweeper {
 }
 
 impl Sweeper {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
     pub fn create(
         deployment_environment: Arc<DeploymentEnvironment>,
         metrics: Arc<Metrics>,
-    ) -> anyhow::Result<Self> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             deployment_environment,
             metrics,
-        })
+        }
     }
 
     /// # Errors

@@ -2,9 +2,9 @@ use std::ops::ControlFlow;
 
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
-pub(crate) enum ParameterValue<TValue> {
+pub enum ParameterValue<TValue> {
     Supported(TValue),
     Unsupported(String),
 }

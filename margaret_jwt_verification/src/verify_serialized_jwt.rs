@@ -1,26 +1,33 @@
+use std::ops::ControlFlow;
+
 use serde::de::DeserializeOwned;
 
-use margaret_jws_verification::compact_jws::CompactJws;
-use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_registered_claims::numeric_date::NumericDate;
 
+use crate::attribute_serialized_jwt::attribute_serialized_jwt;
 use crate::jwt_expectation::JwtExpectation;
+use crate::jwt_profile::JwtProfile;
+use crate::jwt_profiling::JwtProfiling;
 use crate::jwt_rejection::JwtRejection;
 use crate::jwt_verification::JwtVerification;
-use crate::verify_jwt::verify_jwt;
 
 #[must_use]
-pub fn verify_serialized_jwt<TClaims: DeserializeOwned>(
+pub fn verify_serialized_jwt<TClaims: DeserializeOwned, TProfile: JwtProfile>(
     key_set: &VerificationKeySet,
     token: &str,
     expectation: &JwtExpectation,
     now: NumericDate,
-) -> JwtVerification<TClaims> {
-    match CompactJws::parse(token) {
-        CompactJwsParsing::Parsed(jws) => verify_jwt(key_set, &jws, expectation, now),
-        CompactJwsParsing::Rejected(rejection) => {
-            JwtVerification::Rejected(JwtRejection::Jws(rejection))
+) -> JwtVerification<TClaims, TProfile> {
+    let attributed = match attribute_serialized_jwt(token, expectation) {
+        ControlFlow::Continue(attributed) => attributed,
+        ControlFlow::Break(rejection) => return JwtVerification::Rejected(rejection),
+    };
+
+    match attributed.profile::<TProfile>() {
+        JwtProfiling::Profiled(profiled) => profiled.verify(key_set, now),
+        JwtProfiling::Rejected(rejection) => {
+            JwtVerification::Rejected(JwtRejection::Type(rejection))
         }
     }
 }

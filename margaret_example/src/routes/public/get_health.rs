@@ -5,22 +5,21 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
-use crate::app_name::AppName;
+use crate::config::app_name::AppName;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/health", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/health", server = "public")]
 pub struct GetHealth {
     app_name: Arc<AppName>,
 }
 
 impl GetHealth {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(app_name: Arc<AppName>) -> anyhow::Result<Self> {
-        Ok(Self { app_name })
+    pub fn create(app_name: Arc<AppName>) -> Self {
+        Self { app_name }
     }
 
     /// # Errors

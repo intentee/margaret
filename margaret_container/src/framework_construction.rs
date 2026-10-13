@@ -1,6 +1,8 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 
+use crate::constructor_outcome::ConstructorOutcome;
 use crate::framework_dependency::FrameworkDependency;
+use crate::preparation_source::PreparationSource;
 
 pub enum FrameworkConstruction {
     Accessor {
@@ -11,11 +13,11 @@ pub enum FrameworkConstruction {
         dependencies: Vec<FrameworkDependency>,
         is_async: bool,
         method: String,
+        outcome: ConstructorOutcome,
     },
-    UriSelected {
-        argument_name: String,
-        resolver: CanonicalPath,
-        value_type: CanonicalPath,
+    Prepared {
+        method: String,
+        sources: Vec<PreparationSource>,
     },
     Unit,
 }

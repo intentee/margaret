@@ -8,7 +8,7 @@ use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 use margaret_jose_parameters::key_operation::KeyOperation;
 use margaret_jose_parameters::key_use::KeyUse;
 
-use crate::declared_algorithm::confirm_declared_algorithm;
+use crate::admitted_key::AdmittedKey;
 use crate::ignored_key_reason::IgnoredKeyReason;
 use crate::key_disclosure::KeyDisclosure;
 use crate::key_exclusion::KeyExclusion;
@@ -58,7 +58,7 @@ impl PublishedJwk {
     pub(crate) fn into_verification_key(
         self,
         composition: KeySetComposition,
-    ) -> ControlFlow<KeyExclusion, VerificationKey> {
+    ) -> ControlFlow<KeyExclusion, AdmittedKey> {
         let Self {
             alg,
             key_ops,
@@ -81,6 +81,9 @@ impl PublishedJwk {
             ParameterValue::Supported(KeyType::Oct) => {
                 return ControlFlow::Break(KeyExclusion::Disclosed(KeyDisclosure::SymmetricKey));
             }
+            ParameterValue::Supported(KeyType::OctetKeyPair) => {
+                PublishedPublicKey::OctetKeyPair(members)
+            }
             ParameterValue::Supported(KeyType::Rsa) => PublishedPublicKey::Rsa(members),
             ParameterValue::Unsupported(kty) => {
                 return ControlFlow::Break(KeyExclusion::Ignored(
@@ -92,15 +95,9 @@ impl PublishedJwk {
         verification_usage(key_use, key_ops, composition)
             .map_break(|rejection| KeyExclusion::Ignored(IgnoredKeyReason::Usage(rejection)))?;
 
-        let Some(kid) = kid else {
-            return ControlFlow::Break(KeyExclusion::Ignored(IgnoredKeyReason::MissingKeyId));
-        };
         let material = public_key
-            .into_material()
-            .map_break(|rejection| KeyExclusion::Ignored(IgnoredKeyReason::Material(rejection)))?;
-
-        confirm_declared_algorithm(alg, &material)
-            .map_break(|rejection| KeyExclusion::Ignored(IgnoredKeyReason::Algorithm(rejection)))?;
+            .into_material(alg)
+            .map_break(KeyExclusion::Ignored)?;
 
         if let Some(chain) = x5c {
             PublishedCertificate {
@@ -114,6 +111,9 @@ impl PublishedJwk {
             })?;
         }
 
-        ControlFlow::Continue(VerificationKey::new(kid, material))
+        ControlFlow::Continue(match kid {
+            Some(kid) => AdmittedKey::Identified(VerificationKey::new(kid, material)),
+            None => AdmittedKey::Unidentified(material),
+        })
     }
 }

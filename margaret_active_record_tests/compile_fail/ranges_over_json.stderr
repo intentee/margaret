@@ -1,0 +1,13 @@
+error[E0599]: the method `above` exists for struct `Operand<Article, Json<BTreeMap<String, String>>>`, but its trait bounds were not satisfied
+  --> compile_fail/ranges_over_json.rs:14:38
+   |
+14 |         .when(|article| article.tags.above(Json::new(BTreeMap::new())))
+   |                                      ^^^^^ method cannot be called on `Operand<Article, Json<BTreeMap<String, String>>>` due to unsatisfied trait bounds
+   |
+  ::: $WORKSPACE/margaret_active_record/src/json.rs
+   |
+   | pub struct Json<Payload> {
+   | ------------------------ doesn't satisfy `Json<BTreeMap<String, String>>: Ordered`
+   |
+   = note: the following trait bounds were not satisfied:
+           `Json<BTreeMap<String, String>>: Ordered`

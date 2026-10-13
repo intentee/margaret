@@ -1,4 +1,5 @@
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::jwt_verification::id_token_profile::IdTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 use margaret::framework::macros::infer_from_request;
 use margaret::framework::macros::infers_authenticated_user;
@@ -18,7 +19,7 @@ impl UpstreamRunnerProvider {
     #[infer_from_request]
     pub fn infer(
         &self,
-        #[bearer_token(issuer = upstream)] token: Option<VerifiedJwt<Claims>>,
+        #[bearer_token(issuer = upstream)] token: Option<VerifiedJwt<Claims, IdTokenProfile>>,
     ) -> anyhow::Result<AuthenticatedUserOutcome<UpstreamRunner>> {
         Ok(match token {
             Some(verified) => AuthenticatedUserOutcome::Authenticated(UpstreamRunner {

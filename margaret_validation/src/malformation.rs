@@ -4,18 +4,17 @@ use std::fmt::Result;
 
 #[derive(Debug)]
 pub enum Malformation {
-    Absent,
-    Unreadable,
+    Unreadable { source: serde_json::Error },
 }
 
 impl Display for Malformation {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
-        let message = match self {
-            Self::Absent => "the request input is absent",
-            Self::Unreadable => "the request input could not be interpreted",
-        };
-
-        formatter.write_str(message)
+        match self {
+            Self::Unreadable { source } => write!(
+                formatter,
+                "the request input could not be interpreted: {source}"
+            ),
+        }
     }
 }
 
@@ -24,18 +23,13 @@ mod tests {
     use super::Malformation;
 
     #[test]
-    fn describes_an_absent_input() {
-        assert_eq!(
-            Malformation::Absent.to_string(),
-            "the request input is absent"
-        );
-    }
+    fn describes_an_unreadable_input_with_its_cause() {
+        let source = serde_json::from_str::<u8>("\"text\"").expect_err("text is not a number");
+        let cause = source.to_string();
 
-    #[test]
-    fn describes_an_unreadable_input() {
         assert_eq!(
-            Malformation::Unreadable.to_string(),
-            "the request input could not be interpreted"
+            Malformation::Unreadable { source }.to_string(),
+            format!("the request input could not be interpreted: {cause}")
         );
     }
 }

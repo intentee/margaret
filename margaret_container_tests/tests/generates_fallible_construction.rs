@@ -58,7 +58,7 @@ fn renders_a_fallible_service_construction_that_depends_on_a_fallible_singleton(
 }
 
 #[test]
-fn constructs_a_fieldless_singleton_without_wrapping() {
+fn constructs_a_fieldless_singleton_without_wrapping_since_it_cannot_fail() {
     let source = fixture("fieldless");
 
     assert!(source.contains("crate::UnitMarker"));

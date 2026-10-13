@@ -11,7 +11,7 @@ mod tests {
     use super::bootstrap_argument_field_ident;
 
     #[test]
-    fn names_the_field_after_its_slot() {
+    fn names_the_bootstrap_field_after_its_slot_so_every_argument_field_is_distinct() {
         assert_eq!(bootstrap_argument_field_ident(3).to_string(), "argument3");
     }
 }

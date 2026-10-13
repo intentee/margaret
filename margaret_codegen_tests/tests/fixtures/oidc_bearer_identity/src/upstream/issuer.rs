@@ -1,32 +1,5 @@
-use margaret::framework::macros::constructor;
-use margaret::framework::macros::singleton;
-use margaret::framework::macros::trusts_oidc_issuer;
-use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
-use margaret::framework::token_trust::token_trust::TokenTrust;
+use margaret::framework::macros::verifies_tokens_from_issuer;
+use margaret::framework::trusted_issuer::issuer_keys::IssuerKeys;
 
-#[singleton]
-#[trusts_oidc_issuer(upstream)]
-pub struct Issuer {
-    token_trust: TokenTrust,
-}
-
-impl Issuer {
-    /// # Errors
-    ///
-    /// Returns an error when the trusted issuer identifier or audience is malformed.
-    #[constructor]
-    pub fn create() -> anyhow::Result<Self> {
-        Ok(Self {
-            token_trust: TokenTrust {
-                audience: "fixture".parse()?,
-                issuer: "https://upstream.fixture".parse()?,
-            },
-        })
-    }
-}
-
-impl DeclaresTokenTrust for Issuer {
-    fn token_trust(&self) -> &TokenTrust {
-        &self.token_trust
-    }
-}
+#[verifies_tokens_from_issuer(upstream, audience = "fixture", issuer = "https://upstream.fixture", keys = IssuerKeys::Discovered)]
+pub struct Issuer;

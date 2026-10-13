@@ -6,17 +6,17 @@ use rustls::ServerConnection;
 use rustls::pki_types::ServerName;
 
 use margaret_spiffe_svid::svid_certified_key_holder::SvidCertifiedKeyHolder;
+use margaret_spiffe_svid::svid_crypto_provider::svid_crypto_provider;
 use margaret_spiffe_svid_client_tests::build_client_config_with_svid_server_verifier::build_client_config_with_svid_server_verifier;
-use margaret_spiffe_svid_tests::install_crypto_provider::install_crypto_provider;
 use margaret_spiffe_svid_tests::pump_tls_handshake::pump_tls_handshake;
 
 #[test]
 fn server_fails_when_holder_has_no_cert() {
-    install_crypto_provider();
-
     let holder = SvidCertifiedKeyHolder::default();
 
-    let server_config = ServerConfig::builder()
+    let server_config = ServerConfig::builder_with_provider(svid_crypto_provider())
+        .with_safe_default_protocol_versions()
+        .expect("the provider supports the safe default protocol versions")
         .with_no_client_auth()
         .with_cert_resolver(Arc::new(holder));
     let client_config = build_client_config_with_svid_server_verifier();

@@ -1,3 +1,8 @@
+use margaret_macros::constructor;
+use margaret_macros::middleware;
+use margaret_macros::responds_to_http;
+use margaret_macros::singleton;
+
 #[singleton]
 struct RootStruct;
 
@@ -29,8 +34,8 @@ struct AliasedSingleton;
 #[ns::singleton]
 struct UnrelatedSingleton;
 
-#[singleton]
-#[singleton]
+#[middleware(logged)]
+#[middleware(traced)]
 struct RepeatedAttrs;
 
 use std::collections::{HashMap, HashSet};
@@ -41,6 +46,8 @@ const ROOT_CONST: u8 = 0;
 type RootAlias = u8;
 
 mod inline_module {
+    use margaret_macros::singleton;
+
     #[singleton]
     struct InsideInline;
 }

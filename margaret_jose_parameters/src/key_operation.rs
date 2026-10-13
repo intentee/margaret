@@ -108,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_operation_outside_the_registry() {
+    fn rejects_an_operation_outside_the_registry_so_no_unknown_one_is_misread() {
         assert!(serde_json::from_str::<KeyOperation>("\"attest\"").is_err());
     }
 
@@ -118,7 +118,7 @@ mod tests {
     }
 
     #[test]
-    fn displays_the_wire_name() {
+    fn displays_a_key_operation_as_its_registered_key_ops_name_as_written_in_a_jwk() {
         assert_eq!(KeyOperation::WrapKey.to_string(), "wrapKey");
     }
 

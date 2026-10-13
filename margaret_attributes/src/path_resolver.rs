@@ -15,10 +15,12 @@ fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
     match leaf {
         "Box" => Some(StandardLibraryItem::Box.std_path()),
         "Copy" => Some(copy_path()),
+        "From" => Some(StandardLibraryItem::From.std_path()),
         "Option" => Some(StandardLibraryItem::Option.std_path()),
         "Send" => Some(StandardLibraryItem::Send.std_path()),
         "String" => Some(StandardLibraryItem::String.std_path()),
         "Sync" => Some(StandardLibraryItem::Sync.std_path()),
+        "TryFrom" => Some(StandardLibraryItem::TryFrom.std_path()),
         "Vec" => Some(StandardLibraryItem::Vec.std_path()),
         primitive if is_copy_primitive(primitive) => {
             Some(CanonicalPath::new(vec![leaf.to_string()]))
@@ -295,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn resolves_an_imported_leaf() {
+    fn resolves_an_imported_name_to_the_canonical_path_of_the_item_it_imports() {
         let resolver = resolver(
             &[],
             &[Import {
@@ -324,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_generic_arguments_on_the_leaf() {
+    fn ignores_generic_arguments_on_the_leaf_so_generic_types_resolve_to_their_item() {
         let resolver = resolver(
             &[],
             &[Import {
@@ -345,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn resolves_a_same_module_defined_leaf() {
+    fn resolves_a_same_module_defined_leaf_so_local_items_need_no_import() {
         let resolver = resolver(&[&["crate", "models", "User"]], &[]);
 
         assert_eq!(
@@ -355,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn a_local_definition_shadows_the_prelude() {
+    fn a_local_definition_shadows_the_prelude_so_resolution_matches_rustc() {
         let resolver = resolver(&[&["crate", "String"]], &[]);
 
         assert_eq!(
@@ -381,6 +383,18 @@ mod tests {
     }
 
     #[test]
+    fn resolves_the_bare_conversion_traits_to_the_prelude() {
+        assert_eq!(
+            resolved(&PathResolver::default(), &parse_quote!(From), &["crate"]),
+            Some("std::convert::From".to_string())
+        );
+        assert_eq!(
+            resolved(&PathResolver::default(), &parse_quote!(TryFrom), &["crate"]),
+            Some("std::convert::TryFrom".to_string())
+        );
+    }
+
+    #[test]
     fn resolves_a_bare_copy_marker_to_the_prelude() {
         assert_eq!(
             resolved(&PathResolver::default(), &parse_quote!(Copy), &["crate"]),
@@ -389,7 +403,7 @@ mod tests {
     }
 
     #[test]
-    fn returns_none_for_an_unresolvable_leaf() {
+    fn returns_none_for_an_unresolvable_leaf_so_unknown_names_are_never_guessed() {
         assert_eq!(
             resolved(&PathResolver::default(), &parse_quote!(Unknown), &["crate"]),
             None
@@ -397,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn a_path_without_segments_is_unresolvable() {
+    fn a_path_without_segments_is_unresolvable_so_an_empty_path_names_no_item() {
         let empty = Path {
             leading_colon: None,
             segments: Punctuated::new(),
@@ -626,7 +640,7 @@ mod tests {
     }
 
     #[test]
-    fn follows_the_parents_import_through_super() {
+    fn follows_the_parents_import_through_super_so_super_paths_resolve_like_rustc() {
         let resolver = resolver(
             &[&["crate", "routes"], &["crate", "routes", "public"]],
             &[Import {
@@ -688,7 +702,7 @@ mod tests {
     }
 
     #[test]
-    fn peels_a_shared_reference() {
+    fn resolves_a_shared_reference_to_its_referent_so_a_borrow_names_the_borrowed_item() {
         let resolver = resolver(
             &[],
             &[Import {
@@ -705,7 +719,7 @@ mod tests {
     }
 
     #[test]
-    fn peels_a_mutable_reference() {
+    fn resolves_a_mutable_reference_to_its_referent_so_a_borrow_names_the_borrowed_item() {
         let resolver = resolver(
             &[],
             &[Import {
@@ -730,7 +744,7 @@ mod tests {
     }
 
     #[test]
-    fn recognizes_an_item_imported_by_name() {
+    fn recognizes_an_item_imported_by_name_so_codegen_can_tell_it_is_used() {
         let resolver = resolver(
             &[],
             &[Import {

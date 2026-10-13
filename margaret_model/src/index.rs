@@ -1,4 +1,5 @@
+#[derive(Debug, Eq, PartialEq)]
 pub struct Index {
-    pub columns: Vec<String>,
-    pub name: String,
+    pub columns: &'static [&'static str],
+    pub name: &'static str,
 }

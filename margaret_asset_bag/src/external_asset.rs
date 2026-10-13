@@ -28,7 +28,7 @@ mod tests {
     use super::ExternalAsset;
 
     #[test]
-    fn renders_an_async_defer_script_tag() {
+    fn renders_an_external_script_async_and_deferred_so_it_never_blocks_parsing() {
         assert_eq!(
             ExternalAsset::Script("https://challenges.example/api.js".to_string())
                 .render()
@@ -38,7 +38,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_stylesheet_link_tag() {
+    fn renders_an_external_stylesheet_link_to_its_url_as_given_without_a_root_prefix() {
         assert_eq!(
             ExternalAsset::Stylesheet("https://fonts.example/inter.css".to_string())
                 .render()
@@ -48,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn escapes_a_url_inside_the_attribute() {
+    fn escapes_an_external_url_inside_the_attribute_so_it_cannot_break_out_of_it() {
         assert_eq!(
             ExternalAsset::Script("https://example/s.js?a=1&b=\"x\"".to_string())
                 .render()

@@ -1,0 +1,4 @@
+mod merges_application_claims_into_the_registered_members;
+mod reports_application_claims_colliding_with_a_registered_member;
+mod reports_application_claims_that_are_not_an_object;
+mod reports_application_claims_that_cannot_be_serialized;

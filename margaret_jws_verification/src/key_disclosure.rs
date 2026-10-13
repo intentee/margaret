@@ -22,7 +22,7 @@ mod tests {
     use super::KeyDisclosure;
 
     #[test]
-    fn describes_every_disclosure() {
+    fn describes_every_key_disclosure_so_the_distrusted_key_log_names_the_leaked_secret() {
         assert_eq!(
             KeyDisclosure::PrivateKey.to_string(),
             "the key publishes its private key"

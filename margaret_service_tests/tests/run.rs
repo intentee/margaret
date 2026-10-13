@@ -28,7 +28,7 @@ impl Service for Fails {
 }
 
 #[tokio::test]
-async fn maps_clean_completion_to_succeeded() {
+async fn maps_clean_completion_to_succeeded_so_the_process_exits_with_success() {
     let mut manager = ServiceManager::default();
 
     manager.register_service(Completes);
@@ -44,7 +44,7 @@ async fn maps_clean_completion_to_succeeded() {
 }
 
 #[tokio::test]
-async fn maps_a_failing_service_to_failed() {
+async fn maps_a_failing_service_to_failed_so_the_process_exits_with_failure() {
     let mut manager = ServiceManager::default();
 
     manager.register_service(Fails);

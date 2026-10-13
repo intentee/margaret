@@ -7,6 +7,7 @@ use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
 use crate::request_binding_error::RequestBindingError;
 use crate::request_input_source::RequestInputSource;
+use crate::request_inputs::REQUEST_INPUTS;
 
 pub(crate) struct FormRequestArguments {
     pub(crate) source: RequestInputSource,
@@ -30,7 +31,7 @@ impl FormRequestArguments {
             let source = index
                 .resolve_item_path(item, &from)
                 .as_ref()
-                .and_then(RequestInputSource::from_canonical)
+                .and_then(|resolved| REQUEST_INPUTS.variant(resolved))
                 .ok_or_else(|| RequestBindingError::UnknownRequestInput {
                     subject: subject.to_string(),
                     parameter: position.to_string(),

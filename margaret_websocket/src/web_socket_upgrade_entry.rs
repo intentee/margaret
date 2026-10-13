@@ -15,6 +15,7 @@ use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::web_socket_driver_sender::WebSocketDriverSender;
 use margaret_http::web_socket_upgrade::WebSocketUpgrade;
+use margaret_websocket_session::created_web_socket_session::CreatedWebSocketSession;
 use margaret_websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome;
 use margaret_websocket_session::web_socket_session_factory::WebSocketSessionFactory;
 
@@ -93,8 +94,11 @@ where
         }
 
         let accept = derive_accept_key(key.as_bytes());
-        let session = match self.factory.create(handshake).await {
-            Ok(WebSocketSessionCreationOutcome::Created(session)) => session,
+        let CreatedWebSocketSession {
+            cookie_changes,
+            session,
+        } = match self.factory.create(handshake).await {
+            Ok(WebSocketSessionCreationOutcome::Created(created)) => created,
             Ok(WebSocketSessionCreationOutcome::Interrupted(continuation)) => return continuation,
             Err(error) => {
                 eprintln!("margaret_websocket: session creation failed: {error:#}");
@@ -113,12 +117,12 @@ where
             return ResponseContinuation::from(Response::text(500, "Internal Server Error"));
         }
 
-        ResponseContinuation::from(
+        cookie_changes.precede(ResponseContinuation::from(
             Response::text(101, "")
                 .header("connection", "Upgrade")
                 .header("sec-websocket-accept", accept)
                 .header("upgrade", "websocket"),
-        )
+        ))
     }
 }
 

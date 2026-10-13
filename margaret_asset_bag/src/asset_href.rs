@@ -27,7 +27,7 @@ mod tests {
     }
 
     #[test]
-    fn passes_an_absolute_url_through_unchanged() {
+    fn passes_an_absolute_url_through_unchanged_so_cdn_assets_keep_their_origin() {
         assert_eq!(
             AssetHref::Absolute("https://fonts.example/font.woff2").url(),
             "https://fonts.example/font.woff2"

@@ -14,46 +14,50 @@ enum IndexedAttributeArgs {
     Rejected(AttributeArgumentsError),
 }
 
-fn derive_path() -> CanonicalPath {
-    CanonicalPath::new(vec!["derive".to_string()])
-}
-
 pub struct IndexedAttribute {
     args: IndexedAttributeArgs,
     attribute: Attribute,
-    canonical_path: CanonicalPath,
     framework_attribute: Option<FrameworkAttribute>,
 }
 
 impl IndexedAttribute {
-    pub(crate) fn from_canonical(attribute: &Attribute, canonical_path: &CanonicalPath) -> Self {
+    pub(crate) fn from_resolution(attribute: &Attribute, resolved: Option<&CanonicalPath>) -> Self {
         let args = match AttributeArgs::from_attribute(attribute) {
             Ok(args) => IndexedAttributeArgs::Parsed(args),
             Err(rejected) => IndexedAttributeArgs::Rejected(rejected),
         };
 
-        let framework_attribute = FrameworkAttribute::from_canonical_path(canonical_path);
+        let framework_attribute = FrameworkAttribute::recognize(attribute.path(), resolved);
 
         Self {
             args,
             attribute: attribute.clone(),
-            canonical_path: canonical_path.clone(),
             framework_attribute,
         }
     }
 
     #[must_use]
     pub fn new(attribute: &Attribute) -> Self {
-        let canonical_path = CanonicalPath::new(
-            attribute
-                .path()
-                .segments
-                .iter()
-                .map(|segment| segment.ident.to_string())
-                .collect(),
-        );
+        Self::from_resolution(attribute, None)
+    }
 
-        Self::from_canonical(attribute, &canonical_path)
+    #[cfg(test)]
+    pub(crate) fn resolving_to_margaret_macro(attribute: &Attribute) -> Self {
+        let name = attribute
+            .path()
+            .get_ident()
+            .expect("a margaret macro is named by one identifier")
+            .to_string();
+
+        Self::from_resolution(
+            attribute,
+            Some(&CanonicalPath::new(vec![
+                "margaret".to_string(),
+                "framework".to_string(),
+                "macros".to_string(),
+                name,
+            ])),
+        )
     }
 
     /// # Errors
@@ -70,7 +74,7 @@ impl IndexedAttribute {
     ///
     /// Returns `AttributeError::Arguments`.
     pub fn derived_paths(&self) -> Result<Vec<Path>, AttributeError> {
-        if self.canonical_path != derive_path() {
+        if !self.attribute.path().is_ident("derive") {
             return Ok(Vec::new());
         }
 
@@ -130,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn distinguishes_bare_attributes_from_argument_lists() {
+    fn distinguishes_a_bare_attribute_from_an_empty_list_so_markers_can_forbid_parens() {
         let bare = IndexedAttribute::new(&parse_quote!(#[tag]));
         let listed = IndexedAttribute::new(&parse_quote!(#[tag()]));
 

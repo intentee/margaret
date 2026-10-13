@@ -19,6 +19,13 @@ impl SignedClaims {
         Self::signed(&key, &key.header(), claims)
     }
 
+    fn signed(key: &FixtureKey, header: &Value, claims: &Value) -> Self {
+        Self {
+            key_set: VerificationKeySet::assemble(vec![key.verification_key()]),
+            token: key.token(header, claims),
+        }
+    }
+
     #[must_use]
     pub fn typed(typ: &str, claims: &Value) -> Self {
         let key = FixtureKey::generate(Curve::P256, "kid");
@@ -27,12 +34,5 @@ impl SignedClaims {
         header["typ"] = json!(typ);
 
         Self::signed(&key, &header, claims)
-    }
-
-    fn signed(key: &FixtureKey, header: &Value, claims: &Value) -> Self {
-        Self {
-            key_set: VerificationKeySet::assemble(vec![key.verification_key()]),
-            token: key.token(header, claims),
-        }
     }
 }

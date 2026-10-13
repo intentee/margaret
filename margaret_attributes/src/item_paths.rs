@@ -36,7 +36,7 @@ mod tests {
     }
 
     #[test]
-    fn recognises_a_path_that_was_indexed() {
+    fn recognises_a_path_that_was_indexed_so_local_definitions_resolve() {
         let paths = ItemPaths::from_iter([path("Indexed")]);
 
         assert!(paths.contains(&path("Indexed")));

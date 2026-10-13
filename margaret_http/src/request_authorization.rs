@@ -1,3 +1,6 @@
+use std::ops::ControlFlow;
+
+use crate::bearer_challenge::BearerChallenge;
 use crate::bearer_token::BearerToken;
 
 const BEARER_SCHEME: &str = "Bearer";
@@ -67,11 +70,28 @@ impl RequestAuthorization {
             Self::Malformed
         }
     }
+
+    /// # Errors
+    ///
+    /// Breaks with the `BearerChallenge` answering a request that presents no bearer token, or a
+    /// malformed one.
+    pub fn bearer(&self) -> ControlFlow<BearerChallenge, &BearerToken> {
+        match self {
+            Self::Absent | Self::OtherScheme => {
+                ControlFlow::Break(BearerChallenge::MissingCredentials)
+            }
+            Self::Bearer(token) => ControlFlow::Continue(token),
+            Self::Malformed => ControlFlow::Break(BearerChallenge::InvalidRequest),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::ops::ControlFlow;
+
     use super::RequestAuthorization;
+    use crate::bearer_challenge::BearerChallenge;
     use crate::bearer_token::BearerToken;
 
     fn bearer(token: &str) -> RequestAuthorization {
@@ -79,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_an_absent_field_as_absent() {
+    fn reads_an_absent_field_as_absent_so_the_request_is_challenged_for_credentials() {
         assert_eq!(
             RequestAuthorization::parse(None),
             RequestAuthorization::Absent
@@ -87,7 +107,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_bearer_token() {
+    fn reads_the_token_after_the_bearer_scheme_as_the_credential_to_verify() {
         assert_eq!(
             RequestAuthorization::parse(Some("Bearer mF_9.B5f-4.1JqM")),
             bearer("mF_9.B5f-4.1JqM")
@@ -95,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn compares_the_scheme_case_insensitively() {
+    fn compares_the_scheme_case_insensitively_as_rfc_9110_requires_of_auth_schemes() {
         assert_eq!(
             RequestAuthorization::parse(Some("bEARER abc")),
             bearer("abc")
@@ -103,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_several_spaces_before_the_token() {
+    fn accepts_several_spaces_before_the_token_as_the_header_grammar_allows() {
         assert_eq!(
             RequestAuthorization::parse(Some("Bearer   abc")),
             bearer("abc")
@@ -111,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn keeps_trailing_padding_of_the_token() {
+    fn keeps_trailing_padding_of_the_token_so_the_verified_credential_is_unaltered() {
         assert_eq!(
             RequestAuthorization::parse(Some("Bearer abc+/==")),
             bearer("abc+/==")
@@ -127,7 +147,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_empty_bearer_token() {
+    fn rejects_an_empty_bearer_token_as_malformed_so_it_draws_an_invalid_request() {
         assert_eq!(
             RequestAuthorization::parse(Some("Bearer ")),
             RequestAuthorization::Malformed
@@ -135,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_token_with_a_space() {
+    fn rejects_a_token_with_a_space_rather_than_verifying_only_part_of_it() {
         assert_eq!(
             RequestAuthorization::parse(Some("Bearer abc def")),
             RequestAuthorization::Malformed
@@ -143,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_padding_inside_the_token() {
+    fn rejects_padding_inside_the_token_since_b64token_allows_it_only_at_the_end() {
         assert_eq!(
             RequestAuthorization::parse(Some("Bearer ab=c")),
             RequestAuthorization::Malformed
@@ -151,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_token_of_padding_alone() {
+    fn rejects_a_token_of_padding_alone_since_b64token_needs_at_least_one_symbol() {
         assert_eq!(
             RequestAuthorization::parse(Some("Bearer ==")),
             RequestAuthorization::Malformed
@@ -159,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_another_scheme_with_parameters() {
+    fn reads_a_non_bearer_scheme_with_parameters_as_another_scheme_to_challenge_it() {
         assert_eq!(
             RequestAuthorization::parse(Some("Basic dXNlcjpwYXNz")),
             RequestAuthorization::OtherScheme
@@ -167,7 +187,38 @@ mod tests {
     }
 
     #[test]
-    fn reads_another_scheme_alone() {
+    fn continues_with_the_bearer_token_so_the_request_proceeds_to_verification() {
+        assert_eq!(
+            bearer("abc").bearer(),
+            ControlFlow::Continue(&BearerToken::new("abc".to_string()))
+        );
+    }
+
+    #[test]
+    fn challenges_a_request_without_a_bearer_token_for_credentials() {
+        assert_eq!(
+            [
+                RequestAuthorization::Absent,
+                RequestAuthorization::parse(Some("Basic dXNlcjpwYXNz")),
+                RequestAuthorization::OtherScheme,
+            ]
+            .iter()
+            .map(RequestAuthorization::bearer)
+            .collect::<Vec<_>>(),
+            vec![ControlFlow::Break(BearerChallenge::MissingCredentials); 3]
+        );
+    }
+
+    #[test]
+    fn challenges_a_malformed_authorization_as_an_invalid_request() {
+        assert_eq!(
+            RequestAuthorization::Malformed.bearer(),
+            ControlFlow::Break(BearerChallenge::InvalidRequest)
+        );
+    }
+
+    #[test]
+    fn reads_a_bare_non_bearer_scheme_as_another_scheme_so_it_is_challenged_for_credentials() {
         assert_eq!(
             RequestAuthorization::parse(Some("Negotiate")),
             RequestAuthorization::OtherScheme
@@ -175,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_empty_field() {
+    fn reads_an_empty_field_as_malformed_rather_than_absent_since_a_header_was_sent() {
         assert_eq!(
             RequestAuthorization::parse(Some("")),
             RequestAuthorization::Malformed

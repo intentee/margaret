@@ -1,0 +1,32 @@
+use margaret::framework::active_record::lookup::Lookup;
+use margaret::framework::active_record::model::Model;
+use margaret_active_record_tests::models::node::Node;
+use margaret_active_record_tests::models::node_with_grandparent::NodeWithGrandparent;
+use margaret_active_record_tests::models::node_with_parent::NodeWithParent;
+
+use crate::postgres::created_node::created_node;
+use crate::postgres::started_with_models::started_with_models;
+
+#[tokio::test]
+async fn loads_an_optional_parent_of_an_optional_parent() {
+    let started = started_with_models().await;
+    let database = started.database.as_ref();
+    let root = created_node(database, "root", None).await;
+    let leaf = created_node(database, "leaf", Some(&root)).await;
+
+    assert_eq!(
+        Node::query()
+            .id
+            .eq(leaf.id)
+            .load::<NodeWithGrandparent, _>(database)
+            .await
+            .expect("the node is loaded"),
+        Lookup::Found(NodeWithGrandparent {
+            node: leaf,
+            parent: Some(NodeWithParent {
+                node: root,
+                parent: None,
+            }),
+        })
+    );
+}

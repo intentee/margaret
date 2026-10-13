@@ -66,7 +66,9 @@ mod tests {
         attribute: &Attribute,
         declared: &Type,
     ) -> Result<EnvironmentVariable, EnvironmentVariableCodegenError> {
-        let indexed = IndexedSource::new("#[singleton]\nstruct Config;\n");
+        let indexed = IndexedSource::new(
+            "use margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n",
+        );
 
         read_environment_variable(
             &indexed.index,
@@ -81,7 +83,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_required_variable() {
+    fn requires_a_variable_whose_parameter_type_cannot_represent_its_absence() {
         assert_eq!(
             describe(
                 &parse_quote!(#[environment_variable(from = "DATABASE_URL")]),
@@ -92,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_an_optional_variable() {
+    fn makes_a_variable_optional_when_its_parameter_is_an_option_of_the_parsed_type() {
         assert_eq!(
             describe(
                 &parse_quote!(#[environment_variable(from = "WORKER_COUNT")]),
@@ -114,7 +116,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_a_malformed_name() {
+    fn rejects_a_name_containing_a_space_because_it_is_not_a_usable_variable_name() {
         assert!(
             describe(
                 &parse_quote!(#[environment_variable(from = "DATABASE URL")]),
@@ -125,7 +127,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_an_unusable_value_type() {
+    fn propagates_an_unusable_value_type_since_a_variable_parses_into_one_concrete_type() {
         assert!(
             describe(
                 &parse_quote!(#[environment_variable(from = "TAGS")]),

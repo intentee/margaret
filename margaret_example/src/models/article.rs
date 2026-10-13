@@ -3,15 +3,19 @@ use chrono::Utc;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
+use margaret::framework::active_record::key::Key;
 use margaret::framework::macros::model;
+use margaret::framework::model::column_default::ColumnDefault;
+use margaret::framework::model::on_delete::OnDelete;
 
-use crate::models::article_status::ArticleStatus;
+use crate::enums::article_status::ArticleStatus;
 use crate::models::author::Author;
 
 #[model(table = "articles")]
+#[index(name = "articles_by_author", fields = [author, id])]
 #[derive(Clone)]
 pub struct Article {
-    #[column(primary_key)]
+    #[column(primary_key, default = ColumnDefault::UuidV7)]
     pub id: Uuid,
     #[column]
     pub title: String,
@@ -31,7 +35,6 @@ pub struct Article {
     #[index]
     pub created_at: DateTime<Utc>,
     #[column]
-    #[foreign_key(on_delete = cascade)]
-    #[index]
-    pub author: Author,
+    #[foreign_key(on_delete = OnDelete::Cascade)]
+    pub author: Key<Author>,
 }

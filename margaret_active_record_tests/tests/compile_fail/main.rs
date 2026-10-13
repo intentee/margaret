@@ -1,0 +1,1 @@
+mod compiles_exactly_the_queries_the_models_can_express;

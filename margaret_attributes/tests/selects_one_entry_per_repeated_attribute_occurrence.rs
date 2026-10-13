@@ -12,7 +12,7 @@ fn selects_one_entry_per_repeated_attribute_occurrence() {
         .expect("the valid fixture indexes cleanly")
         .build();
     let occurrences = index
-        .select_framework_attribute(FrameworkAttribute::Singleton)
+        .select_framework_attribute(FrameworkAttribute::Middleware)
         .filter(|matched| {
             matched.item().canonical_path().to_string() == "valid_crate::RepeatedAttrs"
         })

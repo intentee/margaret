@@ -1,6 +1,3 @@
-#[cfg(test)]
-use syn::Attribute;
-
 use crate::canonical_path::CanonicalPath;
 use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
@@ -19,6 +16,7 @@ pub struct IndexedItem {
     is_copy: bool,
     kind: ItemKind,
     methods: Vec<IndexedMethod>,
+    module_path: Vec<String>,
     trait_impls: Vec<IndexedTraitImpl>,
     variants: Vec<IndexedVariant>,
 }
@@ -33,6 +31,7 @@ impl IndexedItem {
             is_copy,
             kind,
             methods,
+            module_path,
             trait_impls,
             variants,
         } = parts;
@@ -45,6 +44,7 @@ impl IndexedItem {
             is_copy,
             kind,
             methods,
+            module_path,
             trait_impls,
             variants,
         }
@@ -54,23 +54,27 @@ impl IndexedItem {
     pub(crate) fn new(
         kind: ItemKind,
         identifier: String,
-        canonical_path: CanonicalPath,
-        attributes: Vec<Attribute>,
+        module_path: Vec<String>,
+        attributes: Vec<IndexedAttribute>,
         fields: Vec<IndexedField>,
         variants: Vec<IndexedVariant>,
         is_copy: bool,
     ) -> Self {
         Self {
-            attributes: attributes
-                .into_iter()
-                .map(|attribute| IndexedAttribute::new(&attribute))
-                .collect(),
-            canonical_path,
+            attributes,
+            canonical_path: CanonicalPath::new(
+                module_path
+                    .iter()
+                    .cloned()
+                    .chain([identifier.clone()])
+                    .collect(),
+            ),
             fields,
             identifier,
             is_copy,
             kind,
             methods: Vec::new(),
+            module_path,
             trait_impls: Vec::new(),
             variants,
         }
@@ -116,6 +120,11 @@ impl IndexedItem {
     #[must_use]
     pub fn methods(&self) -> &[IndexedMethod] {
         &self.methods
+    }
+
+    #[must_use]
+    pub fn module_path(&self) -> &[String] {
+        &self.module_path
     }
 
     #[must_use]

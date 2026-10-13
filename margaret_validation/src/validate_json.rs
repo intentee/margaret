@@ -2,18 +2,14 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use validator::Validate;
 
-use crate::malformation::Malformation;
 use crate::validation_result::ValidationResult;
 
 #[must_use]
-pub fn validate_json<Model>(data: Option<&Value>) -> ValidationResult<Model>
+pub fn validate_json<Model>(value: &Value) -> ValidationResult<Model>
 where
     Model: DeserializeOwned + Validate,
 {
-    match data {
-        Some(value) => ValidationResult::from_value(value),
-        None => ValidationResult::Malformed(Malformation::Absent),
-    }
+    ValidationResult::from_value(value)
 }
 
 #[cfg(test)]
@@ -24,7 +20,6 @@ mod tests {
     use validator::Validate;
 
     use super::validate_json;
-    use crate::malformation::Malformation;
     use crate::validation_result::ValidationResult;
 
     #[derive(Debug, Deserialize, Validate)]
@@ -35,46 +30,36 @@ mod tests {
         optional: Option<String>,
     }
 
-    fn outcome(data: Option<&Value>) -> Result<Sample, &'static str> {
-        match validate_json::<Sample>(data) {
+    fn outcome(value: &Value) -> Result<Sample, &'static str> {
+        match validate_json::<Sample>(value) {
             ValidationResult::Valid(sample) => Ok(sample),
             ValidationResult::Invalid(_) => Err("invalid"),
-            ValidationResult::Malformed(Malformation::Absent) => Err("absent"),
-            ValidationResult::Malformed(Malformation::Unreadable) => Err("unreadable"),
+            ValidationResult::Malformed(_) => Err("malformed"),
         }
     }
 
     #[test]
-    fn accepts_valid_fields() {
-        let body = json!({ "required": "here", "optional": "present" });
-        let sample = outcome(Some(&body)).expect("a valid body");
+    fn builds_the_model_from_a_json_body_that_passes_every_rule_so_the_handler_gets_its_values() {
+        let sample =
+            outcome(&json!({ "required": "here", "optional": "present" })).expect("a valid body");
 
         assert_eq!(sample.required, "here");
         assert_eq!(sample.optional.as_deref(), Some("present"));
     }
 
     #[test]
-    fn reports_a_rule_violation_as_invalid() {
-        let body = json!({ "required": "" });
-
+    fn reports_a_rule_violation_as_invalid_not_malformed_so_users_can_correct_it() {
         assert_eq!(
-            outcome(Some(&body)).expect_err("an invalid body"),
+            outcome(&json!({ "required": "" })).expect_err("an invalid body"),
             "invalid"
         );
     }
 
     #[test]
-    fn reports_an_absent_body_as_malformed() {
-        assert_eq!(outcome(None).expect_err("an absent body"), "absent");
-    }
-
-    #[test]
-    fn reports_an_unreadable_body_as_malformed() {
-        let body = json!({});
-
+    fn reports_an_uninterpretable_body_as_malformed_since_no_model_can_be_built() {
         assert_eq!(
-            outcome(Some(&body)).expect_err("an unreadable body"),
-            "unreadable"
+            outcome(&json!({})).expect_err("an uninterpretable body"),
+            "malformed"
         );
     }
 }

@@ -8,5 +8,8 @@ publish = false
 margaret = { workspace = true, features = ["runtime"] }
 uuid = { workspace = true }
 
+[build-dependencies]
+margaret = { workspace = true, default-features = false, features = ["codegen"] }
+
 [lints]
 workspace = true

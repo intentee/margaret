@@ -10,8 +10,7 @@ use crate::indexed_attribute::IndexedAttribute;
 pub struct IndexedParameter {
     attributes: Vec<IndexedAttribute>,
     declared: Type,
-    diagnostic_name: String,
-    holder: Ident,
+    name: Ident,
     position: usize,
 }
 
@@ -19,15 +18,13 @@ impl IndexedParameter {
     pub(crate) fn from_parts(
         attributes: Vec<IndexedAttribute>,
         declared: Type,
-        diagnostic_name: String,
-        holder: Ident,
+        name: Ident,
         position: usize,
     ) -> Self {
         Self {
             attributes,
             declared,
-            diagnostic_name,
-            holder,
+            name,
             position,
         }
     }
@@ -38,11 +35,9 @@ impl IndexedParameter {
         pattern: &Pat,
         position: usize,
     ) -> Self {
-        let (diagnostic_name, holder) = match pattern {
-            Pat::Ident(pattern_ident) => {
-                (pattern_ident.ident.to_string(), pattern_ident.ident.clone())
-            }
-            _ => (position.to_string(), format_ident!("argument_{position}")),
+        let name = match pattern {
+            Pat::Ident(pattern_ident) => pattern_ident.ident.clone(),
+            _ => format_ident!("argument_{position}"),
         };
 
         Self {
@@ -51,8 +46,7 @@ impl IndexedParameter {
                 .map(|attribute| IndexedAttribute::new(&attribute))
                 .collect(),
             declared,
-            diagnostic_name,
-            holder,
+            name,
             position,
         }
     }
@@ -68,11 +62,6 @@ impl IndexedParameter {
     }
 
     #[must_use]
-    pub fn diagnostic_name(&self) -> &str {
-        &self.diagnostic_name
-    }
-
-    #[must_use]
     pub fn framework_attribute(&self, attribute: FrameworkAttribute) -> Option<&IndexedAttribute> {
         self.attributes
             .iter()
@@ -80,8 +69,8 @@ impl IndexedParameter {
     }
 
     #[must_use]
-    pub fn holder(&self) -> &Ident {
-        &self.holder
+    pub fn name(&self) -> &Ident {
+        &self.name
     }
 
     #[must_use]

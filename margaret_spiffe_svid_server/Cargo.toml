@@ -10,14 +10,14 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
-thiserror = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 log = { workspace = true }
 margaret_spiffe_svid = { workspace = true }
-spiffe = { workspace = true, features = ["spiffe-types"] }
 margaret_sync_holder = { workspace = true }
 rustls = { workspace = true }
+spiffe = { workspace = true, features = ["spiffe-types"] }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }

@@ -10,6 +10,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::asset_bag_codegen_error::AssetBagCodegenError;
 use crate::asset_bag_generation::AssetBagGeneration;
@@ -92,7 +93,6 @@ fn asset_macro_tokens(
 fn asset_responder(
     ServedAssets {
         assets_directory_name,
-        embed_relative,
         served_tails,
     }: &ServedAssets,
     output_paths: &BTreeSet<String>,
@@ -106,13 +106,8 @@ fn asset_responder(
     Ok(AssetResponder {
         declaration: quote! { pub mod #responder_module_identifier; },
         module: GeneratedModuleTokens::new(
-            format!("{root_module}/{responder_module}"),
-            render_asset_responder(
-                &served,
-                assets_directory_name,
-                embed_relative,
-                responder_type,
-            ),
+            ModulePath::root(root_module).child(responder_module),
+            render_asset_responder(&served, assets_directory_name, responder_type),
         ),
     })
 }
@@ -168,6 +163,7 @@ pub fn render_asset_bag(
     }
 
     let [root_module, ..] = asset_macro_canonical_suffix();
+    let root_module = ModulePath::root(root_module);
 
     let asset_macro = match generation {
         AssetBagGeneration::Macro | AssetBagGeneration::MacroAndResponder(_) => {
@@ -237,7 +233,7 @@ mod tests {
 
         modules
             .into_iter()
-            .find(|module| module.name() == name)
+            .find(|module| module.path().to_string() == name)
             .expect("the requested module is generated")
             .format()
             .expect("the generated tokens form a valid Rust file")
@@ -258,7 +254,6 @@ mod tests {
     fn served(served_tails: &[&str]) -> ServedAssets {
         ServedAssets {
             assets_directory_name: "assets".to_string(),
-            embed_relative: "..".to_string(),
             served_tails: served_tails
                 .iter()
                 .map(|tail| (*tail).to_string())
@@ -295,7 +290,7 @@ mod tests {
             .expect("the asset bag module is generated");
 
         assert_eq!(modules.len(), 1);
-        assert_eq!(modules[0].name(), "asset_bag");
+        assert_eq!(modules[0].path().to_string(), "asset_bag");
 
         let root = formatted(FULL_METAFILE, &AssetBagGeneration::Macro, "asset_bag");
 
@@ -308,11 +303,15 @@ mod tests {
             .expect("the asset bag module is generated");
 
         assert_eq!(modules.len(), 2);
-        assert!(modules.iter().any(|module| module.name() == "asset_bag"));
         assert!(
             modules
                 .iter()
-                .any(|module| module.name() == "asset_bag/asset_responder")
+                .any(|module| module.path().to_string() == "asset_bag")
+        );
+        assert!(
+            modules
+                .iter()
+                .any(|module| module.path().to_string() == "asset_bag/asset_responder")
         );
 
         let root = formatted(FULL_METAFILE, &emit(FULL_METAFILE_TAILS), "asset_bag");
@@ -419,7 +418,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_metafile_without_outputs() {
+    fn rejects_a_metafile_without_outputs_rather_than_generating_an_empty_asset_bag() {
         assert_eq!(
             render_asset_bag(r#"{ "outputs": {} }"#, &AssetBagGeneration::Macro)
                 .expect_err("a metafile without outputs is rejected")
@@ -429,7 +428,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_an_ambiguous_static_input_error() {
+    fn rejects_a_static_input_with_two_outputs_as_ambiguous_rather_than_picking_one() {
         assert!(matches!(
             render_asset_bag(
                 r#"{
@@ -452,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_a_duplicate_entrypoint_error() {
+    fn rejects_two_outputs_of_one_entry_point_as_duplicate_rather_than_picking_one() {
         assert!(matches!(
             render_asset_bag(
                 r#"{

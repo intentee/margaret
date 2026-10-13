@@ -9,23 +9,23 @@ use rustls::pki_types::CertificateDer;
 use rustls::pki_types::PrivateKeyDer;
 use rustls::pki_types::ServerName;
 
+use margaret_spiffe_svid::svid_crypto_provider::svid_crypto_provider;
 use margaret_spiffe_svid_tests::ca_der::CA_DER;
 use margaret_spiffe_svid_tests::handshake_error::HandshakeError;
-use margaret_spiffe_svid_tests::install_crypto_provider::install_crypto_provider;
 use margaret_spiffe_svid_tests::leaf_spiffe_example_org_server_der::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
 use margaret_spiffe_svid_tests::leaf_spiffe_example_org_server_key_der::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER;
 use margaret_spiffe_svid_tests::pump_tls_handshake::pump_tls_handshake;
 
 #[test]
 fn gives_up_when_the_handshake_cannot_progress() {
-    install_crypto_provider();
-
     let mut root_store = RootCertStore::empty();
     root_store
         .add(CertificateDer::from(CA_DER.to_vec()))
         .unwrap();
 
-    let server_config = ServerConfig::builder()
+    let server_config = ServerConfig::builder_with_provider(svid_crypto_provider())
+        .with_safe_default_protocol_versions()
+        .expect("the provider supports the safe default protocol versions")
         .with_no_client_auth()
         .with_single_cert(
             vec![CertificateDer::from(
@@ -34,7 +34,9 @@ fn gives_up_when_the_handshake_cannot_progress() {
             PrivateKeyDer::try_from(LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER.to_vec()).unwrap(),
         )
         .unwrap();
-    let client_config = ClientConfig::builder()
+    let client_config = ClientConfig::builder_with_provider(svid_crypto_provider())
+        .with_safe_default_protocol_versions()
+        .expect("the provider supports the safe default protocol versions")
         .with_root_certificates(root_store)
         .with_no_client_auth();
 

@@ -1,3 +1,4 @@
+#[derive(Debug, Eq, PartialEq)]
 pub struct UniqueConstraint {
-    pub columns: Vec<String>,
+    pub columns: &'static [&'static str],
 }

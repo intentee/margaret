@@ -28,7 +28,7 @@ pub async fn dispatch_notification<Handler>(
     Handler: RespondsToWebSocketNotification,
     Handler::Message: DeserializeOwned + Validate,
 {
-    if let ValidationResult::Valid(message) = validate_json::<Handler::Message>(Some(&params)) {
+    if let ValidationResult::Valid(message) = validate_json::<Handler::Message>(&params) {
         report_notification_result(
             handler
                 .process(
@@ -47,7 +47,7 @@ mod tests {
     use super::report_notification_result;
 
     #[test]
-    fn reports_a_notification_handler_failure() {
+    fn reports_a_notification_handler_failure_without_panicking_the_dispatcher() {
         report_notification_result(Err(anyhow::anyhow!("database unavailable")));
     }
 }

@@ -1,8 +1,3 @@
-mod jwks_roll_interval_outlasts_the_access_token_lifetime;
-mod jwks_roller_server_bundle_publishes_on_its_first_tick;
 mod jwks_roller_server_error_document_serialization_reports_its_source;
-mod jwks_roller_service_reports_a_roll_failure;
-mod public_jwks_handler_reports_not_ready_before_the_first_roll;
-mod public_jwks_handler_serves_the_document_after_a_roll;
-mod roll_and_publish_restores_the_persisted_secret_across_a_restart;
-mod roll_and_publish_seeds_and_persists_a_fresh_secret_on_first_start;
+#[cfg(feature = "tests_that_use_postgres")]
+mod postgres;

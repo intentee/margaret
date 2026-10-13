@@ -1,11 +1,13 @@
-use margaret_model::column_check::ColumnCheck;
+use margaret_model::column_default::ColumnDefault;
+use margaret_model::column_type::ColumnType;
 
-use crate::inferred_column::InferredColumn;
+use crate::resolved_check::ResolvedCheck;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResolvedColumn {
-    pub checks: Vec<ColumnCheck>,
-    pub inferred: InferredColumn,
+    pub checks: Vec<ResolvedCheck>,
+    pub column_type: ColumnType,
+    pub default: ColumnDefault,
     pub name: String,
-    pub primary_key: bool,
+    pub nullable: bool,
 }

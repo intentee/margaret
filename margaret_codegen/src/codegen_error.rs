@@ -3,20 +3,30 @@ use std::io;
 use std::path::PathBuf;
 
 use thiserror::Error;
-use toml::de;
 
+use margaret_accepted_clients_codegen::accepted_clients_codegen_error::AcceptedClientsCodegenError;
+use margaret_active_record_codegen::active_record_codegen_error::ActiveRecordCodegenError;
 use margaret_asset_bag_codegen::asset_bag_codegen_error::AssetBagCodegenError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
 use margaret_container::container_error::ContainerError;
+use margaret_database_codegen::database_codegen_error::DatabaseCodegenError;
 use margaret_generated_module::generated_module_error::GeneratedModuleError;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_model_codegen::model_codegen_error::ModelCodegenError;
+use margaret_oauth_client_codegen::oauth_client_codegen_error::OAuthClientCodegenError;
+use margaret_oauth_vocabulary_codegen::oauth_vocabulary_codegen_error::OAuthVocabularyCodegenError;
+use margaret_oidc_provider_codegen::oidc_provider_codegen_error::OidcProviderCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 use margaret_serve_input_codegen::serve_input_codegen_error::ServeInputCodegenError;
 use margaret_service_codegen::service_codegen_error::ServiceCodegenError;
+use margaret_session_endpoints_codegen::session_endpoints_codegen_error::SessionEndpointsCodegenError;
+use margaret_sessions_codegen::sessions_codegen_error::SessionsCodegenError;
+use margaret_sign_in_endpoints_codegen::sign_in_endpoints_codegen_error::SignInEndpointsCodegenError;
 use margaret_tag_codegen::tag_error::TagError;
+use margaret_token_issuance_codegen::token_issuance_codegen_error::TokenIssuanceCodegenError;
+use margaret_trusted_issuer_codegen::trusted_issuer_codegen_error::TrustedIssuerCodegenError;
 use margaret_views_codegen::views_codegen_error::ViewsCodegenError;
 use margaret_websocket_codegen::web_socket_codegen_error::WebSocketCodegenError;
 
@@ -34,6 +44,42 @@ pub enum CodegenError {
         source: AssetBagCodegenError,
     },
 
+    #[error("failed to read the postgres database: {source}")]
+    Database {
+        #[from]
+        source: DatabaseCodegenError,
+    },
+
+    #[error("failed to read the token issuance: {source}")]
+    TokenIssuance {
+        #[from]
+        source: TokenIssuanceCodegenError,
+    },
+
+    #[error("failed to read the accepted oauth clients: {source}")]
+    AcceptedClients {
+        #[from]
+        source: AcceptedClientsCodegenError,
+    },
+
+    #[error("failed to read the oauth vocabulary: {source}")]
+    OAuthVocabulary {
+        #[from]
+        source: OAuthVocabularyCodegenError,
+    },
+
+    #[error("failed to read the oauth clients: {source}")]
+    OAuthClient {
+        #[from]
+        source: OAuthClientCodegenError,
+    },
+
+    #[error("failed to read the trusted issuers: {source}")]
+    TrustedIssuer {
+        #[from]
+        source: TrustedIssuerCodegenError,
+    },
+
     #[error("failed to read the serve inputs: {source}")]
     ServeInput {
         #[from]
@@ -41,14 +87,43 @@ pub enum CodegenError {
     },
 
     #[error(
-        "a constructor injects the asset responder, but no esbuild metafile was found at the workspace root"
+        "a constructor injects the asset responder, but no esbuild metafile was found in the manifest directory"
     )]
     AssetResponderWithoutMetafile,
 
     #[error(
-        "a module imports the asset macro, but no esbuild metafile was found at the workspace root"
+        "a module imports the asset macro, but no esbuild metafile was found in the manifest directory"
     )]
     AssetMacroWithoutMetafile,
+
+    #[error("failed to derive the openid connect provider endpoints: {source}")]
+    OidcProvider {
+        #[from]
+        source: OidcProviderCodegenError,
+    },
+
+    #[error("failed to read the sessions: {source}")]
+    Sessions {
+        #[from]
+        source: SessionsCodegenError,
+    },
+
+    #[error("failed to read the session endpoints: {source}")]
+    SessionEndpoints {
+        #[from]
+        source: SessionEndpointsCodegenError,
+    },
+
+    #[error("failed to read the sign-in endpoints: {source}")]
+    SignInEndpoints {
+        #[from]
+        source: SignInEndpointsCodegenError,
+    },
+
+    #[error(
+        "the framework handler '{handler}' serving the route '{route}' is not planned in the dependency container"
+    )]
+    UnplannedFrameworkResponder { handler: String, route: String },
 
     #[error("failed to collect the tags: {source}")]
     Tag {
@@ -98,6 +173,12 @@ pub enum CodegenError {
         source: ModelCodegenError,
     },
 
+    #[error("failed to generate the eager loading shapes: {source}")]
+    Shapes {
+        #[from]
+        source: ActiveRecordCodegenError,
+    },
+
     #[error("failed to generate the views: {source}")]
     Views {
         #[from]
@@ -120,18 +201,6 @@ pub enum CodegenError {
     ManifestDirectory {
         #[source]
         source: VarError,
-    },
-
-    #[error("no Cargo workspace root was found above the manifest directory '{start}'")]
-    WorkspaceRootNotFound { start: PathBuf },
-
-    #[error("failed to read the workspace manifest '{path}': {source}")]
-    ReadWorkspaceManifest { path: PathBuf, source: io::Error },
-
-    #[error("failed to parse the workspace manifest '{path}': {source}")]
-    ParseWorkspaceManifest {
-        path: PathBuf,
-        source: Box<de::Error>,
     },
 
     #[error("failed to create the generated directory '{path}': {source}")]

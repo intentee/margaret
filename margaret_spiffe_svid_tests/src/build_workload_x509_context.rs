@@ -25,7 +25,7 @@ mod tests {
     use super::build_workload_x509_context;
 
     #[test]
-    fn builds_the_default_workload_context() {
+    fn builds_the_default_workload_context_so_svid_tests_share_one_valid_fixture() {
         assert!(build_workload_x509_context().is_ok());
     }
 }

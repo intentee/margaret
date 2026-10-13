@@ -5,7 +5,7 @@ use margaret_websocket_tests::driver_harness::DriverHarness;
 use margaret_websocket_tests::test_dispatch_table::test_dispatch_table;
 
 #[tokio::test]
-async fn streams_a_request_across_many_frames() {
+async fn streams_a_request_across_many_frames_so_clients_see_progress_before_the_end() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
@@ -48,7 +48,7 @@ async fn answers_a_single_response_request_with_a_string_id() {
 }
 
 #[tokio::test]
-async fn applies_a_notification_to_the_session() {
+async fn applies_a_notification_to_the_session_so_fire_and_forget_messages_take_effect() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
@@ -67,7 +67,7 @@ async fn applies_a_notification_to_the_session() {
 }
 
 #[tokio::test]
-async fn reports_invalid_request_parameters() {
+async fn answers_a_request_whose_parameters_fail_validation_with_invalid_params_for_its_id() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
@@ -84,7 +84,7 @@ async fn reports_invalid_request_parameters() {
 }
 
 #[tokio::test]
-async fn reports_malformed_request_parameters() {
+async fn answers_a_request_whose_parameters_do_not_deserialize_with_invalid_params_for_its_id() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
@@ -101,7 +101,7 @@ async fn reports_malformed_request_parameters() {
 }
 
 #[tokio::test]
-async fn reports_an_unknown_request_method() {
+async fn reports_an_unknown_request_method_under_its_id_so_the_client_can_match_it() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
@@ -118,7 +118,7 @@ async fn reports_an_unknown_request_method() {
 }
 
 #[tokio::test]
-async fn ignores_an_unknown_notification_method() {
+async fn ignores_an_unknown_notification_method_since_it_has_no_id_to_answer() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
@@ -138,7 +138,7 @@ async fn ignores_an_unknown_notification_method() {
 }
 
 #[tokio::test]
-async fn ignores_invalid_notification_parameters() {
+async fn drops_a_notification_whose_parameters_fail_validation_since_it_has_no_id_to_answer() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
@@ -158,7 +158,7 @@ async fn ignores_invalid_notification_parameters() {
 }
 
 #[tokio::test]
-async fn ignores_non_text_frames() {
+async fn skips_binary_frames_and_keeps_serving_later_requests_on_the_connection() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
@@ -177,7 +177,7 @@ async fn ignores_non_text_frames() {
 }
 
 #[tokio::test]
-async fn closes_on_a_malformed_frame() {
+async fn closes_on_a_malformed_frame_since_the_client_broke_the_message_protocol() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness.send("this is not a websocket envelope").await;
@@ -193,7 +193,7 @@ async fn closes_when_the_client_sends_a_close_frame() {
 }
 
 #[tokio::test]
-async fn closes_on_cancellation() {
+async fn finishes_the_driver_when_cancelled_so_shutdown_closes_open_connections() {
     let harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness.cancellation_token.cancel();

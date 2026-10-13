@@ -40,7 +40,7 @@ mod tests {
     use super::CardLayoutProps;
 
     #[test]
-    fn wraps_the_body_and_links_home() {
+    fn wraps_the_body_and_links_home_so_every_card_offers_a_way_back() {
         let markup = CardLayout
             .render(CardLayoutProps {
                 body: html! { "hello" },

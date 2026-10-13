@@ -3,7 +3,7 @@ use rustls::pki_types::CertificateDer;
 use margaret_spiffe_svid::ca_bundle::CaBundle;
 
 #[test]
-fn rejects_invalid_der() {
+fn refuses_to_build_a_root_store_from_an_undecodable_ca_so_trust_is_never_partial() {
     let bundle = CaBundle {
         ca_certs: vec![CertificateDer::from(vec![0xFF, 0x00, 0x01])],
     };

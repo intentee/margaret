@@ -2,9 +2,10 @@ use margaret::framework::http::response::Response;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/logo.png", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/logo.png", server = "public")]
 pub struct GetLogo;
 
 impl GetLogo {
@@ -17,7 +18,7 @@ impl GetLogo {
             Response::bytes(
                 200,
                 "image/png",
-                include_bytes!("../../../../assets/logo.png").as_slice(),
+                include_bytes!("../../../assets/logo.png").as_slice(),
             )
         })
     }

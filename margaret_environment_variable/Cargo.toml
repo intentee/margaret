@@ -11,6 +11,10 @@ publish.workspace = true
 
 [dependencies]
 thiserror = { workspace = true }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+margaret_process_tests = { path = "../margaret_process_tests" }
 
 [lints]
 workspace = true

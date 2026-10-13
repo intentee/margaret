@@ -25,7 +25,7 @@ mod tests {
     use crate::key_id::KeyId;
 
     #[test]
-    fn names_the_shared_key_id() {
+    fn names_the_shared_key_id_so_operators_can_find_the_clashing_keys() {
         assert_eq!(
             DuplicateKeyId {
                 kid: KeyId::new("twice".to_string()),

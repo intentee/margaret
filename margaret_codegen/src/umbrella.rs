@@ -1,4 +1,5 @@
 use margaret_generated_module::generated_module::GeneratedModule;
+use margaret_generated_module::module_path::ModulePath;
 
 use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
@@ -7,26 +8,59 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
     let serves_http = features.serves_http();
     let mut source = String::from("#![forbid(unsafe_code)]\n");
 
-    source.push_str("#[rustfmt::skip]\npub mod container;\n");
+    if features.contains(GeneratedFeature::Container) {
+        source.push_str("#[rustfmt::skip]\npub mod container;\n");
+    }
 
     if features.contains(GeneratedFeature::AssetBag) {
         source.push_str("#[rustfmt::skip]\npub mod asset_bag;\n");
+    }
+
+    if features.contains(GeneratedFeature::TokenIssuance) {
+        source.push_str("#[rustfmt::skip]\npub mod token_issuance;\n");
+    }
+
+    if features.contains(GeneratedFeature::ResourceTokens) {
+        source.push_str("#[rustfmt::skip]\npub mod resource_tokens;\n");
+    }
+
+    if features.contains(GeneratedFeature::Scopes) {
+        source.push_str("#[rustfmt::skip]\npub mod scopes;\n");
+    }
+
+    if features.contains(GeneratedFeature::Sessions) {
+        source.push_str("#[rustfmt::skip]\npub mod sessions;\n");
     }
 
     if features.contains(GeneratedFeature::Jwks) {
         source.push_str("#[rustfmt::skip]\npub mod jwks;\n");
     }
 
-    if features.contains(GeneratedFeature::Oidc) {
-        source.push_str("#[rustfmt::skip]\npub mod oidc;\n");
+    if features.contains(GeneratedFeature::TrustedIssuers) {
+        source.push_str("#[rustfmt::skip]\npub mod trusted_issuers;\n");
+    }
+
+    if features.contains(GeneratedFeature::OAuthClients) {
+        source.push_str("#[rustfmt::skip]\npub mod oauth_clients;\n");
+    }
+
+    if features.contains(GeneratedFeature::AcceptedClients) {
+        source.push_str("#[rustfmt::skip]\npub mod accepted_clients;\n");
+    }
+
+    if features.contains(GeneratedFeature::OidcProvider) {
+        source.push_str("#[rustfmt::skip]\npub mod oidc_provider;\n");
     }
 
     if features.contains(GeneratedFeature::AuthenticatedUsers) && serves_http {
         source.push_str("#[rustfmt::skip]\npub mod authenticated_users;\n");
     }
 
-    if serves_http {
+    if features.contains(GeneratedFeature::Forwarders) {
         source.push_str("#[rustfmt::skip]\npub mod forwarders;\n");
+    }
+
+    if serves_http {
         source.push_str("#[rustfmt::skip]\npub mod http;\n");
         source.push_str("#[rustfmt::skip]\npub mod routes;\n");
     }
@@ -40,7 +74,16 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
     }
 
     if features.contains(GeneratedFeature::Models) {
+        source.push_str("#[rustfmt::skip]\npub mod models;\n");
+        source.push_str("#[rustfmt::skip]\npub mod tables;\n");
+    }
+
+    if features.contains(GeneratedFeature::Schema) {
         source.push_str("#[rustfmt::skip]\npub mod schema;\n");
+    }
+
+    if features.contains(GeneratedFeature::Shapes) {
+        source.push_str("#[rustfmt::skip]\npub mod shapes;\n");
     }
 
     if features.contains(GeneratedFeature::Views) {
@@ -57,7 +100,7 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
 
     source.push_str("#[rustfmt::skip]\npub use ::margaret::framework;\n");
 
-    GeneratedModule::new("mod", source)
+    GeneratedModule::new(ModulePath::root("mod"), source)
 }
 
 #[cfg(test)]

@@ -16,7 +16,7 @@ mod tests {
     use super::build_reqwest_client;
 
     #[test]
-    fn surfaces_builder_errors() {
+    fn surfaces_a_client_build_failure_as_an_svid_error_instead_of_panicking() {
         let builder_with_invalid_tls_backend = Client::builder().use_preconfigured_tls(0u8);
 
         assert!(build_reqwest_client(builder_with_invalid_tls_backend).is_err());

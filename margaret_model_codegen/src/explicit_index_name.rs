@@ -1,10 +1,10 @@
-use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
+use margaret_attributes::is_snake_case_name::is_snake_case_name;
 use margaret_schema_identifier_naming::validate_identifier_length::validate_identifier_length;
 
 use crate::model_codegen_error::ModelCodegenError;
 
 pub(crate) fn explicit_index_name(name: String, model: &str) -> Result<String, ModelCodegenError> {
-    if !is_snake_case_identifier(&name) {
+    if !is_snake_case_name(&name) {
         return Err(ModelCodegenError::InvalidIndexName {
             index: name,
             model: model.to_string(),

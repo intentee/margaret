@@ -2,6 +2,7 @@ use syn::Attribute;
 use syn::Path;
 
 use crate::attribute_error::AttributeError;
+use crate::attribute_host::AttributeHost;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_item::IndexedItem;
 use crate::indexed_item_parts::IndexedItemParts;
@@ -20,6 +21,7 @@ pub(crate) struct ScannedItem {
     identifier: String,
     kind: ItemKind,
     methods: Vec<ScannedMethod>,
+    module_path: Vec<String>,
     trait_impls: Vec<IndexedTraitImpl>,
     variants: Vec<IndexedVariant>,
 }
@@ -28,18 +30,25 @@ impl ScannedItem {
     pub(crate) fn new(
         kind: ItemKind,
         identifier: String,
-        canonical_path: CanonicalPath,
+        module_path: Vec<String>,
         attributes: Vec<Attribute>,
         fields: Vec<ScannedField>,
         variants: Vec<IndexedVariant>,
     ) -> Self {
         Self {
             attributes: ScannedAttribute::scan_all(attributes),
-            canonical_path,
+            canonical_path: CanonicalPath::new(
+                module_path
+                    .iter()
+                    .cloned()
+                    .chain([identifier.clone()])
+                    .collect(),
+            ),
             fields,
             identifier,
             kind,
             methods: Vec::new(),
+            module_path,
             trait_impls: Vec::new(),
             variants,
         }
@@ -59,27 +68,29 @@ impl ScannedItem {
 
     pub(crate) fn resolve(
         mut self,
-        resolve: impl Copy + Fn(&[String], &Path) -> CanonicalPath,
+        resolve: impl Copy + Fn(&[String], &Path) -> Option<CanonicalPath>,
     ) -> Result<IndexedItem, AttributeError> {
         self.methods
             .sort_by(|left, right| left.identifier().cmp(right.identifier()));
-        let module_path = self
-            .canonical_path
-            .segments()
-            .split_last()
-            .map_or(&[][..], |(_, module)| module);
+        let module_path = &self.module_path;
         let resolve_item_path = |path: &Path| resolve(module_path, path);
-        let attributes = ScannedAttribute::resolve_all(self.attributes, resolve_item_path);
+        let owner = &self.canonical_path;
+        let attributes = ScannedAttribute::resolve_all(
+            self.attributes,
+            AttributeHost::Item,
+            || owner.to_string(),
+            resolve_item_path,
+        )?;
         let fields = self
             .fields
             .into_iter()
-            .map(|field| field.resolve(resolve_item_path))
-            .collect();
+            .map(|field| field.resolve(owner, resolve_item_path))
+            .collect::<Result<Vec<_>, _>>()?;
         let methods = self
             .methods
             .into_iter()
-            .map(|method| method.resolve(resolve))
-            .collect();
+            .map(|method| method.resolve(owner, resolve))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let is_copy = item_is_copy(&attributes, module_path, &self.trait_impls, resolve)?;
 
@@ -91,6 +102,7 @@ impl ScannedItem {
             is_copy,
             kind: self.kind,
             methods,
+            module_path: self.module_path,
             trait_impls: self.trait_impls,
             variants: self.variants,
         }))

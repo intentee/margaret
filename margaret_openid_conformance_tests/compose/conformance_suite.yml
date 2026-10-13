@@ -1,0 +1,60 @@
+services:
+  mongodb:
+    image: ${CONFORMANCE_SUITE_MONGODB_IMAGE:?run the conformance tests through make}
+  server:
+    image: ${CONFORMANCE_SUITE_SERVER_IMAGE:?run the conformance tests through make}
+    environment:
+      BASE_URL: https://${CONFORMANCE_SUITE_HOST:?}:8443
+      BASE_MTLS_URL: https://${CONFORMANCE_SUITE_HOST:?}:8444
+      MONGODB_HOST: mongodb
+      OIDC_GITLAB_CLIENTID: gitlab-client
+      OIDC_GITLAB_SECRET: gitlab-secret
+      OIDC_GOOGLE_CLIENTID: google-client
+      OIDC_GOOGLE_SECRET: google-secret
+      SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      - mongodb
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - --output
+        - /dev/null
+        - --header
+        - "X-Forwarded-Proto: https"
+        - http://localhost:8080/api/plan?length=1
+      start_interval: 1s
+      start_period: 60s
+  nginx:
+    image: ${CONFORMANCE_SUITE_NGINX_IMAGE:?run the conformance tests through make}
+    networks:
+      default:
+        aliases:
+          - ${CONFORMANCE_SUITE_HOST:?}
+    depends_on:
+      server:
+        condition: service_healthy
+    configs:
+      - source: suite_certificate
+        target: /etc/ssl/certs/nginx-selfsigned.crt
+      - source: suite_private_key
+        target: /etc/ssl/private/nginx-selfsigned.key
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - --output
+        - /dev/null
+        - --insecure
+        - https://localhost:8443/api/plan?length=1
+      start_interval: 1s
+      start_period: 60s
+configs:
+  suite_certificate:
+    content: ${CONFORMANCE_SUITE_CERTIFICATE:?}
+  suite_private_key:
+    content: ${CONFORMANCE_SUITE_PRIVATE_KEY:?}

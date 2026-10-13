@@ -1,69 +1,46 @@
-use std::sync::Arc;
-
-use crate::build_url::build_url;
 use crate::redirect::Redirect;
-use crate::url_segment::UrlSegment;
 
 pub struct ForwardableRoute {
-    origin: Arc<str>,
-    segments: Vec<UrlSegment>,
+    url: String,
 }
 
 impl ForwardableRoute {
     #[must_use]
-    pub fn new(origin: Arc<str>, segments: Vec<UrlSegment>) -> Self {
-        Self { origin, segments }
+    pub fn new(url: String) -> Self {
+        Self { url }
     }
 
     #[must_use]
     pub fn permanent_redirect(&self) -> Redirect {
-        Redirect::permanent(self.url())
+        Redirect::permanent(self.url.clone())
     }
 
     #[must_use]
     pub fn see_other(&self) -> Redirect {
-        Redirect::see_other(self.url())
+        Redirect::see_other(self.url.clone())
     }
 
     #[must_use]
     pub fn temporary_redirect(&self) -> Redirect {
-        Redirect::temporary(self.url())
+        Redirect::temporary(self.url.clone())
     }
 
     #[must_use]
     pub fn url(&self) -> String {
-        build_url(&self.origin, &self.segments)
+        self.url.clone()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::ForwardableRoute;
-    use crate::url_parameter::UrlParameter;
-    use crate::url_segment::UrlSegment;
 
     fn article_route() -> ForwardableRoute {
-        ForwardableRoute::new(
-            Arc::from("http://localhost"),
-            vec![
-                UrlSegment::Literal("/articles/"),
-                UrlSegment::Parameter(UrlParameter {
-                    name: "article",
-                    value: "rust".to_string(),
-                }),
-            ],
-        )
+        ForwardableRoute::new("http://localhost/articles/rust".to_string())
     }
 
     #[test]
-    fn renders_the_url_from_its_origin_and_parameters() {
-        assert_eq!(article_route().url(), "http://localhost/articles/rust");
-    }
-
-    #[test]
-    fn sees_other_to_the_route_url() {
+    fn sees_other_to_the_route_url_with_303_so_the_client_follows_up_with_a_get() {
         let response = article_route().see_other().into_response().into_http();
 
         assert_eq!(response.status().as_u16(), 303);
@@ -77,7 +54,7 @@ mod tests {
     }
 
     #[test]
-    fn temporarily_redirects_to_the_route_url() {
+    fn temporarily_redirects_to_the_route_url_with_307_keeping_the_request_method() {
         let response = article_route()
             .temporary_redirect()
             .into_response()
@@ -94,7 +71,7 @@ mod tests {
     }
 
     #[test]
-    fn permanently_redirects_to_the_route_url() {
+    fn permanently_redirects_to_the_route_url_with_308_so_clients_cache_the_move() {
         let response = article_route()
             .permanent_redirect()
             .into_response()

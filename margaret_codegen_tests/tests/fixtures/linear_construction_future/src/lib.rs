@@ -13,6 +13,7 @@ pub mod level_seven;
 pub mod level_six;
 pub mod level_three;
 pub mod level_two;
+pub mod level_watcher;
 pub mod record;
 mod serve_construction;
 

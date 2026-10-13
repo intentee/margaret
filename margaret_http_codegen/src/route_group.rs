@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 
+use margaret_route_method::route_method::RouteMethod;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
 use crate::http_route::HttpRoute;
 
 pub(crate) struct RouteGroup {
-    methods: BTreeMap<String, HttpRoute>,
+    methods: BTreeMap<RouteMethod, HttpRoute>,
     path: RoutePath,
 }
 
@@ -25,7 +26,11 @@ impl RouteGroup {
         &self.path
     }
 
-    pub(crate) fn take_method(&mut self, method: String, route: HttpRoute) -> Option<HttpRoute> {
+    pub(crate) fn take_method(
+        &mut self,
+        method: RouteMethod,
+        route: HttpRoute,
+    ) -> Option<HttpRoute> {
         self.methods.insert(method, route)
     }
 }

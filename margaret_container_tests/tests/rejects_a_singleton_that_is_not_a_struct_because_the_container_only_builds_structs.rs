@@ -1,0 +1,13 @@
+use std::path::Path;
+
+use margaret_container::container_error::ContainerError;
+use margaret_container_tests::generate_container_source::generate_container_source;
+
+#[test]
+fn rejects_a_singleton_that_is_not_a_struct_because_the_container_only_builds_structs() {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/not_a_struct");
+    let error = generate_container_source("not_a_struct", &directory)
+        .expect_err("use margaret::framework::macros::singleton;\na #[singleton] on a non-struct item must be rejected");
+
+    assert!(matches!(error, ContainerError::NotASingletonStruct { .. }));
+}

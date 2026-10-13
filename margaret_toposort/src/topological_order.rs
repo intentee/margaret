@@ -112,17 +112,17 @@ mod tests {
     }
 
     #[test]
-    fn orders_an_empty_graph_as_empty() {
+    fn orders_an_empty_graph_as_an_empty_order_instead_of_reporting_a_cycle() {
         assert_eq!(order(&[]), Some(names(&[])));
     }
 
     #[test]
-    fn orders_a_single_node() {
+    fn includes_a_lone_dependency_free_node_so_no_declared_node_is_dropped() {
         assert_eq!(order(&[("a", &[])]), Some(names(&["a"])));
     }
 
     #[test]
-    fn orders_dependencies_before_dependents() {
+    fn orders_each_dependency_before_its_dependent_so_it_is_built_first() {
         assert_eq!(
             order(&[("a", &["b"]), ("b", &[])]),
             Some(names(&["b", "a"]))
@@ -130,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    fn orders_independent_nodes_in_sorted_order() {
+    fn orders_independent_nodes_in_sorted_order_so_every_run_yields_the_same_order() {
         assert_eq!(
             order(&[("zebra", &[]), ("apple", &[])]),
             Some(names(&["apple", "zebra"]))

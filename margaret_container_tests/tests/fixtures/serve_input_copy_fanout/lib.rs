@@ -1,3 +1,6 @@
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
+
 #[derive(Clone, Copy)]
 struct Budget(u32);
 

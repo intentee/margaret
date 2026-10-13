@@ -2,11 +2,12 @@ use margaret::framework::http::response::Response;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::ci::ci_runner::CiRunner;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/runner", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/runner", server = "public")]
 pub struct RunnerPage;
 
 impl RunnerPage {

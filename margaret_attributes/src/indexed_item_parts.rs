@@ -14,6 +14,7 @@ pub(crate) struct IndexedItemParts {
     pub(crate) is_copy: bool,
     pub(crate) kind: ItemKind,
     pub(crate) methods: Vec<IndexedMethod>,
+    pub(crate) module_path: Vec<String>,
     pub(crate) trait_impls: Vec<IndexedTraitImpl>,
     pub(crate) variants: Vec<IndexedVariant>,
 }

@@ -14,15 +14,15 @@ chrono = { workspace = true }
 margaret_identity_session = { workspace = true }
 margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
-margaret_jwks_roller_server = { workspace = true }
+margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_token_issuance = { workspace = true }
-margaret_token_signer = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
-uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+aws-lc-rs = { workspace = true }
 
 [lints]
 workspace = true

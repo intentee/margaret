@@ -23,12 +23,10 @@ pub struct GreetingView {
 }
 
 impl GreetingView {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(card_layout: Arc<CardLayout>) -> anyhow::Result<Self> {
-        Ok(Self { card_layout })
+    pub fn create(card_layout: Arc<CardLayout>) -> Self {
+        Self { card_layout }
     }
 }
 
@@ -64,7 +62,8 @@ mod tests {
         let view = GreetingView {
             card_layout: Arc::new(CardLayout),
         };
-        let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
+        let routes = Routes::from_origins("http://identity", "http://internal", "http://public")
+            .expect("the routes build");
 
         let markup = view
             .render(GreetingViewProps {

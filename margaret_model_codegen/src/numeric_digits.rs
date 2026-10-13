@@ -15,37 +15,40 @@ impl NumericDigits {
         model: &str,
         field: &str,
     ) -> Result<Self, ModelCodegenError> {
-        match (precision, scale) {
-            (None, None) => Ok(NumericDigits::NotDeclared),
-            (None, Some(_)) => Err(ModelCodegenError::NumericPrecisionMissing {
+        let Some(precision) = precision else {
+            return match scale {
+                None => Ok(NumericDigits::NotDeclared),
+                Some(_) => Err(ModelCodegenError::NumericPrecisionMissing {
+                    field: field.to_string(),
+                    model: model.to_string(),
+                }),
+            };
+        };
+        let Some(scale) = scale else {
+            return Err(ModelCodegenError::NumericScaleMissing {
                 field: field.to_string(),
                 model: model.to_string(),
-            }),
-            (Some(_), None) => Err(ModelCodegenError::NumericScaleMissing {
+            });
+        };
+
+        if precision == 0 || precision > MAX_NUMERIC_PRECISION {
+            return Err(ModelCodegenError::NumericPrecisionOutOfRange {
                 field: field.to_string(),
                 model: model.to_string(),
-            }),
-            (Some(precision), Some(scale)) => {
-                if precision == 0 || precision > MAX_NUMERIC_PRECISION {
-                    return Err(ModelCodegenError::NumericPrecisionOutOfRange {
-                        field: field.to_string(),
-                        model: model.to_string(),
-                        precision,
-                    });
-                }
-
-                if scale > precision {
-                    return Err(ModelCodegenError::NumericScaleExceedsPrecision {
-                        field: field.to_string(),
-                        model: model.to_string(),
-                        precision,
-                        scale,
-                    });
-                }
-
-                Ok(NumericDigits::Declared { precision, scale })
-            }
+                precision,
+            });
         }
+
+        if scale > precision {
+            return Err(ModelCodegenError::NumericScaleExceedsPrecision {
+                field: field.to_string(),
+                model: model.to_string(),
+                precision,
+                scale,
+            });
+        }
+
+        Ok(NumericDigits::Declared { precision, scale })
     }
 }
 
@@ -63,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_absent_arguments_as_not_declared() {
+    fn reads_absent_digit_arguments_as_undeclared_so_non_numeric_columns_need_none() {
         assert_eq!(
             parse(None, None).expect("absent arguments parse"),
             NumericDigits::NotDeclared
@@ -71,7 +74,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_precision_and_scale_pair() {
+    fn reads_a_precision_and_scale_pair_that_sizes_the_numeric_column() {
         assert_eq!(
             parse(Some(12), Some(2)).expect("a digit pair parses"),
             NumericDigits::Declared {
@@ -82,7 +85,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_the_largest_representable_precision() {
+    fn accepts_a_precision_of_28_as_the_most_digits_a_rust_decimal_holds() {
         assert_eq!(
             parse(Some(MAX_NUMERIC_PRECISION), Some(MAX_NUMERIC_PRECISION))
                 .expect("the largest representable precision parses"),
@@ -94,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_scale_without_a_precision() {
+    fn rejects_a_scale_without_a_precision_so_numeric_digits_are_never_implicit() {
         assert!(matches!(
             parse(None, Some(2)).expect_err("a lone scale is rejected"),
             ModelCodegenError::NumericPrecisionMissing { ref field, ref model }
@@ -103,7 +106,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_precision_without_a_scale() {
+    fn rejects_a_precision_without_a_scale_instead_of_implying_a_scale_of_zero() {
         assert!(matches!(
             parse(Some(12), None).expect_err("a lone precision is rejected"),
             ModelCodegenError::NumericScaleMissing { ref field, ref model }
@@ -112,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_zero_precision() {
+    fn rejects_a_zero_precision_because_a_numeric_column_needs_at_least_one_digit() {
         assert!(matches!(
             parse(Some(0), Some(0)).expect_err("a zero precision is rejected"),
             ModelCodegenError::NumericPrecisionOutOfRange { precision, .. }

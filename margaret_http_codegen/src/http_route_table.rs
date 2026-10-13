@@ -24,7 +24,7 @@ impl HttpRouteTable {
         path: RoutePath,
         route: HttpRoute,
     ) -> Result<(), HttpCodegenError> {
-        let method = route.method.clone();
+        let method = route.method();
         let server = route.server.clone();
 
         self.servers
@@ -36,11 +36,13 @@ impl HttpRouteTable {
     pub(crate) fn named_routes(&self, server: &str) -> Vec<NamedRoute<'_>> {
         let mut named: Vec<NamedRoute<'_>> = self
             .route_groups(server)
-            .flat_map(|group| {
-                group.method_routes().filter_map(|route| {
+            .enumerate()
+            .flat_map(|(position, group)| {
+                group.method_routes().filter_map(move |route| {
                     route.name.as_deref().map(|name| NamedRoute {
                         name,
                         path: group.path(),
+                        position,
                         route,
                     })
                 })

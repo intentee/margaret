@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 use crate::canonical_path::CanonicalPath;
 
@@ -13,8 +14,15 @@ impl ModuleImports {
         self.by_name.get(name)
     }
 
-    pub(crate) fn insert(&mut self, name: String, path: CanonicalPath) {
-        self.by_name.insert(name, path);
+    pub(crate) fn insert(&mut self, name: String, path: CanonicalPath) -> bool {
+        match self.by_name.entry(name) {
+            Entry::Occupied(_) => false,
+            Entry::Vacant(vacant) => {
+                vacant.insert(path);
+
+                true
+            }
+        }
     }
 
     pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
@@ -46,7 +54,7 @@ mod tests {
     }
 
     #[test]
-    fn returns_none_for_an_unknown_name() {
+    fn returns_none_for_an_unknown_name_so_unimported_names_stay_unbound() {
         let imports = ModuleImports::default();
 
         assert_eq!(imports.resolve("Routes"), None);

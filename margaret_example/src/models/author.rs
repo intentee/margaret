@@ -5,7 +5,7 @@ use uuid::Uuid;
 use margaret::framework::macros::model;
 
 #[model(table = "authors")]
-#[index(name = "authors_active_joined", columns = [is_active, joined_at])]
+#[index(name = "authors_active_joined", fields = [active, joined_at])]
 #[derive(Clone)]
 pub struct Author {
     #[column(primary_key)]

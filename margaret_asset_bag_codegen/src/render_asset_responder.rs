@@ -11,12 +11,7 @@ use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use crate::cache_policy::CachePolicy;
 use crate::content_type::content_type;
 
-fn responder_arm(
-    tail: &str,
-    policy: &CachePolicy,
-    assets_directory_name: &str,
-    embed_relative: &str,
-) -> TokenStream {
+fn responder_arm(tail: &str, policy: &CachePolicy, assets_directory_name: &str) -> TokenStream {
     let resolved_content_type = content_type(tail);
     let cache_control = policy.header_value();
     let output_path = format!("{assets_directory_name}/{tail}");
@@ -28,8 +23,6 @@ fn responder_arm(
             ::core::include_bytes!(::core::concat!(
                 ::core::env!("CARGO_MANIFEST_DIR"),
                 "/",
-                #embed_relative,
-                "/",
                 #output_path
             )),
         )
@@ -40,7 +33,6 @@ fn responder_arm(
 pub(crate) fn render_asset_responder(
     served: &BTreeMap<String, CachePolicy>,
     assets_directory_name: &str,
-    embed_relative: &str,
     responder_type: &str,
 ) -> TokenStream {
     let type_identifier = format_ident!("{responder_type}");
@@ -51,12 +43,7 @@ pub(crate) fn render_asset_responder(
             continue;
         }
 
-        arms.push(responder_arm(
-            tail,
-            policy,
-            assets_directory_name,
-            embed_relative,
-        ));
+        arms.push(responder_arm(tail, policy, assets_directory_name));
     }
 
     let too_many_lines = too_many_lines_allow();
@@ -85,7 +72,7 @@ mod tests {
     use crate::cache_policy::CachePolicy;
 
     fn rendered(served: &BTreeMap<String, CachePolicy>) -> String {
-        render_asset_responder(served, "assets", "..", "AssetResponder").to_string()
+        render_asset_responder(served, "assets", "AssetResponder").to_string()
     }
 
     #[test]
@@ -104,9 +91,9 @@ mod tests {
         assert!(source.contains("\"text/javascript\""));
         assert!(source.contains("\"public, max-age=31536000, immutable\""));
         assert!(source.contains("\"no-cache\""));
-        assert!(source.contains("CARGO_MANIFEST_DIR"));
-        assert!(source.contains("\"..\""));
-        assert!(source.contains("\"assets/app_A1B2C3D4.js\""));
+        assert!(source.split_whitespace().collect::<String>().contains(
+            "::core::include_bytes!(::core::concat!(::core::env!(\"CARGO_MANIFEST_DIR\"),\"/\",\"assets/app_A1B2C3D4.js\"))"
+        ));
         assert!(source.contains("\"assets/service_worker.js\""));
         assert!(source.contains("not_found"));
     }

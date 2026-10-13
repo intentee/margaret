@@ -1,5 +1,5 @@
-pub mod access_token_verifier_holding;
-pub mod admission_answer;
-pub mod admitting_handler;
-pub mod id_token_verifier_holding;
-pub mod unready_verifier;
+pub mod admit_access_token;
+pub mod held_key_set;
+pub mod held_trusted_issuer;
+pub mod refused_with_challenge;
+pub mod refused_without_headers;

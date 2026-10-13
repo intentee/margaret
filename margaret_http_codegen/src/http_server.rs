@@ -1,20 +1,32 @@
 use proc_macro2::Ident;
 use quote::format_ident;
 
+use margaret_attributes::canonical_path::CanonicalPath;
+
+use crate::server_origin_source::ServerOriginSource;
 use crate::server_transport_policy::ServerTransportPolicy;
+use crate::server_uploads::ServerUploads;
 
 #[derive(Clone)]
 pub struct HttpServer {
     name: String,
+    origin: ServerOriginSource,
     transport_policy: ServerTransportPolicy,
+    uploads: ServerUploads,
 }
 
 impl HttpServer {
     #[must_use]
-    pub fn new(name: String, transport_policy: ServerTransportPolicy) -> Self {
+    pub fn new(
+        name: String,
+        transport_policy: ServerTransportPolicy,
+        uploads: ServerUploads,
+    ) -> Self {
         Self {
             name,
+            origin: ServerOriginSource::Argument,
             transport_policy,
+            uploads,
         }
     }
 
@@ -34,6 +46,19 @@ impl HttpServer {
     }
 
     #[must_use]
+    pub fn origin(&self) -> &ServerOriginSource {
+        &self.origin
+    }
+
+    #[must_use]
+    pub fn served_at_issuer_origin(self, endpoints: CanonicalPath) -> Self {
+        Self {
+            origin: ServerOriginSource::Issuer { endpoints },
+            ..self
+        }
+    }
+
+    #[must_use]
     pub fn transport_argument(&self) -> String {
         format!("{}-transport", self.name)
     }
@@ -49,8 +74,8 @@ impl HttpServer {
     }
 
     #[must_use]
-    pub fn uploads_argument(&self) -> String {
-        format!("{}-uploads", self.name)
+    pub fn uploads(&self) -> ServerUploads {
+        self.uploads
     }
 
     #[must_use]

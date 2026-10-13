@@ -6,8 +6,8 @@ publish = false
 autotests = false
 
 [dev-dependencies]
-margaret_spiffe_svid = { workspace = true }
 margaret_peer_identity = { workspace = true }
+margaret_spiffe_svid = { workspace = true }
 margaret_spiffe_svid_server = { workspace = true }
 margaret_spiffe_svid_tests = { path = "../margaret_spiffe_svid_tests" }
 rustls = { workspace = true }

@@ -1,0 +1,15 @@
+use std::path::Path;
+
+use margaret_container_tests::generate_container_source::generate_container_source;
+
+#[test]
+fn instantiates_fieldless_singletons_directly_so_they_need_no_constructor() {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/fieldless");
+    let generated = generate_container_source("crate", &directory)
+        .expect("fieldless singletons generate without a #[constructor]");
+    let source: String = generated.source().split_whitespace().collect();
+
+    assert!(source.contains("crate::UnitMarker"));
+    assert!(source.contains("crate::EmptyNamed{}"));
+    assert!(source.contains("crate::EmptyTuple()"));
+}

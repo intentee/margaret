@@ -1,0 +1,33 @@
+[package]
+name = "margaret_coverage_spiffe_fixture_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+futures-util = { workspace = true }
+margaret_coverage_spiffe_fixture = { path = "../margaret_coverage_spiffe_fixture" }
+margaret_local_server_tests = { path = "../margaret_local_server_tests" }
+margaret_spiffe_svid = { workspace = true }
+margaret_spiffe_svid_client = { workspace = true }
+margaret_spiffe_svid_tests = { path = "../margaret_spiffe_svid_tests" }
+reqwest = { workspace = true }
+rustls = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt", "time"] }
+tokio-rustls = { workspace = true }
+tokio-tungstenite = { workspace = true }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
+
+[features]
+tests_that_use_spire = []
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

@@ -1,6 +1,7 @@
 use log::warn;
 use spiffe::spiffe_id::SpiffeId;
 
+use crate::spiffe_id_extraction::SpiffeIdExtraction;
 use crate::spiffe_id_from_cert::spiffe_id_from_cert;
 
 pub enum PeerIdentity {
@@ -15,9 +16,9 @@ impl PeerIdentity {
         match certificate_der {
             None => Self::Anonymous,
             Some(certificate_der) => match spiffe_id_from_cert(certificate_der) {
-                Ok(spiffe_id) => Self::Verified { spiffe_id },
-                Err(error) => {
-                    warn!("unable to extract a SPIFFE ID from the peer certificate: {error}");
+                SpiffeIdExtraction::Extracted(spiffe_id) => Self::Verified { spiffe_id },
+                SpiffeIdExtraction::Rejected(rejection) => {
+                    warn!("unable to extract a SPIFFE ID from the peer certificate: {rejection}");
 
                     Self::Unidentified
                 }

@@ -6,5 +6,4 @@ pub struct ExtractionContext<'context> {
     pub error_return: &'context TokenStream,
     pub provider_access: &'context TokenStream,
     pub request_local: &'context Ident,
-    pub response_return: &'context TokenStream,
 }

@@ -6,18 +6,19 @@ use x509_parser::prelude::GeneralName;
 use x509_parser::prelude::ParsedExtension;
 use x509_parser::prelude::X509Certificate;
 
-use crate::peer_identity_error::PeerIdentityError;
+use crate::spiffe_id_extraction::SpiffeIdExtraction;
+use crate::spiffe_id_rejection::SpiffeIdRejection;
 
-/// # Errors
-///
-/// Returns `PeerIdentityError::CertificateEncoding` or `PeerIdentityError::MissingUri` or `PeerIdentityError::SpiffeId`.
-pub fn spiffe_id_from_cert(certificate_der: &[u8]) -> Result<SpiffeId, PeerIdentityError> {
-    let (_remaining, certificate) =
-        X509Certificate::from_der(certificate_der).map_err(|error| {
-            PeerIdentityError::CertificateEncoding {
+#[must_use]
+pub fn spiffe_id_from_cert(certificate_der: &[u8]) -> SpiffeIdExtraction {
+    let certificate = match X509Certificate::from_der(certificate_der) {
+        Ok(parsed) => parsed.1,
+        Err(error) => {
+            return SpiffeIdExtraction::Rejected(SpiffeIdRejection::CertificateEncoding {
                 source: error.into(),
-            }
-        })?;
+            });
+        }
+    };
 
     let uris: Vec<&str> = certificate
         .iter_extensions()
@@ -35,8 +36,11 @@ pub fn spiffe_id_from_cert(certificate_der: &[u8]) -> Result<SpiffeId, PeerIdent
         .collect();
 
     match uris.as_slice() {
-        [] => Err(PeerIdentityError::MissingUri),
-        [uri] => SpiffeId::from_str(uri).map_err(|source| PeerIdentityError::SpiffeId { source }),
-        _ => Err(PeerIdentityError::MultipleUris { count: uris.len() }),
+        [] => SpiffeIdExtraction::Rejected(SpiffeIdRejection::MissingUri),
+        [uri] => match SpiffeId::from_str(uri) {
+            Ok(spiffe_id) => SpiffeIdExtraction::Extracted(spiffe_id),
+            Err(source) => SpiffeIdExtraction::Rejected(SpiffeIdRejection::SpiffeId { source }),
+        },
+        _ => SpiffeIdExtraction::Rejected(SpiffeIdRejection::MultipleUris { count: uris.len() }),
     }
 }

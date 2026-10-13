@@ -2,4 +2,4 @@ pub mod get_home;
 pub mod get_identity;
 pub mod get_metrics;
 pub mod get_well_known_jwks;
-pub mod post_mint_access_token;
+pub mod post_session_refresh;

@@ -9,10 +9,13 @@ autotests = false
 margaret_jose_parameters = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_jws_verification_tests = { path = "../margaret_jws_verification_tests" }
-margaret_jwt_verification = { workspace = true }
-margaret_registered_claims = { workspace = true }
 margaret_token_trust = { workspace = true }
 serde_json = { workspace = true }
+
+[dev-dependencies]
+base64ct = { workspace = true }
+margaret_jwt_verification = { workspace = true }
+margaret_registered_claims = { workspace = true }
 
 [[test]]
 name = "main"

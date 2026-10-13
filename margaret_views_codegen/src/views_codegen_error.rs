@@ -2,7 +2,6 @@ use thiserror::Error;
 
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
-use margaret_container::container_error::ContainerError;
 
 #[derive(Debug, Error)]
 pub enum ViewsCodegenError {
@@ -10,12 +9,6 @@ pub enum ViewsCodegenError {
     AttributeArguments {
         #[from]
         source: AttributeArgumentsError,
-    },
-
-    #[error(transparent)]
-    Container {
-        #[from]
-        source: ContainerError,
     },
 
     #[error("failed to index the crate: {source}")]
@@ -26,11 +19,6 @@ pub enum ViewsCodegenError {
 
     #[error("#[renders_view] is only supported on structs, but '{view}' is not a struct")]
     ViewNotAStruct { view: String },
-
-    #[error(
-        "#[renders_view] '{view}' is declared more than once; a view struct maps to exactly one view"
-    )]
-    DuplicateViewDeclaration { view: String },
 
     #[error("view '{view}' is missing the 'name' argument")]
     ViewMissingName { view: String },

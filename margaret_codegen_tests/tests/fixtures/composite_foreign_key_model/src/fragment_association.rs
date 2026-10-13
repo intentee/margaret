@@ -1,21 +1,16 @@
+use margaret::framework::active_record::key::Key;
 use margaret::framework::macros::model;
+use margaret::framework::model::on_delete::OnDelete;
 
 use crate::fragment_metadata::FragmentMetadata;
 
 #[model(table = "fragment")]
-#[primary_key(columns = [partition, hash, context])]
-#[unique(columns = [hash, context])]
-#[index(name = "fragment_context_partition", columns = [context, partition])]
-#[foreign_key(
-    columns = [partition, hash],
-    references = FragmentMetadata,
-    on_delete = cascade
-)]
+#[primary_key(fields = [metadata, context])]
+#[index(name = "fragment_context_metadata", fields = [context, metadata])]
 pub struct FragmentAssociation {
     #[column]
-    pub partition: uuid::Uuid,
-    #[column]
-    pub hash: Vec<u8>,
+    #[foreign_key(on_delete = OnDelete::Cascade)]
+    pub metadata: Key<FragmentMetadata>,
     #[column]
     pub context: uuid::Uuid,
 }

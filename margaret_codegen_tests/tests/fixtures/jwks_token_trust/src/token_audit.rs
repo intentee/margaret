@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use chrono::DateTime;
-use serde_json::json;
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
+use margaret::framework::identity_session::session_access_token_claims::SessionAccessTokenClaims;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
@@ -29,9 +30,15 @@ impl TokenAudit {
     /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
-        let _signing = self
-            .secret_store
-            .sign_access_token(&json!({ "scope": "audit" }), DateTime::UNIX_EPOCH)?;
+        let _signing = self.secret_store.issue_session_access_token(
+            &SessionAccessTokenClaims {
+                auth_time: DateTime::UNIX_EPOCH,
+                sid: Uuid::nil(),
+                sub: Uuid::nil(),
+            },
+            "audit",
+            DateTime::UNIX_EPOCH,
+        );
 
         cancellation_token.cancelled().await;
 

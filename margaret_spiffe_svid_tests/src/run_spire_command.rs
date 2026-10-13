@@ -38,7 +38,7 @@ mod tests {
     use super::run_spire_command;
 
     #[tokio::test]
-    async fn errors_when_binary_does_not_exist() {
+    async fn errors_when_the_binary_does_not_exist_so_a_missing_spire_install_is_reported() {
         let socket_path = PathBuf::from("/tmp/irrelevant.sock");
 
         let result = run_spire_command(

@@ -1,5 +1,5 @@
 pub enum FrameworkEnablement {
-    Always,
+    Declared,
     Dependency,
     WhenReferenced,
 }

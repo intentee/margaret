@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 use margaret_spiffe_svid::svid_rotate_loop::svid_rotate_loop;
 
 #[tokio::test]
-async fn exits_on_cancellation() {
+async fn returns_once_cancelled_while_the_spire_stream_is_idle_so_shutdown_never_hangs() {
     let (x509_context_tx, _x509_context_rx) = broadcast::channel::<X509Context>(1);
     let cancellation_token = CancellationToken::new();
     let cancellation_token_for_loop = cancellation_token.clone();

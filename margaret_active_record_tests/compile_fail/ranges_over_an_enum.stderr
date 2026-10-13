@@ -1,0 +1,13 @@
+error[E0599]: the method `above` exists for struct `Operand<Article, ArticleStatus>`, but its trait bounds were not satisfied
+  --> compile_fail/ranges_over_an_enum.rs:12:40
+   |
+12 |         .when(|article| article.status.above(ArticleStatus::Draft))
+   |                                        ^^^^^ method cannot be called on `Operand<Article, ArticleStatus>` due to unsatisfied trait bounds
+   |
+  ::: src/models/article_status.rs
+   |
+   | pub enum ArticleStatus {
+   | ---------------------- doesn't satisfy `ArticleStatus: Ordered`
+   |
+   = note: the following trait bounds were not satisfied:
+           `ArticleStatus: Ordered`

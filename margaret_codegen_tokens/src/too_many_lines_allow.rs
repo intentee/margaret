@@ -16,7 +16,7 @@ mod tests {
     use super::too_many_lines_allow;
 
     #[test]
-    fn allows_the_lint_with_a_reason() {
+    fn allows_too_many_lines_with_a_reason_so_long_generated_lists_pass_clippy() {
         let rendered: String = too_many_lines_allow()
             .to_string()
             .split_whitespace()

@@ -1,6 +1,8 @@
-use margaret_attributes::canonical_path::CanonicalPath;
+use std::slice;
+
 use margaret_attributes::struct_shape::StructShape;
 
+use crate::constructor_outcome::ConstructorOutcome;
 use crate::dependency_kind::DependencyKind;
 
 #[derive(Clone)]
@@ -9,6 +11,7 @@ pub(crate) enum DirectConstruction {
         dependencies: Vec<DependencyKind>,
         is_async: bool,
         method: String,
+        outcome: ConstructorOutcome,
     },
     Fieldless {
         shape: StructShape,
@@ -17,15 +20,15 @@ pub(crate) enum DirectConstruction {
         dependencies: Vec<DependencyKind>,
         is_async: bool,
         method: String,
+        outcome: ConstructorOutcome,
+    },
+    FrameworkPrepared {
+        dependency: DependencyKind,
     },
     FrameworkUnit,
     FrameworkAccessor {
         accessor: String,
         dependencies: Vec<DependencyKind>,
-    },
-    Resolved {
-        dependencies: Vec<DependencyKind>,
-        resolver: CanonicalPath,
     },
 }
 
@@ -34,9 +37,21 @@ impl DirectConstruction {
         match self {
             DirectConstruction::Constructor { dependencies, .. }
             | DirectConstruction::FrameworkConstructor { dependencies, .. }
-            | DirectConstruction::FrameworkAccessor { dependencies, .. }
-            | DirectConstruction::Resolved { dependencies, .. } => dependencies,
+            | DirectConstruction::FrameworkAccessor { dependencies, .. } => dependencies,
+            DirectConstruction::FrameworkPrepared { dependency } => slice::from_ref(dependency),
             DirectConstruction::Fieldless { .. } | DirectConstruction::FrameworkUnit => &[],
+        }
+    }
+
+    pub(crate) fn outcome(&self) -> ConstructorOutcome {
+        match self {
+            Self::Constructor { outcome, .. } | Self::FrameworkConstructor { outcome, .. } => {
+                *outcome
+            }
+            Self::Fieldless { .. }
+            | Self::FrameworkPrepared { .. }
+            | Self::FrameworkUnit
+            | Self::FrameworkAccessor { .. } => ConstructorOutcome::Infallible,
         }
     }
 

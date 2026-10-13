@@ -1,7 +1,4 @@
-use margaret::framework::token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+use margaret::framework::macros::issues_tokens;
 
-#[singleton]
-#[issues_tokens]
+#[issues_tokens(provider, issuer = "https://issuer.fixture")]
 struct Issuer;
-
-impl DeclaresTokenIssuance for Issuer {}

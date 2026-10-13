@@ -9,6 +9,7 @@ autotests = false
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 margaret_peer_identity = { workspace = true }
+margaret_spiffe_svid = { workspace = true }
 margaret_spiffe_svid_client = { workspace = true }
 margaret_spiffe_svid_tests = { path = "../margaret_spiffe_svid_tests" }
 rustls = { workspace = true }
@@ -16,7 +17,6 @@ tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
 [dev-dependencies]
-margaret_spiffe_svid = { workspace = true }
 margaret_sync_holder = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types"] }
 tokio = { workspace = true, features = ["macros", "rt"] }

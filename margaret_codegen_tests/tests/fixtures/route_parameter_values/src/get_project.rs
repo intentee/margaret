@@ -4,6 +4,7 @@ use margaret::framework::http::response::Response;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 
 use super::project_id::ProjectId;
 use super::project_revision::ProjectRevision;
@@ -11,7 +12,7 @@ use super::project_slug::ProjectSlug;
 
 #[singleton]
 #[responds_to_http(
-    method = "get",
+    method = RouteMethod::Get,
     name = "get_project",
     path = "/projects/{project_slug}/{project_id}/{project_revision}",
     server = "public"

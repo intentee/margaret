@@ -7,6 +7,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+use margaret_route_parameter_codegen::route_path_registry::RoutePathRegistry;
 
 use crate::built_websocket_plan::BuiltWebSocketPlan;
 use crate::message_kind::MessageKind;
@@ -41,6 +42,7 @@ fn reject_duplicate_response_methods(
 
 pub(crate) fn build_websocket_plan(
     index: &AttributeIndex,
+    route_paths: &mut RoutePathRegistry,
     bindings: &ContainerBindings,
     middleware_plans: &MiddlewarePlans,
     registries: &BindingRegistries,
@@ -49,7 +51,7 @@ pub(crate) fn build_websocket_plan(
 
     reject_duplicate_response_methods(&messages)?;
 
-    let sessions = websocket_sessions(index, bindings, middleware_plans, registries)?;
+    let sessions = websocket_sessions(index, route_paths, bindings, middleware_plans, registries)?;
     let handlers = websocket_handlers(index)?;
     let message_by_path: HashMap<&CanonicalPath, &WebSocketMessage> = messages
         .iter()

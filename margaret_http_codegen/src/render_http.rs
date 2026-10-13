@@ -5,24 +5,25 @@ use crate::http_plan::HttpPlan;
 use crate::render::render;
 use crate::render_forwarders::render_forwarders;
 use crate::render_routes::render_routes;
+use crate::server_layouts::server_layouts;
 
 #[must_use]
 pub fn render_http(plan: HttpPlan, bindings: &ContainerBindings) -> HttpArtifacts {
+    let layouts = server_layouts(&plan.table, &plan.servers);
     let mut modules = render(
         &plan.table,
-        &plan.servers,
+        &layouts,
         plan.has_views,
-        &plan.websocket_servers,
+        &plan.websocket_paths,
         bindings,
     );
 
-    modules.extend(render_routes(&plan.table, &plan.servers));
-    modules.extend(render_forwarders(&plan.table, &plan.servers));
+    modules.extend(render_routes(&plan.table, &layouts, &plan.websocket_paths));
 
-    HttpArtifacts::new(
+    HttpArtifacts {
+        forwarders: render_forwarders(&plan.table, &layouts),
+        retained_roots: plan.retained_roots,
         modules,
-        plan.servers,
-        plan.server_serve_inputs,
-        plan.retained_roots,
-    )
+        servers: plan.servers,
+    }
 }

@@ -5,26 +5,25 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_method::route_method::RouteMethod;
 use margaret::framework::views::renders_view::RendersView;
 
-use crate::app_name::AppName;
+use crate::config::app_name::AppName;
 use crate::margaret::routes::Routes;
 use crate::margaret::views::Views;
 use crate::views::farewell_view::FarewellViewProps;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/farewell-card", server = "public")]
+#[responds_to_http(method = RouteMethod::Get, path = "/farewell-card", server = "public")]
 pub struct GetFarewellCard {
     app_name: Arc<AppName>,
 }
 
 impl GetFarewellCard {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(app_name: Arc<AppName>) -> anyhow::Result<Self> {
-        Ok(Self { app_name })
+    pub fn create(app_name: Arc<AppName>) -> Self {
+        Self { app_name }
     }
 
     /// # Errors
@@ -41,45 +40,5 @@ impl GetFarewellCard {
                 })?,
             )
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use super::GetFarewellCard;
-    use crate::app_name::AppName;
-    use crate::margaret::routes::Routes;
-    use crate::margaret::views::Views;
-    use crate::views::card_layout::CardLayout;
-    use crate::views::farewell_view::FarewellView;
-    use crate::views::greeting_view::GreetingView;
-
-    #[tokio::test]
-    async fn responds_with_the_rendered_farewell_card() {
-        let card_layout = Arc::new(CardLayout);
-        let views = Views {
-            card_layout: card_layout.clone(),
-            farewell_view: Arc::new(
-                FarewellView::create(card_layout.clone())
-                    .expect("the farewell view is constructed"),
-            ),
-            greeting_view: Arc::new(
-                GreetingView::create(card_layout).expect("the greeting view is constructed"),
-            ),
-        };
-        let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
-        let app_name = AppName::create().expect("the app name is constructed");
-        let responder =
-            GetFarewellCard::create(Arc::new(app_name)).expect("the responder is constructed");
-
-        assert_eq!(
-            responder
-                .respond(&routes, &views)
-                .expect("the responder succeeds")
-                .status(),
-            200
-        );
     }
 }

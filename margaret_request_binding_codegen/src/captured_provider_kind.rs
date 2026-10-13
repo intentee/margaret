@@ -24,20 +24,17 @@ impl CapturedProviderKind {
 
     #[must_use]
     pub fn binds(&self, binding: &RequestBinding) -> bool {
-        match (self, binding) {
-            (
-                Self::AuthenticatedUser { application },
-                RequestBinding::AuthenticatedUser {
-                    application: bound, ..
-                },
-            ) => application.concrete == bound.concrete,
-            (
-                Self::Binder { provider, .. },
-                RequestBinding::BoundRouteParameter {
-                    binder_provider, ..
-                },
-            ) => provider == binder_provider,
-            _ => false,
+        match self {
+            Self::AuthenticatedUser { application } => matches!(
+                binding,
+                RequestBinding::AuthenticatedUser { application: bound, .. }
+                    if application.concrete == bound.concrete
+            ),
+            Self::Binder { provider, .. } => matches!(
+                binding,
+                RequestBinding::BoundRouteParameter { binder_provider, .. }
+                    if provider == binder_provider
+            ),
         }
     }
 }

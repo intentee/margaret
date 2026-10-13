@@ -34,9 +34,9 @@ impl ServerTransportPolicy {
 
     #[must_use]
     pub fn combined_with(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Negotiable, Self::Negotiable) => Self::Negotiable,
-            (Self::PinnedSpiffeMtls, _) | (_, Self::PinnedSpiffeMtls) => Self::PinnedSpiffeMtls,
+        match self {
+            Self::Negotiable => other,
+            Self::PinnedSpiffeMtls => Self::PinnedSpiffeMtls,
         }
     }
 }
@@ -51,6 +51,9 @@ mod tests {
     use margaret_request_binding_codegen::authenticated_user_challenge::AuthenticatedUserChallenge;
     use margaret_request_binding_codegen::authenticated_user_requirement::AuthenticatedUserRequirement;
     use margaret_request_binding_codegen::bound_parameter::BoundParameter;
+    use margaret_request_binding_codegen::inference_fallibility::InferenceFallibility;
+    use margaret_request_binding_codegen::inference_kind::InferenceKind;
+    use margaret_request_binding_codegen::inference_shape::InferenceShape;
     use margaret_request_binding_codegen::request_binding::RequestBinding;
 
     use super::ServerTransportPolicy;
@@ -72,6 +75,10 @@ mod tests {
                 challenge: AuthenticatedUserChallenge::Unchallenged,
                 concrete: path("PeerUserProvider"),
                 field: "peer_user_provider".to_string(),
+                inference: InferenceShape {
+                    fallibility: InferenceFallibility::Fallible,
+                    kind: InferenceKind::Outcome,
+                },
                 injects_peer_spiffe_id,
                 injects_routes: false,
                 injects_views: false,

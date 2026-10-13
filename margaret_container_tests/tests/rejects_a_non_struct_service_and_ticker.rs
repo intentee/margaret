@@ -4,21 +4,22 @@ use margaret_container::container_error::ContainerError;
 use margaret_container_tests::generate_container_source::generate_container_source;
 
 #[test]
-fn rejects_a_non_struct_service() {
+fn rejects_a_non_struct_service_since_the_container_only_builds_structs() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/service_not_a_struct");
-    let error = generate_container_source("crate", &directory)
-        .expect_err("a #[service] on a non-struct must be rejected");
+    let error = generate_container_source("crate", &directory).expect_err(
+        "use margaret::framework::macros::service;\na #[service] on a non-struct must be rejected",
+    );
 
     assert!(matches!(error, ContainerError::RoleNotAStruct { .. }));
 }
 
 #[test]
-fn rejects_a_non_struct_ticker() {
+fn rejects_a_non_struct_ticker_since_the_container_only_builds_structs() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ticker_not_a_struct");
     let error = generate_container_source("crate", &directory)
-        .expect_err("a #[scheduled_with_tick_timer] on a non-struct must be rejected");
+        .expect_err("use margaret::framework::macros::scheduled_with_tick_timer;\na #[scheduled_with_tick_timer] on a non-struct must be rejected");
 
     assert!(matches!(error, ContainerError::RoleNotAStruct { .. }));
 }

@@ -13,7 +13,7 @@ mod tests {
     use margaret::framework::console::command_outcome::CommandOutcome;
 
     #[test]
-    fn returns_failed_without_a_recognized_command() {
+    fn returns_failed_without_a_recognized_command_so_a_bad_invocation_never_passes() {
         assert_eq!(super::main(), CommandOutcome::Failed);
     }
 }

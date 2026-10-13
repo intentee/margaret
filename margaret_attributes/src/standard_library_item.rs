@@ -14,11 +14,13 @@ struct StandardLibraryLocation {
 pub enum StandardLibraryItem {
     Arc,
     Box,
+    From,
     Option,
     Rc,
     Send,
     String,
     Sync,
+    TryFrom,
     Vec,
 }
 
@@ -32,11 +34,13 @@ impl StandardLibraryItem {
         [
             Self::Arc,
             Self::Box,
+            Self::From,
             Self::Option,
             Self::Rc,
             Self::Send,
             Self::String,
             Self::Sync,
+            Self::TryFrom,
             Self::Vec,
         ]
         .into_iter()
@@ -74,6 +78,11 @@ impl StandardLibraryItem {
                 name: "Box",
                 roots: &ALLOC_ROOTS,
             },
+            Self::From => StandardLibraryLocation {
+                module: "convert",
+                name: "From",
+                roots: &CORE_ROOTS,
+            },
             Self::Option => StandardLibraryLocation {
                 module: "option",
                 name: "Option",
@@ -97,6 +106,11 @@ impl StandardLibraryItem {
             Self::Sync => StandardLibraryLocation {
                 module: "marker",
                 name: "Sync",
+                roots: &CORE_ROOTS,
+            },
+            Self::TryFrom => StandardLibraryLocation {
+                module: "convert",
+                name: "TryFrom",
                 roots: &CORE_ROOTS,
             },
             Self::Vec => StandardLibraryLocation {
@@ -124,11 +138,13 @@ mod tests {
         for item in [
             StandardLibraryItem::Arc,
             StandardLibraryItem::Box,
+            StandardLibraryItem::From,
             StandardLibraryItem::Option,
             StandardLibraryItem::Rc,
             StandardLibraryItem::Send,
             StandardLibraryItem::String,
             StandardLibraryItem::Sync,
+            StandardLibraryItem::TryFrom,
             StandardLibraryItem::Vec,
         ] {
             assert_eq!(

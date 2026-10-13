@@ -80,7 +80,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_a_view_rendering_failure() {
+    fn propagates_a_view_rendering_failure_unchanged_so_its_cause_stays_visible() {
         let error = FailingView
             .render_to_string(())
             .expect_err("the view failure is propagated");

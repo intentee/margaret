@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -5,13 +7,12 @@ use rustls::ServerConfig;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::route_entry::RouteEntry;
-use margaret_http::router::Router;
 use margaret_http::server::Server;
-use margaret_http::server_registry::ServerRegistry;
+use margaret_http::server_paths::ServerPaths;
+use margaret_http::server_routes::ServerRoutes;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 
@@ -22,21 +23,24 @@ pub struct RunningFixtureServer {
 }
 
 impl RunningFixtureServer {
-    /// # Panics
-    ///
-    /// Panics when the fixture it builds cannot be prepared.
-    pub async fn start(server_config: Arc<ServerConfig>, route_entries: Vec<RouteEntry>) -> Self {
-        let server = Server::new(
-            "fixture",
-            "127.0.0.1:0".to_string(),
-            TransportConfig::MutualTls { server_config },
-            UploadConfig::Disabled,
-            BodyLimit::default(),
-            Router::build(route_entries).expect("the route entries register cleanly"),
-        );
-        let server_registry = Arc::new(ServerRegistry::new(vec![server]));
-        let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
-        let bound = BoundServer::bind(server_registry, forward_targets, Arc::from("fixture"))
+    async fn serve<const COUNT: usize>(
+        address: SocketAddr,
+        transport: TransportConfig,
+        upload_config: UploadConfig,
+        paths: [&'static str; COUNT],
+        route_entries: [RouteEntry; COUNT],
+    ) -> Self {
+        let ServerRoutes {
+            named_handlers,
+            router,
+        } = ServerPaths::build(paths)
+            .expect("the route paths do not conflict")
+            .routes(route_entries)
+            .build()
+            .expect("the route entries register cleanly");
+        let server = Server::new(address.to_string(), transport, upload_config, router);
+        let forward_targets = Arc::new(ForwardTargets::new(named_handlers));
+        let bound = BoundServer::bind(Arc::new(server), forward_targets)
             .await
             .expect("the fixture server binds");
         let address = bound
@@ -50,6 +54,60 @@ impl RunningFixtureServer {
             cancellation_token,
             join_handle,
         }
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
+    pub async fn start<const COUNT: usize>(
+        server_config: Arc<ServerConfig>,
+        paths: [&'static str; COUNT],
+        route_entries: [RouteEntry; COUNT],
+    ) -> Self {
+        Self::start_at(
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            server_config,
+            paths,
+            route_entries,
+        )
+        .await
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
+    pub async fn start_at<const COUNT: usize>(
+        ip: IpAddr,
+        server_config: Arc<ServerConfig>,
+        paths: [&'static str; COUNT],
+        route_entries: [RouteEntry; COUNT],
+    ) -> Self {
+        Self::serve(
+            SocketAddr::new(ip, 0),
+            TransportConfig::MutualTls { server_config },
+            UploadConfig::Disabled,
+            paths,
+            route_entries,
+        )
+        .await
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
+    pub async fn start_plain<const COUNT: usize>(
+        upload_config: UploadConfig,
+        paths: [&'static str; COUNT],
+        route_entries: [RouteEntry; COUNT],
+    ) -> Self {
+        Self::serve(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
+            TransportConfig::Plain,
+            upload_config,
+            paths,
+            route_entries,
+        )
+        .await
     }
 
     #[must_use]

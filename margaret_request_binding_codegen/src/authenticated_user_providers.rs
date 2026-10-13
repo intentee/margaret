@@ -11,6 +11,7 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::is_singleton::is_singleton;
+use margaret_tag_codegen::session_source::SessionSource;
 use margaret_tag_codegen::tag_pool::TagPool;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
@@ -18,7 +19,12 @@ use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
+use crate::bound_parameter::BoundParameter;
 use crate::classify_parameters::classify_parameters;
+use crate::declared_inference::declared_inference;
+use crate::inference_fallibility::InferenceFallibility;
+use crate::inference_kind::InferenceKind;
+use crate::inference_shape::InferenceShape;
 use crate::infers_authenticated_user_arguments::InfersAuthenticatedUserArguments;
 use crate::injects_peer_spiffe_id::injects_peer_spiffe_id;
 use crate::injects_routes::injects_routes;
@@ -53,6 +59,42 @@ fn infer_from_request_method<'index>(
         })
 }
 
+fn wrapper_inference(
+    declared: InferenceShape,
+    challenge: &AuthenticatedUserChallenge,
+    parameters: &[BoundParameter],
+) -> InferenceShape {
+    let interrupted_by_session = matches!(
+        challenge,
+        AuthenticatedUserChallenge::Session {
+            source: SessionSource::Consumed,
+            ..
+        }
+    );
+
+    InferenceShape {
+        fallibility: match challenge {
+            AuthenticatedUserChallenge::Session {
+                source: SessionSource::Issued,
+                ..
+            } => InferenceFallibility::Fallible,
+            AuthenticatedUserChallenge::Bearer { .. }
+            | AuthenticatedUserChallenge::Introspection { .. }
+            | AuthenticatedUserChallenge::Session { .. }
+            | AuthenticatedUserChallenge::Unchallenged => declared.fallibility,
+        },
+        kind: if interrupted_by_session
+            || parameters
+                .iter()
+                .any(|parameter| parameter.binding.interrupts_inference())
+        {
+            InferenceKind::Outcome
+        } else {
+            declared.kind
+        },
+    }
+}
+
 /// # Errors
 ///
 /// Returns `RequestBindingError::AuthenticatedUserProviderNotAStruct` or `RequestBindingError::AuthenticatedUserProviderRequiresSingleton` or `RequestBindingError::AuthenticatedUserProviderUnknownUserModel`.
@@ -65,8 +107,8 @@ pub fn authenticated_user_providers(
     let mut registry: HashMap<CanonicalPath, AuthenticatedUserProvider> = HashMap::new();
 
     for item in index.items() {
-        let Some(matched) = AttributeQuery::new(item)
-            .find_framework(FrameworkAttribute::InfersAuthenticatedUser)?
+        let Some(matched) =
+            AttributeQuery::new(item).find_framework(FrameworkAttribute::InfersAuthenticatedUser)
         else {
             continue;
         };
@@ -98,6 +140,7 @@ pub fn authenticated_user_providers(
             )?;
 
         let method = infer_from_request_method(item, &provider)?;
+        let declared = declared_inference(index, item, method, &provider)?;
 
         let subject = format!("authenticated user provider '{provider}'");
         let parameters = classify_parameters(
@@ -120,8 +163,10 @@ pub fn authenticated_user_providers(
             });
         }
 
+        let challenge = AuthenticatedUserChallenge::required_by(&parameters);
         let application = AuthenticatedUserApplication {
-            challenge: AuthenticatedUserChallenge::required_by(&parameters),
+            inference: wrapper_inference(declared, &challenge, &parameters),
+            challenge,
             concrete,
             field: identifier.field().to_string(),
             injects_peer_spiffe_id: injects_peer_spiffe_id(&parameters),
@@ -137,6 +182,7 @@ pub fn authenticated_user_providers(
             model,
             AuthenticatedUserProvider {
                 application,
+                declared,
                 is_async,
                 method_name,
                 parameters,

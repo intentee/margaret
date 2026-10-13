@@ -1,5 +1,7 @@
+use crate::runner_outcome::RunnerOutcome;
+
 #[derive(Clone, Copy)]
 pub(crate) enum ServiceUnitOrigin {
-    Framework,
+    Framework { outcome: RunnerOutcome },
     User,
 }

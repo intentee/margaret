@@ -27,9 +27,8 @@ fn ignores_an_rsa_key_declaring_an_ecdsa_algorithm() {
         ignored_keys.as_slice(),
         [IgnoredKey {
             index: 0,
-            reason: IgnoredKeyReason::Algorithm(KeyAlgorithmRejection::AlgorithmMismatch {
-                declared: JwsAlgorithm::Es256,
-                implied: JwsAlgorithm::Rs256
+            reason: IgnoredKeyReason::Algorithm(KeyAlgorithmRejection::NotAnRsaAlgorithm {
+                declared: JwsAlgorithm::Es256
             })
         }]
     ));

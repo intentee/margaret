@@ -12,6 +12,9 @@ pub enum AttributeError {
     #[error("two items resolve to the same canonical path '{path}'")]
     DuplicateCanonicalPath { path: String },
 
+    #[error("module '{module}' imports the name '{name}' more than once")]
+    DuplicateImport { module: String, name: String },
+
     #[error("failed to parse Rust source file '{path}': {source}")]
     FileParse {
         path: String,
@@ -28,13 +31,6 @@ pub enum AttributeError {
 
     #[error("glob import is not allowed in '{file}'")]
     GlobImport { file: String },
-
-    #[error("invalid attribute selector '{input}': {source}")]
-    InvalidSelector {
-        input: String,
-        #[source]
-        source: syn::Error,
-    },
 
     #[error("module '{module}' resolves to both '{file_module}' and '{directory_module}'")]
     ModuleFileCollision {

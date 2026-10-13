@@ -1,3 +1,5 @@
+use std::ops::ControlFlow;
+
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
 use p256::ecdsa::signature::Signer;
@@ -8,7 +10,6 @@ use p256::pkcs8::EncodePrivateKey;
 use p256::pkcs8::LineEnding;
 use zeroize::Zeroizing;
 
-use margaret_jose_parameters::curve::Curve;
 use margaret_jose_parameters::key_use::KeyUse;
 use margaret_jws_verification::ec_jwk::EcJwk;
 use margaret_jws_verification::jwk::Jwk;
@@ -16,6 +17,7 @@ use margaret_jws_verification::key_id::KeyId;
 use margaret_jws_verification::verification_material::VerificationMaterial;
 
 use crate::jwks_key_error::JwksKeyError;
+use crate::signing_curve::SigningCurve;
 use crate::signing_material::SigningMaterial;
 
 fn encoded_coordinate(
@@ -29,19 +31,29 @@ fn encoded_coordinate(
 }
 
 fn ec_jwk(
-    curve: Curve,
+    curve: SigningCurve,
     kid: &KeyId,
     x: Option<&[u8]>,
     y: Option<&[u8]>,
 ) -> Result<Jwk, JwksKeyError> {
     Ok(Jwk::Ec(EcJwk {
-        alg: Some(curve.algorithm()),
-        crv: curve,
+        alg: Some(curve.curve().algorithm()),
+        crv: curve.curve(),
         kid: Some(kid.clone()),
         key_use: Some(KeyUse::Signature),
         x: encoded_coordinate(x, "x")?,
         y: encoded_coordinate(y, "y")?,
     }))
+}
+
+fn ec_verification_material(
+    curve: SigningCurve,
+    point: &[u8],
+) -> Result<VerificationMaterial, JwksKeyError> {
+    match VerificationMaterial::from_ec_point(curve.curve(), point) {
+        ControlFlow::Continue(material) => Ok(material),
+        ControlFlow::Break(source) => Err(JwksKeyError::VerificationKeyRejected { source }),
+    }
 }
 
 fn with_pem(
@@ -63,31 +75,18 @@ pub struct EcSigningKey {
 impl EcSigningKey {
     /// # Errors
     ///
-    /// Returns `JwksKeyError::PemEncoding` when the generated key cannot be encoded.
-    pub fn generate(curve: Curve) -> Result<Self, JwksKeyError> {
-        match curve {
-            Curve::P256 => {
-                let key = p256::ecdsa::SigningKey::random(&mut OsRng);
-                let pem = key.to_pkcs8_pem(LineEnding::LF);
-
-                with_pem(SigningMaterial::P256(key), pem)
-            }
-            Curve::P384 => {
-                let key = p384::ecdsa::SigningKey::random(&mut OsRng);
-                let pem = key.to_pkcs8_pem(LineEnding::LF);
-
-                with_pem(SigningMaterial::P384(key), pem)
-            }
-        }
-    }
-
-    /// # Errors
-    ///
     /// Returns `JwksKeyError::SigningKeyRejected` when the pem is not a pkcs#8 key of the curve.
-    pub fn from_pkcs8_pem(curve: Curve, pem: Zeroizing<String>) -> Result<Self, JwksKeyError> {
+    pub fn from_pkcs8_pem(
+        curve: SigningCurve,
+        pem: Zeroizing<String>,
+    ) -> Result<Self, JwksKeyError> {
         let material = match curve {
-            Curve::P256 => p256::ecdsa::SigningKey::from_pkcs8_pem(&pem).map(SigningMaterial::P256),
-            Curve::P384 => p384::ecdsa::SigningKey::from_pkcs8_pem(&pem).map(SigningMaterial::P384),
+            SigningCurve::P256 => {
+                p256::ecdsa::SigningKey::from_pkcs8_pem(&pem).map(SigningMaterial::P256)
+            }
+            SigningCurve::P384 => {
+                p384::ecdsa::SigningKey::from_pkcs8_pem(&pem).map(SigningMaterial::P384)
+            }
         };
 
         match material {
@@ -96,11 +95,31 @@ impl EcSigningKey {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `JwksKeyError::PemEncoding` when the generated key cannot be encoded.
+    pub fn generate(curve: SigningCurve) -> Result<Self, JwksKeyError> {
+        match curve {
+            SigningCurve::P256 => {
+                let key = p256::ecdsa::SigningKey::random(&mut OsRng);
+                let pem = key.to_pkcs8_pem(LineEnding::LF);
+
+                with_pem(SigningMaterial::P256(key), pem)
+            }
+            SigningCurve::P384 => {
+                let key = p384::ecdsa::SigningKey::random(&mut OsRng);
+                let pem = key.to_pkcs8_pem(LineEnding::LF);
+
+                with_pem(SigningMaterial::P384(key), pem)
+            }
+        }
+    }
+
     #[must_use]
-    pub fn curve(&self) -> Curve {
+    pub fn curve(&self) -> SigningCurve {
         match self.material {
-            SigningMaterial::P256(_) => Curve::P256,
-            SigningMaterial::P384(_) => Curve::P384,
+            SigningMaterial::P256(_) => SigningCurve::P256,
+            SigningMaterial::P384(_) => SigningCurve::P384,
         }
     }
 
@@ -115,7 +134,7 @@ impl EcSigningKey {
                 let point = key.verifying_key().to_encoded_point(false);
 
                 ec_jwk(
-                    Curve::P256,
+                    SigningCurve::P256,
                     kid,
                     point.x().map(AsRef::as_ref),
                     point.y().map(AsRef::as_ref),
@@ -125,7 +144,7 @@ impl EcSigningKey {
                 let point = key.verifying_key().to_encoded_point(false);
 
                 ec_jwk(
-                    Curve::P384,
+                    SigningCurve::P384,
                     kid,
                     point.x().map(AsRef::as_ref),
                     point.y().map(AsRef::as_ref),
@@ -157,11 +176,13 @@ impl EcSigningKey {
         }
     }
 
-    pub(crate) fn verification_material(&self) -> VerificationMaterial {
-        match &self.material {
-            SigningMaterial::P256(key) => VerificationMaterial::P256(*key.verifying_key()),
-            SigningMaterial::P384(key) => VerificationMaterial::P384(*key.verifying_key()),
-        }
+    pub(crate) fn verification_material(&self) -> Result<VerificationMaterial, JwksKeyError> {
+        let point = match &self.material {
+            SigningMaterial::P256(key) => key.verifying_key().to_encoded_point(false).to_bytes(),
+            SigningMaterial::P384(key) => key.verifying_key().to_encoded_point(false).to_bytes(),
+        };
+
+        ec_verification_material(self.curve(), &point)
     }
 }
 
@@ -171,11 +192,15 @@ mod tests {
 
     use margaret_jose_parameters::curve::Curve;
     use margaret_jws_verification::key_id::KeyId;
+    use margaret_jws_verification::verification_material::VerificationMaterial;
 
     use super::EcSigningKey;
     use super::SigningMaterial;
     use super::ec_jwk;
+    use super::ec_verification_material;
     use super::with_pem;
+    use crate::jwks_key_error::JwksKeyError;
+    use crate::signing_curve::SigningCurve;
 
     fn kid() -> KeyId {
         KeyId::new("kid".to_string())
@@ -183,7 +208,7 @@ mod tests {
 
     #[test]
     fn publishes_the_curve_of_a_generated_key() {
-        let key = EcSigningKey::generate(Curve::P384).expect("the key generates");
+        let key = EcSigningKey::generate(SigningCurve::P384).expect("the key generates");
 
         let published = serde_json::to_value(key.public_jwk(&kid()).expect("the key publishes"))
             .expect("the published key serializes");
@@ -213,7 +238,7 @@ mod tests {
     #[test]
     fn reports_a_point_without_an_x_coordinate() {
         assert_eq!(
-            ec_jwk(Curve::P256, &kid(), None, Some(&[2]))
+            ec_jwk(SigningCurve::P256, &kid(), None, Some(&[2]))
                 .expect_err("the missing coordinate is reported")
                 .to_string(),
             "the public key is missing its x coordinate"
@@ -223,10 +248,23 @@ mod tests {
     #[test]
     fn reports_a_point_without_a_y_coordinate() {
         assert_eq!(
-            ec_jwk(Curve::P256, &kid(), Some(&[1]), None)
+            ec_jwk(SigningCurve::P256, &kid(), Some(&[1]), None)
                 .expect_err("the missing coordinate is reported")
                 .to_string(),
             "the public key is missing its y coordinate"
         );
+    }
+
+    #[test]
+    fn reports_a_point_that_is_not_on_the_curve() {
+        let point = [4; 65];
+        let rejection = VerificationMaterial::from_ec_point(Curve::P256, &point)
+            .break_value()
+            .expect("the point is not on the curve");
+
+        assert!(matches!(
+            ec_verification_material(SigningCurve::P256, &point),
+            Err(JwksKeyError::VerificationKeyRejected { source }) if source == rejection
+        ));
     }
 }

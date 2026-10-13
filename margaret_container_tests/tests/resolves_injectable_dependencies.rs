@@ -22,7 +22,7 @@ fn reports_a_single_dependency_with_no_provider() {
 }
 
 #[test]
-fn reports_an_unsupported_parameter_shape() {
+fn reports_a_plain_string_parameter_as_an_unsupported_shape_not_a_missing_provider() {
     assert!(matches!(
         resolve_full_fixture("App", "String"),
         InjectableResolution::UnsupportedShape

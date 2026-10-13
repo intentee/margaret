@@ -7,7 +7,7 @@ use margaret_spiffe_svid_client::svid_server_cert_verifier_facade::SvidServerCer
 use margaret_spiffe_svid_tests::build_digitally_signed_struct::build_digitally_signed_struct;
 
 #[test]
-fn rejects_tls12_signatures() {
+fn rejects_every_tls12_signature_because_svid_connections_require_tls13() {
     let facade = SvidServerCertVerifierFacade::default();
     let dss = build_digitally_signed_struct(SignatureScheme::RSA_PSS_SHA256, &[0u8; 256]);
 

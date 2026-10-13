@@ -1,0 +1,33 @@
+[package]
+name = "margaret_database_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+chrono = { workspace = true, features = ["clock"] }
+margaret_database = { workspace = true }
+margaret_model = { workspace = true }
+margaret_registered_claims = { workspace = true }
+margaret_sql_identifier = { workspace = true }
+margaret_token_digest = { workspace = true }
+tokio = { workspace = true, features = ["rt", "time"] }
+tokio-postgres = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+futures-util = { workspace = true }
+margaret_sql = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+tests_that_use_postgres = []
+
+[[test]]
+name = "postgres"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

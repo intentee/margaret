@@ -1,15 +1,25 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::str::FromStr;
 
-use crate::registered_claims_error::RegisteredClaimsError;
+use crate::audience_parsing::AudienceParsing;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Audience {
     value: String,
 }
 
 impl Audience {
+    #[must_use]
+    pub fn parse(value: &str) -> AudienceParsing {
+        if value.is_empty() {
+            AudienceParsing::Empty
+        } else {
+            AudienceParsing::Accepted(Self {
+                value: value.to_string(),
+            })
+        }
+    }
+
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.value
@@ -19,19 +29,5 @@ impl Audience {
 impl Display for Audience {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(&self.value)
-    }
-}
-
-impl FromStr for Audience {
-    type Err = RegisteredClaimsError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        if value.is_empty() {
-            return Err(RegisteredClaimsError::AudienceEmpty);
-        }
-
-        Ok(Self {
-            value: value.to_string(),
-        })
     }
 }

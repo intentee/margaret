@@ -13,13 +13,9 @@ use crate::assets_directory_name::ASSETS_DIRECTORY_NAME;
 use crate::codegen_error::CodegenError;
 use crate::walk_asset_directory::walk_asset_directory;
 
-fn served_assets(
-    assets_directory: &Path,
-    embed_relative: &str,
-) -> Result<ServedAssets, CodegenError> {
+fn served_assets(assets_directory: &Path) -> Result<ServedAssets, CodegenError> {
     Ok(ServedAssets {
         assets_directory_name: ASSETS_DIRECTORY_NAME.to_string(),
-        embed_relative: embed_relative.to_string(),
         served_tails: walk_asset_directory(assets_directory)?,
     })
 }
@@ -29,18 +25,22 @@ pub(crate) fn asset_bag_modules(
     metafile_contents: Option<&str>,
     bindings: &ContainerBindings,
     assets_directory: &Path,
-    embed_relative: &str,
 ) -> Result<Vec<GeneratedModuleTokens>, CodegenError> {
     let imports_macro = index.is_imported(&asset_macro_canonical_path());
     let requests_responder = bindings.provides(&asset_responder_canonical_path());
-    let metafile = match (imports_macro, requests_responder, metafile_contents) {
-        (false, false, _) => return Ok(Vec::new()),
-        (_, true, None) => return Err(CodegenError::AssetResponderWithoutMetafile),
-        (true, false, None) => return Err(CodegenError::AssetMacroWithoutMetafile),
-        (_, _, Some(metafile)) => metafile,
+    if !imports_macro && !requests_responder {
+        return Ok(Vec::new());
+    }
+
+    let Some(metafile) = metafile_contents else {
+        return Err(if requests_responder {
+            CodegenError::AssetResponderWithoutMetafile
+        } else {
+            CodegenError::AssetMacroWithoutMetafile
+        });
     };
     let generation = if requests_responder {
-        let served = served_assets(assets_directory, embed_relative)?;
+        let served = served_assets(assets_directory)?;
 
         if imports_macro {
             AssetBagGeneration::MacroAndResponder(served)

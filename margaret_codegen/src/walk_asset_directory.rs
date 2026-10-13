@@ -171,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_file_symlink() {
+    fn rejects_a_file_symlink_so_files_outside_the_asset_directory_are_never_served() {
         let directory = tempdir().expect("a temporary assets directory");
         let secret = directory.path().join("secret.txt");
         fs::write(&secret, "top secret").expect("the target file exists");
@@ -190,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_directory_symlink() {
+    fn rejects_a_directory_symlink_so_the_walk_cannot_escape_the_asset_directory() {
         let directory = tempdir().expect("a temporary assets directory");
         let outside = directory.path().join("outside");
         fs::create_dir(&outside).expect("the target directory exists");
@@ -209,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_symlink_cycle() {
+    fn rejects_a_cyclic_symlink_so_the_walk_never_recurses_forever() {
         let directory = tempdir().expect("a temporary assets directory");
         let assets = directory.path().join("assets");
         fs::create_dir(&assets).expect("the assets directory exists");
@@ -225,7 +225,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_non_regular_file() {
+    fn rejects_a_socket_in_the_asset_directory_since_only_regular_files_are_served() {
         let directory = tempdir().expect("a temporary assets directory");
         let socket_path = directory.path().join("socket");
         let _listener = UnixListener::bind(&socket_path).expect("the unix socket exists");

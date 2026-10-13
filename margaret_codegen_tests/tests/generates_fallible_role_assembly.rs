@@ -1,22 +1,9 @@
-use std::path::PathBuf;
-
-use margaret_attributes::crate_root::CrateRoot;
-use margaret_codegen::build::build;
 use margaret_codegen::generated_code::GeneratedCode;
+use margaret_codegen_tests::generate_fixture::generate_fixture;
 use margaret_codegen_tests::generated_module_source::generated_module_source;
 
 fn generated() -> GeneratedCode {
-    let source_directory =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/fallible_roles/src");
-    let assets_directory = source_directory.join("assets");
-
-    build(
-        &CrateRoot::new("crate", source_directory),
-        None,
-        &assets_directory,
-        ".",
-    )
-    .expect("the fallible_roles fixture generates")
+    generate_fixture("fallible_roles").expect("the fallible_roles fixture generates")
 }
 
 fn collapsed(source: &str) -> String {
@@ -46,7 +33,7 @@ fn reports_a_fallible_console_command_into_the_command_outcome() {
 }
 
 #[test]
-fn views_builder_reads_only_completed_dependencies() {
+fn views_builder_reads_only_completed_dependencies_so_it_cannot_fail() {
     let source = module(&generated(), "views/build");
 
     assert!(source.contains("->super::Views"));
@@ -60,14 +47,14 @@ fn http_server_assembly_reads_only_completed_dependencies() {
 
     assert!(source.contains("container.get_home_get_home()"));
     assert!(source.contains("super::super::websocket::public_routes(container,routes)"));
-    assert!(source.contains(
-        "->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>"
-    ));
+    assert!(
+        source.contains("->margaret::framework::http::server_route_entries::ServerRouteEntries{")
+    );
     assert!(!source.contains("ConstructionError"));
 }
 
 #[test]
-fn websocket_dispatch_reads_only_completed_dependencies() {
+fn websocket_dispatch_reads_only_completed_dependencies_so_none_can_fail_to_build() {
     let source = module(
         &generated(),
         "websocket/chat_chat_session_chat_session/upgrade_entry",

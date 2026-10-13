@@ -5,8 +5,6 @@ use std::fmt::Result;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::audience::Audience;
-
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
 pub enum AudienceClaim {
@@ -16,13 +14,16 @@ pub enum AudienceClaim {
 
 impl AudienceClaim {
     #[must_use]
-    pub fn is_exactly(&self, audience: &Audience) -> bool {
+    pub fn contains(&self, audience: &str) -> bool {
         match self {
-            Self::Multiple(values) => {
-                matches!(values.as_slice(), [value] if value == audience.as_str())
-            }
-            Self::Single(value) => value == audience.as_str(),
+            Self::Multiple(values) => values.iter().any(|value| value == audience),
+            Self::Single(value) => value == audience,
         }
+    }
+
+    #[must_use]
+    pub fn contains_any(&self, audiences: &[&str]) -> bool {
+        audiences.iter().any(|audience| self.contains(audience))
     }
 
     #[must_use]
@@ -53,7 +54,7 @@ mod tests {
     use super::AudienceClaim;
 
     #[test]
-    fn describes_a_single_audience_as_written() {
+    fn describes_a_single_audience_as_written_so_messages_quote_it_verbatim() {
         assert_eq!(
             AudienceClaim::Single("ours".to_string()).to_string(),
             "ours"

@@ -5,5 +5,6 @@ use crate::http_route::HttpRoute;
 pub(crate) struct NamedRoute<'route> {
     pub(crate) name: &'route str,
     pub(crate) path: &'route RoutePath,
+    pub(crate) position: usize,
     pub(crate) route: &'route HttpRoute,
 }

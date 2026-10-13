@@ -1,64 +1,41 @@
-use std::sync::Arc;
-
-use crate::build_url::build_url;
 use crate::redirect::Redirect;
-use crate::url_segment::UrlSegment;
 
 pub struct RouteReference {
-    origin: Arc<str>,
-    segments: Vec<UrlSegment>,
+    url: String,
 }
 
 impl RouteReference {
     #[must_use]
-    pub fn new(origin: Arc<str>, segments: Vec<UrlSegment>) -> Self {
-        Self { origin, segments }
+    pub fn new(url: String) -> Self {
+        Self { url }
     }
 
     #[must_use]
     pub fn permanent_redirect(&self) -> Redirect {
-        Redirect::permanent(self.url())
+        Redirect::permanent(self.url.clone())
     }
 
     #[must_use]
     pub fn temporary_redirect(&self) -> Redirect {
-        Redirect::temporary(self.url())
+        Redirect::temporary(self.url.clone())
     }
 
     #[must_use]
     pub fn url(&self) -> String {
-        build_url(&self.origin, &self.segments)
+        self.url.clone()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::RouteReference;
-    use crate::url_parameter::UrlParameter;
-    use crate::url_segment::UrlSegment;
 
     fn article_reference() -> RouteReference {
-        RouteReference::new(
-            Arc::from("http://localhost"),
-            vec![
-                UrlSegment::Literal("/articles/"),
-                UrlSegment::Parameter(UrlParameter {
-                    name: "article",
-                    value: "rust".to_string(),
-                }),
-            ],
-        )
+        RouteReference::new("http://localhost/articles/rust".to_string())
     }
 
     #[test]
-    fn renders_the_url_from_its_origin_and_parameters() {
-        assert_eq!(article_reference().url(), "http://localhost/articles/rust");
-    }
-
-    #[test]
-    fn temporarily_redirects_to_the_reference_url() {
+    fn temporarily_redirects_to_the_reference_url_with_307_keeping_the_request_method() {
         let response = article_reference()
             .temporary_redirect()
             .into_response()
@@ -75,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    fn permanently_redirects_to_the_reference_url() {
+    fn permanently_redirects_to_the_reference_url_with_308_so_clients_cache_the_move() {
         let response = article_reference()
             .permanent_redirect()
             .into_response()

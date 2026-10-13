@@ -5,7 +5,7 @@ use margaret_spiffe_svid_tests::ca_der::CA_DER;
 use margaret_spiffe_svid_tests::ca_untrusted_der::CA_UNTRUSTED_DER;
 
 #[test]
-fn converts_multiple_cas_to_root_store() {
+fn converts_every_ca_into_the_root_store_so_peers_of_each_authority_are_trusted() {
     let bundle = CaBundle {
         ca_certs: vec![
             CertificateDer::from(CA_DER.to_vec()),

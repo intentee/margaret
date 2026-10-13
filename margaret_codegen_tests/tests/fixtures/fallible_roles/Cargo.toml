@@ -5,9 +5,9 @@ edition = "2024"
 publish = false
 
 [dependencies]
-failures = { package = "anyhow", version = "1.0" }
 async-trait = { workspace = true }
 clap = { workspace = true }
+failures = { package = "anyhow", version = "1.0" }
 margaret = { workspace = true, features = ["runtime"] }
 maud = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

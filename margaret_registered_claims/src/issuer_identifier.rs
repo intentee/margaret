@@ -8,7 +8,7 @@ use crate::registered_claims_error::RegisteredClaimsError;
 
 const ISSUER_SCHEME: &str = "https";
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct IssuerIdentifier {
     original: String,
     url: Url,
