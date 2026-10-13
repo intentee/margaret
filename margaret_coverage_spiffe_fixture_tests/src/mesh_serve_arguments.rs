@@ -1,16 +1,16 @@
 use std::ffi::OsString;
+use std::net::SocketAddr;
 
 use margaret_spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams;
 
-use crate::served_mesh::ServedMesh;
-
 #[must_use]
 pub fn mesh_serve_arguments(
-    ServedMesh { mesh, public, .. }: &ServedMesh,
+    mesh: SocketAddr,
+    public: SocketAddr,
     SvidServiceBundleParams {
         spiffe_trust_domain,
         spire_agent_addr,
-    }: SvidServiceBundleParams,
+    }: &SvidServiceBundleParams,
 ) -> Vec<OsString> {
     vec![
         OsString::from("margaret_coverage_spiffe_fixture"),

@@ -180,6 +180,7 @@ mod tests {
                 continuation_return: &quote! { return response },
                 error_return: &quote! { return error },
                 owner: &TokenStream::new(),
+                refused: &quote! { refuse },
                 request_local: &format_ident!("request"),
             },
         )

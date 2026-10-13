@@ -64,6 +64,7 @@ pub mod route_parameter_resolutions;
 mod session_marker;
 pub mod session_user;
 pub mod session_user_parameter;
+mod user_resolution;
 pub mod views_availability;
 
 #[cfg(test)]
@@ -1338,8 +1339,10 @@ struct SecondClient;
                 continuation_return: &quote::quote! { return response },
                 error_return: &quote::quote! { return error },
                 owner: &proc_macro2::TokenStream::new(),
+                refused: &quote::quote! { refuse },
                 request_local: &format_ident!("request"),
             },
+            &quote::quote! { body },
         )
         .to_string()
         .split_whitespace()
@@ -1541,12 +1544,14 @@ struct PartnerSessions;
         let continuation_return = quote::quote! { return response };
         let error_return = quote::quote! { return error };
         let owner = proc_macro2::TokenStream::new();
+        let refused = quote::quote! { refuse };
         let request_local = format_ident!("request");
 
         render(&HeadExtractionContext {
             continuation_return: &continuation_return,
             error_return: &error_return,
             owner: &owner,
+            refused: &refused,
             request_local: &request_local,
         })
     }
@@ -1557,6 +1562,7 @@ struct PartnerSessions;
                 parameters,
                 &CapturedProviders::capture(parameters, &mut NameAllocator::new()),
                 context,
+                &quote::quote! { body },
             )
         })
         .to_string()
@@ -1758,11 +1764,11 @@ struct PartnerSessions;
     }
 
     #[test]
-    fn refuses_an_anonymous_visitor_where_a_present_user_is_required() {
+    fn continues_only_with_a_present_user_where_one_is_required() {
         assert!(
             page_extraction(&page_parameters(&provider_returning("", "", PRESENCE), "User"))
                 .contains(
-                    "matchmargaret::framework::identity::require_present_user::require_present_user(margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(reader_provider.as_ref(),request,).await){"
+                    "margaret::framework::http::with_requirement::with_requirement(margaret::framework::identity::require_present_user::require_present_user(margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(reader_provider.as_ref(),request,).await),refuse,move|argument_1|asyncmove{body},).await"
                 )
         );
     }
@@ -1885,6 +1891,7 @@ struct PartnerSessions;
             continuation_return: &quote::quote! { return response },
             error_return: &quote::quote! { return error },
             owner: &proc_macro2::TokenStream::new(),
+            refused: &quote::quote! { refuse },
             request_local: &format_ident!("request"),
         };
         let inference: String = render_session_user_inference(
@@ -1896,17 +1903,18 @@ struct PartnerSessions;
         .to_string()
         .split_whitespace()
         .collect();
-        let extraction: String = render_head_extractions(&parameters, &captured, &context)
-            .to_string()
-            .split_whitespace()
-            .collect();
+        let extraction: String =
+            render_head_extractions(&parameters, &captured, &context, &quote::quote! { body })
+                .to_string()
+                .split_whitespace()
+                .collect();
 
         assert!(inference.contains(
             "letmargaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:changed_cookies,outcome:argument_1,}=matchmargaret::framework::identity::infers_session_user::InfersSessionUser::infer("
         ));
         assert!(!extraction.contains("SessionUserInference"));
         assert!(extraction.contains(
-            "margaret::framework::http::requirement::Requirement::Unmet(response)=>returnresponse"
+            "margaret::framework::http::with_requirement::with_requirement(margaret::framework::identity::require_authenticated_user::require_authenticated_user(argument_1),refuse,move|argument_1|asyncmove{body},).await"
         ));
     }
 

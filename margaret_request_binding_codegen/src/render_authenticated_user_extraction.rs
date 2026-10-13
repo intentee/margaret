@@ -8,17 +8,11 @@ use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
 use crate::extraction_context::ExtractionContext;
 use crate::inference_fallibility::InferenceFallibility;
 use crate::inference_kind::InferenceKind;
+use crate::user_resolution::UserResolution;
 
-fn required(
-    resolver: &TokenStream,
-    inferred: &TokenStream,
-    continuation_return: &TokenStream,
-) -> TokenStream {
-    quote! {
-        match #resolver(#inferred) {
-            margaret::framework::http::requirement::Requirement::Met(value) => value,
-            margaret::framework::http::requirement::Requirement::Unmet(response) => #continuation_return,
-        }
+fn required(resolver: &TokenStream, inferred: &TokenStream) -> UserResolution {
+    UserResolution::Continued {
+        requirement: quote! { #resolver(#inferred) },
     }
 }
 
@@ -30,8 +24,7 @@ fn resolved_user(
     }: &AuthenticatedUserApplication,
     requirement: AuthenticatedUserRequirement,
     inferred: &TokenStream,
-    continuation_return: &TokenStream,
-) -> TokenStream {
+) -> UserResolution {
     match inference.kind {
         InferenceKind::Outcome => {
             let resolver = match requirement {
@@ -50,16 +43,17 @@ fn resolved_user(
                 },
             };
 
-            required(&resolver, inferred, continuation_return)
+            required(&resolver, inferred)
         }
         InferenceKind::Presence => match requirement {
-            AuthenticatedUserRequirement::Optional => quote! {
-                margaret::framework::identity::optional_present_user::optional_present_user(#inferred)
+            AuthenticatedUserRequirement::Optional => UserResolution::Bound {
+                value: quote! {
+                    margaret::framework::identity::optional_present_user::optional_present_user(#inferred)
+                },
             },
             AuthenticatedUserRequirement::Required => required(
                 &quote! { margaret::framework::identity::require_present_user::require_present_user },
                 inferred,
-                continuation_return,
             ),
         },
     }
@@ -70,22 +64,15 @@ pub(crate) fn render_authenticated_user_extraction(
     requirement: AuthenticatedUserRequirement,
     holder: &Ident,
     ExtractionContext {
-        continuation_return,
         error_return,
         provider_access,
         request_local,
+        ..
     }: &ExtractionContext,
-) -> TokenStream {
+) -> UserResolution {
     match application.challenge {
         AuthenticatedUserChallenge::Session { .. } => {
-            let resolved = resolved_user(
-                application,
-                requirement,
-                &quote! { #holder },
-                continuation_return,
-            );
-
-            quote! { let #holder = #resolved; }
+            resolved_user(application, requirement, &quote! { #holder })
         }
         AuthenticatedUserChallenge::Bearer { .. }
         | AuthenticatedUserChallenge::Introspection { .. }
@@ -105,9 +92,8 @@ pub(crate) fn render_authenticated_user_extraction(
                 },
                 InferenceFallibility::Infallible => infer,
             };
-            let resolved = resolved_user(application, requirement, &inferred, continuation_return);
 
-            quote! { let #holder = #resolved; }
+            resolved_user(application, requirement, &inferred)
         }
     }
 }

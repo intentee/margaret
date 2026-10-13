@@ -1331,9 +1331,11 @@ impl RespondsToWebSocketMessage for Chatter {
             "margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(self.session_user_provider.as_ref(),handshake,).await"
         ));
         assert!(source.contains(
-            "margaret::framework::identity::optional_authenticated_user::optional_authenticated_user(matchmargaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(self.session_user_provider.as_ref(),handshake,).await{::std::result::Result::Ok(inferred)=>inferred,"
+            "margaret::framework::http::with_requirement::with_requirement(margaret::framework::identity::optional_authenticated_user::optional_authenticated_user(matchmargaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(self.session_user_provider.as_ref(),handshake,).await{::std::result::Result::Ok(inferred)=>inferred,"
         ));
-        assert!(source.contains("WebSocketSessionCreationOutcome::Interrupted(response,)"));
+        assert!(source.contains(
+            "margaret::framework::websocket_session::interrupted_creation::interrupted_creation,move|argument_0|asyncmove{"
+        ));
         assert!(source.contains("WebSocketSessionCreationError::consumer(error,)"));
     }
 

@@ -477,7 +477,7 @@ impl PostNote {
             .find("margaret::framework::http_validation::require_input::require_input(")
             .expect("the content is required");
         let application = source
-            .find("margaret::framework::http::responded::responded(responder.respond(argument_1,argument_2))}.await.map(|continuation|changed_cookies.precede(continuation))")
+            .find("margaret::framework::http::responded::responded(responder.respond(argument_1,argument_2))},).await}.await.map(|continuation|changed_cookies.precede(continuation))")
             .expect("every continuation of the block receives the session cookie changes");
 
         assert!(inference < block && block < content_rejection && content_rejection < application);

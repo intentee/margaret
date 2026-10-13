@@ -167,6 +167,7 @@ fn responder_body(
         views_local,
     }: &HandlerNames,
 ) -> TokenStream {
+    let refused = quote! { ::std::result::Result::Ok };
     let extraction_context = HeadExtractionContext {
         continuation_return: &quote! {
             return ::std::result::Result::Ok(response)
@@ -177,10 +178,9 @@ fn responder_body(
             )
         },
         owner: &TokenStream::new(),
+        refused: &refused,
         request_local: request_binding,
     };
-    let head_extractions =
-        render_head_extractions(&responder.arguments, captured, &extraction_context);
     let server = format_ident!("{server}");
     let argument_values = responder
         .arguments
@@ -193,11 +193,15 @@ fn responder_body(
         quote! { #responder_binding.#method_name(#(#argument_values),*) }
     };
     let content_tokens = content_bindings(responder, body_binding, content_local, request_binding);
-    let continuation = quote! {
-        #head_extractions
-        #content_tokens
-        margaret::framework::http::responded::responded(#respond_call)
-    };
+    let continuation = render_head_extractions(
+        &responder.arguments,
+        captured,
+        &extraction_context,
+        &quote! {
+            #content_tokens
+            margaret::framework::http::responded::responded(#respond_call)
+        },
+    );
 
     let resolved = match session_user_parameter(&responder.arguments) {
         Some(session_user) => {
@@ -219,12 +223,7 @@ fn responder_body(
         None => continuation,
     };
 
-    render_route_inputs(
-        &responder.arguments,
-        request_binding,
-        &quote! { ::std::result::Result::Ok },
-        &resolved,
-    )
+    render_route_inputs(&responder.arguments, request_binding, &refused, &resolved)
 }
 
 fn framework_handler(

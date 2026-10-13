@@ -148,34 +148,38 @@ fn create_body(
     };
 
     let owner = quote! { self. };
+    let refused = quote! { margaret::framework::websocket_session::interrupted_creation::interrupted_creation };
     let extraction_context = HeadExtractionContext {
         continuation_return: &continuation_return,
         error_return: &error_return,
         owner: &owner,
+        refused: &refused,
         request_local: handshake,
     };
-    let extractions = render_head_extractions(&session.parameters, captured, &extraction_context);
     let session_path = path_tokens(&session.session_path);
     let method_name = &session.method_name;
     let arguments = build_arguments(session);
-    let creation = quote! {
-        #extractions
-
-        #session_path::#method_name(#arguments)
-            .map(|created| {
-                margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created(
-                    margaret::framework::websocket_session::created_web_socket_session::CreatedWebSocketSession {
-                        cookie_changes: margaret::framework::http::cookie_changes::CookieChanges {
-                            cookies: ::std::vec::Vec::new(),
+    let creation = render_head_extractions(
+        &session.parameters,
+        captured,
+        &extraction_context,
+        &quote! {
+            #session_path::#method_name(#arguments)
+                .map(|created| {
+                    margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created(
+                        margaret::framework::websocket_session::created_web_socket_session::CreatedWebSocketSession {
+                            cookie_changes: margaret::framework::http::cookie_changes::CookieChanges {
+                                cookies: ::std::vec::Vec::new(),
+                            },
+                            session: ::std::sync::Arc::new(created),
                         },
-                        session: ::std::sync::Arc::new(created),
-                    },
+                    )
+                })
+                .map_err(
+                    margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
                 )
-            })
-            .map_err(
-                margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
-            )
-    };
+        },
+    );
 
     let resolved = match session_user_parameter(&session.parameters) {
         Some(session_user) => {
@@ -198,12 +202,7 @@ fn create_body(
         None => creation,
     };
 
-    render_route_inputs(
-        &session.parameters,
-        handshake,
-        &quote! { margaret::framework::websocket_session::interrupted_creation::interrupted_creation },
-        &resolved,
-    )
+    render_route_inputs(&session.parameters, handshake, &refused, &resolved)
 }
 
 fn build_arguments(session: &WebSocketSession) -> TokenStream {

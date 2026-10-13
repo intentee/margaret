@@ -89,6 +89,7 @@ pub mod web_socket_driver;
 mod web_socket_driver_channel;
 pub mod web_socket_driver_sender;
 pub mod web_socket_upgrade;
+pub mod with_requirement;
 pub mod with_route_parameters;
 pub mod with_verified_peer;
 pub use matchit;

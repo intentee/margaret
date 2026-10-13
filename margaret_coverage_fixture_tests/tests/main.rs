@@ -46,5 +46,6 @@ mod reserves_a_reading_room_seat_for_a_patron_card;
 mod routes_a_book_by_its_shelf_number_and_title;
 mod shows_a_listed_librarian_their_notices;
 mod shows_an_anonymous_visitor_the_public_notices;
+mod signs_the_guestbook_for_every_visitor_as_a_guest;
 mod welcomes_a_named_visitor_to_the_lobby;
 mod welcomes_an_anonymous_visitor_to_the_lobby;

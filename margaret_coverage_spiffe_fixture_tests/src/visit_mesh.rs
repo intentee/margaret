@@ -38,19 +38,22 @@ pub async fn visit_mesh(visit: impl AsyncFnOnce(&ServedMesh)) -> CommandOutcome 
     )
     .await
     .expect("SPIRE starts");
-    let svid_params = || SvidServiceBundleParams {
+    let mesh = reserved_address();
+    let public = reserved_address();
+    let svid_params = SvidServiceBundleParams {
         spiffe_trust_domain: cluster.spiffe_trust_domain().to_string(),
         spire_agent_addr: format!("unix://{}", cluster.agent_socket_path().display()),
     };
+    let serve_arguments = mesh_serve_arguments(mesh, public, &svid_params);
     let svid_bundle =
-        SvidClientBundle::new(svid_params()).expect("the test SVID client is configured");
+        SvidClientBundle::new(svid_params).expect("the test SVID client is configured");
     let served = ServedMesh {
-        mesh: reserved_address(),
+        mesh,
         mesh_client: svid_bundle
             .reqwest_client()
             .expect("the test SVID client builds"),
         mesh_tls: Arc::new(svid_bundle.client_config()),
-        public: reserved_address(),
+        public,
         public_client: Client::new(),
     };
     let mut svid_services = ServiceManager::default();
@@ -64,7 +67,7 @@ pub async fn visit_mesh(visit: impl AsyncFnOnce(&ServedMesh)) -> CommandOutcome 
     let relay = format!("http://{}/relay", served.public);
     let peer = format!("https://{}/peer", served.mesh);
     let outcome = visit_served(
-        run(mesh_serve_arguments(&served, svid_params())),
+        run(serve_arguments),
         || async {
             answers(served.public_client.get(&relay)).await
                 && answers(served.mesh_client.get(&peer)).await
