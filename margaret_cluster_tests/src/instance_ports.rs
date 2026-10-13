@@ -1,31 +1,9 @@
-use std::io::ErrorKind;
-use std::iter;
-use std::net::Ipv4Addr;
 use std::net::SocketAddr;
-use std::net::TcpListener;
-use std::sync::OnceLock;
-use std::sync::atomic::AtomicU16;
-use std::sync::atomic::Ordering;
 
 use margaret_cluster_fixture::margaret::routes::Routes;
+use margaret_local_server_tests::reserved_address::reserved_address;
 
 use crate::cluster_server::ClusterServer;
-use crate::ephemeral_port_start::ephemeral_port_start;
-use crate::first_unprivileged_port::FIRST_UNPRIVILEGED_PORT;
-
-static NEXT_CANDIDATE: OnceLock<AtomicU16> = OnceLock::new();
-
-fn reserved_address() -> SocketAddr {
-    let cursor = NEXT_CANDIDATE.get_or_init(|| AtomicU16::new(ephemeral_port_start()));
-
-    iter::from_fn(|| Some(cursor.fetch_sub(1, Ordering::SeqCst) - 1))
-        .take_while(|candidate| *candidate >= FIRST_UNPRIVILEGED_PORT)
-        .map(|candidate| TcpListener::bind((Ipv4Addr::LOCALHOST, candidate)))
-        .find(|bound| !matches!(bound, Err(error) if error.kind() == ErrorKind::AddrInUse))
-        .expect("an unprivileged port below the ephemeral range is free")
-        .and_then(|listener| listener.local_addr())
-        .expect("the reserved port is bound")
-}
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct InstancePorts {
@@ -65,50 +43,12 @@ impl InstancePorts {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-    use std::net::Ipv4Addr;
-    use std::net::TcpListener;
-
     use super::InstancePorts;
-    use crate::ephemeral_port_start::ephemeral_port_start;
 
     #[test]
-    fn reserves_ports_the_system_never_assigns_ephemerally() {
+    fn reserves_distinct_ports_for_the_servers_of_an_instance() {
         let ports = InstancePorts::reserve();
 
-        assert!(ports.identity.port() < ephemeral_port_start());
-        assert!(ports.public.port() < ephemeral_port_start());
-    }
-
-    #[test]
-    fn skips_a_candidate_port_another_listener_holds() {
-        let first = InstancePorts::reserve();
-        let held = TcpListener::bind((Ipv4Addr::LOCALHOST, first.public.port() - 1))
-            .expect("the next candidate port is free");
-        let second = InstancePorts::reserve();
-
-        assert_eq!(
-            held.local_addr().expect("the held port is known").port() - 1,
-            second.identity.port()
-        );
-    }
-
-    #[test]
-    fn reserves_distinct_ports_for_every_instance_so_instances_never_collide_on_bind() {
-        let first = InstancePorts::reserve();
-        let second = InstancePorts::reserve();
-
-        assert_eq!(
-            [
-                first.identity.port(),
-                first.public.port(),
-                second.identity.port(),
-                second.public.port(),
-            ]
-            .iter()
-            .collect::<BTreeSet<_>>()
-            .len(),
-            4
-        );
+        assert_ne!(ports.identity.port(), ports.public.port());
     }
 }

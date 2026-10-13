@@ -189,35 +189,57 @@ mod tests {
         collect_registries(index, has_views).expect("the binding registries are collected")
     }
 
-    fn http_source(lib_source: &str, has_views: bool) -> Result<String, HttpCodegenError> {
+    fn rendered_http(lib_source: &str, has_views: bool) -> Result<HttpArtifacts, HttpCodegenError> {
         let index = IndexedSource::try_new(lib_source)?.index;
         let registries = collect_registries(&index, has_views)?;
         let tags = collected_tags(&index);
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)?;
         let bindings = bindings_for(&index);
 
-        Ok(render_http(
+        render_http(
             &index,
             has_views,
             &no_websocket_servers(),
             &plans,
             &bindings,
             &registries,
-        )?
-        .into_modules()
-        .into_iter()
-        .filter(|module| {
-            module.path().to_string() == "http" || module.path().to_string().starts_with("http/")
-        })
-        .map(|module| {
-            module
-                .format()
-                .expect("the module formats")
-                .source()
-                .to_string()
-        })
-        .collect::<Vec<String>>()
-        .join("\n"))
+        )
+    }
+
+    fn forwarders_source(lib_source: &str) -> String {
+        rendered_http(lib_source, false)
+            .expect("the http source is generated")
+            .forwarders
+            .into_iter()
+            .map(|module| {
+                module
+                    .format()
+                    .expect("the module formats")
+                    .source()
+                    .to_string()
+            })
+            .collect::<String>()
+            .split_whitespace()
+            .collect()
+    }
+
+    fn http_source(lib_source: &str, has_views: bool) -> Result<String, HttpCodegenError> {
+        Ok(rendered_http(lib_source, has_views)?
+            .into_modules()
+            .into_iter()
+            .filter(|module| {
+                module.path().to_string() == "http"
+                    || module.path().to_string().starts_with("http/")
+            })
+            .map(|module| {
+                module
+                    .format()
+                    .expect("the module formats")
+                    .source()
+                    .to_string()
+            })
+            .collect::<Vec<String>>()
+            .join("\n"))
     }
 
     const FRAMEWORK_ENDPOINTS: &str = r#"use margaret::framework::macros::process;
@@ -568,7 +590,7 @@ impl GetProfile {
             "margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(session_user_provider.as_ref(),request,).await"
         ));
         assert!(source.contains(
-            "margaret::framework::identity::require_authenticated_user::require_authenticated_user(outcome,)"
+            "margaret::framework::identity::require_authenticated_user::require_authenticated_user(matchmargaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(session_user_provider.as_ref(),request,).await{::std::result::Result::Ok(inferred)=>inferred,"
         ));
     }
 
@@ -707,7 +729,7 @@ impl GetUser {
         assert!(source.contains("letstore=container.store();"));
         assert!(source.contains("letstore=store.clone();"));
         assert!(source.contains(
-            "margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,\"user\",store.as_ref(),)"
+            "margaret::framework::http::bind_route_parameter::bind_route_parameter(argument_2,\"user\",store.as_ref(),)"
         ));
     }
 
@@ -740,7 +762,7 @@ impl GetAsset {
             "letargument_1=::margaret::framework::asset_bag::asset_bag::AssetBag::new();"
         ));
         assert!(source.contains(
-            "margaret::framework::http::require_route_parameter::require_route_parameter(request,\"id\",)"
+            r#"with_route_parameters(request,["id"],::std::result::Result::Ok,move|[argument_2]|"#
         ));
     }
 
@@ -801,7 +823,7 @@ impl GetArticle {
             "margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(store.as_ref(),request,)"
         ));
         assert!(source.contains(
-            "margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,\"article\",store_2.as_ref(),)"
+            "margaret::framework::http::bind_route_parameter::bind_route_parameter(argument_2,\"article\",store_2.as_ref(),)"
         ));
     }
 
@@ -814,7 +836,7 @@ impl GetArticle {
             .find("InfersAuthenticatedUser::infer(")
             .expect("the user is authenticated");
         let binding = source
-            .find("require_bound_route_parameter(")
+            .find("bind_route_parameter::bind_route_parameter(")
             .expect("the article is bound");
 
         assert!(authentication < binding);
@@ -862,17 +884,18 @@ impl GetPair {
         );
         assert_eq!(
             source
-                .matches(
-                    "margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,"
-                )
+                .matches("margaret::framework::http::bind_route_parameter::bind_route_parameter(")
                 .count(),
             2
         );
         assert!(source.contains(
             "margaret::framework::route_parameter_binding::join_route_parameter_bindings::join_route_parameter_bindings("
         ));
-        assert!(source.contains("\"author\",user_binder.as_ref(),"));
-        assert!(source.contains("\"editor\",user_binder.as_ref(),"));
+        assert!(source.contains(
+            r#"with_route_parameters(request,["author","editor"],::std::result::Result::Ok,move|[argument_1,argument_2]|"#
+        ));
+        assert!(source.contains("(argument_1,\"author\",user_binder.as_ref(),)"));
+        assert!(source.contains("(argument_2,\"editor\",user_binder.as_ref(),)"));
     }
 
     const BOUND_MODEL: &str = r#"use margaret::framework::macros::process;
@@ -1280,27 +1303,39 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             "pubget_greeting:margaret::framework::http::forwardable_route::ForwardableRoute,"
         ));
         assert!(source.contains(
-            "get_greeting:margaret::framework::http::forwardable_route::ForwardableRoute::new(margaret::framework::http::literal_url::literal_url(origin,\"/greeting\"),),"
+            "get_greeting:margaret::framework::http::forwardable_route::ForwardableRoute::new(margaret::framework::http::literal_url::literal_url(origin,\"/greeting\",),),"
         ));
     }
 
     #[test]
-    fn names_a_builder_parameter_apart_from_a_rust_keyword_so_the_builder_compiles() {
+    fn builds_the_routes_of_a_plan_without_servers_unconditionally() {
+        assert!(routes_source_for("").contains(
+            "pubfnfrom_origins()->::std::result::Result<Self,margaret::framework::http::router_error::RouterError,>{::std::result::Result::Ok(Self{})}"
+        ));
+    }
+
+    #[test]
+    fn names_builder_parameters_by_position_so_no_placeholder_name_reaches_a_binding() {
         let source = routes_source_for(
             r#"use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 
 #[singleton]
-#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = "get_kind", path = "/kinds/{type}", server = "public")]
+#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = "get_kind", path = "/kinds/{type}/{slug}/{slag}", server = "public")]
 struct GetKind;
-impl GetKind { #[process] fn respond(&self, #[route_parameter(from = "type")] kind: String) -> anyhow::Result<Response> {} }
+impl GetKind { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 "#,
         );
 
-        assert!(source.contains("pubfnget_kind(&self,type_2:::std::string::String,)"));
         assert!(source.contains(
-            "margaret::framework::http::url_parameter::UrlParameter{name:\"type\",value:type_2,}"
+            "pubfnget_kind(&self,parameter_0:::std::string::String,parameter_1:::std::string::String,parameter_2:::std::string::String,)"
+        ));
+        assert!(source.contains(
+            "margaret::framework::http::url_parameter::UrlParameter{name:\"type\",value:parameter_0,}"
+        ));
+        assert!(source.contains(
+            "margaret::framework::http::url_parameter::UrlParameter{name:\"slag\",value:parameter_2,}"
         ));
     }
 
@@ -1312,7 +1347,7 @@ impl GetKind { #[process] fn respond(&self, #[route_parameter(from = "type")] ki
                 &websocket_server("public", ServerTransportPolicy::Negotiable)
             )
             .contains(
-                "margaret::framework::http::server_paths::ServerPaths::build([\"/health\",\"/chat\",])"
+                "margaret::framework::http::server_paths::ServerPaths::build([\"/health\",\"/chat\"])"
             )
         );
     }
@@ -1346,10 +1381,10 @@ impl GetKind { #[process] fn respond(&self, #[route_parameter(from = "type")] ki
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "pubfnget_article(&self,article:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::forwardable_route::ForwardableRoute,>"
+            "pubfnget_article(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::forwardable_route::ForwardableRoute,>"
         ));
         assert!(source.contains(
-            "margaret::framework::http::build_url::build_url(&self.origin,&self.paths,margaret::framework::http::route_position::RoutePosition::new(0),&[margaret::framework::http::url_segment::UrlSegment::Literal{decoded:\"/articles/\",encoded:\"/articles/\",},margaret::framework::http::url_segment::UrlSegment::Parameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:article,},prefix:\"\",},],).map(margaret::framework::http::forwardable_route::ForwardableRoute::new)"
+            "margaret::framework::http::build_url::build_url(&self.origin,&self.paths,margaret::framework::http::route_position::RoutePosition::new(0),&[margaret::framework::http::url_segment::UrlSegment::Literal{decoded:\"/articles/\",encoded:\"/articles/\",},margaret::framework::http::url_segment::UrlSegment::Parameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:parameter_0,},prefix:\"\",},],).map(margaret::framework::http::forwardable_route::ForwardableRoute::new)"
         ));
         assert!(!source.contains("Params"));
     }
@@ -1359,7 +1394,7 @@ impl GetKind { #[process] fn respond(&self, #[route_parameter(from = "type")] ki
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "margaret::framework::http::url_segment::UrlSegment::CatchAllParameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"rest\",value:rest,},prefix:\"\",}"
+            "margaret::framework::http::url_segment::UrlSegment::CatchAllParameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"rest\",value:parameter_0,},prefix:\"\",}"
         ));
     }
 
@@ -1392,7 +1427,7 @@ impl GetCallback { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             )
         );
         assert!(source.contains(
-            "pubfnpatch_article(&self,article:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference,>"
+            "pubfnpatch_article(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference,>"
         ));
         assert!(!source.contains("forward_to"));
     }
@@ -1410,7 +1445,7 @@ impl GetCallback { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             "pubstructInternal{pub(crate)paths:margaret::framework::http::server_paths::ServerPaths<1>,}"
         ));
         assert!(source.contains(&format!(
-            "implInternal{{{allow}pub(crate)fnnew(_origin:&str,)->::std::result::Result<Self,margaret::framework::http::router_error::RouterError,>{{::std::result::Result::Ok(Self{{paths:margaret::framework::http::server_paths::ServerPaths::build([\"/health\",])?,}})}}}}"
+            "implInternal{{{allow}pub(crate)fnnew(_origin:&str,)->::std::result::Result<Self,margaret::framework::http::router_error::RouterError,>{{margaret::framework::http::server_paths::ServerPaths::build([\"/health\"]).map(|paths|Self{{paths}})}}}}"
         )));
     }
 
@@ -1439,7 +1474,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             .collect();
 
         assert!(source.contains(&format!(
-            "implIdentity{{{allow}pub(crate)fnnew(origin:&str,)->::std::result::Result<Self,margaret::framework::http::router_error::RouterError,>{{::std::result::Result::Ok(Self{{paths:margaret::framework::http::server_paths::ServerPaths::build([\"/consent\",\"/login\",])?,get_login:margaret::framework::http::forwardable_route::ForwardableRoute::new(margaret::framework::http::literal_url::literal_url(origin,\"/login\"),),post_consent:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/consent\"),),}})}}}}"
+            "implIdentity{{{allow}pub(crate)fnnew(origin:&str,)->::std::result::Result<Self,margaret::framework::http::router_error::RouterError,>{{margaret::framework::http::server_paths::ServerPaths::build([\"/consent\",\"/login\",]).map(|paths|Self{{paths,get_login:margaret::framework::http::forwardable_route::ForwardableRoute::new(margaret::framework::http::literal_url::literal_url(origin,\"/login\"),),post_consent:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/consent\",),),}})}}}}"
         )));
     }
 
@@ -1451,7 +1486,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             source.contains("pubfnfrom_origins(origin_internal:&str,origin_public:&str,)->::std::result::Result<Self,margaret::framework::http::router_error::RouterError,>")
         );
         assert!(source.contains(
-            "internal:servers::internal::Internal::new(origin_internal)?,public:servers::public::Public::new(origin_public)?,"
+            "servers::internal::Internal::new(origin_internal).and_then(|internal|{servers::public::Public::new(origin_public).map(|public|Self{internal,public})})"
         ));
     }
 
@@ -1491,7 +1526,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         );
 
         assert!(source.contains(
-            "margaret::framework::http::require_peer_spiffe_id::require_peer_spiffe_id("
+            "margaret::framework::http::with_verified_peer::with_verified_peer(request,::std::result::Result::Ok,move|argument_1|asyncmove{margaret::framework::http::responded::responded(responder.respond(argument_1),)},).await"
         ));
     }
 
@@ -1503,8 +1538,9 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         );
 
         assert!(
-            source
-                .contains("responder.respond(super::super::forwarders::public::Forwarder::new())")
+            source.contains(
+                "responder.respond(super::super::forwarders::public::Forwarder::default())"
+            )
         );
     }
 
@@ -1516,6 +1552,31 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         );
 
         assert!(message.contains("must be a route parameter"));
+    }
+
+    #[test]
+    fn emits_no_forwarder_for_a_server_whose_responders_inject_none() {
+        assert!(forwarders_source(ROUTES_FIXTURE).is_empty());
+    }
+
+    #[test]
+    fn emits_a_constructible_forwarder_to_every_get_route_of_the_server_injecting_it() {
+        let source = forwarders_source(
+            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse crate::margaret::forwarders::public::Forwarder;\n\n#[singleton]
+#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {}\n}\n\n#[singleton]
+#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_article\", path = \"/articles/{article}\", server = \"public\")]\nstruct GetArticle;\nimpl GetArticle {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
+#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_health\", path = \"/health\", server = \"public\")]\nstruct GetHealth;\nimpl GetHealth {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_report\", path = \"/report\", server = \"internal\")]\nstruct GetReport;\nimpl GetReport {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+        );
+
+        assert_eq!(source.matches("structForwarder").count(), 1);
+        assert!(source.contains("#[derive(Default)]pubstructForwarder(());"));
+        assert!(source.contains(
+            "#[must_use]pubfnget_article(self,parameter_0:::std::string::String,)->margaret::framework::http::forward::Forward{margaret::framework::http::forward::Forward::new(\"get_article\",::std::collections::HashMap::from([(\"article\".to_string(),parameter_0)]),)}"
+        ));
+        assert!(source.contains(
+            "#[must_use]pubfnget_health(self)->margaret::framework::http::forward::Forward{margaret::framework::http::forward::Forward::new(\"get_health\",::std::collections::HashMap::new(),)}"
+        ));
+        assert!(!source.contains("get_report(self"));
     }
 
     #[test]
@@ -1615,7 +1676,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             "margaret::framework::http::server_paths::ServerPaths::build([\"/articles/{article}\",])"
         ));
         assert!(source.contains(
-            "margaret::framework::http::server_paths::ServerPaths::build([\"/articles/{id}\",])"
+            "margaret::framework::http::server_paths::ServerPaths::build([\"/articles/{id}\"])"
         ));
     }
 
@@ -1667,20 +1728,16 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         let source = source_for(ROUTE_PARAMETER);
 
         assert!(routes_source_for(ROUTE_PARAMETER).contains(
-            "margaret::framework::http::server_paths::ServerPaths::build([\"/users/{id}\",])"
+            "margaret::framework::http::server_paths::ServerPaths::build([\"/users/{id}\"])"
         ));
         assert!(source.contains("container.get_user()"));
         assert!(source.contains(
             "|responder:std::sync::Arc<crate::GetUser>,request:&margaret::framework::http::request::Request"
         ));
         assert!(source.contains(
-            r#"letargument_1=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"id""#
+            r#"with_route_parameters(request,["id"],::std::result::Result::Ok,move|[argument_1]|asyncmove{margaret::framework::http::responded::responded(responder.respond(argument_1),)}"#
         ));
-        assert!(source.contains("margaret::framework::http::requirement::Requirement::Met(value"));
-        assert!(
-            source.contains("margaret::framework::http::requirement::Requirement::Unmet(response")
-        );
-        assert!(source.contains("responder.respond(argument_1)"));
+        assert!(!source.contains("Requirement::Unmet"));
     }
 
     #[test]
@@ -1722,10 +1779,13 @@ impl GetProject {
         );
 
         assert!(source.contains(
-            r#"letargument_1=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"project_slug""#
+            r#"with_route_parameters(request,["project_slug","project_id"],::std::result::Result::Ok,move|[argument_1,argument_2]|"#
         ));
         assert!(source.contains(
-            r#"letargument_2=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"project_id""#
+            "letargument_1=matchmargaret::framework::http::route_parameter_value::route_parameter_value(argument_1,)"
+        ));
+        assert!(source.contains(
+            "letargument_2=matchmargaret::framework::http::route_parameter_value::route_parameter_value(argument_2,)"
         ));
         assert!(source.contains("responder.respond(argument_1,argument_2)"));
         assert!(!source.contains("responder.respond(argument_1,argument_2).await"));
@@ -1748,9 +1808,8 @@ impl GetProject {
             "|responder:std::sync::Arc<crate::Echo>,request:&margaret::framework::http::request::Request"
         ));
         assert!(source.contains(
-            r#"letargument_2=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"id""#
+            r#"with_route_parameters(request,["id"],::std::result::Result::Ok,move|[argument_2]|asyncmove{letargument_1=request;"#
         ));
-        assert!(source.contains("letargument_1=request;"));
         assert!(source.contains("responder.respond(argument_1,argument_2)"));
     }
 
@@ -1775,7 +1834,7 @@ impl GetProject {
 
         assert!(source.contains("request:&margaret::framework::http::request::Request"));
         assert!(source.contains(
-            r#"letargument_1=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"request""#
+            r#"with_route_parameters(request,["request"],::std::result::Result::Ok,move|[argument_1]|"#
         ));
         assert!(source.contains("responder.respond(argument_1)"));
     }
@@ -1789,7 +1848,7 @@ impl GetProject {
 
         assert!(source.contains("|responder:std::sync::Arc<crate::GetX>"));
         assert!(source.contains(
-            r#"letargument_1=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"responder""#
+            r#"with_route_parameters(request,["responder"],::std::result::Result::Ok,move|[argument_1]|"#
         ));
         assert!(source.contains("responder.respond(argument_1)"));
     }
@@ -1799,7 +1858,7 @@ impl GetProject {
         let source = source_for(DESTRUCTURED_ROUTE_PARAMETER);
 
         assert!(source.contains(
-            r#"margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,"id",user_binder.as_ref()"#
+            r#"with_route_parameters(request,["id"],::std::result::Result::Ok,move|[argument_1]|asyncmove{letargument_1=matchmargaret::framework::http::bind_route_parameter::bind_route_parameter(argument_1,"id",user_binder.as_ref(),)"#
         ));
         assert!(source.contains("responder.respond(argument_1)"));
     }
@@ -1810,7 +1869,7 @@ impl GetProject {
 
         assert!(source.contains("container.user_binder()"));
         assert!(source.contains(
-            r#"margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,"user",user_binder.as_ref()"#
+            r#"with_route_parameters(request,["user"],::std::result::Result::Ok,move|[argument_1]|asyncmove{letargument_1=matchmargaret::framework::http::bind_route_parameter::bind_route_parameter(argument_1,"user",user_binder.as_ref(),)"#
         ));
         assert!(!source.contains("http_route_parameter_binder::HttpRouteParameterBinder"));
         assert!(source.contains("responder.respond(argument_1)"));
@@ -2225,7 +2284,7 @@ impl GetGreeting {
         assert!(!source.contains("route_with_name"));
         assert!(source.contains("routes.public.paths.routes([margaret::framework::http::route_entry::RouteEntry::new(::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::forwardable(\"get_greeting\","));
         assert!(routes_source_for(NAMED_ROUTE).contains(
-            "margaret::framework::http::server_paths::ServerPaths::build([\"/greeting\",])"
+            "margaret::framework::http::server_paths::ServerPaths::build([\"/greeting\"])"
         ));
     }
 
@@ -2308,9 +2367,13 @@ impl GetGreeting {
 
         assert!(source.contains("pub(crate)fnnew_2(origin:&str,)"));
         assert!(source.contains(
-            "pubfnnew(&self,id:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::forwardable_route::ForwardableRoute,>"
+            "pubfnnew(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::forwardable_route::ForwardableRoute,>"
         ));
-        assert!(source.contains("servers::public::Public::new_2(origin_public)?"));
+        assert!(
+            source.contains(
+                "servers::public::Public::new_2(origin_public).map(|public|Self{public})"
+            )
+        );
     }
 
     #[test]
@@ -2393,10 +2456,10 @@ impl GetMetrics {
         let source = source_for(MULTIPLE_SERVERS);
 
         assert!(source.contains(
-            "server_public(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::router_error::RouterError,>{routes.public.paths.routes([margaret::framework::http::route_entry::RouteEntry::new("
+            "server_public(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->margaret::framework::http::server_route_entries::ServerRouteEntries{routes.public.paths.routes([margaret::framework::http::route_entry::RouteEntry::new("
         ));
         assert!(source.contains(
-            "server_internal(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::router_error::RouterError,>{routes.internal.paths.routes([margaret::framework::http::route_entry::RouteEntry::new("
+            "server_internal(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->margaret::framework::http::server_route_entries::ServerRouteEntries{routes.internal.paths.routes([margaret::framework::http::route_entry::RouteEntry::new("
         ));
 
         let routes = routes_source_for(MULTIPLE_SERVERS);
@@ -2405,10 +2468,10 @@ impl GetMetrics {
             "pubstructPublic{pub(crate)paths:margaret::framework::http::server_paths::ServerPaths<1>,}"
         ));
         assert!(routes.contains(
-            "paths:margaret::framework::http::server_paths::ServerPaths::build([\"/\"])?"
+            "margaret::framework::http::server_paths::ServerPaths::build([\"/\"]).map(|paths|Self{paths})"
         ));
         assert!(routes.contains(
-            "paths:margaret::framework::http::server_paths::ServerPaths::build([\"/metrics\",])?"
+            "margaret::framework::http::server_paths::ServerPaths::build([\"/metrics\"]).map(|paths|Self{paths})"
         ));
     }
 
@@ -2913,7 +2976,7 @@ impl Configured {
             .find("letargument_1=matchmargaret::framework::http::read_uploaded_files::read_uploaded_files(request,body,margaret::framework::http::body_limit::BodyLimit::new(4_096),)")
             .expect("the uploaded files are read");
         let route_parameter = source
-            .find("letargument_2=matchmargaret::framework::http::require_route_parameter::require_route_parameter(")
+            .find("move|[argument_2]|asyncmove{")
             .expect("the route parameter is required");
 
         assert!(route_parameter < read);

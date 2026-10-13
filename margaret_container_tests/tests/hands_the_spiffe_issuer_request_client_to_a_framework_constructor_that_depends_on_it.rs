@@ -41,7 +41,7 @@ fn hands_the_spiffe_issuer_request_client_to_a_framework_constructor_that_depend
             .expect("the workload has planned serve inputs")
             .iter()
             .map(|slotted| slotted.input.name())
-            .collect::<Vec<&str>>(),
+            .collect::<Vec<String>>(),
         ["spiffe_issuer_request_client"]
     );
 }

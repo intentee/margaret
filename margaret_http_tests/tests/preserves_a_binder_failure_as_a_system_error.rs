@@ -1,11 +1,8 @@
-use std::collections::HashMap;
 use std::error::Error;
 
 use async_trait::async_trait;
-use http::Method;
 
-use margaret_http::require_bound_route_parameter::require_bound_route_parameter;
-use margaret_http_tests::fixture_request::FixtureRequest;
+use margaret_http::bind_route_parameter::bind_route_parameter;
 use margaret_route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;
 use margaret_route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome;
 
@@ -22,11 +19,7 @@ impl HttpRouteParameterBinder for FailingBinder {
 
 #[tokio::test]
 async fn preserves_a_binder_failure_as_a_system_error() {
-    let request = FixtureRequest::new(Method::GET, "/numbers/42")
-        .into_request()
-        .with_path_params(HashMap::from([("number".to_string(), "42".to_string())]));
-
-    let error = require_bound_route_parameter(&request, "number", &FailingBinder)
+    let error = bind_route_parameter("42".to_string(), "number", &FailingBinder)
         .await
         .err()
         .expect("the binder fails");

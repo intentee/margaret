@@ -55,7 +55,6 @@ async fn serves_an_access_token_a_margaret_resource_server_admits() {
     let request = request_authorized_by(&format!("Bearer {}", signed_in.access_token.secret()));
     let BearerTokenRouting::Routed(routed) =
         route_bearer_token(request.inputs.server.authorization(), &[trusted_issuer])
-            .expect("the system clock reads as a numeric date")
     else {
         panic!("the access token is routed to the provider");
     };

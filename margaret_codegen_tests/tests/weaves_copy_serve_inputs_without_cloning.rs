@@ -15,25 +15,29 @@ fn module(generated: &GeneratedCode, name: &str) -> String {
 
 #[test]
 fn reads_a_required_standard_library_copy_argument_without_cloning() {
-    assert!(module(&generated(), "run").contains(
-        "matches.get_one::<::std::num::NonZeroU32>(\"max-connections\"){Some(value)=>*value"
+    let run = module(&generated(), "run");
+
+    assert!(run.contains(
+        "margaret::framework::console::required_argument::required_argument::<::std::num::NonZeroU32,>(matches,\"max-connections\").and_then(|serve_input_1|"
     ));
+    assert!(!run.contains(".clone()"));
 }
 
 #[test]
 fn reads_a_required_consumer_copy_argument_without_cloning() {
-    assert!(
-        module(&generated(), "run")
-            .contains("matches.get_one::<crate::budget::Budget>(\"budget\"){Some(value)=>*value")
-    );
+    let run = module(&generated(), "run");
+
+    assert!(run.contains(
+        "margaret::framework::console::required_argument::required_argument::<crate::budget::Budget,>(matches,\"budget\").and_then(|serve_input_0|"
+    ));
+    assert!(!run.contains(".clone()"));
 }
 
 #[test]
 fn reads_an_optional_copy_argument_as_a_copied_option() {
-    assert!(
-        module(&generated(), "run")
-            .contains("matches.get_one::<::std::num::NonZeroU32>(\"spare-connections\").copied()")
-    );
+    assert!(module(&generated(), "run").contains(
+        "margaret::framework::console::optional_argument::optional_argument::<::std::num::NonZeroU32,>(matches,\"spare-connections\").map(|serve_input_2|"
+    ));
 }
 
 #[test]

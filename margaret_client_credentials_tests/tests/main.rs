@@ -1,4 +1,3 @@
-mod rejects_a_resource_grant_of_a_malformed_scope;
 mod relays_a_refused_client_credentials_grant_so_callers_see_the_oauth_error;
 mod renews_a_token_that_expires_within_the_refresh_margin;
 mod renews_a_token_without_a_stated_lifetime;

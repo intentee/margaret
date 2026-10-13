@@ -339,8 +339,11 @@ fn classify_route_parameter(
     };
 
     match resolutions.get(value_type) {
-        Some(RouteParameterResolution::Value) => {
-            Ok(RequestBinding::RouteParameterValue { path_key: from })
+        Some(RouteParameterResolution::Value(conversion)) => {
+            Ok(RequestBinding::RouteParameterValue {
+                conversion: *conversion,
+                path_key: from,
+            })
         }
         Some(RouteParameterResolution::Binder(binder)) => Ok(RequestBinding::BoundRouteParameter {
             binder_field: binder.field.clone(),

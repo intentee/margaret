@@ -3,45 +3,36 @@ use quote::quote;
 
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_input_weaving::input_value::InputValue;
-use margaret_input_weaving::weaving_kind::WeavingKind;
 
 use crate::console_argument::ConsoleArgument;
-use crate::required_flag_read::required_flag_read;
-
-fn failed_outcome() -> TokenStream {
-    quote! { return margaret::framework::console::command_outcome::CommandOutcome::Failed }
-}
 
 fn valued_read(
     id: &str,
     InputValue {
         required,
         value_type,
-        weaving,
+        ..
     }: &InputValue,
 ) -> TokenStream {
-    let is_copy = weaving == &WeavingKind::Copy;
     let value_type = path_tokens(value_type);
 
     if *required {
-        let present = if is_copy {
-            quote! { *value }
-        } else {
-            quote! { value.clone() }
-        };
-
-        required_flag_read(&value_type, id, &present, &failed_outcome())
-    } else if is_copy {
-        quote! { matches.get_one::<#value_type>(#id).copied() }
+        quote! {
+            margaret::framework::console::required_argument::required_argument::<#value_type>(matches, #id)
+        }
     } else {
-        quote! { matches.get_one::<#value_type>(#id).cloned() }
+        quote! {
+            margaret::framework::console::optional_argument::optional_argument::<#value_type>(matches, #id)
+        }
     }
 }
 
 #[must_use]
 pub fn console_argument_read(argument: &ConsoleArgument) -> TokenStream {
     match argument {
-        ConsoleArgument::Flag { name } => quote! { matches.get_flag(#name) },
+        ConsoleArgument::Flag { name } => quote! {
+            margaret::framework::console::flag_argument::flag_argument(matches, #name)
+        },
         ConsoleArgument::Named { name, value } => valued_read(name, value),
         ConsoleArgument::Positional { id, value } => valued_read(id, value),
     }
@@ -57,11 +48,11 @@ mod tests {
 
     use super::console_argument_read;
 
-    fn value(required: bool, weaving: WeavingKind, segments: &[&str]) -> InputValue {
+    fn value(required: bool, segments: &[&str]) -> InputValue {
         InputValue {
             required,
             value_type: CanonicalPath::new(segments.iter().map(ToString::to_string).collect()),
-            weaving,
+            weaving: WeavingKind::Cloned,
         }
     }
 
@@ -73,69 +64,45 @@ mod tests {
     }
 
     #[test]
-    fn a_flag_reads_through_get_flag_since_a_flag_holds_a_boolean_not_a_value() {
+    fn reads_a_flag_through_the_framework_flag_reader_since_a_flag_holds_a_boolean() {
         assert_eq!(
             collapsed(&ConsoleArgument::Flag {
                 name: "loud".to_string(),
             }),
-            r#"matches.get_flag("loud")"#
+            r#"margaret::framework::console::flag_argument::flag_argument(matches,"loud")"#
         );
     }
 
     #[test]
-    fn a_required_copy_argument_dereferences_the_read_value() {
-        assert!(
-            collapsed(&ConsoleArgument::Named {
-                name: "retries".to_string(),
-                value: value(true, WeavingKind::Copy, &["u16"]),
-            })
-            .contains("matches.get_one::<u16>(\"retries\"){Some(value)=>*value")
-        );
-    }
-
-    #[test]
-    fn a_required_non_copy_argument_clones_the_qualified_read_value() {
-        assert!(
+    fn reads_a_required_argument_through_the_framework_so_no_missing_branch_is_generated() {
+        assert_eq!(
             collapsed(&ConsoleArgument::Named {
                 name: "label".to_string(),
-                value: value(true, WeavingKind::BorrowedStr, &["std", "string", "String"]),
-            })
-            .contains(
-                "matches.get_one::<::std::string::String>(\"label\"){Some(value)=>value.clone()"
-            )
+                value: value(true, &["std", "string", "String"]),
+            }),
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String>(matches,"label")"#
         );
     }
 
     #[test]
-    fn an_optional_argument_reads_a_cloned_qualified_option() {
+    fn reads_an_optional_argument_as_an_option_of_its_qualified_type() {
         assert_eq!(
             collapsed(&ConsoleArgument::Named {
                 name: "note".to_string(),
-                value: value(false, WeavingKind::Cloned, &["std", "string", "String"]),
+                value: value(false, &["std", "string", "String"]),
             }),
-            r#"matches.get_one::<::std::string::String>("note").cloned()"#
+            r#"margaret::framework::console::optional_argument::optional_argument::<::std::string::String>(matches,"note")"#
         );
     }
 
     #[test]
-    fn an_optional_copy_argument_reads_a_copied_qualified_option() {
+    fn reads_a_positional_argument_by_its_id() {
         assert_eq!(
-            collapsed(&ConsoleArgument::Named {
-                name: "retries".to_string(),
-                value: value(false, WeavingKind::Copy, &["u16"]),
-            }),
-            r#"matches.get_one::<u16>("retries").copied()"#
-        );
-    }
-
-    #[test]
-    fn a_positional_argument_reads_by_its_id() {
-        assert!(
             collapsed(&ConsoleArgument::Positional {
                 id: "point".to_string(),
-                value: value(true, WeavingKind::Cloned, &["crate", "geometry", "Point"]),
-            })
-            .contains(r#"matches.get_one::<crate::geometry::Point>("point")"#)
+                value: value(true, &["crate", "geometry", "Point"]),
+            }),
+            r#"margaret::framework::console::required_argument::required_argument::<crate::geometry::Point>(matches,"point")"#
         );
     }
 }

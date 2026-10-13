@@ -28,6 +28,7 @@ margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" 
 margaret_oauth_client = { workspace = true }
 margaret_oidc_sign_in = { workspace = true }
 margaret_route_method = { workspace = true }
+margaret_server_origin = { workspace = true }
 margaret_sessions = { workspace = true }
 margaret_sessions_tests = { path = "../margaret_sessions_tests" }
 serde = { workspace = true, features = ["derive"] }

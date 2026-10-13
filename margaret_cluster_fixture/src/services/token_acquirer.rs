@@ -23,20 +23,18 @@ pub struct TokenAcquirer {
 }
 
 impl TokenAcquirer {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
     pub fn create(
         clock: Arc<SystemClock>,
         credentials: Arc<ResourceCredentials>,
         database: Arc<Database>,
-    ) -> anyhow::Result<Self> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             clock,
             credentials,
             database,
-        })
+        }
     }
 
     /// # Errors

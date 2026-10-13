@@ -11,6 +11,7 @@ use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http_validation::responded_to_form::responded_to_form;
+use margaret_server_origin::route_url::RouteUrl;
 use margaret_sessions::issued_sessions::IssuedSessions;
 use margaret_sessions::resolved_session::ResolvedSession;
 use margaret_validation::validate::validate;
@@ -44,13 +45,13 @@ where
         authorization: Arc<AuthorizationEndpoint>,
         sessions: Arc<IssuedSessions>,
         consent_view: Arc<TConsentView>,
-        decision_url: String,
+        decision_url: RouteUrl,
         routes: Arc<TRoutes>,
     ) -> Self {
         Self {
             authorization,
             consent_view,
-            decision_url,
+            decision_url: String::from(decision_url),
             routes,
             sessions,
         }

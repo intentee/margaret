@@ -22,6 +22,7 @@ fn collects_only_the_forwardable_handlers_of_a_server() {
             MethodHandler::forwardable("get_articles", not_found()),
             MethodHandler::head(RouteMethod::Post, not_found()),
         ])])
+        .build()
         .expect("the entries build a router");
 
     assert_eq!(server_routes.named_handlers.len(), 1);

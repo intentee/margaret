@@ -23,7 +23,6 @@ async fn saves_the_changes_of_an_article_so_a_patch_keeps_the_fields_it_omits() 
 
     assert_eq!(
         PatchArticle::create(Arc::clone(&blog.database))
-            .expect("the responder is constructed")
             .respond(
                 article,
                 PatchArticleForm {

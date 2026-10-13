@@ -135,7 +135,7 @@ fn sign_out_provider(
         ],
         "create",
         FrameworkInjectionRole::FrameworkState,
-        handler.handler_path(),
+        handler.handler_path().clone(),
     )
 }
 

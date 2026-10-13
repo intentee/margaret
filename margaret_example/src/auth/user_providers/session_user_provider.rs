@@ -19,12 +19,10 @@ pub struct SessionUserProvider {
 }
 
 impl SessionUserProvider {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(user_accounts: Arc<UserAccountRepository>) -> anyhow::Result<Self> {
-        Ok(Self { user_accounts })
+    pub fn create(user_accounts: Arc<UserAccountRepository>) -> Self {
+        Self { user_accounts }
     }
 
     /// # Errors

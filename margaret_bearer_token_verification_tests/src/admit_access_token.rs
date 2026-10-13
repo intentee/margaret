@@ -16,9 +16,7 @@ pub async fn admit_access_token(
 ) -> TokenAdmission<VerifiedJwt<TestClaims, AccessTokenProfile>> {
     let authorization = RequestAuthorization::parse(Some(authorization));
 
-    match route_bearer_token(&authorization, &[trusted_issuer])
-        .expect("the system clock reads as a numeric date")
-    {
+    match route_bearer_token(&authorization, &[trusted_issuer]) {
         BearerTokenRouting::Refused(continuation) => TokenAdmission::Refused(continuation),
         BearerTokenRouting::Routed(routed) => routed.admit(trusted_issuer).await,
     }

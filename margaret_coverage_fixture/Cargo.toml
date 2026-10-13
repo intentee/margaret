@@ -1,0 +1,24 @@
+[package]
+name = "margaret_coverage_fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
+http = { workspace = true }
+margaret = { workspace = true, features = ["runtime"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["fs", "macros", "rt", "sync", "time"] }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
+validator = { workspace = true, features = ["derive"] }
+
+[build-dependencies]
+margaret = { workspace = true, default-features = false, features = ["codegen"] }
+
+[lints]
+workspace = true

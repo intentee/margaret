@@ -1,12 +1,13 @@
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::struct_shape::StructShape;
 use margaret_codegen_tokens::bootstrap_argument_field_ident::bootstrap_argument_field_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
-use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
+use margaret_codegen_tokens::positional_naming::PositionalNaming;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
@@ -84,7 +85,11 @@ fn dependency_expression(
                 .rev()
                 .map(|url| match url {
                     PlannedUrl::Declared(url) => quote! { ::std::string::String::from(#url) },
-                    PlannedUrl::Route { input, slot } => weaver.weave(input, *slot),
+                    PlannedUrl::Route { input, slot } => {
+                        let route_url = weaver.weave(input, *slot);
+
+                        quote! { ::std::string::String::from(#route_url) }
+                    }
                 })
                 .collect();
 
@@ -110,6 +115,22 @@ fn dependency_expressions(
     expressions
 }
 
+fn constructor_call(
+    concrete: &TokenStream,
+    method: &str,
+    arguments: &[TokenStream],
+    is_async: bool,
+) -> TokenStream {
+    let constructor = format_ident!("{method}");
+    let call = quote! { #concrete::#constructor(#(#arguments),*) };
+
+    if is_async {
+        quote! { #call.await }
+    } else {
+        call
+    }
+}
+
 fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver) -> TokenStream {
     let provider = &planned.provider;
     let concrete = path_tokens(&provider.concrete_path);
@@ -117,19 +138,27 @@ fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver)
 
     match &provider.construction {
         DirectConstruction::Constructor {
-            is_async, method, ..
+            is_async,
+            method,
+            outcome,
+            ..
         } => {
-            let constructor = format_ident!("{method}");
-            let arguments = dependency_expressions(dependencies, weaver, ArcClone::Inferred);
-            let construct_singleton = construct_singleton_path();
-            let singleton = provider.concrete_path.to_string();
-            let call = if *is_async {
-                quote! { #concrete::#constructor(#(#arguments),*).await }
-            } else {
-                quote! { #concrete::#constructor(#(#arguments),*) }
-            };
+            let call = constructor_call(
+                &concrete,
+                method,
+                &dependency_expressions(dependencies, weaver, ArcClone::Inferred),
+                *is_async,
+            );
 
-            quote! { #construct_singleton(#singleton, #call)? }
+            match outcome {
+                ConstructorOutcome::Fallible => {
+                    let construct_singleton = construct_singleton_path();
+                    let singleton = provider.concrete_path.to_string();
+
+                    quote! { #construct_singleton(#singleton, #call)? }
+                }
+                ConstructorOutcome::Infallible => call,
+            }
         }
         DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
         DirectConstruction::FrameworkConstructor {
@@ -138,13 +167,12 @@ fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver)
             outcome,
             ..
         } => {
-            let constructor = format_ident!("{method}");
-            let arguments = dependency_expressions(dependencies, weaver, ArcClone::Typed);
-            let call = if *is_async {
-                quote! { #concrete::#constructor(#(#arguments),*).await }
-            } else {
-                quote! { #concrete::#constructor(#(#arguments),*) }
-            };
+            let call = constructor_call(
+                &concrete,
+                method,
+                &dependency_expressions(dependencies, weaver, ArcClone::Typed),
+                *is_async,
+            );
 
             match outcome {
                 ConstructorOutcome::Fallible => {
@@ -161,6 +189,11 @@ fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver)
                 ConstructorOutcome::Infallible => call,
             }
         }
+        DirectConstruction::FrameworkPrepared { .. } => {
+            let prepared = dependency_expressions(dependencies, weaver, ArcClone::Inferred);
+
+            quote! { #(#prepared)* }
+        }
         DirectConstruction::FrameworkUnit => quote! { #concrete },
         DirectConstruction::FrameworkAccessor { accessor, .. } => {
             let accessor = format_ident!("{accessor}");
@@ -171,32 +204,41 @@ fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver)
     }
 }
 
-fn statement(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver) -> TokenStream {
+fn constructed_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver) -> FlowValue {
     let provider = &planned.provider;
-    let binding = field_ident(provider);
     let value = direct_value(planned, weaver);
-    let constructed = match &provider.construction {
-        DirectConstruction::Constructor { .. }
-        | DirectConstruction::FrameworkAccessor { .. }
-        | DirectConstruction::FrameworkConstructor {
-            outcome: ConstructorOutcome::Fallible,
-            ..
-        } => value,
-        DirectConstruction::Fieldless { .. }
-        | DirectConstruction::FrameworkConstructor {
-            outcome: ConstructorOutcome::Infallible,
-            ..
-        }
-        | DirectConstruction::FrameworkUnit => quote! { ::std::sync::Arc::new(#value) },
-    };
 
-    quote! { let #binding = #constructed; }
+    FlowValue {
+        binding: field_ident(provider),
+        value: match &provider.construction {
+            DirectConstruction::FrameworkAccessor { .. }
+            | DirectConstruction::Constructor {
+                outcome: ConstructorOutcome::Fallible,
+                ..
+            }
+            | DirectConstruction::FrameworkConstructor {
+                outcome: ConstructorOutcome::Fallible,
+                ..
+            } => value,
+            DirectConstruction::Fieldless { .. }
+            | DirectConstruction::Constructor {
+                outcome: ConstructorOutcome::Infallible,
+                ..
+            }
+            | DirectConstruction::FrameworkConstructor {
+                outcome: ConstructorOutcome::Infallible,
+                ..
+            }
+            | DirectConstruction::FrameworkPrepared { .. }
+            | DirectConstruction::FrameworkUnit => quote! { ::std::sync::Arc::new(#value) },
+        },
+    }
 }
 
 fn arguments_declaration(
     function: &Ident,
     inputs: &[SlottedServeInput],
-    naming: ServeInputNaming,
+    naming: PositionalNaming,
 ) -> TokenStream {
     if inputs.is_empty() {
         return TokenStream::new();
@@ -242,55 +284,52 @@ fn arguments_module(
     ))
 }
 
-fn flow_statements(flow: &[&PlannedProvider], naming: ServeInputNaming) -> Vec<TokenStream> {
-    let mut weaver = ReverseServeInputWeaver::new(naming);
-    let mut statements: Vec<TokenStream> = flow
+fn flow_values(flow: &[&PlannedProvider], weaver: &mut ReverseServeInputWeaver) -> Vec<FlowValue> {
+    let mut values: Vec<FlowValue> = flow
         .iter()
         .rev()
-        .map(|planned| statement(planned, &mut weaver))
+        .map(|planned| constructed_value(planned, weaver))
         .collect();
 
-    statements.reverse();
-    statements
+    values.reverse();
+    values
 }
 
 fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
-    let flow = construction_flow(plan, &[root]);
+    let dependencies: Vec<&PlannedProvider> = construction_flow(plan, &[root])
+        .into_iter()
+        .filter(|planned| planned.key != root.key)
+        .collect();
     let provider = &root.provider;
     let function = format_ident!("construct_{}", provider.field_name);
     let naming = plan.serve_input_naming();
     let parameters = arguments_declaration(&function, &root.serve_inputs, naming);
-    let statements = flow_statements(&flow, naming);
-    let root_binding = field_ident(provider);
-    let root_type = field_type(provider);
-    let error = construction_error_path();
+    let mut weaver = ReverseServeInputWeaver::new(naming);
+    let root_value = constructed_value(root, &mut weaver);
+    let mut statements: Vec<TokenStream> = flow_values(&dependencies, &mut weaver)
+        .iter()
+        .map(FlowValue::statement)
+        .collect();
+    let constructed = match root.outcome {
+        ConstructorOutcome::Fallible => {
+            statements.push(root_value.statement());
 
-    let body = quote! {
-            #(#statements)*
-
-            Ok(#root_binding)
-    };
-
-    let too_many_lines = too_many_lines_allow();
-    let return_type = quote! { ::std::result::Result<#root_type, #error> };
-    let errors_doc = construction_errors_doc();
-    let tokens = if root.is_async {
-        quote! {
-            #errors_doc
-            #too_many_lines
-            pub async fn #function(#parameters) -> #return_type {
-                #body
-            }
+            root_value.binding.to_token_stream()
         }
-    } else {
-        quote! {
-            #errors_doc
-            #too_many_lines
-            pub fn #function(#parameters) -> #return_type {
-                #body
-            }
-        }
+        ConstructorOutcome::Infallible => root_value.value,
     };
+    let tokens = builder_function(
+        root.is_async,
+        &function,
+        &parameters,
+        constructed_signature(
+            root.outcome,
+            root.is_async,
+            &statements,
+            &constructed,
+            &field_type(provider),
+        ),
+    );
 
     RootBuilder {
         arguments: arguments_module(&function, &root.serve_inputs),
@@ -299,10 +338,138 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
     }
 }
 
+fn serve_builder(plan: &ContainerPlan, served_roots: &[&PlannedProvider]) -> RootBuilder {
+    let flow = construction_flow(plan, served_roots);
+    let inputs = unify_serve_inputs(
+        served_roots
+            .iter()
+            .flat_map(|root| root.serve_inputs.iter()),
+    );
+    let function = format_ident!("serve");
+    let naming = plan.serve_input_naming();
+    let parameters = arguments_declaration(&function, &inputs, naming);
+    let statements: Vec<TokenStream> =
+        flow_values(&flow, &mut ReverseServeInputWeaver::new(naming))
+            .iter()
+            .map(FlowValue::statement)
+            .collect();
+    let fields = served_roots.iter().enumerate().map(|(position, planned)| {
+        let binding = field_ident(&planned.provider);
+        let field = container_field_ident(position);
+
+        quote! { #field: #binding, }
+    });
+    let is_async = served_roots.iter().any(|entry| entry.is_async);
+    let tokens = builder_function(
+        is_async,
+        &function,
+        &parameters,
+        constructed_signature(
+            served_roots
+                .iter()
+                .fold(ConstructorOutcome::Infallible, |outcome, root| {
+                    outcome.combined_with(root.outcome)
+                }),
+            is_async,
+            &statements,
+            &quote! {
+                super::super::Container {
+                    #(#fields)*
+                }
+            },
+            &quote! { super::super::Container },
+        ),
+    );
+
+    RootBuilder {
+        arguments: arguments_module(&function, &inputs),
+        function,
+        tokens,
+    }
+}
+
+fn builder_function(
+    is_async: bool,
+    function: &Ident,
+    parameters: &TokenStream,
+    ConstructedSignature {
+        attributes,
+        body,
+        return_type,
+    }: ConstructedSignature,
+) -> TokenStream {
+    let asyncness = is_async.then(|| quote! { async });
+    let too_many_lines = too_many_lines_allow();
+
+    quote! {
+        #attributes
+        #too_many_lines
+        pub #asyncness fn #function(#parameters) -> #return_type {
+            #body
+        }
+    }
+}
+
+fn constructed_signature(
+    outcome: ConstructorOutcome,
+    is_async: bool,
+    statements: &[TokenStream],
+    constructed: &TokenStream,
+    constructed_type: &TokenStream,
+) -> ConstructedSignature {
+    match outcome {
+        ConstructorOutcome::Fallible => {
+            let error = construction_error_path();
+
+            ConstructedSignature {
+                attributes: construction_errors_doc(),
+                body: quote! {
+                    #(#statements)*
+
+                    Ok(#constructed)
+                },
+                return_type: quote! { ::std::result::Result<#constructed_type, #error> },
+            }
+        }
+        ConstructorOutcome::Infallible => ConstructedSignature {
+            attributes: if is_async {
+                TokenStream::new()
+            } else {
+                quote! { #[must_use] }
+            },
+            body: quote! {
+                #(#statements)*
+
+                #constructed
+            },
+            return_type: constructed_type.clone(),
+        },
+    }
+}
+
 #[derive(Clone, Copy)]
 enum ArcClone {
     Inferred,
     Typed,
+}
+
+struct FlowValue {
+    binding: Ident,
+    value: TokenStream,
+}
+
+impl FlowValue {
+    fn statement(&self) -> TokenStream {
+        let Self { binding, value } = self;
+
+        quote! { let #binding = #value; }
+    }
+}
+
+struct ConstructedSignature {
+    attributes: TokenStream,
+    body: TokenStream,
+    return_type: TokenStream,
 }
 
 struct RootBuilder {
@@ -316,66 +483,12 @@ pub(crate) fn render_build(
     served_roots: &[&PlannedProvider],
     builder_roots: &[&PlannedProvider],
 ) -> Vec<GeneratedModuleTokens> {
-    let root_builders = builder_roots
+    let builders = builder_roots
         .iter()
         .map(|root| root_builder(root, plan))
-        .collect::<Vec<_>>();
-    let serve_flow = construction_flow(plan, served_roots);
-    let serve_inputs = unify_serve_inputs(
-        served_roots
-            .iter()
-            .flat_map(|root| root.serve_inputs.iter()),
-    );
-    let serve_function = format_ident!("serve");
-    let naming = plan.serve_input_naming();
-    let serve_parameters = arguments_declaration(&serve_function, &serve_inputs, naming);
-    let serve_arguments_module = arguments_module(&serve_function, &serve_inputs);
-    let serve_statements = flow_statements(&serve_flow, naming);
-    let fields = served_roots
-        .iter()
-        .enumerate()
-        .map(|(position, planned)| {
-            let binding = field_ident(&planned.provider);
-            let field = container_field_ident(position);
-
-            quote! { #field: #binding, }
-        })
-        .collect::<Vec<_>>();
-    let error = construction_error_path();
-
-    let serve_return = quote! { ::std::result::Result<super::super::Container, #error> };
-    let serve_body = quote! {
-            #(#serve_statements)*
-
-            Ok(super::super::Container {
-                #(#fields)*
-            })
-    };
-    let serve_too_many_lines = too_many_lines_allow();
-    let serve_errors_doc = construction_errors_doc();
-    let serve = if served_roots.iter().any(|entry| entry.is_async) {
-        quote! {
-            #serve_errors_doc
-            #serve_too_many_lines
-            pub async fn serve(
-                #serve_parameters
-            ) -> #serve_return {
-                #serve_body
-            }
-        }
-    } else {
-        quote! {
-            #serve_errors_doc
-            #serve_too_many_lines
-            pub fn serve(
-                #serve_parameters
-            ) -> #serve_return {
-                #serve_body
-            }
-        }
-    };
-
-    let builder_module_declarations = root_builders.iter().map(|builder| {
+        .chain([serve_builder(plan, served_roots)])
+        .collect::<Vec<RootBuilder>>();
+    let module_declarations = builders.iter().map(|builder| {
         let function = &builder.function;
         let arguments_module = builder
             .arguments
@@ -388,38 +501,28 @@ pub(crate) fn render_build(
             mod #function;
         }
     });
-    let builder_module_exports = root_builders.iter().map(|builder| {
+    let module_exports = builders.iter().map(|builder| {
         let function = &builder.function;
 
         quote! { pub use #function::#function; }
     });
-    let serve_arguments_declaration = serve_arguments_module
-        .as_ref()
-        .map(|_| bootstrap_arguments_module(&serve_function))
-        .map(|module| quote! { pub mod #module; });
     let build = build_module();
     let mut modules = vec![GeneratedModuleTokens::new(
         build.clone(),
         quote! {
-            #(#builder_module_declarations)*
-            #serve_arguments_declaration
-            mod serve;
+            #(#module_declarations)*
 
-            #(#builder_module_exports)*
-            pub use serve::serve;
+            #(#module_exports)*
         },
     )];
 
-    for builder in root_builders {
+    for builder in builders {
         modules.extend(builder.arguments);
         modules.push(GeneratedModuleTokens::new(
             build.child(builder.function.to_string()),
             builder.tokens,
         ));
     }
-
-    modules.extend(serve_arguments_module);
-    modules.push(GeneratedModuleTokens::new(build.child("serve"), serve));
 
     modules
 }

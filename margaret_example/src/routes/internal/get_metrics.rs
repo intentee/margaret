@@ -16,12 +16,10 @@ pub struct GetMetrics {
 }
 
 impl GetMetrics {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(metrics: Arc<Metrics>) -> anyhow::Result<Self> {
-        Ok(Self { metrics })
+    pub fn create(metrics: Arc<Metrics>) -> Self {
+        Self { metrics }
     }
 
     /// # Errors

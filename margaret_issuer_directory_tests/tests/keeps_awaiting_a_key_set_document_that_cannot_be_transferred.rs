@@ -13,7 +13,7 @@ async fn keeps_awaiting_a_key_set_document_that_cannot_be_transferred() {
     assert!(matches!(
         localhost_jwks_endpoint()
             .first_poll(
-                IssuerRequestClient::build(
+                IssuerRequestClient::preconfigured(
                     fixture_client_builder(&fixture.certificate_authority)
                         .resolve(&fixture.server_name, server.address())
                 )

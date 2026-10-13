@@ -11,7 +11,7 @@ fn awaits_a_root_whose_dependency_graph_is_asynchronous() {
         .construction_invocation(
             &CanonicalPath::new(vec!["crate".to_string(), "Pool".to_string()]),
             "pool",
-            &[],
+            &bindings.construction_arguments("pool", &[]),
         )
         .to_string()
         .split_whitespace()

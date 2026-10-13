@@ -3,12 +3,12 @@ use reqwest::StatusCode;
 use serde_json::json;
 
 use margaret_cluster_fixture::tickers::note_sweep_interval::NOTE_SWEEP_INTERVAL;
+use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
+use margaret_cluster_tests::stored_note::StoredNote;
+use margaret_local_server_tests::poll_until::poll_until;
 
-use crate::addressed_route::addressed_route;
 use crate::cluster_binary::cluster_binary;
-use crate::poll_until::poll_until;
-use crate::stored_note::StoredNote;
 
 #[tokio::test]
 async fn any_instance_sweeps_notes_another_wrote_so_a_crashed_writer_leaves_no_garbage() {

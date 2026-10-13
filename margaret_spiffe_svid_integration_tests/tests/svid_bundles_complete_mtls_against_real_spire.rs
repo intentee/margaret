@@ -8,6 +8,7 @@ use tokio_util::sync::CancellationToken;
 use trzcina::ServiceManager;
 use trzcina::ServiceShutdownOptions;
 
+use margaret_spiffe_svid::register_services::register_services;
 use margaret_spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams;
 use margaret_spiffe_svid_bundle::svid_bundle::SvidBundle;
 use margaret_spiffe_svid_tests::pump_tls_handshake::pump_tls_handshake;
@@ -37,7 +38,7 @@ async fn completes_mtls_with_a_real_spire_issued_svid() {
     let mut client_readiness = svid_bundle.client_readiness();
 
     let mut service_manager = ServiceManager::default();
-    service_manager.register_bundle(svid_bundle).await.unwrap();
+    register_services(&mut service_manager, svid_bundle.into_services());
 
     let cancellation_token = CancellationToken::new();
     let cancellation_token_for_manager = cancellation_token.clone();

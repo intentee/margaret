@@ -19,6 +19,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
 use margaret_console_codegen::console_plan::ConsolePlan;
 use margaret_console_codegen::render_console::render_console;
+use margaret_console_codegen::serve_dispatch::ServeDispatch;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_enablement::FrameworkEnablement;
@@ -50,6 +51,7 @@ use margaret_schema_codegen::render_table::render_table;
 use margaret_schema_codegen::render_tables::render_tables;
 use margaret_serve_input_codegen::scan::scan;
 use margaret_service_codegen::framework_service::FrameworkService;
+use margaret_service_codegen::read_serve_invocation::read_serve_invocation;
 use margaret_service_codegen::render_services::render_services;
 use margaret_service_codegen::service_plan::ServicePlan;
 use margaret_session_endpoints_codegen::declared_session_endpoints::DeclaredSessionEndpoints;
@@ -377,6 +379,7 @@ fn render_serving_modules(
     } else {
         HttpModules {
             artifacts: HttpArtifacts {
+                forwarders: Vec::new(),
                 retained_roots: Vec::new(),
                 modules: Vec::new(),
                 servers: Vec::new(),
@@ -386,6 +389,7 @@ fn render_serving_modules(
     };
 
     Ok(ServingModules {
+        forwarders: http.artifacts.forwarders,
         modules: [
             websockets.modules,
             views.modules,
@@ -423,20 +427,24 @@ fn render_role_modules(
     let service_plan = ServicePlan::build(index, framework_services, bindings, serving_roots)?;
     let service_roots = service_plan.roots().to_vec();
 
-    if features.contains(GeneratedFeature::Serves) {
-        modules.push(render_services(
+    let serve = if features.contains(GeneratedFeature::Serves) {
+        modules.extend(render_services(
             &service_plan,
             servers,
             features.contains(GeneratedFeature::Views),
             bindings,
         ));
-    }
+
+        ServeDispatch::Served(read_serve_invocation(&service_plan, servers, bindings))
+    } else {
+        ServeDispatch::Unserved
+    };
 
     let console_roots = if features.contains(GeneratedFeature::Console) {
         let plan = ConsolePlan::build(index, bindings)?;
         let console = render_console(
             &plan,
-            features.contains(GeneratedFeature::Serves),
+            &serve,
             features.contains(GeneratedFeature::Schema),
             servers,
             service_plan.serve_inputs(),
@@ -471,6 +479,7 @@ fn served_modules(
         registries,
     } = render_wrapper_modules(index, bindings, features, binding)?;
     let ServingModules {
+        forwarders,
         modules: serving_modules,
         retained_roots: serving_roots,
         servers,
@@ -497,6 +506,7 @@ fn served_modules(
     )?;
 
     Ok(ServedModules {
+        forwarders,
         modules: [wrapper_modules, serving_modules, role_modules]
             .into_iter()
             .flatten()
@@ -569,24 +579,31 @@ fn issuance_modules(
 
 fn rendered(
     planned_container: PlannedContainer,
-    RoleRoots {
-        console,
-        serving,
-        service,
-    }: &RoleRoots,
+    ServedModules {
+        forwarders,
+        modules,
+        roots: RoleRoots {
+            console,
+            serving,
+            service,
+        },
+    }: ServedModules,
     mut module_tokens: Vec<GeneratedModuleTokens>,
     mut features: GeneratedFeatures,
 ) -> Result<GeneratedCode, CodegenError> {
+    features.enable_if(GeneratedFeature::Forwarders, !forwarders.is_empty());
+    module_tokens.extend(modules);
+    module_tokens.extend(forwarders);
+
     let served_roots = service
-        .iter()
+        .into_iter()
         .chain(serving)
-        .cloned()
         .collect::<BTreeSet<CanonicalPath>>()
         .into_iter()
         .collect::<Vec<CanonicalPath>>();
 
     planned_container
-        .render(&served_roots, console)
+        .render(&served_roots, &console)
         .map_err(CodegenError::from)
         .and_then(|rendered_container| {
             features.enable_if(
@@ -713,7 +730,7 @@ pub fn build(
 
     module_tokens.extend(framework.modules);
 
-    let ServedModules { modules, roots } =
+    let served =
         framework_responders(&endpoints, &client_sign_ins, bindings).and_then(|responders| {
             served_modules(
                 &index,
@@ -733,9 +750,7 @@ pub fn build(
             )
         })?;
 
-    module_tokens.extend(modules);
-
-    rendered(planned_container, &roots, module_tokens, features)
+    rendered(planned_container, served, module_tokens, features)
 }
 
 #[cfg(test)]
@@ -1252,17 +1267,15 @@ impl Worker {
         let code = generate(SPIFFE_HTTP_CLIENT_CRATE).expect("the build succeeds");
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains(
-            "letspiffe_bundle=matchmargaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
+        let run: String = module(&code, "run").split_whitespace().collect();
+        assert!(run.contains(
+            "margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{spiffe_trust_domain,spire_agent_addr,}).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|spiffe_bundle|{spiffe_bundle.reqwest_client().map_err(margaret::framework::console::report_failure::report_failure,).map(|spiffe_http_client|{letserve_input_0=spiffe_http_client.clone();"
         ));
         assert!(serve.contains("letspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(serve.contains(
-            "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
+            "margaret::framework::spiffe_svid::register_services::register_services(&mutmanager,spiffe_bundle.into_services(),);"
         ));
-        assert!(serve.contains(
-            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
-        ));
-        assert!(serve.contains("letserve_input_0=spiffe_http_client.clone();"));
+        assert!(!serve.contains("register_bundle"));
         assert!(serve.contains(
             "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:container.worker(),},),);"
         ));
@@ -1280,7 +1293,6 @@ impl Worker {
             .collect();
         assert!(construction.contains("pubargument0:margaret::framework::reqwest::Client,"));
 
-        let run: String = module(&code, "run").split_whitespace().collect();
         assert!(run.contains(
             r#"clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true)"#
         ));
@@ -1328,17 +1340,18 @@ impl CallRoute {
         let code = generate(SPIFFE_HTTP_SERVER_CLIENT_CRATE).expect("the build succeeds");
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains(
-            "letspiffe_bundle=matchmargaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
+        let run: String = module(&code, "run").split_whitespace().collect();
+        assert!(run.contains(
+            "margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{spiffe_trust_domain,spire_agent_addr,})"
+        ));
+        assert!(run.contains(
+            "transport:margaret::framework::http::transport_config::TransportConfig::Plain,"
         ));
         assert!(serve.contains(
-            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
+            "margaret::framework::spiffe_svid::register_services::register_services(&mutmanager,spiffe_bundle.into_services(),);register_servers(&mutmanager,listeners,container,&routes,&spiffe_client_readiness,);"
         ));
         assert!(serve.contains(
-            "letserver_services=margaret::framework::service::serve_application::serve_application(matches,servers,)?;"
-        ));
-        assert!(serve.contains(
-            "forserver_serviceinserver_services{manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),server_service,),);}"
+            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),margaret::framework::service::server_service::ServerService::new(server_public_listener,super::http::server_public::server_public(container,routes),),),);"
         ));
         assert!(serve.contains(
             "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
@@ -1388,30 +1401,25 @@ impl GetIdentity {
         let code = generate(SPIFFE_BOTH_CRATE).expect("the build succeeds");
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains(
-            "letspiffe_bundle=matchmargaret::framework::spiffe_svid_bundle::svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
+        let run: String = module(&code, "run").split_whitespace().collect();
+        assert!(run.contains(
+            "margaret::framework::spiffe_svid_bundle::svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{spiffe_trust_domain,spire_agent_addr,}).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|spiffe_bundle|{letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config(),);spiffe_bundle.reqwest_client().map_err(margaret::framework::console::report_failure::report_failure,).and_then(|spiffe_http_client|"
         ));
-        assert!(serve.contains(
-            "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
+        assert!(run.contains(
+            r#"margaret::framework::console::required_argument::required_argument::<margaret::framework::service::transport_choice::TransportChoice,>(matches,"internal-transport").map(|server_internal_transport|{letserver_internal_listener=margaret::framework::service::server_listener::ServerListener{address:server_internal_address,transport:server_internal_transport.config(&spiffe_server_config),"#
         ));
         assert!(serve.contains("letspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(serve.contains(
-            "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
+            "margaret::framework::spiffe_svid::register_services::register_services(&mutmanager,spiffe_bundle.into_services(),);"
         ));
         assert!(serve.contains(
-            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
-        ));
-        assert!(serve.contains(
-            "transport:matchmatches.get_one::<margaret::framework::service::transport_choice::TransportChoice"
-        ));
-        assert!(serve.contains("{Some(value)=>value.config(spiffe_server_config),"));
-        assert!(serve.contains(
-            "forserver_serviceinserver_services{manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),server_service,),);}"
+            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),margaret::framework::service::server_service::ServerService::new(server_internal_listener,super::http::server_internal::server_internal(container,routes),),),);"
         ));
         assert!(serve.contains(
             "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
         ));
-        assert!(serve.matches("SvidBundle::new").count() == 1);
+        assert!(run.matches("SvidBundle::new").count() == 1);
+        assert!(!serve.contains("SvidBundle::new"));
         assert!(!serve.contains("run_all"));
         assert!(!serve.contains("bundle_services"));
     }
@@ -1512,11 +1520,9 @@ impl GetIdentity {
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains("impltrzcina::ServiceforMargaretJwksJwksRoller"));
-        assert!(
-            serve.contains(
-                "self.inner.run(cancellation_token).await?;::std::result::Result::Ok(())"
-            )
-        );
+        assert!(serve.contains(
+            "self.inner.run(cancellation_token).await.map_err(margaret::framework::anyhow::Error::from)"
+        ));
         assert!(!serve.contains("impltrzcina::TickerforMargaretJwksJwksRoller"));
     }
 
@@ -1563,12 +1569,16 @@ impl GetIdentity {
             .split_whitespace()
             .collect();
         let serve: String = module(&code, "serve").split_whitespace().collect();
+        let run: String = module(&code, "run").split_whitespace().collect();
 
         assert!(construction.contains(
             "letframework_issuer_directory_issuer_directory_issuer_directory=::std::sync::Arc::new(::margaret::framework::issuer_directory::issuer_directory::IssuerDirectory::create(::std::sync::Arc::<::margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::vec::Vec::from([::std::sync::Arc::<crate::margaret::trusted_issuers::auth::PolledKeySet,>::clone(&margaret_trusted_issuers_auth_polled_key_set),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::PolledKeySet,>::clone(&margaret_trusted_issuers_partner_polled_key_set),]),),);"
         ));
+        assert!(run.contains(
+            "::margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient::create().map_err(margaret::framework::console::report_failure::report_failure,).map(|serve_input_0|"
+        ));
         assert!(construction.contains(
-            "margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient::create().map_err(margaret::framework::anyhow::Error::from),)?;"
+            "letframework_issuer_request_issuer_request_client_issuer_request_client=::std::sync::Arc::new(serve_input_0,);"
         ));
         assert_eq!(serve.matches("impltrzcina::Servicefor").count(), 1);
         assert!(serve.contains(
@@ -1921,34 +1931,30 @@ struct ApplicationDatabase;
         assert!(construction.contains(
             "crate::margaret::oidc_provider::RevocationEndpoint::create(::std::sync::Arc::<crate::margaret::oidc_provider::AcceptedClients,>::clone(&margaret_oidc_provider_accepted_clients),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::accepted_clients::accepted_resources::ACCEPTED_RESOURCES,)"
         ));
-        assert!(
-            module(&code, "serve")
-                .split_whitespace()
-                .collect::<String>()
-                .contains("letserve_input_0=matchmargaret::framework::environment_variable::read_required::read_required::<::margaret::framework::database::database_url::DatabaseUrl,>(\"APPLICATION_DATABASE_URL\")")
-        );
-        assert!(
-            module(&code, "serve")
-                .split_whitespace()
-                .collect::<String>()
-                .contains("letserve_input_1=matchmargaret::framework::environment_variable::read_required::read_required::<::margaret::framework::database::max_connections::MaxConnections,>(\"APPLICATION_DATABASE_MAX_CONNECTIONS\")")
-        );
-        assert!(!module(&code, "serve").contains("serve_input_4"));
+        let run: String = module(&code, "run").split_whitespace().collect();
+        assert!(run.contains(
+            "crate::margaret::oidc_provider::IssuerMetadata::of_provider(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS,).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_0|"
+        ));
+        assert!(run.contains(
+            "margaret::framework::environment_variable::read_required::read_required::<::margaret::framework::database::database_url::DatabaseUrl,>(\"APPLICATION_DATABASE_URL\").map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_1|"
+        ));
+        assert!(run.contains(
+            "margaret::framework::environment_variable::read_required::read_required::<::margaret::framework::database::max_connections::MaxConnections,>(\"APPLICATION_DATABASE_MAX_CONNECTIONS\").map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_2|"
+        ));
+        assert!(construction.contains(
+            "letmargaret_oidc_provider_issuer_metadata=::std::sync::Arc::new(serve_input_0);"
+        ));
+        assert!(!run.contains("serve_input_8"));
         assert!(
             module(&code, "schema")
                 .split_whitespace()
                 .collect::<String>()
                 .contains("table_sets:&[::margaret::framework::signing_keys::margaret::tables::TABLES,::margaret::framework::authorization_grants::margaret::tables::TABLES,::margaret::framework::client_assertions::margaret::tables::TABLES,::margaret::framework::sessions::margaret::tables::TABLES,]")
         );
-        assert!(
-            module(&code, "serve")
-                .split_whitespace()
-                .collect::<String>()
-                .contains(
-                    "letorigin_public:::std::sync::Arc<str>=::std::sync::Arc::from(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.issuer_origin,);letroutes=matchsuper::routes::Routes::from_origins(&origin_public){Ok(routes)=>::std::sync::Arc::new(routes),Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
-                )
-        );
-        assert!(!module(&code, "run").contains("public-url"));
+        assert!(run.contains(
+            "{letorigin_public=::std::sync::Arc::<str,>::from(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.issuer_origin,);super::routes::Routes::from_origins(&origin_public).map(::std::sync::Arc::new).map_err(margaret::framework::console::report_failure::report_failure,)"
+        ));
+        assert!(!run.contains("public-url"));
     }
 
     #[test]
@@ -1957,7 +1963,7 @@ struct ApplicationDatabase;
         let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
-        let serve: String = module(&code, "serve").split_whitespace().collect();
+        let run: String = module(&code, "run").split_whitespace().collect();
         let server: String = module(&code, "http/server_public")
             .split_whitespace()
             .collect();
@@ -1966,11 +1972,11 @@ struct ApplicationDatabase;
             module(&code, "oidc_provider/authorization_handler"),
             "pub type AuthorizationHandler = margaret::framework::oidc_provider::authorization_handler::AuthorizationHandler<\n    crate::ConsentView,\n    crate::margaret::routes::Routes,\n>;\n"
         );
-        assert!(serve.contains(
-            "letserve_input_2=margaret::framework::http::literal_url::literal_url(&origin_public,\"/consent\",);letserve_input_3=::std::sync::Arc::clone(&routes);"
+        assert!(run.contains(
+            "margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/consent\",),).map_err(margaret::framework::console::report_failure::report_failure,).map(|serve_input_6|{letserve_input_7=::std::sync::Arc::clone(&routes);"
         ));
         assert!(construction.contains(
-            "crate::margaret::oidc_provider::authorization_handler::AuthorizationHandler::create(::std::sync::Arc::<crate::margaret::oidc_provider::AuthorizationEndpoint,>::clone(&margaret_oidc_provider_authorization_endpoint),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),::std::sync::Arc::<crate::ConsentView>::clone(&consent_view),serve_input_2,serve_input_3,)"
+            "crate::margaret::oidc_provider::authorization_handler::AuthorizationHandler::create(::std::sync::Arc::<crate::margaret::oidc_provider::AuthorizationEndpoint,>::clone(&margaret_oidc_provider_authorization_endpoint),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),::std::sync::Arc::<crate::ConsentView>::clone(&consent_view),serve_input_6,serve_input_7,)"
         ));
         assert!(construction.contains(
             "crate::margaret::oidc_provider::ConsentHandler::create(::std::sync::Arc::<crate::margaret::oidc_provider::ConsentEndpoint,>::clone(&margaret_oidc_provider_consent_endpoint),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),)"
@@ -2045,15 +2051,16 @@ struct ApplicationDatabase;
 
     #[test]
     fn describes_the_provider_by_the_aggregates_of_its_accepted_clients() {
-        let construction: String = module(
-            &generate(OIDC_PROVIDER_CRATE).expect("the build succeeds"),
-            "container/build/serve",
-        )
-        .split_whitespace()
-        .collect();
+        let code = generate(OIDC_PROVIDER_CRATE).expect("the build succeeds");
+        let construction: String = module(&code, "container/build/serve")
+            .split_whitespace()
+            .collect();
 
         assert!(construction.contains(
-            "crate::margaret::oidc_provider::ProviderMetadataHandler::create(crate::margaret::accepted_clients::provider_support::PROVIDER_SUPPORT,crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS,crate::margaret::token_issuance::TOKEN_ISSUANCE,)"
+            "letmargaret_oidc_provider_provider_metadata_handler=::std::sync::Arc::new(serve_input_5,);"
+        ));
+        assert!(module(&code, "run").split_whitespace().collect::<String>().contains(
+            "crate::margaret::oidc_provider::ProviderMetadataHandler::create(crate::margaret::accepted_clients::provider_support::PROVIDER_SUPPORT,crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS,crate::margaret::token_issuance::TOKEN_ISSUANCE,).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_5|"
         ));
         assert!(construction.contains(
             "crate::margaret::accepted_clients::accepted_resources::ACCEPTED_RESOURCES,)"
@@ -2264,22 +2271,22 @@ struct GetDiscovery;
         let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
-        let serve: String = module(&code, "serve").split_whitespace().collect();
+        let run: String = module(&code, "run").split_whitespace().collect();
         let server: String = module(&code, "http/server_public")
             .split_whitespace()
             .collect();
 
-        assert!(serve.contains(
-            "letserve_input_2=margaret::framework::http::literal_url::literal_url(&origin_public,\"/sign-in/callback\",);letserve_input_3=margaret::framework::http::literal_url::literal_url(&origin_public,\"/welcome\",);"
+        assert!(run.contains(
+            "margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/sign-in/callback\",),).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_3|{margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/welcome\",),).map_err(margaret::framework::console::report_failure::report_failure,).map(|serve_input_4|"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client,),::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_2,crate::margaret::oauth_clients::partner_client::sign_in_scopes::SIGN_IN_SCOPES,).map_err(margaret::framework::anyhow::Error::from)"
+            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client),::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_3,crate::margaret::oauth_clients::partner_client::sign_in_scopes::SIGN_IN_SCOPES,),);"
         ));
         assert!(construction.contains(
             "crate::margaret::oauth_clients::partner_client::SignInStartHandler::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::SignInFlow,>::clone(&margaret_oauth_clients_partner_client_sign_in_flow),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::sign_in_callback_handler::SignInCallbackHandler::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::SignInFlow,>::clone(&margaret_oauth_clients_partner_client_sign_in_flow),::std::sync::Arc::<crate::PartnerReaders>::clone(&partner_readers),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),serve_input_3,)"
+            "crate::margaret::oauth_clients::partner_client::sign_in_callback_handler::SignInCallbackHandler::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::SignInFlow,>::clone(&margaret_oauth_clients_partner_client_sign_in_flow),::std::sync::Arc::<crate::PartnerReaders>::clone(&partner_readers),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),serve_input_4,)"
         ));
         assert_eq!(
             module(
@@ -2371,7 +2378,7 @@ struct GetDiscovery;
             "pub use margaret::framework::client_credentials::client_credentials::ClientCredentials;"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::AuthorizationServerClient::with_client_secret_basic(::std::sync::Arc::<::margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::IssuerMetadata,>::clone(&margaret_trusted_issuers_partner_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::TrustedIssuer,>::clone(&margaret_trusted_issuers_partner_trusted_issuer),crate::margaret::oauth_clients::partner_client::client_id::CLIENT_ID,serve_input_0"
+            "crate::margaret::oauth_clients::partner_client::AuthorizationServerClient::with_client_secret_basic(::std::sync::Arc::<::margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::IssuerMetadata,>::clone(&margaret_trusted_issuers_partner_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::TrustedIssuer,>::clone(&margaret_trusted_issuers_partner_trusted_issuer),crate::margaret::oauth_clients::partner_client::client_id::CLIENT_ID,serve_input_1"
         ));
         assert!(construction.contains(
             "crate::margaret::oauth_clients::partner_client::ClientCredentials::create("
@@ -2417,11 +2424,17 @@ struct GetDiscovery;
             "pub const RESOURCE_GRANT: margaret::framework::client_credentials::resource_grant::ResourceGrant = margaret::framework::client_credentials::resource_grant::ResourceGrant {\n    audience: crate::margaret::resource_tokens::reports::audience::AUDIENCE,\n    scopes: &[\"reports:read\"],\n};\n"
         );
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::service_client::resources::reports::ResourceCredentials::create(::std::sync::Arc::<crate::margaret::oauth_clients::service_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_service_client_authorization_server_client,),crate::margaret::oauth_clients::service_client::resources::reports::resource_grant::RESOURCE_GRANT,)"
+            "crate::margaret::oauth_clients::service_client::resources::reports::ResourceCredentials::create(::std::sync::Arc::<crate::margaret::oauth_clients::service_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_service_client_authorization_server_client),serve_input_4,),);"
+        ));
+        assert!(module(&code, "run").split_whitespace().collect::<String>().contains(
+            "::margaret::framework::client_credentials::resource_grant::ResourceGrant::target(crate::margaret::oauth_clients::service_client::resources::reports::resource_grant::RESOURCE_GRANT,).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_4|"
         ));
         assert!(!module(&code, "oauth_clients/service_client").contains("ClientCredentials"));
         assert!(construction.contains(
-            "crate::margaret::oidc_provider::IssuerMetadata::of_provider(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS,)"
+            "letmargaret_oidc_provider_issuer_metadata=::std::sync::Arc::new(serve_input_0);"
+        ));
+        assert!(module(&code, "run").split_whitespace().collect::<String>().contains(
+            "crate::margaret::oidc_provider::IssuerMetadata::of_provider(crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS,).map_err(margaret::framework::console::report_failure::report_failure,)"
         ));
         assert_eq!(
             module(&code, "trusted_issuers/service_client/token_trust"),
@@ -2445,20 +2458,16 @@ struct GetDiscovery;
             .split_whitespace()
             .collect();
 
-        assert!(
-            module(&code, "serve")
-                .split_whitespace()
-                .collect::<String>()
-                .contains(
-                    "letserve_input_2=margaret::framework::http::literal_url::literal_url(&origin_public,\"/blog/callback\",);"
-                )
-        );
-        assert!(!module(&code, "serve").contains("serve_input_6"));
+        let run: String = module(&code, "run").split_whitespace().collect();
+        assert!(run.contains(
+            "margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/blog/callback\",),).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_05|"
+        ));
+        assert_eq!(run.matches("\"/blog/callback\"").count(), 1);
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::blog_app::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([serve_input_2"
+            "crate::margaret::accepted_clients::clients::blog_app::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(serve_input_05.clone())]),"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::blog::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::blog::AuthorizationServerClient,>::clone(&margaret_oauth_clients_blog_authorization_server_client),::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_2"
+            "crate::margaret::oauth_clients::blog::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::blog::AuthorizationServerClient,>::clone(&margaret_oauth_clients_blog_authorization_server_client),::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_05,"
         ));
         assert_eq!(
             module(&code, "oauth_clients/blog/sign_in_scopes"),
@@ -3382,6 +3391,26 @@ impl Metrics {
 ";
 
     #[test]
+    fn declares_no_forwarders_module_when_no_responder_injects_a_forwarder() {
+        let code = generate(MULTI_SERVER_CRATE).expect("the build succeeds");
+
+        assert!(!module(&code, "mod").contains("pub mod forwarders;"));
+        assert!(!has_module(&code, "forwarders"));
+    }
+
+    #[test]
+    fn declares_the_forwarder_of_the_server_whose_responder_injects_it() {
+        let code = generate(&format!(
+            "{MULTI_SERVER_CRATE}use crate::margaret::forwarders::public::Forwarder;\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/forward\", server = \"public\")]\nstruct GetForward;\n\nimpl GetForward {{\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {{}}\n}}\n"
+        ))
+        .expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod forwarders;"));
+        assert!(has_module(&code, "forwarders/public/forwarder"));
+        assert!(!has_module(&code, "forwarders/internal"));
+    }
+
+    #[test]
     fn generates_a_server_function_and_address_argument_per_active_server() {
         let code = generate(MULTI_SERVER_CRATE).expect("the build succeeds");
 
@@ -3392,14 +3421,22 @@ impl Metrics {
         assert!(!http.contains("async fn server_internal"));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains("super::http::server_public::server_public(container,"));
-        assert!(serve.contains("super::http::server_internal::server_internal(container,"));
-        assert!(serve.contains(r#"address_argument:"public-addr""#));
-        assert!(serve.contains(r#"address_argument:"internal-addr""#));
+        assert!(serve.contains(
+            "margaret::framework::service::server_service::ServerService::new(server_public_listener,super::http::server_public::server_public(container,"
+        ));
+        assert!(serve.contains(
+            "margaret::framework::service::server_service::ServerService::new(server_internal_listener,super::http::server_internal::server_internal(container,"
+        ));
 
-        let run = module(&code, "run");
+        let run: String = module(&code, "run").split_whitespace().collect();
         assert!(run.contains(r#"clap::Arg::new("public-addr")"#));
         assert!(run.contains(r#"clap::Arg::new("internal-addr")"#));
+        assert!(run.contains(
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"public-addr")"#
+        ));
+        assert!(run.contains(
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"internal-addr")"#
+        ));
     }
 
     #[test]
@@ -3761,14 +3798,14 @@ impl Page {
         let code = generate(CONSOLE_ARGUMENT_RESPONDER_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        assert!(serve.contains("letserve_input_0="));
-        assert!(serve.contains(
-            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0"
+        let run: String = module(&code, "run").split_whitespace().collect();
+
+        assert!(run.contains(
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"greeting").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
         ));
+        assert!(serve.contains("letcontainer=matchsuper::container::build::serve(arguments){"));
         assert!(serve.contains("server_public(container,routes"));
         assert!(!serve.contains("server_public(container,&serve_input_0"));
-
-        let run = module(&code, "run");
         assert!(run.contains(r#"clap::Arg::new("greeting")"#));
     }
 
@@ -3800,10 +3837,12 @@ impl Page {
         let code = generate(CONSOLE_ARGUMENT_VIEW_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        assert!(serve.contains("letserve_input_0="));
-        assert!(serve.contains(
-            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0"
+        let run: String = module(&code, "run").split_whitespace().collect();
+
+        assert!(run.contains(
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"title").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
         ));
+        assert!(serve.contains("letcontainer=matchsuper::container::build::serve(arguments){"));
         assert!(serve.contains("super::views::build::build(container)"));
     }
 
@@ -3843,10 +3882,12 @@ impl RespondsToWebSocketMessage for Chatter {
         let code = generate(CONSOLE_ARGUMENT_WEBSOCKET_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        assert!(serve.contains("letserve_input_0="));
-        assert!(serve.contains(
-            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0"
+        let run: String = module(&code, "run").split_whitespace().collect();
+
+        assert!(run.contains(
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"greeting").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
         ));
+        assert!(serve.contains("letcontainer=matchsuper::container::build::serve(arguments){"));
         assert!(serve.contains("server_public(container,routes"));
         assert!(!serve.contains("server_public(container,&serve_input_0"));
     }
@@ -3896,10 +3937,12 @@ impl RespondsToWebSocketMessage for Chatter {
         let code = generate(CONSOLE_ARGUMENT_SESSION_DEPENDENCY_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        assert!(serve.contains("letserve_input_0="));
-        assert!(serve.contains(
-            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0"
+        let run: String = module(&code, "run").split_whitespace().collect();
+
+        assert!(run.contains(
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"timezone").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
         ));
+        assert!(serve.contains("letcontainer=matchsuper::container::build::serve(arguments){"));
         assert!(serve.contains("server_public(container,routes"));
         assert!(!serve.contains("server_public(container,&serve_input_0"));
     }
@@ -4064,9 +4107,9 @@ impl GetWelcome {
 
         assert!(source.contains("crate::margaret::sessions::ConsumedSessions::create("));
         assert!(source.contains(
-            "letspiffe_issuer_request_client=matchmargaret::framework::issuer_request::issuer_request_client::IssuerRequestClient::preconfigured(spiffe_bundle.reqwest_client_builder(),){Ok(client)=>::std::sync::Arc::new(client),"
+            "margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient::preconfigured(spiffe_bundle.reqwest_client_builder(),).map(::std::sync::Arc::new).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|spiffe_issuer_request_client|"
         ));
-        assert!(source.contains("::std::sync::Arc::clone(&spiffe_issuer_request_client)"));
+        assert!(source.contains("::std::sync::Arc::clone(&spiffe_issuer_request_client,)"));
         assert!(!source.contains("spiffe_http_client"));
     }
 

@@ -9,6 +9,7 @@ use margaret_http::head_handler::HeadHandler;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_jwt_verification_tests::fixture_audience::FIXTURE_AUDIENCE;
 use margaret_peer_identity::peer_identity::PeerIdentity;
+use margaret_server_origin::route_url::RouteUrl;
 use margaret_sessions::issued_sessions::IssuedSessions;
 use margaret_sessions::session_sign_out_endpoint::SessionSignOutEndpoint;
 use margaret_sessions_tests::presenting_cookies::presenting_cookies;
@@ -24,7 +25,7 @@ async fn redirects_a_signed_out_visitor_to_the_landing_route() {
             session_store(),
             FIXTURE_AUDIENCE,
         )),
-        "https://blog.example/welcome".to_string(),
+        RouteUrl::parse("https://blog.example/welcome".to_string()).expect("the landing is a url"),
     )
     .handle(&presenting_cookies(
         Method::POST,

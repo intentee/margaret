@@ -224,6 +224,11 @@ pub enum RequestBindingError {
     MissingInferFromRequest { provider: String },
 
     #[error(
+        "#[infer_from_request] '{method}' of '{provider}' must return an AuthenticatedUserOutcome or an AuthenticatedUserPresence, bare or as the success of a result"
+    )]
+    UnsupportedInferenceReturnType { method: String, provider: String },
+
+    #[error(
         "#[infers_authenticated_user] '{provider}' has more than one #[infer_from_request] method: {methods}"
     )]
     AmbiguousInferFromRequest { provider: String, methods: String },

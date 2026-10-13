@@ -5,11 +5,11 @@ use margaret_cluster_tests::begun_sign_in::BegunSignIn;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::cluster_server::ClusterServer;
 use margaret_cluster_tests::completed_sign_in::completed_sign_in;
+use margaret_cluster_tests::profile_status::profile_status;
 use margaret_cluster_tests::response_cookies::response_cookies;
 use margaret_cluster_tests::started_alice_session::started_alice_session;
 
 use crate::cluster_binary::cluster_binary;
-use crate::profile_status::profile_status;
 
 #[tokio::test]
 async fn a_sign_in_begun_on_one_instance_completes_on_another() {

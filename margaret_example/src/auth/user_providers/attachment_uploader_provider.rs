@@ -1,4 +1,4 @@
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_presence::AuthenticatedUserPresence;
 use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 use margaret::framework::macros::infer_from_request;
@@ -13,21 +13,19 @@ use crate::auth::claims::attachment_claims::AttachmentClaims;
 pub struct AttachmentUploaderProvider;
 
 impl AttachmentUploaderProvider {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[infer_from_request]
     pub fn infer_attachment_uploader(
         &self,
         #[bearer_token(resource = attachments)] token: Option<
             VerifiedJwt<AttachmentClaims, AccessTokenProfile>,
         >,
-    ) -> anyhow::Result<AuthenticatedUserOutcome<AttachmentUploader>> {
-        Ok(match token {
-            Some(verified) => AuthenticatedUserOutcome::Authenticated(AttachmentUploader {
+    ) -> AuthenticatedUserPresence<AttachmentUploader> {
+        match token {
+            Some(verified) => AuthenticatedUserPresence::Authenticated(AttachmentUploader {
                 subject: verified.claims.sub,
             }),
-            None => AuthenticatedUserOutcome::Anonymous,
-        })
+            None => AuthenticatedUserPresence::Anonymous,
+        }
     }
 }

@@ -34,12 +34,14 @@ use crate::framework_construction::FrameworkConstruction;
 use crate::framework_dependency::FrameworkDependency;
 use crate::framework_enablement::FrameworkEnablement;
 use crate::framework_injection_role::FrameworkInjectionRole;
+use crate::framework_preparation::FrameworkPreparation;
 use crate::framework_provider::FrameworkProvider;
 use crate::parameter_target::ParameterTarget;
 use crate::path_text::path_text;
 use crate::provider::Provider;
 use crate::provider_requirement::ProviderRequirement;
 use crate::resolve_construction::resolve_construction;
+use crate::resolve_preparation::resolve_preparation;
 use crate::singleton_declaration::SingletonDeclaration;
 use crate::topological_order::topological_order;
 use crate::type_text::type_text;
@@ -152,7 +154,7 @@ fn build_provider_draft<'index>(
     }
 
     let field_name = identifier.field().to_string();
-    let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
+    let construction = resolve_construction(index, item, shape)?;
     let parameters = read_draft_parameters(index, item, &construction);
 
     Ok(Draft {
@@ -202,7 +204,7 @@ fn build_construction_draft<'index>(
     };
 
     let concrete_path = item.canonical_path().clone();
-    let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
+    let construction = resolve_construction(index, item, shape)?;
     let parameters = read_draft_parameters(index, item, &construction);
 
     Ok(Draft {
@@ -219,7 +221,11 @@ fn read_draft_parameters<'index>(
     item: &IndexedItem,
     construction: &ConstructionSource<'index>,
 ) -> Vec<DraftParameter<'index>> {
-    let ConstructionSource::Constructor(constructor) = construction else {
+    let ConstructionSource::Constructor {
+        method: constructor,
+        ..
+    } = construction
+    else {
         return Vec::new();
     };
 
@@ -408,6 +414,19 @@ fn framework_dependency_kind(
         | FrameworkDependency::SingletonView(provider_key) => Ok(DependencyKind::Single {
             provider_key: provider_key.clone(),
         }),
+        FrameworkDependency::Prepared(FrameworkPreparation {
+            function,
+            prepared,
+            sources,
+        }) => Ok(DependencyKind::ServeInput {
+            input: Box::new(ServeInput::Prepared(resolve_preparation(
+                function.clone(),
+                prepared.clone(),
+                sources,
+                token_issuance,
+                provided,
+            )?)),
+        }),
         FrameworkDependency::Providers(provider_keys) => Ok(DependencyKind::Collection {
             provider_keys: provider_keys.clone(),
         }),
@@ -488,6 +507,19 @@ fn resolve_framework_construction(
             method: method.clone(),
             outcome: *outcome,
         },
+        FrameworkConstruction::Prepared { method, sources } => {
+            DirectConstruction::FrameworkPrepared {
+                dependency: DependencyKind::ServeInput {
+                    input: Box::new(ServeInput::Prepared(resolve_preparation(
+                        provided.child(method),
+                        provided.clone(),
+                        sources,
+                        token_issuance,
+                        provided,
+                    )?)),
+                },
+            }
+        }
         FrameworkConstruction::Unit => DirectConstruction::FrameworkUnit,
     })
 }
@@ -503,6 +535,7 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
                 FrameworkDependency::Constant(_)
                 | FrameworkDependency::Database { .. }
                 | FrameworkDependency::EnvironmentVariable { .. }
+                | FrameworkDependency::Prepared(_)
                 | FrameworkDependency::RouteUrl(_)
                 | FrameworkDependency::SingletonView(_)
                 | FrameworkDependency::Routes
@@ -512,7 +545,7 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
                 | FrameworkDependency::Urls(_) => &[],
             })
             .collect(),
-        FrameworkConstruction::Unit => Vec::new(),
+        FrameworkConstruction::Prepared { .. } | FrameworkConstruction::Unit => Vec::new(),
     }
 }
 
@@ -645,7 +678,10 @@ impl DependencyResolver<'_> {
         concrete_path: &CanonicalPath,
     ) -> Result<DirectConstruction, ContainerError> {
         match source {
-            ConstructionSource::Constructor(constructor) => {
+            ConstructionSource::Constructor {
+                method: constructor,
+                outcome,
+            } => {
                 let dependencies =
                     self.resolve_dependencies(concrete_path, constructor, parameters)?;
 
@@ -653,6 +689,7 @@ impl DependencyResolver<'_> {
                     dependencies,
                     is_async: constructor.signature().asyncness.is_some(),
                     method: constructor.identifier().to_string(),
+                    outcome: *outcome,
                 })
             }
             ConstructionSource::Fieldless(shape) => {

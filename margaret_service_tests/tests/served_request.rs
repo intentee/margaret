@@ -48,6 +48,7 @@ async fn exchange(request: &[u8], close_write: bool) -> String {
                 Arc::new(Accepts),
             )]),
         ])
+        .build()
         .expect("the route entries register cleanly")
         .router;
     let bound = BoundServer::bind(

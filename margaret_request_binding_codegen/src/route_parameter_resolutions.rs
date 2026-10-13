@@ -4,7 +4,10 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
+use margaret_attributes::indexed_trait_impl::IndexedTraitImpl;
+use margaret_attributes::standard_library_item::StandardLibraryItem;
 use margaret_container::is_singleton::is_singleton;
+use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
 
 use crate::request_binding_error::RequestBindingError;
 use crate::route_database::RouteDatabase;
@@ -12,6 +15,7 @@ use crate::route_model::RouteModel;
 use crate::route_model_key::RouteModelKey;
 use crate::route_model_resolution::RouteModelResolution;
 use crate::route_parameter_binder::RouteParameterBinder;
+use crate::route_parameter_conversion::RouteParameterConversion;
 use crate::route_parameter_resolution::RouteParameterResolution;
 
 fn associated_model(index: &AttributeIndex, item: &IndexedItem) -> Option<CanonicalPath> {
@@ -26,12 +30,32 @@ fn associated_model(index: &AttributeIndex, item: &IndexedItem) -> Option<Canoni
     })
 }
 
-fn string_path() -> CanonicalPath {
-    CanonicalPath::new(vec![
-        "std".to_string(),
-        "string".to_string(),
-        "String".to_string(),
-    ])
+fn converts_from_string(index: &AttributeIndex, trait_impl: &IndexedTraitImpl) -> bool {
+    let module = trait_impl.module_path();
+    let trait_path = trait_impl.trait_path();
+    let converted_from = trait_path
+        .segments
+        .last()
+        .and_then(single_generic_argument)
+        .and_then(|argument| index.resolve_module_type(module, argument));
+
+    index
+        .resolve_module_path(module, trait_path)
+        .and_then(|resolved| StandardLibraryItem::from_canonical(&resolved))
+        == Some(StandardLibraryItem::From)
+        && converted_from == Some(StandardLibraryItem::String.std_path())
+}
+
+fn value_conversion(index: &AttributeIndex, item: &IndexedItem) -> RouteParameterConversion {
+    if item
+        .trait_impls()
+        .iter()
+        .any(|trait_impl| converts_from_string(index, trait_impl))
+    {
+        RouteParameterConversion::Infallible
+    } else {
+        RouteParameterConversion::Fallible
+    }
 }
 
 fn insert_binder(
@@ -73,7 +97,7 @@ fn insert_binder(
                 binder: provider.to_string(),
             });
         }
-        Some(RouteParameterResolution::Value) => {
+        Some(RouteParameterResolution::Value(_)) => {
             return Err(RequestBindingError::ConflictingRouteParameterResolution {
                 value_type: model.to_string(),
                 binder: provider.to_string(),
@@ -91,6 +115,7 @@ fn insert_binder(
 }
 
 fn insert_value(
+    index: &AttributeIndex,
     item: &IndexedItem,
     resolutions: &mut HashMap<CanonicalPath, RouteParameterResolution>,
 ) -> Result<(), RequestBindingError> {
@@ -114,10 +139,13 @@ fn insert_value(
                 model: value_type.to_string(),
             });
         }
-        Some(RouteParameterResolution::Value) | None => {}
+        Some(RouteParameterResolution::Value(_)) | None => {}
     }
 
-    resolutions.insert(value_type, RouteParameterResolution::Value);
+    resolutions.insert(
+        value_type,
+        RouteParameterResolution::Value(value_conversion(index, item)),
+    );
 
     Ok(())
 }
@@ -145,7 +173,10 @@ pub fn route_parameter_resolutions(
     route_models: &[RouteModel],
     database: &RouteDatabase,
 ) -> Result<HashMap<CanonicalPath, RouteParameterResolution>, RequestBindingError> {
-    let mut resolutions = HashMap::from([(string_path(), RouteParameterResolution::Value)]);
+    let mut resolutions = HashMap::from([(
+        StandardLibraryItem::String.std_path(),
+        RouteParameterResolution::Value(RouteParameterConversion::Identity),
+    )]);
 
     for RouteModel {
         loaded,
@@ -164,7 +195,7 @@ pub fn route_parameter_resolutions(
         }
 
         if item.has_framework_attribute(FrameworkAttribute::RouteParameterValue) {
-            insert_value(item, &mut resolutions)?;
+            insert_value(index, item, &mut resolutions)?;
         }
     }
 
@@ -185,6 +216,7 @@ mod tests {
     use crate::route_model_key::RouteModelKey;
     use crate::route_model_resolution::RouteModelResolution;
     use crate::route_parameter_binder::RouteParameterBinder;
+    use crate::route_parameter_conversion::RouteParameterConversion;
     use crate::route_parameter_resolution::RouteParameterResolution;
 
     const BINDER: &str = "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n";
@@ -196,7 +228,7 @@ mod tests {
         Database(String),
         DatabaseUndeclared,
         Nothing,
-        Value,
+        Value(RouteParameterConversion),
     }
 
     fn article() -> CanonicalPath {
@@ -249,7 +281,7 @@ mod tests {
             Some(RouteParameterResolution::Model(RouteModelResolution::DatabaseUndeclared)) => {
                 ResolvedBy::DatabaseUndeclared
             }
-            Some(RouteParameterResolution::Value) => ResolvedBy::Value,
+            Some(RouteParameterResolution::Value(conversion)) => ResolvedBy::Value(conversion),
             None => ResolvedBy::Nothing,
         }
     }
@@ -283,7 +315,7 @@ mod tests {
     fn resolves_a_string_route_parameter_as_a_value_without_any_declaration() {
         assert_eq!(
             resolved_by("struct Nothing;\n", &["std", "string", "String"]),
-            ResolvedBy::Value
+            ResolvedBy::Value(RouteParameterConversion::Identity)
         );
     }
 
@@ -302,7 +334,7 @@ mod tests {
                 "use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\nstruct ArticleSlug(String);\n",
                 &["crate", "ArticleSlug"]
             ),
-            ResolvedBy::Value
+            ResolvedBy::Value(RouteParameterConversion::Fallible)
         );
     }
 
@@ -313,7 +345,51 @@ mod tests {
                 "use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\nenum ArticleStatus {\n    Draft,\n    Published,\n}\n",
                 &["crate", "ArticleStatus"]
             ),
-            ResolvedBy::Value
+            ResolvedBy::Value(RouteParameterConversion::Fallible)
+        );
+    }
+
+    #[test]
+    fn converts_a_value_from_a_string_infallibly_when_it_implements_from_string() {
+        assert_eq!(
+            resolved_by(
+                "use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\nstruct ArticleSlug(String);\n\nimpl From<String> for ArticleSlug {\n    fn from(value: String) -> Self {}\n}\n",
+                &["crate", "ArticleSlug"],
+            ),
+            ResolvedBy::Value(RouteParameterConversion::Infallible)
+        );
+    }
+
+    #[test]
+    fn converts_a_value_from_a_string_infallibly_through_a_qualified_from_string() {
+        assert_eq!(
+            resolved_by(
+                "use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\nstruct ArticleSlug(String);\n\nimpl std::convert::From<std::string::String> for ArticleSlug {\n    fn from(value: String) -> Self {}\n}\n",
+                &["crate", "ArticleSlug"],
+            ),
+            ResolvedBy::Value(RouteParameterConversion::Infallible)
+        );
+    }
+
+    #[test]
+    fn converts_a_value_fallibly_when_it_only_implements_try_from_string() {
+        assert_eq!(
+            resolved_by(
+                "use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\nstruct PublishedYear(u16);\n\nimpl TryFrom<String> for PublishedYear {\n    type Error = std::num::ParseIntError;\n    fn try_from(value: String) -> Result<Self, Self::Error> {}\n}\n",
+                &["crate", "PublishedYear"],
+            ),
+            ResolvedBy::Value(RouteParameterConversion::Fallible)
+        );
+    }
+
+    #[test]
+    fn converts_a_value_fallibly_when_its_from_takes_another_type_than_a_string() {
+        assert_eq!(
+            resolved_by(
+                "use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\nstruct PublishedYear(u16);\n\nimpl From<u16> for PublishedYear {\n    fn from(value: u16) -> Self {}\n}\n\nimpl TryFrom<String> for PublishedYear {\n    type Error = std::num::ParseIntError;\n    fn try_from(value: String) -> Result<Self, Self::Error> {}\n}\n",
+                &["crate", "PublishedYear"],
+            ),
+            ResolvedBy::Value(RouteParameterConversion::Fallible)
         );
     }
 

@@ -17,6 +17,7 @@ use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::head_extraction_context::HeadExtractionContext;
 use margaret_request_binding_codegen::render_authenticated_user_wrapper_construction::render_authenticated_user_wrapper_construction;
 use margaret_request_binding_codegen::render_head_extractions::render_head_extractions;
+use margaret_request_binding_codegen::render_route_inputs::render_route_inputs;
 use margaret_request_binding_codegen::render_session_user_inference::render_session_user_inference;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 use margaret_request_binding_codegen::session_user_parameter::session_user_parameter;
@@ -176,11 +177,11 @@ fn create_body(
             )
     };
 
-    match session_user_parameter(&session.parameters) {
+    let resolved = match session_user_parameter(&session.parameters) {
         Some(session_user) => {
             let cookie_changes = format_ident!("changed_cookies");
             let inference = render_session_user_inference(
-                session_user,
+                &session_user,
                 captured,
                 &cookie_changes,
                 &extraction_context,
@@ -195,7 +196,14 @@ fn create_body(
             }
         }
         None => creation,
-    }
+    };
+
+    render_route_inputs(
+        &session.parameters,
+        handshake,
+        &quote! { margaret::framework::websocket_session::interrupted_creation::interrupted_creation },
+        &resolved,
+    )
 }
 
 fn build_arguments(session: &WebSocketSession) -> TokenStream {

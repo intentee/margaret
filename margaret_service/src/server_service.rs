@@ -8,19 +8,20 @@ use trzcina::Service;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::server::Server;
+use margaret_http::server_route_entries::ServerRouteEntries;
+use margaret_http::server_routes::ServerRoutes;
+
+use crate::server_listener::ServerListener;
 
 pub struct ServerService {
-    forward_targets: Arc<ForwardTargets>,
-    server: Arc<Server>,
+    listener: ServerListener,
+    routes: ServerRouteEntries,
 }
 
 impl ServerService {
     #[must_use]
-    pub fn new(server: Arc<Server>, forward_targets: Arc<ForwardTargets>) -> Self {
-        Self {
-            forward_targets,
-            server,
-        }
+    pub fn new(listener: ServerListener, routes: ServerRouteEntries) -> Self {
+        Self { listener, routes }
     }
 }
 
@@ -28,10 +29,23 @@ impl ServerService {
 impl Service for ServerService {
     async fn run(self: Box<Self>, cancellation_token: CancellationToken) -> Result<()> {
         let Self {
-            forward_targets,
-            server,
+            listener:
+                ServerListener {
+                    address,
+                    transport,
+                    uploads,
+                },
+            routes,
         } = *self;
-        let bound = BoundServer::bind(server, forward_targets).await?;
+        let ServerRoutes {
+            named_handlers,
+            router,
+        } = routes.build()?;
+        let bound = BoundServer::bind(
+            Arc::new(Server::new(address, transport, uploads, router)),
+            Arc::new(ForwardTargets::new(named_handlers)),
+        )
+        .await?;
 
         bound.serve(cancellation_token).await;
 

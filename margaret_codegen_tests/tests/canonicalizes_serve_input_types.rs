@@ -9,6 +9,8 @@ fn canonicalizes_imported_serve_input_types_across_generated_modules() {
 
     assert!(source.contains("clap::value_parser!(::std::string::String)"));
     assert!(source.contains("clap::value_parser!(::std::path::PathBuf)"));
-    assert!(source.contains(r#"matches.get_one::<::std::path::PathBuf>("root")"#));
+    assert!(source.contains(
+        r#"margaret::framework::console::required_argument::required_argument::<::std::path::PathBuf,>(matches,"root")"#
+    ));
     assert!(source.contains("::std::option::Option<::std::string::String>"));
 }

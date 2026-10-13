@@ -4,9 +4,9 @@ use margaret_cluster_fixture::models::token_acquisition::TokenAcquisition;
 use margaret_cluster_fixture::models::token_acquisition_outcome::TokenAcquisitionOutcome;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::instance_admission::InstanceAdmission;
+use margaret_local_server_tests::poll_until::poll_until;
 
 use crate::cluster_binary::cluster_binary;
-use crate::poll_until::poll_until;
 
 async fn attempts(cluster: &Cluster) -> usize {
     let Page { records, .. } = TokenAcquisition::query()

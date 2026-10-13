@@ -23,7 +23,8 @@ fn rejects_a_route_path_that_answers_one_method_twice() {
             .routes([RouteEntry::new(vec![
                 MethodHandler::head(RouteMethod::Get, not_found()),
                 MethodHandler::head(RouteMethod::Get, not_found()),
-            ])]),
+            ])])
+            .build(),
         Err(RouterError::DuplicateMethod {
             method: RouteMethod::Get,
             path: "/items",

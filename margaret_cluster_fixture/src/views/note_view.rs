@@ -16,12 +16,10 @@ pub struct NoteViewProps<'note> {
 pub struct NoteView;
 
 impl NoteView {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create() -> anyhow::Result<Self> {
-        Ok(Self)
+    pub fn create() -> Self {
+        Self
     }
 }
 

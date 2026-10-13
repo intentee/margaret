@@ -26,7 +26,7 @@ fn refuses_a_token_of_an_untrusted_issuer() {
 
     assert!(matches!(
         route_bearer_token(&authorization, &[&trusted_issuer]),
-        Ok(BearerTokenRouting::Refused(ResponseContinuation::Done(response)))
+        BearerTokenRouting::Refused(ResponseContinuation::Done(response))
             if response.status() == 401
     ));
 }

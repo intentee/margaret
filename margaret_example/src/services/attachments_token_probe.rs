@@ -15,12 +15,10 @@ pub struct AttachmentsTokenProbe {
 }
 
 impl AttachmentsTokenProbe {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(credentials: Arc<ResourceCredentials>) -> anyhow::Result<Self> {
-        Ok(Self { credentials })
+    pub fn create(credentials: Arc<ResourceCredentials>) -> Self {
+        Self { credentials }
     }
 
     /// # Errors

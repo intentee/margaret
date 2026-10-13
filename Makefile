@@ -21,6 +21,7 @@ COVERAGE_REPORTED_PACKAGES := \
 	-p margaret_client_assertions_tests \
 	-p margaret_client_credentials \
 	-p margaret_client_credentials_tests \
+	-p margaret_cluster_fixture \
 	-p margaret_cluster_tests \
 	-p margaret_codegen \
 	-p margaret_codegen_tests \
@@ -31,6 +32,10 @@ COVERAGE_REPORTED_PACKAGES := \
 	-p margaret_construction \
 	-p margaret_container \
 	-p margaret_container_tests \
+	-p margaret_coverage_fixture \
+	-p margaret_coverage_fixture_tests \
+	-p margaret_coverage_spiffe_fixture \
+	-p margaret_coverage_spiffe_fixture_tests \
 	-p margaret_database \
 	-p margaret_database_codegen \
 	-p margaret_database_tests \
@@ -70,6 +75,7 @@ COVERAGE_REPORTED_PACKAGES := \
 	-p margaret_jws_verification_tests \
 	-p margaret_jwt_verification \
 	-p margaret_jwt_verification_tests \
+	-p margaret_local_server_tests \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
@@ -166,6 +172,8 @@ GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_websocket_fixture \
 	-p margaret_codegen_websocket_peer_identity_fixture \
 	-p margaret_composite_foreign_key_model_fixture \
+	-p margaret_coverage_fixture \
+	-p margaret_coverage_spiffe_fixture \
 	-p margaret_example \
 	-p margaret_raw_identifier_model_fixture \
 	-p margaret_schema_postgres_fixture \
@@ -340,6 +348,7 @@ EXAMPLE_SEED_DATABASE_MAX_CONNECTIONS := 1
 EXAMPLE_DATABASE_URL = postgresql://margaret_example:margaret_example@$$($(EXAMPLE_COMPOSE) port postgres 5432)/margaret_example
 
 SPIRE_FEATURES := \
+	--features margaret_coverage_spiffe_fixture_tests/tests_that_use_spire \
 	--features margaret_spiffe_svid_tests/tests_that_use_spire \
 	--features margaret_spiffe_svid_integration_tests/tests_that_use_spire
 
@@ -404,6 +413,7 @@ coverage: node_modules openid-conformance-images
 		--gated margaret_client_assertions_tests=100 \
 		--gated margaret_client_credentials=100 \
 		--gated margaret_client_credentials_tests=100 \
+		--gated margaret_cluster_fixture=100 \
 		--gated margaret_cluster_tests=100 \
 		--gated margaret_codegen=100 \
 		--gated margaret_codegen_tests=100 \
@@ -414,6 +424,10 @@ coverage: node_modules openid-conformance-images
 		--gated margaret_construction=100 \
 		--gated margaret_container=100 \
 		--gated margaret_container_tests=100 \
+		--gated margaret_coverage_fixture=100 \
+		--gated margaret_coverage_fixture_tests=100 \
+		--gated margaret_coverage_spiffe_fixture=100 \
+		--gated margaret_coverage_spiffe_fixture_tests=100 \
 		--gated margaret_database=100 \
 		--gated margaret_database_codegen=100 \
 		--gated margaret_database_tests=100 \
@@ -453,6 +467,7 @@ coverage: node_modules openid-conformance-images
 		--gated margaret_jws_verification_tests=100 \
 		--gated margaret_jwt_verification=100 \
 		--gated margaret_jwt_verification_tests=100 \
+		--gated margaret_local_server_tests=100 \
 		--gated margaret_macros=100 \
 		--gated margaret_middleware_codegen=100 \
 		--gated margaret_model=100 \

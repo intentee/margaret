@@ -2,9 +2,9 @@ use futures_util::future::join_all;
 
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::instance_key_set::instance_key_set;
+use margaret_cluster_tests::signing_key_generations::signing_key_generations;
 
 use crate::cluster_binary::cluster_binary;
-use crate::signing_key_generations::signing_key_generations;
 
 #[tokio::test]
 async fn instances_started_together_on_an_empty_database_create_one_key_set() {

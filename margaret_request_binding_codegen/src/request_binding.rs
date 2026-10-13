@@ -7,6 +7,7 @@ use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
 use crate::extraction_phase::ExtractionPhase;
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::head_input_source::HeadInputSource;
+use crate::route_parameter_conversion::RouteParameterConversion;
 use crate::route_parameter_lookup::RouteParameterLookup;
 
 pub enum RequestBinding {
@@ -49,6 +50,7 @@ pub enum RequestBinding {
     PeerSpiffeId,
     RequestBodyStream,
     RouteParameterValue {
+        conversion: RouteParameterConversion,
         path_key: String,
     },
     Routes,
@@ -61,6 +63,35 @@ pub enum RequestBinding {
 }
 
 impl RequestBinding {
+    #[must_use]
+    pub fn interrupts_inference(&self) -> bool {
+        match self {
+            Self::BearerToken { .. }
+            | Self::BoundRouteParameter { .. }
+            | Self::FormRequest { .. }
+            | Self::IntrospectedBearerToken { .. }
+            | Self::RouteParameterValue {
+                conversion: RouteParameterConversion::Fallible,
+                ..
+            } => true,
+            Self::AssetBag
+            | Self::AuthenticatedUser { .. }
+            | Self::CurrentRequest
+            | Self::FormContent { .. }
+            | Self::Forwarder
+            | Self::Injectable { .. }
+            | Self::JsonContent { .. }
+            | Self::Next
+            | Self::PeerSpiffeId
+            | Self::RequestBodyStream
+            | Self::RouteParameterValue { .. }
+            | Self::Routes
+            | Self::Session { .. }
+            | Self::UploadedFiles
+            | Self::Views => false,
+        }
+    }
+
     pub(crate) fn extraction_phase(&self) -> ExtractionPhase {
         match self {
             Self::AuthenticatedUser { .. } | Self::PeerSpiffeId => ExtractionPhase::CallerIdentity,
@@ -82,5 +113,22 @@ impl RequestBinding {
             | Self::UploadedFiles
             | Self::Views => ExtractionPhase::RequestInput,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RequestBinding;
+    use crate::route_parameter_conversion::RouteParameterConversion;
+
+    #[test]
+    fn keeps_an_inference_reading_an_infallibly_converted_route_parameter_uninterrupted() {
+        assert!(
+            !RequestBinding::RouteParameterValue {
+                conversion: RouteParameterConversion::Infallible,
+                path_key: "slug".to_string(),
+            }
+            .interrupts_inference()
+        );
     }
 }

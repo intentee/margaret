@@ -21,12 +21,10 @@ pub struct GetGreeting {
 }
 
 impl GetGreeting {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(greeter: Arc<EnglishGreeter>) -> anyhow::Result<Self> {
-        Ok(Self { greeter })
+    pub fn create(greeter: Arc<EnglishGreeter>) -> Self {
+        Self { greeter }
     }
 
     /// # Errors

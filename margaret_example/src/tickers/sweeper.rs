@@ -17,18 +17,16 @@ pub struct Sweeper {
 }
 
 impl Sweeper {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
     pub fn create(
         deployment_environment: Arc<DeploymentEnvironment>,
         metrics: Arc<Metrics>,
-    ) -> anyhow::Result<Self> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             deployment_environment,
             metrics,
-        })
+        }
     }
 
     /// # Errors

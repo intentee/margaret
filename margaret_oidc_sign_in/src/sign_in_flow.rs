@@ -9,6 +9,7 @@ use oauth2::CsrfToken;
 use oauth2::RedirectUrl;
 use oauth2::TokenResponse;
 use serde::de::DeserializeOwned;
+use url::Url;
 
 use margaret_authorization_server_client::authorization_request::AuthorizationRequest;
 use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
@@ -37,6 +38,7 @@ use margaret_oauth_vocabulary::declared_scope::DeclaredScope;
 use margaret_oauth_vocabulary::openid_scope::OpenidScope;
 use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::numeric_date::NumericDate;
+use margaret_server_origin::route_url::RouteUrl;
 use margaret_token_digest::equal_in_constant_time::equal_in_constant_time;
 use margaret_token_digest::random_token::random_token;
 use margaret_token_issuance::token_issuance::TokenIssuance;
@@ -46,7 +48,6 @@ use crate::id_token_claims::IdTokenClaims;
 use crate::id_token_fields::IdTokenFields;
 use crate::sign_in_beginning::SignInBeginning;
 use crate::sign_in_completion::SignInCompletion;
-use crate::sign_in_flow_error::SignInFlowError;
 use crate::sign_in_refusal::SignInRefusal;
 use crate::signed_in::SignedIn;
 use crate::transaction_cookie::TransactionCookie;
@@ -75,27 +76,23 @@ pub struct SignInFlow {
 }
 
 impl SignInFlow {
-    /// # Errors
-    ///
-    /// Returns `SignInFlowError::MalformedCallback` when the callback is not a url.
+    #[must_use]
     pub fn create(
         server: Arc<AuthorizationServerClient>,
         secrets: Arc<JwksSecretHolder>,
-        callback: String,
+        callback: RouteUrl,
         scopes: &[&str],
-    ) -> Result<Self, SignInFlowError> {
-        RedirectUrl::new(callback.clone())
-            .map(|callback| Self {
-                callback,
-                requested_scopes: requested_scopes(scopes),
-                secrets,
-                transaction_cookie: TransactionCookie::of(
-                    server.trusted_issuer.trust.issuer,
-                    server.client_id,
-                ),
-                server,
-            })
-            .map_err(|source| SignInFlowError::MalformedCallback { callback, source })
+    ) -> Self {
+        Self {
+            callback: RedirectUrl::from_url(Url::from(callback)),
+            requested_scopes: requested_scopes(scopes),
+            secrets,
+            transaction_cookie: TransactionCookie::of(
+                server.trusted_issuer.trust.issuer,
+                server.client_id,
+            ),
+            server,
+        }
     }
 
     pub async fn begin(&self) -> SignInBeginning {

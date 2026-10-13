@@ -11,12 +11,10 @@ pub struct EnglishGreeter {
 }
 
 impl EnglishGreeter {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(app_name: Arc<AppName>) -> anyhow::Result<Self> {
-        Ok(Self { app_name })
+    pub fn create(app_name: Arc<AppName>) -> Self {
+        Self { app_name }
     }
 
     #[must_use]

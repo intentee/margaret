@@ -18,6 +18,7 @@ pub mod captured_providers;
 pub mod classify_parameters;
 pub mod content_binding;
 pub mod content_extraction_context;
+pub mod declared_inference;
 mod exclusive_bindings;
 pub mod extraction_context;
 mod extraction_phase;
@@ -26,6 +27,9 @@ pub mod form_request_extraction;
 pub mod head_extraction_context;
 pub mod head_input_source;
 mod inference_channel;
+pub mod inference_fallibility;
+pub mod inference_kind;
+pub mod inference_shape;
 mod infers_authenticated_user_arguments;
 pub mod injects_peer_spiffe_id;
 pub mod injects_routes;
@@ -39,6 +43,7 @@ pub mod render_content_extraction;
 pub mod render_head_extractions;
 mod render_model_extraction;
 pub mod render_request_extraction;
+pub mod render_route_inputs;
 pub mod render_session_user_inference;
 pub mod request_binding;
 pub mod request_binding_error;
@@ -52,10 +57,12 @@ pub mod route_model_key;
 pub mod route_model_resolution;
 mod route_parameter_arguments;
 pub mod route_parameter_binder;
+pub mod route_parameter_conversion;
 pub mod route_parameter_lookup;
 pub mod route_parameter_resolution;
 pub mod route_parameter_resolutions;
 mod session_marker;
+pub mod session_user;
 pub mod session_user_parameter;
 pub mod views_availability;
 
@@ -808,7 +815,7 @@ impl SessionUserProvider {
             .serve_inputs(&roots)
             .expect("the provider dependency has planned console arguments")
             .iter()
-            .map(|argument| argument.input.name().to_string())
+            .map(|argument| argument.input.name())
             .collect();
 
         assert_eq!(names, vec!["realm".to_string()]);
@@ -828,7 +835,9 @@ impl SessionUserProvider {
         assert!(source.contains(
             "pubstructSessionUserProvider{pubinner:std::sync::Arc<crate::SessionUserProvider>,}"
         ));
-        assert!(source.contains("typeUser=crate::User;"));
+        assert!(source.contains(
+            "typeInference=margaret::framework::anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<crate::User>>;"
+        ));
         assert!(source.contains("letargument_1=request;"));
         assert!(source.contains("self.inner.infer(argument_1)"));
     }
@@ -974,7 +983,7 @@ struct SecondClient;
             "pubmargaret_oauth_clients_partner_client_authorization_server_client:std::sync::Arc<margaret::framework::authorization_server_client::authorization_server_client::AuthorizationServerClient>,"
         ));
         assert!(source.contains(
-            "letargument_1=matchmargaret::framework::token_introspection::introspect_bearer_token::introspect_bearer_token::<crate::Claims>(request.inputs.server.authorization(),self.margaret_oauth_clients_partner_client_authorization_server_client.as_ref(),).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),};"
+            "letargument_1=matchmargaret::framework::token_introspection::introspect_bearer_token::introspect_bearer_token::<crate::Claims>(request.inputs.server.authorization(),self.margaret_oauth_clients_partner_client_authorization_server_client.as_ref(),).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,)),};"
         ));
         assert!(!source.contains("route_bearer_token"));
     }
@@ -1084,10 +1093,10 @@ struct SecondClient;
             "pubmargaret_trusted_issuers_partner_trusted_issuer:std::sync::Arc<margaret::framework::trusted_issuer::trusted_issuer::TrustedIssuer>,"
         ));
         assert!(source.contains(
-            "letbearer_token=matchmargaret::framework::bearer_token_verification::route_bearer_token::route_bearer_token(request.inputs.server.authorization(),&[self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()],).map_err(margaret::framework::anyhow::Error::from){::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Refused(response))=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Routed(routed))=>routed,::std::result::Result::Err(error)=>return::std::result::Result::Err(error),};"
+            "letbearer_token=matchmargaret::framework::bearer_token_verification::route_bearer_token::route_bearer_token(request.inputs.server.authorization(),&[self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()],){margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Refused(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,)),margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Routed(routed)=>routed,};"
         ));
         assert!(source.contains(
-            "letargument_2=matchbearer_token.admit::<crate::Claims,::margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile>(self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),};"
+            "letargument_2=matchbearer_token.admit::<crate::Claims,::margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile>(self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,)),};"
         ));
         assert!(source.contains("self.inner.infer(argument_1,argument_2)"));
     }
@@ -1337,7 +1346,7 @@ struct SecondClient;
         .collect();
 
         assert!(extraction.contains(
-            "margaret::framework::identity::require_bearer_authenticated_user::require_bearer_authenticated_user(outcome)"
+            "margaret::framework::identity::require_bearer_authenticated_user::require_bearer_authenticated_user(matchmargaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(runner_provider.as_ref(),request,).await{::std::result::Result::Ok(inferred)=>inferred,::std::result::Result::Err(error)=>returnerror,})"
         ));
     }
 
@@ -1406,7 +1415,9 @@ struct SecondClient;
         assert_eq!(
             responder_rejection(&format!(
                 "use margaret::framework::macros::process;\n{}\nstruct Runner;\n\nstruct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct AdminProvider;\n\nimpl AdminProvider {{\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {{}}\n}}\n\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: Runner, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {{}}\n}}\n",
-                bearer_provider_declaration(PARTNER_TOKEN).replace("User", "Runner")
+                bearer_provider_declaration(PARTNER_TOKEN)
+                    .replace("user_model = User", "user_model = Runner")
+                    .replace("Outcome<User>", "Outcome<Runner>")
             )),
             "responder 'Page' infers more than one authenticated user from the bearer token; a request presents one bearer credential, so exactly one #[infers_authenticated_user] provider verifies it"
         );
@@ -1452,7 +1463,7 @@ struct SecondClient;
             .serve_inputs(&roots)
             .expect("the trusted issuer has planned console arguments")
             .iter()
-            .map(|argument| argument.input.name().to_string())
+            .map(|argument| argument.input.name())
             .collect();
 
         assert_eq!(names, vec!["audience".to_string()]);
@@ -1488,9 +1499,295 @@ struct PartnerSessions;
     const ISSUED_SESSION: &str = "#[session(issuer = provider)] session: Option<Session>";
 
     fn reader_provider(declarations: &str, parameters: &str) -> String {
-        format!(
-            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n{declarations}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct ReaderProvider;\n\nimpl ReaderProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameters}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+        provider_returning(
+            declarations,
+            parameters,
+            "anyhow::Result<AuthenticatedUserOutcome<User>>",
         )
+    }
+
+    fn provider_returning(declarations: &str, parameters: &str, returned: &str) -> String {
+        format!(
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::identity::authenticated_user_presence::AuthenticatedUserPresence;\n{declarations}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct ReaderProvider;\n\nimpl ReaderProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameters}) -> {returned} {{}}\n}}\n"
+        )
+    }
+
+    fn page_parameters(provider: &str, user: &str) -> Vec<BoundParameter> {
+        let indexed = IndexedSource::new(&provider_source(&format!(
+            "use margaret::framework::macros::process;\n{provider}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] reader: {user}) -> anyhow::Result<Response> {{}}\n}}\n"
+        )));
+        let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
+            .expect("the binding registries are collected");
+        let item = indexed.item("Page");
+        let route_path = admitted_path("/");
+
+        classify_parameters(
+            &indexed.index,
+            item,
+            process_method(item).expect("the responder has a #[process] method"),
+            &BindingContext::Responder {
+                route_path: &route_path,
+                server: "public",
+                subject: "responder 'Page'",
+            },
+            &registries,
+        )
+        .expect("the responder binds")
+    }
+
+    fn with_page_context<TRendered>(
+        render: impl FnOnce(&HeadExtractionContext<'_>) -> TRendered,
+    ) -> TRendered {
+        let continuation_return = quote::quote! { return response };
+        let error_return = quote::quote! { return error };
+        let owner = proc_macro2::TokenStream::new();
+        let request_local = format_ident!("request");
+
+        render(&HeadExtractionContext {
+            continuation_return: &continuation_return,
+            error_return: &error_return,
+            owner: &owner,
+            request_local: &request_local,
+        })
+    }
+
+    fn page_extraction(parameters: &[BoundParameter]) -> String {
+        with_page_context(|context| {
+            render_head_extractions(
+                parameters,
+                &CapturedProviders::capture(parameters, &mut NameAllocator::new()),
+                context,
+            )
+        })
+        .to_string()
+        .split_whitespace()
+        .collect()
+    }
+
+    fn page_session_inference(parameters: &[BoundParameter]) -> String {
+        with_page_context(|context| {
+            render_session_user_inference(
+                &session_user_parameter(parameters).expect("the responder reads a session user"),
+                &CapturedProviders::capture(parameters, &mut NameAllocator::new()),
+                &format_ident!("changed_cookies"),
+                context,
+            )
+        })
+        .to_string()
+        .split_whitespace()
+        .collect()
+    }
+
+    const OUTCOME: &str = "AuthenticatedUserOutcome<User>";
+    const FALLIBLE_PRESENCE: &str = "anyhow::Result<AuthenticatedUserPresence<User>>";
+    const PRESENCE: &str = "AuthenticatedUserPresence<User>";
+    const PEER: &str = "peer: &spiffe::spiffe_id::SpiffeId";
+    const CONSUMED_SESSION: &str = "#[session(issuer = partner)] session: Option<Session>";
+
+    fn consumed_sessions() -> String {
+        format!("{PARTNER_ISSUER}{CONSUMED_SESSIONS}")
+    }
+
+    fn shaped_wrapper(declarations: &str, parameters: &str, returned: &str) -> String {
+        wrapper_source(&registries_for(&provider_returning(
+            declarations,
+            parameters,
+            returned,
+        )))
+    }
+
+    #[test]
+    fn renders_a_wrapper_that_neither_fails_nor_interrupts_for_a_present_user() {
+        let source = shaped_wrapper("", "", PRESENCE);
+
+        assert!(source.contains(
+            "typeInference=margaret::framework::identity::authenticated_user_presence::AuthenticatedUserPresence<crate::User>;"
+        ));
+        assert!(source.contains("->Self::Inference{self.inner.infer()}"));
+    }
+
+    #[test]
+    fn converts_a_present_user_into_an_outcome_where_the_bearer_token_may_interrupt() {
+        let source = wrapper_source(&registries_for(&format!(
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::identity::authenticated_user_presence::AuthenticatedUserPresence;\n{}",
+            bearer_provider_declaration(PARTNER_TOKEN)
+                .replace("anyhow::Result<AuthenticatedUserOutcome<User>>", PRESENCE)
+        )));
+
+        assert!(source.contains(
+            "typeInference=margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<crate::User>;"
+        ));
+        assert!(source.contains(
+            "BearerTokenRouting::Refused(response)=>returnmargaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),"
+        ));
+        assert!(source.contains(
+            "margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::from(self.inner.infer(argument_1))}}"
+        ));
+    }
+
+    #[test]
+    fn maps_a_fallible_present_user_into_an_outcome_where_the_bearer_token_may_interrupt() {
+        let source = wrapper_source(&registries_for(&format!(
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::identity::authenticated_user_presence::AuthenticatedUserPresence;\n{}",
+            bearer_provider_declaration(PARTNER_TOKEN).replace(
+                "anyhow::Result<AuthenticatedUserOutcome<User>>",
+                FALLIBLE_PRESENCE
+            )
+        )));
+
+        assert!(source.contains(
+            "self.inner.infer(argument_1).map(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::from,)"
+        ));
+    }
+
+    #[test]
+    fn fails_a_present_user_of_issued_sessions_only_through_the_session_resolution() {
+        let source = shaped_wrapper(ISSUED_SESSIONS, ISSUED_SESSION, PRESENCE);
+
+        assert!(source.contains(
+            "typeInference=margaret::framework::anyhow::Result<margaret::framework::identity::session_user_inference::SessionUserInference<margaret::framework::identity::authenticated_user_presence::AuthenticatedUserPresence<crate::User>>>;"
+        ));
+        assert!(source.contains(
+            "::std::result::Result::Ok(margaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:changed_cookies,outcome:self.inner.infer(argument_1),})"
+        ));
+    }
+
+    #[test]
+    fn converts_a_fallible_present_user_of_consumed_sessions_into_an_outcome() {
+        let source = shaped_wrapper(&consumed_sessions(), CONSUMED_SESSION, FALLIBLE_PRESENCE);
+
+        assert!(source.contains(
+            "outcome:margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::from(outcome),"
+        ));
+    }
+
+    #[test]
+    fn interrupts_an_infallible_consumed_session_inference_without_a_result() {
+        let source = shaped_wrapper(&consumed_sessions(), CONSUMED_SESSION, OUTCOME);
+
+        assert!(source.contains(
+            "SessionResolution::Unavailable(unavailability)=>{returnmargaret::framework::identity::session_user_inference::SessionUserInference{"
+        ));
+    }
+
+    #[test]
+    fn refuses_an_unverified_peer_through_the_inference_the_provider_concludes() {
+        assert!(shaped_wrapper("", PEER, PRESENCE).contains(
+            "with_verified_peer(request,margaret::framework::identity::unverified_peer_inference::UnverifiedPeerInference::unverified_peer,"
+        ));
+    }
+
+    #[test]
+    fn interrupts_a_present_user_read_from_a_query_form_since_a_malformed_form_refuses_the_request()
+    {
+        assert!(
+            shaped_wrapper(
+                "use margaret::framework::http_validation::request_input::RequestInput;\nstruct Filters;\n",
+                "#[form_request(from = RequestInput::Query)] filters: Filters",
+                PRESENCE,
+            )
+            .contains(
+                "typeInference=margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<crate::User>;"
+            )
+        );
+    }
+
+    #[test]
+    fn keeps_a_present_user_of_a_verified_peer_a_presence_since_pinned_transport_guarantees_the_peer()
+     {
+        assert!(shaped_wrapper("", PEER, PRESENCE).contains(
+            "typeInference=margaret::framework::identity::authenticated_user_presence::AuthenticatedUserPresence<crate::User>;"
+        ));
+    }
+
+    fn inference_rejection(returned: &str) -> String {
+        rejection_for(&format!(
+            "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct ReaderProvider;\n\nimpl ReaderProvider {{\n    #[infer_from_request]\n    fn infer(&self){returned} {{}}\n}}\n"
+        ))
+    }
+
+    const UNSUPPORTED_INFERENCE: &str = "#[infer_from_request] 'infer' of 'crate::ReaderProvider' must return an AuthenticatedUserOutcome or an AuthenticatedUserPresence, bare or as the success of a result";
+
+    #[test]
+    fn rejects_an_inference_that_returns_nothing() {
+        assert_eq!(inference_rejection(""), UNSUPPORTED_INFERENCE);
+    }
+
+    #[test]
+    fn rejects_an_inference_that_returns_the_user_itself() {
+        assert_eq!(inference_rejection(" -> User"), UNSUPPORTED_INFERENCE);
+    }
+
+    #[test]
+    fn rejects_an_inference_whose_result_succeeds_with_another_type() {
+        assert_eq!(
+            inference_rejection(" -> anyhow::Result<User>"),
+            UNSUPPORTED_INFERENCE
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_that_returns_an_unresolvable_type() {
+        assert_eq!(
+            inference_rejection(" -> anyhow::Result<Missing>"),
+            UNSUPPORTED_INFERENCE
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_that_returns_a_type_other_than_a_path() {
+        assert_eq!(inference_rejection(" -> [User; 1]"), UNSUPPORTED_INFERENCE);
+    }
+
+    #[test]
+    fn rejects_an_inference_whose_first_generic_argument_is_not_a_type() {
+        assert_eq!(
+            inference_rejection(" -> std::borrow::Cow<'static, str>"),
+            UNSUPPORTED_INFERENCE
+        );
+    }
+
+    #[test]
+    fn hands_an_optional_present_user_over_without_a_refusal() {
+        assert!(
+            page_extraction(&page_parameters(&provider_returning("", "", PRESENCE), "Option<User>"))
+                .contains(
+                    "letargument_1=margaret::framework::identity::optional_present_user::optional_present_user(margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(reader_provider.as_ref(),request,).await);"
+                )
+        );
+    }
+
+    #[test]
+    fn refuses_an_anonymous_visitor_where_a_present_user_is_required() {
+        assert!(
+            page_extraction(&page_parameters(&provider_returning("", "", PRESENCE), "User"))
+                .contains(
+                    "matchmargaret::framework::identity::require_present_user::require_present_user(margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(reader_provider.as_ref(),request,).await){"
+                )
+        );
+    }
+
+    #[test]
+    fn infers_an_infallible_outcome_without_an_error_arm() {
+        assert!(
+            page_extraction(&page_parameters(&provider_returning("", "", OUTCOME), "Option<User>"))
+                .contains(
+                    "margaret::framework::identity::optional_authenticated_user::optional_authenticated_user(margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(reader_provider.as_ref(),request,).await)"
+                )
+        );
+    }
+
+    #[test]
+    fn infers_an_infallible_session_user_without_an_error_arm() {
+        assert!(
+            page_session_inference(&page_parameters(
+                &provider_returning(&consumed_sessions(), CONSUMED_SESSION, OUTCOME),
+                "User"
+            ))
+            .ends_with(
+                "=margaret::framework::identity::infers_session_user::InfersSessionUser::infer(reader_provider.as_ref(),request,).await;"
+            )
+        );
     }
 
     #[test]
@@ -1543,7 +1840,7 @@ struct PartnerSessions;
         )));
 
         assert!(source.contains(
-            "margaret::framework::sessions::session_resolution::SessionResolution::Unavailable(unavailability)=>{return::std::result::Result::Ok(margaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:margaret::framework::http::cookie_changes::CookieChanges{cookies:::std::vec::Vec::new(),},outcome:margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(margaret::framework::http::response_continuation::ResponseContinuation::from(unavailability),),},);}"
+            "margaret::framework::sessions::session_resolution::SessionResolution::Unavailable(unavailability)=>{return::std::result::Result::Ok(margaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:margaret::framework::http::cookie_changes::CookieChanges{cookies:::std::vec::Vec::new(),},outcome:margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(margaret::framework::http::response_continuation::ResponseContinuation::from(unavailability),),});}"
         ));
     }
 
@@ -1557,7 +1854,7 @@ struct PartnerSessions;
         )));
 
         assert!(source.contains(
-            "return::std::result::Result::Ok(margaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:changed_cookies,outcome:margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),},)"
+            "return::std::result::Result::Ok(margaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:changed_cookies,outcome:margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),})"
         ));
     }
 
@@ -1591,7 +1888,7 @@ struct PartnerSessions;
             request_local: &format_ident!("request"),
         };
         let inference: String = render_session_user_inference(
-            session_user_parameter(&parameters).expect("the responder reads a session user"),
+            &session_user_parameter(&parameters).expect("the responder reads a session user"),
             &captured,
             &format_ident!("changed_cookies"),
             &context,

@@ -5,7 +5,9 @@ use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
+use margaret_container::framework_preparation::FrameworkPreparation;
 use margaret_container::framework_provider::FrameworkProvider;
+use margaret_container::preparation_source::PreparationSource;
 use margaret_oauth_client_codegen::declared_client_authentication::DeclaredClientAuthentication;
 use margaret_oauth_client_codegen::oauth_client_credentials::OAuthClientCredentials;
 use margaret_oauth_client_codegen::oauth_client_id_path::oauth_client_id_path;
@@ -31,6 +33,8 @@ use margaret_trusted_issuer_codegen::trusted_issuer_item_path::trusted_issuer_it
 
 use crate::issuer_request_client_canonical_path::issuer_request_client_canonical_path;
 use crate::jwks_secret_holder_canonical_path::jwks_secret_holder_canonical_path;
+use crate::resource_grant_canonical_path::resource_grant_canonical_path;
+use crate::token_target_canonical_path::token_target_canonical_path;
 
 fn created(dependencies: Vec<FrameworkDependency>, method: &str) -> FrameworkConstruction {
     FrameworkConstruction::Constructor {
@@ -153,7 +157,7 @@ fn sign_in_providers(
                 ],
                 is_async: false,
                 method: "create".to_string(),
-                outcome: ConstructorOutcome::Fallible,
+                outcome: ConstructorOutcome::Infallible,
             },
             FrameworkEnablement::Dependency,
             flow.clone(),
@@ -211,13 +215,17 @@ fn oauth_client_providers(
                 construction: FrameworkConstruction::Constructor {
                     dependencies: vec![
                         FrameworkDependency::Provider(authorization_server.clone()),
-                        FrameworkDependency::Constant(oauth_client_resource_grant_path(
-                            tag, resource,
-                        )),
+                        FrameworkDependency::Prepared(FrameworkPreparation {
+                            function: resource_grant_canonical_path().child("target"),
+                            prepared: token_target_canonical_path(),
+                            sources: vec![PreparationSource::Constant(
+                                oauth_client_resource_grant_path(tag, resource),
+                            )],
+                        }),
                     ],
                     is_async: false,
                     method: "create".to_string(),
-                    outcome: ConstructorOutcome::Fallible,
+                    outcome: ConstructorOutcome::Infallible,
                 },
                 enablement: FrameworkEnablement::WhenReferenced,
                 injection: FrameworkInjectionRole::Unmarked,

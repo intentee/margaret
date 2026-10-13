@@ -23,7 +23,6 @@ pub async fn seeded_blog() -> StartedDatabase {
             SESSION_AUDIENCE,
         )),
     )
-    .expect("the seed command is constructed")
     .run()
     .await
     .expect("the blog is seeded");

@@ -23,6 +23,7 @@ margaret_serve_input_codegen = { workspace = true }
 margaret_syn_type_peeling = { workspace = true }
 margaret_token_issuance_codegen = { workspace = true }
 margaret_toposort = { workspace = true }
+margaret_umbrella_path = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

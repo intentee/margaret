@@ -12,6 +12,7 @@ use margaret_request_binding_codegen::binding_reads_request::binding_reads_reque
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
+use margaret_request_binding_codegen::render_route_inputs::render_route_inputs;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 use crate::middleware_plan::MiddlewarePlan;
@@ -96,6 +97,16 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     } else {
         quote! { self.inner.process(#(#call_arguments),*) }
     };
+    let body = render_route_inputs(
+        parameters,
+        &request_binding,
+        &quote! { ::std::result::Result::Ok },
+        &quote! {
+            #(#extractions)*
+            #process_call
+                .map_err(margaret::framework::handler_error::handler_error::HandlerError::consumer)
+        },
+    );
 
     quote! {
         pub struct #wrapper {
@@ -114,9 +125,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
                 margaret::framework::http::response_continuation::ResponseContinuation,
                 margaret::framework::handler_error::handler_error::HandlerError,
             > {
-                #(#extractions)*
-                #process_call
-                    .map_err(margaret::framework::handler_error::handler_error::HandlerError::consumer)
+                #body
             }
         }
     }

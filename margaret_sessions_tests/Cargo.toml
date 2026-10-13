@@ -32,6 +32,7 @@ uuid = { workspace = true, features = ["v4"] }
 [dev-dependencies]
 margaret_http_uploaded_file = { workspace = true }
 margaret_issuer_key_set = { workspace = true }
+margaret_server_origin = { workspace = true }
 margaret_sql_identifier = { workspace = true }
 margaret_token_digest = { workspace = true }
 reqwest = { workspace = true }

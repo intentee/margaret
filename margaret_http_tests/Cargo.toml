@@ -22,6 +22,7 @@ rcgen = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 serde_json = { workspace = true }
+spiffe = { workspace = true, features = ["spiffe-types"] }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "test-util"] }
 tokio-rustls = { workspace = true }
 tokio-util = { workspace = true }
@@ -31,7 +32,6 @@ url = { workspace = true }
 futures-util = { workspace = true }
 http-body = { workspace = true }
 mime = { workspace = true }
-spiffe = { workspace = true, features = ["spiffe-types"] }
 tempfile = { workspace = true }
 
 [[test]]

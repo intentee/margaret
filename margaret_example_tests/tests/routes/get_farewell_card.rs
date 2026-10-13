@@ -10,8 +10,7 @@ async fn responds_ok_with_the_rendered_farewell_card_so_the_demo_route_serves_a_
     let routes = Routes::from_origins("http://identity", "http://internal", "http://public")
         .expect("the routes build");
     let app_name = AppName::create().expect("the app name is constructed");
-    let responder =
-        GetFarewellCard::create(Arc::new(app_name)).expect("the responder is constructed");
+    let responder = GetFarewellCard::create(Arc::new(app_name));
 
     assert_eq!(
         responder

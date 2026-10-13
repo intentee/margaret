@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use anyhow::Result;
-use async_trait::async_trait;
 use reqwest::Client;
 use reqwest::ClientBuilder;
 use rustls::ClientConfig;
 use rustls::ServerConfig;
 use trzcina::Service;
-use trzcina::ServiceBundle;
 
 use margaret_spiffe_svid::svid_crypto_provider::svid_crypto_provider;
 use margaret_spiffe_svid::svid_service::SvidService;
@@ -84,19 +81,17 @@ impl SvidBundle {
     }
 
     #[must_use]
-    pub fn server_config(&self) -> ServerConfig {
-        self.server_side.server_config()
-    }
-}
-
-#[async_trait]
-impl ServiceBundle for SvidBundle {
-    async fn services(self) -> Result<Vec<Box<dyn Service>>> {
+    pub fn into_services(self) -> Vec<Box<dyn Service>> {
         let mut services = self.service.into_common_services();
 
         services.push(Box::new(self.server_side.into_verifier_service()));
         services.push(Box::new(self.client_side.into_verifier_service()));
 
-        Ok(services)
+        services
+    }
+
+    #[must_use]
+    pub fn server_config(&self) -> ServerConfig {
+        self.server_side.server_config()
     }
 }

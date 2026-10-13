@@ -2,10 +2,11 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
+use margaret_codegen_tokens::positional_naming::PositionalNaming;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 use margaret_serve_input_codegen::serve_input_registry::ServeInputRegistry;
 
+use crate::constructor_outcome::ConstructorOutcome;
 use crate::container_error::ContainerError;
 use crate::dependency_kind::DependencyKind;
 use crate::planned_dependency::PlannedDependency;
@@ -19,6 +20,7 @@ use crate::url_source::UrlSource;
 struct DependencyCollector {
     collected: Vec<SlottedServeInput>,
     is_async: bool,
+    outcome: ConstructorOutcome,
     seen_slots: BTreeSet<usize>,
 }
 
@@ -50,6 +52,7 @@ impl DependencyCollector {
         }
 
         self.is_async |= planned.is_async;
+        self.outcome = self.outcome.combined_with(planned.outcome);
 
         Ok(PlannedField {
             concrete_path: planned.provider.concrete_path.clone(),
@@ -123,7 +126,7 @@ pub(crate) struct ContainerPlan {
     entries: Vec<PlannedProvider>,
     positions: BTreeMap<CanonicalPath, usize>,
     injectable: BTreeSet<CanonicalPath>,
-    serve_input_naming: ServeInputNaming,
+    serve_input_naming: PositionalNaming,
 }
 
 impl ContainerPlan {
@@ -146,6 +149,7 @@ impl ContainerPlan {
             let mut collector = DependencyCollector {
                 collected: Vec::new(),
                 is_async: provider.construction.is_async(),
+                outcome: provider.construction.outcome(),
                 seen_slots: BTreeSet::new(),
             };
             let dependencies = provider
@@ -159,6 +163,7 @@ impl ContainerPlan {
             let DependencyCollector {
                 collected,
                 is_async,
+                outcome,
                 ..
             } = collector;
 
@@ -167,6 +172,7 @@ impl ContainerPlan {
                 dependencies: dependencies.into(),
                 is_async,
                 key,
+                outcome,
                 provider,
                 serve_inputs: collected.into(),
             });
@@ -174,7 +180,7 @@ impl ContainerPlan {
 
         Ok(Self {
             entries: ordered,
-            serve_input_naming: ServeInputNaming::for_slot_count(input_registry.slot_count()),
+            serve_input_naming: PositionalNaming::serve_inputs(input_registry.slot_count()),
             positions,
             injectable,
         })
@@ -204,7 +210,7 @@ impl ContainerPlan {
         self.entries.iter().map(|entry| &entry.key)
     }
 
-    pub(crate) fn serve_input_naming(&self) -> ServeInputNaming {
+    pub(crate) fn serve_input_naming(&self) -> PositionalNaming {
         self.serve_input_naming
     }
 }
@@ -221,6 +227,7 @@ mod tests {
     use margaret_serve_input_codegen::serve_input::ServeInput;
 
     use super::ContainerPlan;
+    use crate::constructor_outcome::ConstructorOutcome;
     use crate::dependency_kind::DependencyKind;
     use crate::direct_construction::DirectConstruction;
     use crate::framework_injection_role::FrameworkInjectionRole;
@@ -240,6 +247,7 @@ mod tests {
                 dependencies: vec![dependency],
                 is_async: false,
                 method: "create".to_string(),
+                outcome: ConstructorOutcome::Fallible,
             },
             field_name: "root".to_string(),
             injection: FrameworkInjectionRole::Unmarked,
@@ -267,6 +275,7 @@ mod tests {
                 dependencies: vec![input(), input()],
                 is_async: false,
                 method: "create".to_string(),
+                outcome: ConstructorOutcome::Fallible,
             },
             field_name: "root".to_string(),
             injection: FrameworkInjectionRole::Unmarked,

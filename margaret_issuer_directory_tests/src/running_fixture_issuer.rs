@@ -38,7 +38,7 @@ impl RunningFixtureIssuer {
     /// Panics when the fixture request client cannot be built.
     #[must_use]
     pub fn request_client_resolving_to(&self, address: SocketAddr) -> IssuerRequestClient {
-        IssuerRequestClient::build(
+        IssuerRequestClient::preconfigured(
             fixture_client_builder(&self.fixture.certificate_authority)
                 .resolve(&self.fixture.server_name, address),
         )

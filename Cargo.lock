@@ -849,6 +849,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2cd50c473c80f6d7c3670a752354b8e569b1a7cbfdc0419ec88e5edad85e0dc7"
 
 [[package]]
+name = "futures-io"
+version = "0.3.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53c0fa8157de1303bfffdaa1cc2a673bfffb60102f76b0ef4441659124373fed"
+
+[[package]]
 name = "futures-macro"
 version = "0.3.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -878,9 +884,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a77a90a256fce34da66415271e30f94ee91c57b04b8a2c042d9cf3220179deaa"
 dependencies = [
  "futures-core",
+ "futures-io",
  "futures-macro",
  "futures-sink",
  "futures-task",
+ "memchr",
  "pin-project-lite",
  "slab",
 ]
@@ -1873,6 +1881,7 @@ dependencies = [
 name = "margaret_bearer_token_verification"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "margaret_http",
  "margaret_issuer_key_set",
  "margaret_jwt_verification",
@@ -2018,6 +2027,7 @@ dependencies = [
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "margaret_jws_verification",
+ "margaret_local_server_tests",
  "margaret_oidc_provider_tests",
  "margaret_process_tests",
  "margaret_route_method",
@@ -2301,6 +2311,7 @@ dependencies = [
 name = "margaret_codegen_tests"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "margaret_attributes",
  "margaret_codegen",
  "margaret_codegen_fallible_roles_fixture",
@@ -2308,9 +2319,13 @@ dependencies = [
  "margaret_console_argument_codegen",
  "margaret_generated_module",
  "margaret_input_weaving",
+ "margaret_local_server_tests",
  "margaret_serve_input_codegen",
  "margaret_sql_identifier",
+ "reqwest",
+ "serde_json",
  "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]
@@ -2371,6 +2386,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "tokio",
 ]
 
 [[package]]
@@ -2402,6 +2418,7 @@ dependencies = [
  "margaret_http_codegen",
  "margaret_injection_codegen",
  "margaret_serve_input_codegen",
+ "margaret_service_codegen",
  "margaret_token_issuance_codegen",
  "proc-macro2",
  "quote",
@@ -2435,6 +2452,7 @@ dependencies = [
  "margaret_syn_type_peeling",
  "margaret_token_issuance_codegen",
  "margaret_toposort",
+ "margaret_umbrella_path",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2457,6 +2475,79 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "margaret_coverage_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "http",
+ "margaret",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "validator",
+]
+
+[[package]]
+name = "margaret_coverage_fixture_tests"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "margaret_coverage_fixture",
+ "margaret_local_server_tests",
+ "margaret_process_tests",
+ "reqwest",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-tungstenite",
+]
+
+[[package]]
+name = "margaret_coverage_spiffe_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "futures-util",
+ "http",
+ "margaret",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "spiffe",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "validator",
+]
+
+[[package]]
+name = "margaret_coverage_spiffe_fixture_tests"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "margaret_coverage_spiffe_fixture",
+ "margaret_local_server_tests",
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_client",
+ "margaret_spiffe_svid_tests",
+ "reqwest",
+ "rustls",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-rustls",
+ "tokio-tungstenite",
+ "tokio-util",
+ "trzcina",
 ]
 
 [[package]]
@@ -3118,6 +3209,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_local_server_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_process_tests",
+ "tokio",
+]
+
+[[package]]
 name = "margaret_macros"
 version = "0.4.0"
 dependencies = [
@@ -3298,6 +3397,7 @@ dependencies = [
  "margaret_oauth_vocabulary",
  "margaret_oidc_discovery",
  "margaret_registered_claims",
+ "margaret_server_origin",
  "margaret_sessions",
  "margaret_subject_token_exchange",
  "margaret_token_digest",
@@ -3400,6 +3500,7 @@ dependencies = [
  "margaret_oidc_sign_in_tests",
  "margaret_registered_claims",
  "margaret_route_method",
+ "margaret_server_origin",
  "margaret_sessions",
  "margaret_sql_identifier",
  "margaret_subject_token_exchange",
@@ -3447,13 +3548,13 @@ dependencies = [
  "margaret_oauth_vocabulary",
  "margaret_oidc_discovery",
  "margaret_registered_claims",
+ "margaret_server_origin",
  "margaret_sessions",
  "margaret_token_digest",
  "margaret_token_issuance",
  "margaret_trusted_issuer",
  "oauth2",
  "serde",
- "thiserror 2.0.18",
  "url",
  "uuid",
 ]
@@ -3491,6 +3592,7 @@ dependencies = [
  "margaret_oidc_sign_in",
  "margaret_registered_claims",
  "margaret_route_method",
+ "margaret_server_origin",
  "margaret_sessions",
  "margaret_sessions_tests",
  "margaret_trusted_issuer",
@@ -3748,6 +3850,7 @@ dependencies = [
  "margaret_item_naming_argument",
  "margaret_serve_input_codegen",
  "margaret_token_issuance_codegen",
+ "margaret_umbrella_path",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -3763,6 +3866,7 @@ dependencies = [
  "margaret_console",
  "margaret_handler_error",
  "margaret_http",
+ "margaret_http_tests",
  "margaret_http_uploaded_file",
  "margaret_process_tests",
  "margaret_route_method",
@@ -3811,6 +3915,7 @@ dependencies = [
  "margaret_jwt_verification",
  "margaret_model_facade",
  "margaret_registered_claims",
+ "margaret_server_origin",
  "margaret_token_digest",
  "margaret_trusted_issuer",
  "margaret_validation",
@@ -3866,6 +3971,7 @@ dependencies = [
  "margaret_model",
  "margaret_peer_identity",
  "margaret_route_method",
+ "margaret_server_origin",
  "margaret_sessions",
  "margaret_sql_identifier",
  "margaret_token_digest",
@@ -3965,8 +4071,6 @@ dependencies = [
 name = "margaret_spiffe_svid_bundle"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "async-trait",
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_client",
  "margaret_spiffe_svid_server",
@@ -5393,6 +5497,7 @@ dependencies = [
  "bytes",
  "encoding_rs",
  "futures-core",
+ "futures-util",
  "h2",
  "http",
  "http-body",
@@ -5417,12 +5522,14 @@ dependencies = [
  "tokio",
  "tokio-native-tls",
  "tokio-rustls",
+ "tokio-util",
  "tower",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
  "webpki-roots",
 ]
@@ -6664,6 +6771,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc1b4cb0cc549fcf58d7dfc081778139b3d283a081644e833e84682ad71cea24"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "wasm-streams"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

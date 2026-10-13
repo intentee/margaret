@@ -224,7 +224,7 @@ impl ProviderFixture {
     /// Panics when the issuer request client cannot be built.
     #[must_use]
     pub fn issuer_request_client(&self) -> IssuerRequestClient {
-        IssuerRequestClient::build(
+        IssuerRequestClient::preconfigured(
             fixture_client_builder(&self.tls.certificate_authority)
                 .resolve(&self.tls.server_name, self.server.address()),
         )

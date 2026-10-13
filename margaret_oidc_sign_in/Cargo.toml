@@ -29,13 +29,13 @@ margaret_jwt_verification = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_oidc_discovery = { workspace = true }
 margaret_registered_claims = { workspace = true }
+margaret_server_origin = { workspace = true }
 margaret_sessions = { workspace = true }
 margaret_token_digest = { workspace = true }
 margaret_token_issuance = { workspace = true }
 margaret_trusted_issuer = { workspace = true }
 oauth2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-thiserror = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
 

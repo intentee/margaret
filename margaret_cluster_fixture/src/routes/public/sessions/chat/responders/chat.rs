@@ -25,12 +25,10 @@ pub struct Chat {
 }
 
 impl Chat {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(clock: Arc<SystemClock>, database: Arc<Database>) -> anyhow::Result<Self> {
-        Ok(Self { clock, database })
+    pub fn create(clock: Arc<SystemClock>, database: Arc<Database>) -> Self {
+        Self { clock, database }
     }
 }
 

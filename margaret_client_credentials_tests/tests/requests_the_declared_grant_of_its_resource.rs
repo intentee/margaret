@@ -32,9 +32,10 @@ async fn requests_the_declared_grant_of_its_resource() {
         ResourceGrant {
             audience: "attachments",
             scopes: &["files:write", "files:read"],
-        },
+        }
+        .target()
+        .expect("the grant scopes are scope tokens"),
     )
-    .expect("the grant scopes are scope tokens")
     .access_token()
     .await;
 

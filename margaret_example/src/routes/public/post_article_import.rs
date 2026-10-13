@@ -28,15 +28,10 @@ pub struct PostArticleImport {
 }
 
 impl PostArticleImport {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(
-        articles: Arc<ArticleRepository>,
-        clock: Arc<SystemClock>,
-    ) -> anyhow::Result<Self> {
-        Ok(Self { articles, clock })
+    pub fn create(articles: Arc<ArticleRepository>, clock: Arc<SystemClock>) -> Self {
+        Self { articles, clock }
     }
 
     /// # Errors

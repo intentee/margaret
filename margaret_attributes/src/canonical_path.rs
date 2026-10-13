@@ -14,6 +14,18 @@ impl CanonicalPath {
     }
 
     #[must_use]
+    pub fn child(&self, segment: &str) -> Self {
+        Self {
+            segments: self
+                .segments
+                .iter()
+                .cloned()
+                .chain([segment.to_string()])
+                .collect(),
+        }
+    }
+
+    #[must_use]
     pub fn segments(&self) -> &[String] {
         &self.segments
     }
@@ -22,5 +34,20 @@ impl CanonicalPath {
 impl Display for CanonicalPath {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         write!(formatter, "{}", self.segments.join("::"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CanonicalPath;
+
+    #[test]
+    fn names_an_item_nested_under_the_path() {
+        assert_eq!(
+            CanonicalPath::new(vec!["crate".to_string(), "Metadata".to_string()])
+                .child("of_provider")
+                .to_string(),
+            "crate::Metadata::of_provider"
+        );
     }
 }

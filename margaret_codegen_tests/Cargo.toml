@@ -12,20 +12,29 @@ test = false
 [dependencies]
 margaret_attributes = { workspace = true }
 margaret_codegen = { workspace = true }
+margaret_codegen_fallible_roles_fixture = { path = "tests/fixtures/fallible_roles" }
 margaret_generated_module = { workspace = true }
+margaret_local_server_tests = { path = "../margaret_local_server_tests" }
 margaret_sql_identifier = { workspace = true }
+reqwest = { workspace = true }
 
 [dev-dependencies]
-margaret_codegen_fallible_roles_fixture = { path = "tests/fixtures/fallible_roles" }
+futures-util = { workspace = true }
 margaret_codegen_linear_construction_future_fixture = { path = "tests/fixtures/linear_construction_future" }
 margaret_console_argument_codegen = { workspace = true }
 margaret_input_weaving = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt"] }
+tokio-tungstenite = { workspace = true }
 
 [[test]]
 name = "main"
 path = "tests/main.rs"
+
+[[test]]
+name = "served_fixtures"
+path = "tests/served_fixtures/main.rs"
 
 [lints]
 workspace = true

@@ -15,7 +15,6 @@ async fn admits_a_visitor_without_bearer_credentials_as_unaddressed() {
     let trusted_issuer = held_trusted_issuer(fixture_trust(), secret.published_key_set().clone());
     let authorization = RequestAuthorization::parse(None);
     let BearerTokenRouting::Routed(routed) = route_bearer_token(&authorization, &[&trusted_issuer])
-        .expect("the system clock reads as a numeric date")
     else {
         panic!("an absent credential routes");
     };

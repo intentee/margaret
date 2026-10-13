@@ -1,8 +1,10 @@
+mod boxed_service;
 pub mod build_svid_certified_key;
 pub mod ca_bundle;
 pub mod extract_ca_bundle;
 pub mod extract_server_credentials;
 pub mod extract_spiffe_trust_domain;
+pub mod register_services;
 pub mod reject_tls12_signature;
 pub mod root_cert_store_holder;
 pub mod root_cert_store_service;

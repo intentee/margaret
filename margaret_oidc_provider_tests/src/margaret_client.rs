@@ -9,6 +9,7 @@ use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_secret_store_tests::fixture_secrets::fixture_secrets;
 use margaret_oauth_vocabulary::client_secret::ClientSecret;
 use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
+use margaret_server_origin::route_url::RouteUrl;
 use margaret_token_trust::token_trust::TokenTrust;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
@@ -111,10 +112,9 @@ impl MargaretClient {
         SignInFlow::create(
             Arc::clone(&self.server),
             Arc::clone(&self.secrets),
-            callback.to_string(),
+            RouteUrl::parse(callback.to_string()).expect("the callback is a url"),
             scopes,
         )
-        .expect("the callback is a url")
     }
 
     pub async fn stop(self) {

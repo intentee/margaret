@@ -3,12 +3,12 @@ use reqwest::StatusCode;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::cluster_server::ClusterServer;
 use margaret_cluster_tests::code_grant::code_grant;
+use margaret_cluster_tests::expire_authorization_codes::expire_authorization_codes;
 use margaret_cluster_tests::partner_code::partner_code;
 use margaret_cluster_tests::partner_token::partner_token;
 use margaret_cluster_tests::started_alice_session::started_alice_session;
 
 use crate::cluster_binary::cluster_binary;
-use crate::expire_authorization_codes::expire_authorization_codes;
 
 #[tokio::test]
 async fn an_expired_code_is_refused_on_a_peer_so_expiry_cannot_be_dodged_by_switching() {

@@ -736,8 +736,9 @@ impl Guard {
     fn generates_a_factory_that_extracts_route_parameters() {
         let source = generated(FULL_SESSION);
 
-        assert!(source.contains("require_route_parameter::require_route_parameter"));
-        assert!(source.contains("\"room\""));
+        assert!(source.contains(
+            r#"with_route_parameters(handshake,["room"],margaret::framework::websocket_session::interrupted_creation::interrupted_creation,move|[argument_3]|"#
+        ));
         assert!(source.contains("crate::ChatSession::build_for_session"));
         assert!(source.contains("self.argument_0.clone()"));
     }
@@ -1329,9 +1330,8 @@ impl RespondsToWebSocketMessage for Chatter {
         assert!(source.contains(
             "margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(self.session_user_provider.as_ref(),handshake,).await"
         ));
-        assert!(source.contains("::std::result::Result::Ok(outcome)"));
         assert!(source.contains(
-            "margaret::framework::identity::optional_authenticated_user::optional_authenticated_user(outcome,)"
+            "margaret::framework::identity::optional_authenticated_user::optional_authenticated_user(matchmargaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(self.session_user_provider.as_ref(),handshake,).await{::std::result::Result::Ok(inferred)=>inferred,"
         ));
         assert!(source.contains("WebSocketSessionCreationOutcome::Interrupted(response,)"));
         assert!(source.contains("WebSocketSessionCreationError::consumer(error,)"));
@@ -1741,10 +1741,14 @@ impl RespondsToWebSocketMessage for Poster {
     fn generates_a_session_factory_for_every_supported_binding() {
         let source = generated(PARITY_SESSION);
 
-        assert!(source.contains("require_bound_route_parameter::require_bound_route_parameter"));
+        assert!(source.contains(
+            r#"bind_route_parameter::bind_route_parameter(argument_2,"article",self.article_store.as_ref(),)"#
+        ));
         assert!(source.contains(".inputs.query"));
         assert!(source.contains(".inputs.cookies"));
-        assert!(source.contains("require_peer_spiffe_id::require_peer_spiffe_id"));
+        assert!(source.contains(
+            r#"with_verified_peer(handshake,margaret::framework::websocket_session::interrupted_creation::interrupted_creation,move|argument_6|asyncmove{margaret::framework::http::with_route_parameters::with_route_parameters(handshake,["topic","article"],"#
+        ));
         assert!(source.contains("::margaret::framework::asset_bag::asset_bag::AssetBag::new()"));
         assert!(source.contains("self.argument_7.as_ref()"));
         assert!(source.contains("routes:&::std::sync::Arc<super::super::routes::Routes>"));
@@ -1757,10 +1761,10 @@ impl RespondsToWebSocketMessage for Poster {
     fn verifies_the_peer_before_binding_a_route_model() {
         let source = generated(PARITY_SESSION);
         let verification = source
-            .find("require_peer_spiffe_id::require_peer_spiffe_id")
+            .find("with_verified_peer::with_verified_peer")
             .expect("the peer is verified");
         let binding = source
-            .find("require_bound_route_parameter::require_bound_route_parameter")
+            .find("bind_route_parameter::bind_route_parameter")
             .expect("the article is bound");
 
         assert!(verification < binding);
@@ -1857,8 +1861,9 @@ impl Room {
 "#,
         );
 
-        assert!(source.contains("require_route_parameter::require_route_parameter"));
-        assert!(source.contains("\"room_slug\""));
+        assert!(source.contains(
+            r#"with_route_parameters(handshake,["room_slug"],margaret::framework::websocket_session::interrupted_creation::interrupted_creation,move|[argument_0]|asyncmove{letargument_0=matchmargaret::framework::http::route_parameter_value::route_parameter_value(argument_0,)"#
+        ));
         assert!(source.contains("crate::Room::build(argument_0)"));
     }
 

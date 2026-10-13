@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use margaret_attributes::name_allocator::NameAllocator;
+use margaret_codegen_tokens::positional_naming::PositionalNaming;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
@@ -29,7 +29,7 @@ fn route_field_ident(named: &NamedRoute<'_>) -> Ident {
 fn segment_tokens(segment: &UrlSegment, values: &mut ParameterValues) -> TokenStream {
     match segment {
         UrlSegment::CatchAllParameter { name, prefix } => {
-            let value = values.allocated(name);
+            let value = values.allocated();
 
             quote! {
                 margaret::framework::http::url_segment::UrlSegment::CatchAllParameter {
@@ -50,7 +50,7 @@ fn segment_tokens(segment: &UrlSegment, values: &mut ParameterValues) -> TokenSt
             }
         }
         UrlSegment::Parameter { name, prefix } => {
-            let value = values.allocated(name);
+            let value = values.allocated();
 
             quote! {
                 margaret::framework::http::url_segment::UrlSegment::Parameter {
@@ -99,8 +99,8 @@ fn route_method(
     let route_type = route_type_tokens(named);
     let position = Literal::usize_unsuffixed(named.position);
     let mut values = ParameterValues {
-        allocator: NameAllocator::new(),
         idents: Vec::new(),
+        naming: PositionalNaming::route_parameters(named.path.parameters().count()),
     };
     let segments: Vec<TokenStream> = segments
         .iter()
@@ -192,10 +192,11 @@ fn server_struct(
             pub(crate) fn #constructor(
                 #origin_param: &str,
             ) -> ::std::result::Result<Self, margaret::framework::http::router_error::RouterError> {
-                ::std::result::Result::Ok(Self {
-                    #paths: margaret::framework::http::server_paths::ServerPaths::build([
-                        #(#server_patterns),*
-                    ])?,
+                margaret::framework::http::server_paths::ServerPaths::build([
+                    #(#server_patterns),*
+                ])
+                .map(|#paths| Self {
+                    #paths,
                     #(#field_inits)*
                     #origin_init
                 })
@@ -207,18 +208,47 @@ fn server_struct(
 }
 
 struct ParameterValues {
-    allocator: NameAllocator,
     idents: Vec<Ident>,
+    naming: PositionalNaming,
 }
 
 impl ParameterValues {
-    fn allocated(&mut self, name: &str) -> Ident {
-        let value = format_ident!("{}", self.allocator.allocate(name).field());
+    fn allocated(&mut self) -> Ident {
+        let value = self.naming.ident(self.idents.len());
 
         self.idents.push(value.clone());
 
         value
     }
+}
+
+fn built_server(layout: &ServerLayout<'_>) -> TokenStream {
+    let field = &layout.field;
+    let struct_ident = &layout.struct_ident;
+    let constructor = &layout.constructor;
+    let param = origin_param_ident(layout);
+
+    quote! { servers::#field::#struct_ident::#constructor(#param) }
+}
+
+fn constructed_servers(layouts: &[ServerLayout<'_>]) -> TokenStream {
+    let fields = layouts.iter().map(|layout| &layout.field);
+    let constructed = quote! { Self { #(#fields),* } };
+    let Some((last, preceding)) = layouts.split_last() else {
+        return quote! { ::std::result::Result::Ok(#constructed) };
+    };
+    let last_field = &last.field;
+    let last_built = built_server(last);
+
+    preceding.iter().rev().fold(
+        quote! { #last_built.map(|#last_field| #constructed) },
+        |chained, layout| {
+            let field = &layout.field;
+            let built = built_server(layout);
+
+            quote! { #built.and_then(|#field| #chained) }
+        },
+    )
 }
 
 pub(crate) fn render_routes(
@@ -237,14 +267,7 @@ pub(crate) fn render_routes(
 
         quote! { #param: &str, }
     });
-    let server_inits = layouts.iter().map(|layout| {
-        let field = &layout.field;
-        let struct_ident = &layout.struct_ident;
-        let constructor = &layout.constructor;
-        let param = origin_param_ident(layout);
-
-        quote! { #field: servers::#field::#struct_ident::#constructor(#param)?, }
-    });
+    let server_inits = constructed_servers(layouts);
     let server_declarations = layouts.iter().map(|layout| {
         let field = &layout.field;
 
@@ -269,9 +292,7 @@ pub(crate) fn render_routes(
             pub fn from_origins(
                 #(#origin_params)*
             ) -> ::std::result::Result<Self, margaret::framework::http::router_error::RouterError> {
-                ::std::result::Result::Ok(Self {
-                    #(#server_inits)*
-                })
+                #server_inits
             }
         }
     };

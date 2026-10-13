@@ -12,6 +12,7 @@ use margaret_http::redirect::Redirect;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
+use margaret_server_origin::route_url::RouteUrl;
 use margaret_sessions::issued_sessions::IssuedSessions;
 use margaret_sessions::started_session::StartedSession;
 
@@ -33,12 +34,12 @@ impl<TAdmission: AdmitsSignIn> SignInCallbackHandler<TAdmission> {
         flow: Arc<SignInFlow>,
         admission: Arc<TAdmission>,
         sessions: Arc<IssuedSessions>,
-        landing: String,
+        landing: RouteUrl,
     ) -> Self {
         Self {
             admission,
             flow,
-            landing,
+            landing: String::from(landing),
             sessions,
         }
     }

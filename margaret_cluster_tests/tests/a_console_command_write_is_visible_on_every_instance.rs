@@ -1,7 +1,7 @@
 use margaret_cluster_tests::cluster::Cluster;
+use margaret_cluster_tests::stored_note::StoredNote;
 
 use crate::cluster_binary::cluster_binary;
-use crate::stored_note::StoredNote;
 
 #[tokio::test]
 async fn a_console_command_write_is_visible_on_every_instance() {

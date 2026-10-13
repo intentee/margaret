@@ -8,24 +8,28 @@ use crate::sign_out_handler_module_name::SIGN_OUT_HANDLER_MODULE_NAME;
 use crate::sign_out_handler_type_name::SIGN_OUT_HANDLER_TYPE_NAME;
 
 pub struct SignOutEndpointModule {
+    handler_path: CanonicalPath,
     name: String,
 }
 
 impl SignOutEndpointModule {
     #[must_use]
     pub fn new(name: String) -> Self {
-        Self { name }
+        Self {
+            handler_path: umbrella_item_path(&[
+                SESSIONS_MODULE_NAME,
+                SIGN_OUT_ENDPOINTS_MODULE_NAME,
+                &name,
+                SIGN_OUT_HANDLER_MODULE_NAME,
+                SIGN_OUT_HANDLER_TYPE_NAME,
+            ]),
+            name,
+        }
     }
 
     #[must_use]
-    pub fn handler_path(&self) -> CanonicalPath {
-        umbrella_item_path(&[
-            SESSIONS_MODULE_NAME,
-            SIGN_OUT_ENDPOINTS_MODULE_NAME,
-            &self.name,
-            SIGN_OUT_HANDLER_MODULE_NAME,
-            SIGN_OUT_HANDLER_TYPE_NAME,
-        ])
+    pub fn handler_path(&self) -> &CanonicalPath {
+        &self.handler_path
     }
 
     pub(crate) fn handler_module_path(&self) -> ModulePath {

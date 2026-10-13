@@ -10,7 +10,10 @@ pub fn route_url_read(RouteUrlInput { path, server }: &RouteUrlInput) -> TokenSt
     let origin = server_origin_ident(server);
 
     quote! {
-        margaret::framework::http::literal_url::literal_url(&#origin, #path)
+        margaret::framework::server_origin::route_url::RouteUrl::parse(
+            margaret::framework::http::literal_url::literal_url(&#origin, #path),
+        )
+        .map_err(margaret::framework::console::report_failure::report_failure)
     }
 }
 
@@ -20,7 +23,7 @@ mod tests {
     use crate::route_url_input::RouteUrlInput;
 
     #[test]
-    fn composes_the_url_of_a_route_from_the_origin_of_its_server() {
+    fn parses_the_url_of_a_route_composed_from_the_origin_of_its_server() {
         assert_eq!(
             route_url_read(&RouteUrlInput {
                 path: "/sign-in/callback".to_string(),
@@ -29,7 +32,7 @@ mod tests {
             .to_string()
             .split_whitespace()
             .collect::<String>(),
-            "margaret::framework::http::literal_url::literal_url(&origin_public,\"/sign-in/callback\")"
+            "margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/sign-in/callback\"),).map_err(margaret::framework::console::report_failure::report_failure)"
         );
     }
 }

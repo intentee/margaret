@@ -25,12 +25,10 @@ pub struct PostAliceSession {
 }
 
 impl PostAliceSession {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(clock: Arc<SystemClock>, sessions: Arc<IssuedSessions>) -> anyhow::Result<Self> {
-        Ok(Self { clock, sessions })
+    pub fn create(clock: Arc<SystemClock>, sessions: Arc<IssuedSessions>) -> Self {
+        Self { clock, sessions }
     }
 
     /// # Errors

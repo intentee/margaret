@@ -4,8 +4,10 @@ mod console_command;
 mod console_command_arguments;
 mod console_commands;
 pub mod console_plan;
+mod invocation_dispatch;
 mod render;
 pub mod render_console;
+pub mod serve_dispatch;
 
 #[cfg(test)]
 mod tests {
@@ -28,12 +30,15 @@ mod tests {
     use margaret_http_codegen::server_uploads::ServerUploads;
     use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_service_codegen::read_serve_invocation::read_serve_invocation;
+    use margaret_service_codegen::service_plan::ServicePlan;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use crate::console_artifacts::ConsoleArtifacts;
     use crate::console_codegen_error::ConsoleCodegenError;
     use crate::console_plan::ConsolePlan;
     use crate::render_console::render_console;
+    use crate::serve_dispatch::ServeDispatch;
 
     const COMMANDS: &str = r#"
 use std::sync::Arc;
@@ -96,42 +101,18 @@ impl Farewell {
         .bindings
     }
 
-    fn render_planned_console(
+    fn served(
         index: &AttributeIndex,
-        serves: bool,
-        has_models: bool,
-        http_servers: &[HttpServer],
-        serve_inputs: &[SlottedServeInput],
         bindings: &ContainerBindings,
-    ) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
-        let plan = ConsolePlan::build(index, bindings)?;
+        http_servers: &[HttpServer],
+    ) -> ServeDispatch {
+        let plan = ServicePlan::build(index, &[], bindings, &[]).expect("the services are planned");
 
-        Ok(render_console(
-            &plan,
-            serves,
-            has_models,
-            http_servers,
-            serve_inputs,
-            bindings,
-        ))
+        ServeDispatch::Served(read_serve_invocation(&plan, http_servers, bindings))
     }
 
-    fn source_for(lib_source: &str, has_http: bool) -> String {
-        let index = IndexedSource::new(lib_source).index;
-        let http_servers = if has_http {
-            vec![HttpServer::new(
-                "public".to_string(),
-                ServerTransportPolicy::Negotiable,
-                ServerUploads::Refused,
-            )]
-        } else {
-            Vec::new()
-        };
-
-        let bindings = bindings(&index);
-        let plan = ConsolePlan::build(&index, &bindings).expect("the console is planned");
-
-        render_console(&plan, has_http, false, &http_servers, &[], &bindings)
+    fn collapsed(artifacts: ConsoleArtifacts) -> String {
+        artifacts
             .modules
             .into_iter()
             .map(|module| {
@@ -146,11 +127,73 @@ impl Farewell {
             .collect()
     }
 
+    fn render_planned_console(
+        index: &AttributeIndex,
+        serve: &ServeDispatch,
+        has_models: bool,
+        http_servers: &[HttpServer],
+        serve_inputs: &[SlottedServeInput],
+        bindings: &ContainerBindings,
+    ) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
+        let plan = ConsolePlan::build(index, bindings)?;
+
+        Ok(render_console(
+            &plan,
+            serve,
+            has_models,
+            http_servers,
+            serve_inputs,
+            bindings,
+        ))
+    }
+
+    fn served_source(lib_source: &str, http_servers: &[HttpServer]) -> String {
+        let index = IndexedSource::new(lib_source).index;
+        let bindings = bindings(&index);
+
+        collapsed(
+            render_planned_console(
+                &index,
+                &served(&index, &bindings, http_servers),
+                false,
+                http_servers,
+                &[],
+                &bindings,
+            )
+            .expect("the console renders"),
+        )
+    }
+
+    fn source_for(lib_source: &str) -> String {
+        let index = IndexedSource::new(lib_source).index;
+        let bindings = bindings(&index);
+
+        collapsed(
+            render_planned_console(&index, &ServeDispatch::Unserved, false, &[], &[], &bindings)
+                .expect("the console renders"),
+        )
+    }
+
+    fn public() -> Vec<HttpServer> {
+        vec![HttpServer::new(
+            "public".to_string(),
+            ServerTransportPolicy::Negotiable,
+            ServerUploads::Refused,
+        )]
+    }
+
     fn rejection_for(lib_source: &str) -> ConsoleCodegenError {
         let index = IndexedSource::new(lib_source).index;
 
-        render_planned_console(&index, false, false, &[], &[], &bindings(&index))
-            .expect_err("the console source fails to generate")
+        render_planned_console(
+            &index,
+            &ServeDispatch::Unserved,
+            false,
+            &[],
+            &[],
+            &bindings(&index),
+        )
+        .expect_err("the console source fails to generate")
     }
 
     fn error_for(lib_source: &str) -> String {
@@ -161,16 +204,23 @@ impl Farewell {
     fn rejects_a_command_absent_from_the_container_plan() {
         let index = IndexedSource::new(COMMANDS).index;
         let empty_bindings = bindings(&IndexedSource::new("").index);
-        let error = render_planned_console(&index, false, false, &[], &[], &empty_bindings)
-            .map(drop)
-            .expect_err("every command must belong to the same container plan");
+        let error = render_planned_console(
+            &index,
+            &ServeDispatch::Unserved,
+            false,
+            &[],
+            &[],
+            &empty_bindings,
+        )
+        .map(drop)
+        .expect_err("every command must belong to the same container plan");
 
         assert!(error.to_string().contains("crate::Demo"));
     }
 
     #[test]
     fn generates_a_dispatcher_for_each_argument_kind() {
-        let source = source_for(COMMANDS, false);
+        let source = source_for(COMMANDS);
 
         assert!(source.contains("pubfnrun"));
         assert!(source.contains("run<Arguments,Argument>(args:Arguments,)"));
@@ -188,11 +238,14 @@ impl Farewell {
         assert!(source.contains("clap::value_parser!(::std::string::String)"));
 
         assert!(source.contains("super::container::build::construct_demo("));
-        assert!(source.contains(r#"matches.get_one::<::std::string::String>("name")"#));
+        assert!(source.contains(
+            r#"Some(("demo",matches))=>{margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"name").and_then(|serve_input_0|{margaret::framework::console::optional_argument::optional_argument::<::std::string::String,>(matches,"salutation").and_then(|serve_input_1|{margaret::framework::console::flag_argument::flag_argument(matches,"loud",).map(|serve_input_2|self::invocation::Invocation::Run("#
+        ));
         assert!(
-            source.contains(r#"matches.get_one::<::std::string::String>("salutation").cloned()"#)
+            source.contains(
+                "argument0:serve_input_0,argument1:serve_input_1,argument2:serve_input_2,"
+            )
         );
-        assert!(source.contains(r#"matches.get_flag("loud")"#));
 
         assert!(source.contains(r#"Some(("farewell",_matches))=>{"#));
         assert!(source.contains("super::container::build::construct_farewell()"));
@@ -205,7 +258,6 @@ impl Farewell {
     fn declares_the_package_version_on_the_generated_command() {
         let source = source_for(
             "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"boot\")]\nstruct Boot;\n\nimpl Boot {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            false,
         );
 
         assert!(source.contains(r#".version(env!("CARGO_PKG_VERSION"))"#));
@@ -215,7 +267,6 @@ impl Farewell {
     fn accepts_commands_named_after_the_generated_entry_point() {
         let source = source_for(
             "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"run\")]\nstruct Run;\n\nimpl Run {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"command\")]\nstruct Command;\n\nimpl Command {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            false,
         );
 
         assert!(source.contains("pubfnrun<Arguments,Argument>"));
@@ -227,7 +278,7 @@ impl Farewell {
 
     #[test]
     fn adds_a_serve_command_when_http_exists() {
-        let source = source_for("struct App;\n", true);
+        let source = served_source("struct App;\n", &public());
 
         assert!(source.contains("pubasyncfnrun"));
         assert!(source.contains(r#"clap::Command::new("serve")"#));
@@ -239,39 +290,23 @@ impl Farewell {
         );
         assert!(!source.contains("public-upload-dir"));
         assert!(source.contains(
-            "margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|super::serve::serve(matches,cancellation_token,),)"
+            r#"Some(("serve",matches))=>{margaret::framework::console::required_argument::required_argument::<margaret::framework::server_origin::server_origin::ServerOrigin,>(matches,"public-url")"#
+        ));
+        assert!(source.contains(
+            ".map(|serve_invocation|self::invocation::Invocation::Run(margaret::framework::console::command_future::CommandFuture::new(asyncmove{margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|super::serve::serve(serve_invocation,cancellation_token,),).await}),))"
         ));
     }
 
     #[test]
     fn requires_the_upload_directory_of_a_server_that_accepts_uploads() {
-        let index = IndexedSource::new("struct App;\n").index;
-        let bindings = bindings(&index);
-        let source: String = render_planned_console(
-            &index,
-            true,
-            false,
+        let source = served_source(
+            "struct App;\n",
             &[HttpServer::new(
                 "public".to_string(),
                 ServerTransportPolicy::Negotiable,
                 ServerUploads::Accepted,
             )],
-            &[],
-            &bindings,
-        )
-        .expect("the console renders")
-        .modules
-        .into_iter()
-        .map(|module| {
-            module
-                .format()
-                .expect("the module formats")
-                .source()
-                .to_string()
-        })
-        .collect::<String>()
-        .split_whitespace()
-        .collect();
+        );
 
         assert!(source.contains(
             r#"clap::Arg::new("public-upload-dir").long("public-upload-dir").required(true).value_parser(clap::value_parser!(::std::path::PathBuf))"#
@@ -280,11 +315,8 @@ impl Farewell {
 
     #[test]
     fn emits_spiffe_transport_flags_when_a_server_is_pinned() {
-        let index = IndexedSource::new("struct App;\n").index;
-        let source: String = render_planned_console(
-            &index,
-            true,
-            false,
+        let source = served_source(
+            "struct App;\n",
             &[
                 HttpServer::new(
                     "internal".to_string(),
@@ -297,22 +329,7 @@ impl Farewell {
                     ServerUploads::Refused,
                 ),
             ],
-            &[],
-            &bindings(&index),
-        )
-        .expect("the console source is generated")
-        .modules
-        .into_iter()
-        .map(|module| {
-            module
-                .format()
-                .expect("the module formats")
-                .source()
-                .to_string()
-        })
-        .collect::<String>()
-        .split_whitespace()
-        .collect();
+        );
 
         assert!(source.contains(
             r#"clap::Arg::new("internal-transport").long("internal-transport").required(true).value_parser(margaret::framework::service::transport_choice::TransportChoice::pinned_to_spiffe_mtls()"#
@@ -330,7 +347,7 @@ impl Farewell {
 
     #[test]
     fn omits_transport_flags_when_no_server_is_pinned() {
-        let source = source_for("struct App;\n", true);
+        let source = served_source("struct App;\n", &public());
 
         assert!(!source.contains("public-transport"));
         assert!(!source.contains("spiffe-trust-domain"));
@@ -338,11 +355,8 @@ impl Farewell {
 
     #[test]
     fn registers_one_address_argument_per_active_server() {
-        let index = IndexedSource::new("struct App;\n").index;
-        let source: String = render_planned_console(
-            &index,
-            true,
-            false,
+        let source = served_source(
+            "struct App;\n",
             &[
                 HttpServer::new(
                     "public".to_string(),
@@ -355,22 +369,7 @@ impl Farewell {
                     ServerUploads::Refused,
                 ),
             ],
-            &[],
-            &bindings(&index),
-        )
-        .expect("the console source is generated")
-        .modules
-        .into_iter()
-        .map(|module| {
-            module
-                .format()
-                .expect("the module formats")
-                .source()
-                .to_string()
-        })
-        .collect::<String>()
-        .split_whitespace()
-        .collect();
+        );
 
         assert!(
             source.contains(r#"clap::Arg::new("public-addr").long("public-addr").required(true)"#)
@@ -384,22 +383,7 @@ impl Farewell {
 
     #[test]
     fn registers_a_serve_command_without_addr_for_a_service_only_app() {
-        let index = IndexedSource::new("struct App;\n").index;
-        let source: String =
-            render_planned_console(&index, true, false, &[], &[], &bindings(&index))
-                .expect("the console source is generated")
-                .modules
-                .into_iter()
-                .map(|module| {
-                    module
-                        .format()
-                        .expect("the module formats")
-                        .source()
-                        .to_string()
-                })
-                .collect::<String>()
-                .split_whitespace()
-                .collect();
+        let source = served_source("struct App;\n", &[]);
 
         assert!(source.contains(r#"clap::Command::new("serve")"#));
         assert!(!source.contains(r#"clap::Arg::new("addr")"#));
@@ -409,21 +393,17 @@ impl Farewell {
     #[test]
     fn adds_a_schema_command_when_models_exist() {
         let index = IndexedSource::new("struct App;\n").index;
-        let source: String =
-            render_planned_console(&index, false, true, &[], &[], &bindings(&index))
-                .expect("the console source is generated")
-                .modules
-                .into_iter()
-                .map(|module| {
-                    module
-                        .format()
-                        .expect("the module formats")
-                        .source()
-                        .to_string()
-                })
-                .collect::<String>()
-                .split_whitespace()
-                .collect();
+        let source = collapsed(
+            render_planned_console(
+                &index,
+                &ServeDispatch::Unserved,
+                true,
+                &[],
+                &[],
+                &bindings(&index),
+            )
+            .expect("the console source is generated"),
+        );
 
         assert!(source.contains(r#"clap::Command::new("schema")"#));
         assert!(source.contains(r#"Some(("schema",_matches))=>{"#));
@@ -435,31 +415,66 @@ impl Farewell {
     #[test]
     fn emits_a_synchronous_run_when_only_the_schema_command_exists() {
         let index = IndexedSource::new("struct App;\n").index;
-        let source: String =
-            render_planned_console(&index, false, true, &[], &[], &bindings(&index))
-                .expect("the console source is generated")
-                .modules
-                .into_iter()
-                .map(|module| {
-                    module
-                        .format()
-                        .expect("the module formats")
-                        .source()
-                        .to_string()
-                })
-                .collect::<String>()
-                .split_whitespace()
-                .collect();
+        let source = collapsed(
+            render_planned_console(
+                &index,
+                &ServeDispatch::Unserved,
+                true,
+                &[],
+                &[],
+                &bindings(&index),
+            )
+            .expect("the console source is generated"),
+        );
 
         assert!(source.contains("pubfnrun<Arguments,Argument>"));
         assert!(!source.contains("pubasyncfnrun"));
     }
 
     #[test]
+    fn invokes_a_boxed_closure_when_every_command_runs_synchronously() {
+        let source = source_for(COMMANDS);
+
+        assert!(source.contains(
+            "pubenumInvocation{Help,Run(::std::boxed::Box<dyn::std::ops::FnOnce()->margaret::framework::console::command_outcome::CommandOutcome,>,),}"
+        ));
+        assert!(source.contains(
+            "Ok(self::invocation::Invocation::Run(command_run))=>command_run(),Ok(self::invocation::Invocation::Help)=>{margaret::framework::console::print_help::print_help(&mutcommand)}Err(outcome)=>outcome,"
+        ));
+    }
+
+    #[test]
+    fn awaits_a_command_future_when_a_command_runs_asynchronously() {
+        let source = source_for(
+            "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    async fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        );
+
+        assert!(source.contains(
+            "pubenumInvocation{Help,Run(margaret::framework::console::command_future::CommandFuture),}"
+        ));
+        assert!(
+            source
+                .contains("Ok(self::invocation::Invocation::Run(command_run))=>command_run.await,")
+        );
+    }
+
+    #[test]
+    fn reports_a_clap_failure_through_the_only_error_arm_of_the_parse_chain() {
+        let source = source_for(COMMANDS);
+
+        assert!(source.contains(
+            "matchmargaret::framework::console::parsed_arguments::parsed_arguments(&mutcommand,args,).and_then(|matches|matchmatches.subcommand(){"
+        ));
+        assert!(
+            source.contains("_=>::std::result::Result::Ok(self::invocation::Invocation::Help),")
+        );
+        assert_eq!(source.matches("Err(").count(), 2);
+    }
+
+    #[test]
     fn injects_the_cancellation_token_into_a_command_runner() {
         let source = source_for(
             "use tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch {\n    target: String,\n}\n\nimpl Watch {\n    #[constructor]\n    fn create(#[console_argument(positional)] target: String) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            false,
         );
 
         assert!(source.contains(
@@ -472,7 +487,6 @@ impl Farewell {
     fn awaits_an_asynchronous_command_runner_that_takes_the_cancellation_token() {
         let source = source_for(
             "use tokio_util::sync::CancellationToken;\nuse margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[process]\n    async fn run(&self, token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            false,
         );
 
         assert!(source.contains(".run(cancellation_token).await"));
@@ -482,7 +496,6 @@ impl Farewell {
     fn awaits_a_command_that_declares_an_asynchronous_runner() {
         let source = source_for(
             "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    async fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            false,
         );
 
         assert!(source.contains("pubasyncfnrun"));
@@ -493,7 +506,6 @@ impl Farewell {
     fn awaits_a_command_whose_construction_is_asynchronous() {
         let source = source_for(
             "use std::sync::Arc;\nuse margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\n#[singleton]\nstruct Slow;\n\nimpl Slow {\n    #[constructor]\n    async fn create() -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare {\n    slow: Arc<Slow>,\n}\n\nimpl Bare {\n    #[constructor]\n    fn create(slow: Arc<Slow>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            false,
         );
 
         assert!(source.contains("pubasyncfnrun"));
@@ -505,11 +517,12 @@ impl Farewell {
     fn renders_a_command_that_takes_only_a_flag() {
         let source = source_for(
             "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged {\n    loud: bool,\n}\n\nimpl Flagged {\n    #[constructor]\n    fn create(#[console_argument(from = \"loud\")] loud: bool) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            false,
         );
 
         assert!(source.contains("super::container::build::construct_flagged("));
-        assert!(source.contains(r#"matches.get_flag("loud")"#));
+        assert!(source.contains(
+            r#"margaret::framework::console::flag_argument::flag_argument(matches,"loud",).map(|serve_input_0|"#
+        ));
         assert!(source.contains("report_failure::report_failure(error"));
         assert!(source.contains(".run()"));
     }
@@ -692,14 +705,13 @@ impl Farewell {
     fn dispatches_a_fieldless_command_without_a_constructor() {
         let source = source_for(
             "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            false,
         );
 
         assert!(source.contains(r#"Some(("bare",_matches))=>{"#));
-        assert!(source.contains("super::container::build::construct_bare()"));
+        assert!(source.contains("letconstructed=super::container::build::construct_bare();"));
         assert!(!source.contains("super::container::build::construct_bare().await"));
-        assert!(source.contains("report_failure::report_failure(error"));
-        assert!(source.contains(".run()"));
+        assert!(!source.contains("report_failure::report_failure(error"));
+        assert!(source.contains("constructed.run()"));
     }
 
     #[test]
@@ -734,10 +746,11 @@ impl Farewell {
     fn binds_a_destructured_positional_console_argument_by_index_as_it_has_no_name() {
         let source = source_for(
             "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\nstruct Point {\n    x: i32,\n    y: i32,\n}\n\n#[singleton]\n#[console_command(name = \"plot\")]\nstruct Plot {\n    point: Point,\n}\n\nimpl Plot {\n    #[constructor]\n    fn create(#[console_argument(positional)] Point { x, y }: Point) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            false,
         );
 
         assert!(source.contains(r#"clap::Arg::new("argument_0").required(true)"#));
-        assert!(source.contains(r#"matches.get_one::<crate::Point>("argument_0")"#));
+        assert!(source.contains(
+            r#"margaret::framework::console::required_argument::required_argument::<crate::Point,>(matches,"argument_0").map(|serve_input_0|"#
+        ));
     }
 }

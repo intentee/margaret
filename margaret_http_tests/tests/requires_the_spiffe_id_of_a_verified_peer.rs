@@ -1,13 +1,14 @@
 use http::Method;
 use spiffe::spiffe_id::SpiffeId;
 
-use margaret_http::require_peer_spiffe_id::require_peer_spiffe_id;
 use margaret_http::requirement::Requirement;
+use margaret_http::with_verified_peer::with_verified_peer;
 use margaret_http_tests::fixture_request::FixtureRequest;
+use margaret_http_tests::met_verified_peer::met_verified_peer;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
-#[test]
-fn requires_the_spiffe_id_of_a_verified_peer() {
+#[tokio::test]
+async fn requires_the_spiffe_id_of_a_verified_peer() {
     let spiffe_id = SpiffeId::new("spiffe://example.org/workload").expect("the SPIFFE ID parses");
     let mut fixture = FixtureRequest::new(Method::GET, "/");
 
@@ -18,7 +19,8 @@ fn requires_the_spiffe_id_of_a_verified_peer() {
     let request = fixture.into_request();
 
     assert!(matches!(
-        require_peer_spiffe_id(&request),
-        Requirement::Met(verified) if verified == &spiffe_id
+        with_verified_peer(&request, Requirement::Unmet, met_verified_peer)
+        .await,
+        Requirement::Met(verified) if verified == spiffe_id
     ));
 }

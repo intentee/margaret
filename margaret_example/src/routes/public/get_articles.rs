@@ -21,12 +21,10 @@ pub struct GetArticles {
 }
 
 impl GetArticles {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(articles: Arc<ArticleRepository>) -> anyhow::Result<Self> {
-        Ok(Self { articles })
+    pub fn create(articles: Arc<ArticleRepository>) -> Self {
+        Self { articles }
     }
 
     /// # Errors

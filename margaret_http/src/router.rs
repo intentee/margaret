@@ -56,12 +56,12 @@ pub struct Router {
 }
 
 impl Router {
-    pub(crate) fn build<const COUNT: usize>(
+    pub(crate) fn build(
         matcher: Arc<matchit::Router<RoutePosition>>,
-        paths: [&'static str; COUNT],
-        entries: [RouteEntry; COUNT],
+        paths: Vec<&'static str>,
+        entries: Vec<RouteEntry>,
     ) -> Result<Self, RouterError> {
-        let mut targets = Vec::with_capacity(COUNT);
+        let mut targets = Vec::with_capacity(entries.len());
 
         for (path, entry) in paths.into_iter().zip(entries) {
             targets.push(match entry {

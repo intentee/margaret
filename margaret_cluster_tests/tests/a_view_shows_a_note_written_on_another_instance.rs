@@ -1,8 +1,8 @@
+use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
+use margaret_cluster_tests::note_written::note_written;
 
-use crate::addressed_route::addressed_route;
 use crate::cluster_binary::cluster_binary;
-use crate::note_written::note_written;
 
 #[tokio::test]
 async fn a_view_shows_a_note_written_on_another_instance() {

@@ -2,6 +2,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_environment_variable_codegen::environment_variable_name::EnvironmentVariableName;
 use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
 
+use crate::framework_preparation::FrameworkPreparation;
 use crate::url_source::UrlSource;
 
 pub enum FrameworkDependency {
@@ -14,6 +15,7 @@ pub enum FrameworkDependency {
         value_type: CanonicalPath,
     },
     Provider(CanonicalPath),
+    Prepared(FrameworkPreparation),
     Providers(Vec<CanonicalPath>),
     RouteUrl(RouteUrlInput),
     Routes,

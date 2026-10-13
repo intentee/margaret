@@ -17,12 +17,10 @@ pub struct GetAsset {
 }
 
 impl GetAsset {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(asset_responder: Arc<AssetResponder>) -> anyhow::Result<Self> {
-        Ok(Self { asset_responder })
+    pub fn create(asset_responder: Arc<AssetResponder>) -> Self {
+        Self { asset_responder }
     }
 
     /// # Errors

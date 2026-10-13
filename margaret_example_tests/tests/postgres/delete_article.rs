@@ -21,7 +21,6 @@ async fn responds_ok_after_deleting_the_bound_article_so_it_is_no_longer_found()
 
     assert_eq!(
         DeleteArticle::create(Arc::clone(&blog.database))
-            .expect("the responder is constructed")
             .respond(article)
             .await
             .expect("the responder succeeds")

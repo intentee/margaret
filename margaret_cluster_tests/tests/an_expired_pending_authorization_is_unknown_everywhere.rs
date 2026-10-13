@@ -3,11 +3,11 @@ use reqwest::StatusCode;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::cluster_server::ClusterServer;
 use margaret_cluster_tests::consent_decision::consent_decision;
+use margaret_cluster_tests::expire_pending_authorizations::expire_pending_authorizations;
 use margaret_cluster_tests::partner_consent::partner_consent;
 use margaret_cluster_tests::started_alice_session::started_alice_session;
 
 use crate::cluster_binary::cluster_binary;
-use crate::expire_pending_authorizations::expire_pending_authorizations;
 
 #[tokio::test]
 async fn an_expired_pending_authorization_is_unknown_everywhere() {

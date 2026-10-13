@@ -15,10 +15,12 @@ fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
     match leaf {
         "Box" => Some(StandardLibraryItem::Box.std_path()),
         "Copy" => Some(copy_path()),
+        "From" => Some(StandardLibraryItem::From.std_path()),
         "Option" => Some(StandardLibraryItem::Option.std_path()),
         "Send" => Some(StandardLibraryItem::Send.std_path()),
         "String" => Some(StandardLibraryItem::String.std_path()),
         "Sync" => Some(StandardLibraryItem::Sync.std_path()),
+        "TryFrom" => Some(StandardLibraryItem::TryFrom.std_path()),
         "Vec" => Some(StandardLibraryItem::Vec.std_path()),
         primitive if is_copy_primitive(primitive) => {
             Some(CanonicalPath::new(vec![leaf.to_string()]))
@@ -377,6 +379,18 @@ mod tests {
         assert_eq!(
             resolved(&PathResolver::default(), &parse_quote!(u16), &["crate"]),
             Some("u16".to_string())
+        );
+    }
+
+    #[test]
+    fn resolves_the_bare_conversion_traits_to_the_prelude() {
+        assert_eq!(
+            resolved(&PathResolver::default(), &parse_quote!(From), &["crate"]),
+            Some("std::convert::From".to_string())
+        );
+        assert_eq!(
+            resolved(&PathResolver::default(), &parse_quote!(TryFrom), &["crate"]),
+            Some("std::convert::TryFrom".to_string())
         );
     }
 

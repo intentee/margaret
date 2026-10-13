@@ -3,10 +3,10 @@ use futures_util::StreamExt as _;
 use margaret_cluster_tests::chat_socket::chat_socket;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::cluster_server::ClusterServer;
+use margaret_cluster_tests::listed_messages::listed_messages;
 use margaret_cluster_tests::posted_chat_message::posted_chat_message;
 
 use crate::cluster_binary::cluster_binary;
-use crate::listed_messages::listed_messages;
 
 #[tokio::test]
 async fn a_chat_session_closes_on_stop_and_reconnects_to_a_peer() {

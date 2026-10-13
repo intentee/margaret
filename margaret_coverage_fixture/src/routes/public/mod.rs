@@ -1,0 +1,15 @@
+pub mod get_archive;
+pub mod get_audits;
+pub mod get_book;
+pub mod get_deliveries;
+pub mod get_featured;
+pub mod get_loading_dock;
+pub mod get_loans;
+pub mod get_lobby;
+pub mod get_notice_board;
+pub mod get_opening_hours;
+pub mod get_reading_room;
+pub mod get_shelf;
+pub mod get_staff_room;
+pub mod get_visitor_pass;
+pub mod post_book;

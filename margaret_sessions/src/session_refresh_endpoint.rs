@@ -8,10 +8,9 @@ use margaret_http::handles_limited_content::HandlesLimitedContent;
 use margaret_http::no_store::no_store;
 use margaret_http::request::Request;
 use margaret_http::request_body::RequestBody;
-use margaret_http::require_peer_spiffe_id::require_peer_spiffe_id;
-use margaret_http::requirement::Requirement;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::with_verified_peer::with_verified_peer;
 use margaret_http_validation::responded_to_form::responded_to_form;
 use margaret_validation::validation_result::ValidationResult;
 
@@ -62,10 +61,9 @@ impl HandlesLimitedContent for SessionRefreshEndpoint {
         body: RequestBody,
         limit: BodyLimit,
     ) -> Result<ResponseContinuation, HandlerError> {
-        if let Requirement::Unmet(refusal) = require_peer_spiffe_id(request) {
-            return Ok(refusal);
-        }
-
-        responded_to_form(request, body, limit, |refresh| self.respond(refresh)).await
+        with_verified_peer(request, Ok, |_peer| {
+            responded_to_form(request, body, limit, |refresh| self.respond(refresh))
+        })
+        .await
     }
 }

@@ -16,11 +16,11 @@ fn unifies_serve_inputs_across_roots_in_slot_order() {
     let serve = bindings
         .serve_inputs(&[path("Config"), path("Service")])
         .expect("the service roots have complete serve input plans");
-    let names: Vec<&str> = serve.iter().map(|slotted| slotted.input.name()).collect();
+    let names: Vec<String> = serve.iter().map(|slotted| slotted.input.name()).collect();
 
     assert_eq!(serve.len(), 2);
-    assert!(names.contains(&"path"));
-    assert!(names.contains(&"alpha"));
+    assert!(names.contains(&"path".to_string()));
+    assert!(names.contains(&"alpha".to_string()));
     assert!(serve[0].slot < serve[1].slot);
     assert_eq!(
         bindings

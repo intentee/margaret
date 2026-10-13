@@ -27,7 +27,6 @@ async fn routes_a_token_to_the_trusted_issuer_it_names() {
     .signed_by(secret.current());
     let authorization = RequestAuthorization::parse(Some(&format!("Bearer {token}")));
     let BearerTokenRouting::Routed(routed) = route_bearer_token(&authorization, &[&other, &named])
-        .expect("the system clock reads as a numeric date")
     else {
         panic!("the token routes to the issuer it names");
     };

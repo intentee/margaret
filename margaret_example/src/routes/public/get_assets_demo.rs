@@ -19,12 +19,10 @@ pub struct GetAssetsDemo {
 }
 
 impl GetAssetsDemo {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(asset_page: Arc<AssetPage>) -> anyhow::Result<Self> {
-        Ok(Self { asset_page })
+    pub fn create(asset_page: Arc<AssetPage>) -> Self {
+        Self { asset_page }
     }
 
     /// # Errors
@@ -51,10 +49,8 @@ mod tests {
 
     #[tokio::test]
     async fn responds_ok_with_the_rendered_asset_page_so_the_demo_route_serves_a_page() {
-        let page =
-            AssetPage::create(Arc::new(AssetShowcase)).expect("the asset page is constructed");
-        let responder =
-            GetAssetsDemo::create(Arc::new(page)).expect("the responder is constructed");
+        let page = AssetPage::create(Arc::new(AssetShowcase));
+        let responder = GetAssetsDemo::create(Arc::new(page));
 
         assert_eq!(
             responder

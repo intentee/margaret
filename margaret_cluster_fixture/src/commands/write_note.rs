@@ -22,15 +22,10 @@ pub struct WriteNote {
 }
 
 impl WriteNote {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(
-        database: Arc<Database>,
-        #[console_argument(positional)] body: String,
-    ) -> anyhow::Result<Self> {
-        Ok(Self { body, database })
+    pub fn create(database: Arc<Database>, #[console_argument(positional)] body: String) -> Self {
+        Self { body, database }
     }
 
     /// # Errors

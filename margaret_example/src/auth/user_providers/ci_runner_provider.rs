@@ -21,31 +21,27 @@ pub struct CiRunnerProvider {
 }
 
 impl CiRunnerProvider {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(trusted_workflow: Arc<TrustedWorkflow>) -> anyhow::Result<Self> {
-        Ok(Self { trusted_workflow })
+    pub fn create(trusted_workflow: Arc<TrustedWorkflow>) -> Self {
+        Self { trusted_workflow }
     }
 
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[infer_from_request]
     pub fn infer_ci_runner(
         &self,
         #[bearer_token(issuer = github_actions)] token: Option<
             VerifiedJwt<GithubActionsClaims, IdTokenProfile>,
         >,
-    ) -> anyhow::Result<AuthenticatedUserOutcome<CiRunner>> {
+    ) -> AuthenticatedUserOutcome<CiRunner> {
         let Some(verified) = token else {
-            return Ok(AuthenticatedUserOutcome::Anonymous);
+            return AuthenticatedUserOutcome::Anonymous;
         };
 
         if !self.trusted_workflow.admits(&verified.claims) {
-            return Ok(AuthenticatedUserOutcome::Interrupted(
-                ResponseContinuation::from(Response::forbidden()),
+            return AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(
+                Response::forbidden(),
             ));
         }
 
@@ -55,9 +51,9 @@ impl CiRunnerProvider {
             ..
         } = verified.claims;
 
-        Ok(AuthenticatedUserOutcome::Authenticated(CiRunner {
+        AuthenticatedUserOutcome::Authenticated(CiRunner {
             repository,
             repository_id,
-        }))
+        })
     }
 }

@@ -88,6 +88,9 @@ mod tests {
     use crate::bound_parameter::BoundParameter;
     use crate::captured_providers::CapturedProviders;
     use crate::head_extraction_context::HeadExtractionContext;
+    use crate::inference_fallibility::InferenceFallibility;
+    use crate::inference_kind::InferenceKind;
+    use crate::inference_shape::InferenceShape;
     use crate::request_binding::RequestBinding;
     use crate::route_parameter_lookup::RouteParameterLookup;
 
@@ -129,7 +132,7 @@ mod tests {
             .find(caller_identity)
             .expect("the caller identity is extracted");
         let binding = rendered
-            .find("require_bound_route_parameter(")
+            .find("bind_route_parameter(")
             .expect("the route model is bound");
 
         identification < binding
@@ -146,6 +149,10 @@ mod tests {
                         "SessionUserProvider".to_string(),
                     ]),
                     field: "session_user_provider".to_string(),
+                    inference: InferenceShape {
+                        fallibility: InferenceFallibility::Fallible,
+                        kind: InferenceKind::Outcome,
+                    },
                     injects_peer_spiffe_id: false,
                     injects_routes: false,
                     injects_views: false,
@@ -160,19 +167,6 @@ mod tests {
         assert!(renders_before_the_route_model(
             &rendered(&[route_model(), user]),
             "InfersAuthenticatedUser::infer(",
-        ));
-    }
-
-    #[test]
-    fn renders_the_peer_identity_before_route_models() {
-        let peer = BoundParameter {
-            binding: RequestBinding::PeerSpiffeId,
-            holder: format_ident!("peer"),
-        };
-
-        assert!(renders_before_the_route_model(
-            &rendered(&[route_model(), peer]),
-            "require_peer_spiffe_id(",
         ));
     }
 }

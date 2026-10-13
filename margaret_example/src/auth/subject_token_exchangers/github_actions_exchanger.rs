@@ -22,12 +22,10 @@ pub struct GithubActionsExchanger {
 }
 
 impl GithubActionsExchanger {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(trusted_workflow: Arc<TrustedWorkflow>) -> anyhow::Result<Self> {
-        Ok(Self { trusted_workflow })
+    pub fn create(trusted_workflow: Arc<TrustedWorkflow>) -> Self {
+        Self { trusted_workflow }
     }
 }
 

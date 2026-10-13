@@ -56,8 +56,11 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
         source.push_str("#[rustfmt::skip]\npub mod authenticated_users;\n");
     }
 
-    if serves_http {
+    if features.contains(GeneratedFeature::Forwarders) {
         source.push_str("#[rustfmt::skip]\npub mod forwarders;\n");
+    }
+
+    if serves_http {
         source.push_str("#[rustfmt::skip]\npub mod http;\n");
         source.push_str("#[rustfmt::skip]\npub mod routes;\n");
     }

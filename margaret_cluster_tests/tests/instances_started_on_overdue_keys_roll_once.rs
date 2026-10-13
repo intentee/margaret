@@ -3,12 +3,12 @@ use reqwest::StatusCode;
 
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::instance_key_set::instance_key_set;
+use margaret_cluster_tests::overdue_signing_keys::overdue_signing_keys;
+use margaret_cluster_tests::profile_status::profile_status;
+use margaret_cluster_tests::signing_key_generations::signing_key_generations;
 use margaret_cluster_tests::started_alice_session::started_alice_session;
 
 use crate::cluster_binary::cluster_binary;
-use crate::overdue_signing_keys::overdue_signing_keys;
-use crate::profile_status::profile_status;
-use crate::signing_key_generations::signing_key_generations;
 
 #[tokio::test]
 async fn instances_started_on_overdue_keys_roll_once_and_admit_earlier_tokens() {

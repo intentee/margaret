@@ -19,12 +19,10 @@ pub struct DeleteArticle {
 }
 
 impl DeleteArticle {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create(database: Arc<Database>) -> anyhow::Result<Self> {
-        Ok(Self { database })
+    pub fn create(database: Arc<Database>) -> Self {
+        Self { database }
     }
 
     /// # Errors

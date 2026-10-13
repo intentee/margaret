@@ -16,7 +16,6 @@ fn titles(articles: &[Article]) -> Vec<&str> {
 async fn lists_the_seeded_articles_in_id_order() {
     let blog = seeded_blog().await;
     let listed = ArticleRepository::create(Arc::clone(&blog.database))
-        .expect("the article repository is constructed")
         .listed(None)
         .await
         .expect("the articles are listed");
@@ -35,7 +34,6 @@ async fn lists_the_articles_of_one_author_so_the_author_filter_excludes_the_rest
     assert_eq!(
         titles(
             &ArticleRepository::create(Arc::clone(&blog.database))
-                .expect("the article repository is constructed")
                 .listed(Some("Milo".to_string()))
                 .await
                 .expect("the articles are listed")
@@ -50,7 +48,6 @@ async fn lists_no_articles_of_an_unknown_author() {
 
     assert!(
         ArticleRepository::create(Arc::clone(&blog.database))
-            .expect("the article repository is constructed")
             .listed(Some("Nobody".to_string()))
             .await
             .expect("the articles are listed")

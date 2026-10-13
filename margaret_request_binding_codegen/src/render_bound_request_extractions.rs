@@ -54,7 +54,6 @@ pub(crate) fn render_bound_request_extractions(
     HeadExtractionContext {
         continuation_return,
         owner,
-        request_local,
         ..
     }: &HeadExtractionContext,
 ) -> TokenStream {
@@ -92,9 +91,11 @@ pub(crate) fn render_bound_request_extractions(
             }
         };
 
+        let holder = &bound.parameter.holder;
+
         quote! {
-            margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(
-                #request_local,
+            margaret::framework::http::bind_route_parameter::bind_route_parameter(
+                #holder,
                 #path_key,
                 #binder,
             )
@@ -187,7 +188,7 @@ mod tests {
         .collect();
 
         assert!(rendered.contains(
-            "require_bound_route_parameter(request,\"article\",&margaret::framework::active_record::primary_key_binder::PrimaryKeyBinder::<crate::Article>::new(framework_database.as_ref(),),)"
+            "bind_route_parameter(article,\"article\",&margaret::framework::active_record::primary_key_binder::PrimaryKeyBinder::<crate::Article>::new(framework_database.as_ref(),),)"
         ));
     }
 }

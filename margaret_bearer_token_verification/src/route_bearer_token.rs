@@ -1,5 +1,6 @@
 use std::ops::ControlFlow;
-use std::time::SystemTime;
+
+use chrono::Utc;
 
 use margaret_http::bearer_challenge::BearerChallenge;
 use margaret_http::request_authorization::RequestAuthorization;
@@ -8,7 +9,6 @@ use margaret_jwt_verification::jwt_presentation::JwtPresentation;
 use margaret_jwt_verification::jwt_routing::JwtRouting;
 use margaret_jwt_verification::presented_jwt::PresentedJwt;
 use margaret_registered_claims::numeric_date::NumericDate;
-use margaret_registered_claims::registered_claims_error::RegisteredClaimsError;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 use crate::attributed_bearer_token::AttributedBearerToken;
@@ -54,13 +54,14 @@ fn route_presented_at<'request, 'trusted>(
     }
 }
 
-/// # Errors
-///
-/// Returns `RegisteredClaimsError` when the system clock cannot be read as a numeric date.
+#[must_use]
 pub fn route_bearer_token<'request, 'trusted>(
     authorization: &'request RequestAuthorization,
     trusted_issuers: &[&'trusted TrustedIssuer],
-) -> Result<BearerTokenRouting<'request, 'trusted>, RegisteredClaimsError> {
-    NumericDate::from_system_time(SystemTime::now())
-        .map(|presented_at| route_presented_at(authorization, trusted_issuers, presented_at))
+) -> BearerTokenRouting<'request, 'trusted> {
+    route_presented_at(
+        authorization,
+        trusted_issuers,
+        NumericDate::from(Utc::now()),
+    )
 }

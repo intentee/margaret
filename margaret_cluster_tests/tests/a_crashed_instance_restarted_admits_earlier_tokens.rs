@@ -1,10 +1,10 @@
 use reqwest::StatusCode;
 
 use margaret_cluster_tests::cluster::Cluster;
+use margaret_cluster_tests::profile_status::profile_status;
 use margaret_cluster_tests::started_alice_session::started_alice_session;
 
 use crate::cluster_binary::cluster_binary;
-use crate::profile_status::profile_status;
 
 #[tokio::test]
 async fn a_crashed_instance_restarted_admits_earlier_tokens() {

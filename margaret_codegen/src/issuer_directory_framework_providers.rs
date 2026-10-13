@@ -18,11 +18,9 @@ pub(crate) fn issuer_directory_framework_providers(
 
     vec![
         FrameworkProvider {
-            construction: FrameworkConstruction::Constructor {
-                dependencies: Vec::new(),
-                is_async: false,
+            construction: FrameworkConstruction::Prepared {
                 method: "create".to_string(),
-                outcome: ConstructorOutcome::Fallible,
+                sources: Vec::new(),
             },
             enablement: FrameworkEnablement::Dependency,
             injection: FrameworkInjectionRole::Unmarked,

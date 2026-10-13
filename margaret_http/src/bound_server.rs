@@ -454,6 +454,7 @@ mod tests {
         ServerPaths::build(paths)
             .expect("the route paths do not conflict")
             .routes(entries)
+            .build()
             .expect("the route entries register cleanly")
             .router
     }

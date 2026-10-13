@@ -1,0 +1,5 @@
+mod admits_a_profile_through_an_aliased_inference;
+mod binds_a_user_behind_an_aliased_guard;
+mod boots_through_an_aliased_command;
+mod echoes_a_chat_message_through_an_aliased_responder;
+mod renders_a_view_through_aliased_results;

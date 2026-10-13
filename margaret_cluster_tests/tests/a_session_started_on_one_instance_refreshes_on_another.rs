@@ -2,12 +2,12 @@ use reqwest::StatusCode;
 use reqwest::header::COOKIE;
 
 use margaret_cluster_tests::cluster::Cluster;
+use margaret_cluster_tests::profile_status::profile_status;
 use margaret_cluster_tests::response_cookie::response_cookie;
 use margaret_cluster_tests::session_access_cookie::SESSION_ACCESS_COOKIE;
 use margaret_cluster_tests::started_alice_session::started_alice_session;
 
 use crate::cluster_binary::cluster_binary;
-use crate::profile_status::profile_status;
 
 #[tokio::test]
 async fn a_session_started_on_one_instance_refreshes_on_another() {

@@ -1,12 +1,12 @@
 use reqwest::StatusCode;
 use serde_json::json;
 
+use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
+use margaret_cluster_tests::note_written::note_written;
+use margaret_cluster_tests::stored_note::StoredNote;
 
-use crate::addressed_route::addressed_route;
 use crate::cluster_binary::cluster_binary;
-use crate::note_written::note_written;
-use crate::stored_note::StoredNote;
 
 #[tokio::test]
 async fn notes_are_written_read_updated_and_deleted_across_instances() {

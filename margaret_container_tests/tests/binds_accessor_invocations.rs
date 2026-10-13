@@ -33,7 +33,7 @@ fn invokes_the_selected_root_construction_function_so_only_that_root_is_built() 
     let invocation = bindings.construction_invocation(
         &CanonicalPath::new(vec!["crate".to_string(), "Loader".to_string()]),
         "loader",
-        &[],
+        &bindings.construction_arguments("loader", &[]),
     );
 
     assert_eq!(

@@ -3,18 +3,26 @@ use quote::quote;
 
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_container::container_bindings::ContainerBindings;
+use margaret_container::reported_construction::reported_construction;
 use margaret_container::serve_input_binding::ServeInputBinding;
 use margaret_container::slotted_serve_input::SlottedServeInput;
+use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::module_path::ModulePath;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_origin_source::ServerOriginSource;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::server_uploads::ServerUploads;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
+use margaret_serve_input_codegen::chained_read::ChainedRead;
+use margaret_serve_input_codegen::chained_reads::chained_reads;
 use margaret_serve_input_codegen::serve_input_read::serve_input_read;
 use margaret_serve_input_codegen::serve_input_registration::serve_input_registration;
 use margaret_serve_input_codegen::spiffe_client_requirements::SpiffeClientRequirements;
+use margaret_service_codegen::serve_invocation_read::ServeInvocationRead;
 
 use crate::console_command::ConsoleCommand;
+use crate::invocation_dispatch::InvocationDispatch;
+use crate::serve_dispatch::ServeDispatch;
 
 fn transport_argument_registration(server: &HttpServer) -> TokenStream {
     let transport_argument = server.transport_argument();
@@ -107,7 +115,72 @@ fn serve_registration(
     }
 }
 
-fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenStream {
+fn command_execution(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenStream {
+    let naming = bindings.serve_input_naming();
+    let arguments: Vec<ServeInputBinding> = command
+        .serve_inputs
+        .iter()
+        .map(|SlottedServeInput { slot, .. }| {
+            let binding = naming.ident(*slot);
+
+            ServeInputBinding {
+                slot: *slot,
+                value: quote! { #binding },
+            }
+        })
+        .collect();
+    let field_name = command.accessor.to_string();
+    let constructed = reported_construction(
+        &bindings.construction_invocation(
+            &command.construction_root,
+            &field_name,
+            &bindings.construction_arguments(&field_name, &arguments),
+        ),
+        bindings.construction_outcome(&command.construction_root),
+    );
+
+    if command.takes_token {
+        let run_call = if command.is_async {
+            quote! { constructed.run(cancellation_token).await }
+        } else {
+            quote! { constructed.run(cancellation_token) }
+        };
+
+        quote! {
+            margaret::framework::service::dispatch_serve::dispatch_serve(
+                margaret::framework::service::install::install,
+                |cancellation_token| async move {
+                    let constructed = #constructed;
+
+                    margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
+                        #run_call,
+                    )
+                },
+            )
+            .await
+        }
+    } else {
+        let run_call = if command.is_async {
+            quote! { constructed.run().await }
+        } else {
+            quote! { constructed.run() }
+        };
+
+        quote! {
+            let constructed = #constructed;
+
+            margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
+                #run_call,
+            )
+        }
+    }
+}
+
+fn command_arm(
+    command: &ConsoleCommand,
+    bindings: &ContainerBindings,
+    dispatch: InvocationDispatch,
+) -> TokenStream {
     let name = &command.name;
     let matches_binding = if command
         .serve_inputs
@@ -118,90 +191,70 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
     } else {
         quote! { _matches }
     };
-    let values: Vec<ServeInputBinding> = command
+    let naming = bindings.serve_input_naming();
+    let reads: Vec<ChainedRead> = command
         .serve_inputs
         .iter()
-        .map(|SlottedServeInput { input, slot }| ServeInputBinding {
-            slot: *slot,
-            value: serve_input_read(input),
+        .map(|SlottedServeInput { input, slot }| {
+            let binding = naming.ident(*slot);
+
+            ChainedRead {
+                binding: quote! { #binding },
+                read: serve_input_read(input),
+            }
         })
         .collect();
-    let construction = bindings.construction_invocation(
-        &command.construction_root,
-        &command.accessor.to_string(),
-        &values,
-    );
-    let accessor_access = quote! {
-        (match #construction {
-            Ok(value) => value,
-            Err(error) => {
-                return margaret::framework::console::report_failure::report_failure(error);
-            }
-        })
-    };
+    let chain = chained_reads(&reads, &dispatch.run(&command_execution(command, bindings)));
 
-    if command.takes_token {
-        let run_call = if command.is_async {
-            quote! { #accessor_access.run(cancellation_token).await }
-        } else {
-            quote! { #accessor_access.run(cancellation_token) }
-        };
-
-        quote! {
-            Some((#name, #matches_binding)) => {
-                margaret::framework::service::dispatch_serve::dispatch_serve(
-                    margaret::framework::service::install::install,
-                    |cancellation_token| async move {
-                        margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
-                            #run_call,
-                        )
-                    },
-                )
-                .await
-            }
-        }
-    } else {
-        let run_call = if command.is_async {
-            quote! { #accessor_access.run().await }
-        } else {
-            quote! { #accessor_access.run() }
-        };
-
-        quote! {
-            Some((#name, #matches_binding)) => {
-                margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
-                    #run_call,
-                )
-            }
-        }
+    quote! {
+        Some((#name, #matches_binding)) => #chain,
     }
 }
 
-fn schema_tokens(has_models: bool) -> SchemaTokens {
-    let registration = if has_models {
-        quote! {
-            .subcommand(clap::Command::new("schema"))
-        }
-    } else {
-        quote! {}
-    };
+fn serve_arm(serve: &ServeDispatch, dispatch: InvocationDispatch) -> TokenStream {
+    match serve {
+        ServeDispatch::Served(ServeInvocationRead { binding, chain }) => {
+            let run = dispatch.run(&quote! {
+                margaret::framework::service::dispatch_serve::dispatch_serve(
+                    margaret::framework::service::install::install,
+                    |cancellation_token| super::serve::serve(serve_invocation, cancellation_token),
+                )
+                .await
+            });
 
-    let arm = if has_models {
-        quote! {
-            Some(("schema", _matches)) => {
-                println!(
-                    "{}",
-                    margaret::framework::model::render_postgres::render_postgres(&super::schema::SCHEMA)
-                );
-
-                margaret::framework::console::command_outcome::CommandOutcome::Succeeded
+            quote! {
+                Some(("serve", #binding)) => #chain.map(|serve_invocation| #run),
             }
         }
-    } else {
-        quote! {}
-    };
+        ServeDispatch::Unserved => TokenStream::new(),
+    }
+}
 
-    SchemaTokens { arm, registration }
+fn schema_tokens(has_models: bool, dispatch: InvocationDispatch) -> SchemaTokens {
+    if !has_models {
+        return SchemaTokens {
+            arm: TokenStream::new(),
+            registration: TokenStream::new(),
+        };
+    }
+
+    let run = dispatch.run(&quote! {
+        println!(
+            "{}",
+            margaret::framework::model::render_postgres::render_postgres(&super::schema::SCHEMA)
+        );
+
+        margaret::framework::console::command_outcome::CommandOutcome::Succeeded
+    });
+
+    SchemaTokens {
+        arm: quote! {
+            Some(("schema", _matches)) => ::std::result::Result::Ok(#run),
+        },
+        registration: quote! {
+            .subcommand(clap::Command::new("schema"))
+        },
+    }
 }
 
 struct SchemaTokens {
@@ -211,81 +264,88 @@ struct SchemaTokens {
 
 pub(crate) fn render(
     commands: &[ConsoleCommand],
-    serves: bool,
+    serve: &ServeDispatch,
     has_models: bool,
     http_servers: &[HttpServer],
     serve_inputs: &[SlottedServeInput],
     bindings: &ContainerBindings,
-) -> TokenStream {
-    let dispatches_asynchronously = serves
+) -> Vec<GeneratedModuleTokens> {
+    let serves = matches!(serve, ServeDispatch::Served(_));
+    let dispatch = if serves
         || commands.iter().any(|command| {
             command.takes_token
                 || command.is_async
                 || bindings.construction_is_async(&command.construction_root)
-        });
-    let run_asyncness = if dispatches_asynchronously {
-        quote! { async }
+        }) {
+        InvocationDispatch::Asynchronous
     } else {
-        quote! {}
+        InvocationDispatch::Synchronous
     };
+    let run_asyncness = dispatch.run_asyncness();
     let subcommands = commands.iter().map(subcommand_registration);
     let arms = commands
         .iter()
-        .map(|command| command_arm(command, bindings))
+        .map(|command| command_arm(command, bindings, dispatch))
         .collect::<Vec<TokenStream>>();
-
     let SchemaTokens {
         arm: schema_arm,
         registration: schema_registration,
-    } = schema_tokens(has_models);
-
+    } = schema_tokens(has_models, dispatch);
     let serve_registration = if serves {
         serve_registration(http_servers, serve_inputs)
     } else {
         quote! {}
     };
-
-    let serve_arm = if serves {
-        quote! {
-            Some(("serve", matches)) => {
-                margaret::framework::service::dispatch_serve::dispatch_serve(
-                    margaret::framework::service::install::install,
-                            |cancellation_token| super::serve::serve(matches, cancellation_token),
-                )
-                .await
-            }
-        }
-    } else {
-        quote! {}
-    };
-
+    let serve_arm = serve_arm(serve, dispatch);
+    let invoked = dispatch.invoked();
+    let invocation_type = dispatch.invocation_type();
     let too_many_lines = too_many_lines_allow();
-    quote! {
-        #too_many_lines
-        pub #run_asyncness fn run<Arguments, Argument>(
-            args: Arguments,
-        ) -> margaret::framework::console::command_outcome::CommandOutcome
-        where
-            Arguments: IntoIterator<Item = Argument>,
-            Argument: Into<std::ffi::OsString> + Clone,
-        {
-            let mut command = clap::Command::new(env!("CARGO_PKG_NAME"))
-                .version(env!("CARGO_PKG_VERSION"))
-                #(#subcommands)*
-                #serve_registration
-                #schema_registration;
 
-            match command.try_get_matches_from_mut(args) {
-                Ok(matches) => match matches.subcommand() {
-                    #(#arms)*
-                    #serve_arm
-                    #schema_arm
-                    _ => margaret::framework::console::print_help::print_help(&mut command),
-                },
-                Err(error) => {
-                    margaret::framework::console::outcome_for_clap_error::outcome_for_clap_error(&error)
+    vec![
+        GeneratedModuleTokens::new(
+            ModulePath::root("run").child("invocation"),
+            quote! {
+                pub enum Invocation {
+                    Help,
+                    Run(#invocation_type),
                 }
-            }
-        }
-    }
+            },
+        ),
+        GeneratedModuleTokens::new(
+            ModulePath::root("run"),
+            quote! {
+                mod invocation;
+
+                #too_many_lines
+                pub #run_asyncness fn run<Arguments, Argument>(
+                    args: Arguments,
+                ) -> margaret::framework::console::command_outcome::CommandOutcome
+                where
+                    Arguments: IntoIterator<Item = Argument>,
+                    Argument: Into<std::ffi::OsString> + Clone,
+                {
+                    let mut command = clap::Command::new(env!("CARGO_PKG_NAME"))
+                        .version(env!("CARGO_PKG_VERSION"))
+                        #(#subcommands)*
+                        #serve_registration
+                        #schema_registration;
+
+                    match margaret::framework::console::parsed_arguments::parsed_arguments(&mut command, args)
+                        .and_then(|matches| match matches.subcommand() {
+                            #(#arms)*
+                            #serve_arm
+                            #schema_arm
+                            _ => ::std::result::Result::Ok(self::invocation::Invocation::Help),
+                        })
+                    {
+                        Ok(self::invocation::Invocation::Run(command_run)) => #invoked,
+                        Ok(self::invocation::Invocation::Help) => {
+                            margaret::framework::console::print_help::print_help(&mut command)
+                        }
+                        Err(outcome) => outcome,
+                    }
+                }
+            },
+        ),
+    ]
 }

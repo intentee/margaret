@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use cookie::Cookie;
 
+#[derive(Debug, PartialEq)]
 pub struct Forward {
     cookies: Vec<Cookie<'static>>,
     name: &'static str,

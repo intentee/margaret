@@ -95,7 +95,7 @@ impl FixtureAuthorizationServer {
     #[must_use]
     pub fn request_client(&self) -> Arc<IssuerRequestClient> {
         Arc::new(
-            IssuerRequestClient::build(
+            IssuerRequestClient::preconfigured(
                 fixture_client_builder(&self.fixture.certificate_authority)
                     .resolve(&self.fixture.server_name, self.server.address()),
             )

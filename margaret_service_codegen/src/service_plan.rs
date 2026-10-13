@@ -1,10 +1,9 @@
-use proc_macro2::TokenStream;
-
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::serve_input_binding::ServeInputBinding;
 use margaret_container::slotted_serve_input::SlottedServeInput;
+use margaret_serve_input_codegen::chained_read::ChainedRead;
 use margaret_serve_input_codegen::spiffe_client_requirements::SpiffeClientRequirements;
 
 use crate::framework_service::FrameworkService;
@@ -15,8 +14,8 @@ use crate::service_units::service_units;
 
 pub struct ServicePlan {
     pub(crate) construction_arguments: Vec<ServeInputBinding>,
+    pub(crate) reads: Vec<ChainedRead>,
     pub(crate) reads_clap_matches: bool,
-    pub(crate) prelude: TokenStream,
     pub(crate) units: Vec<ServiceUnit>,
     roots: Vec<CanonicalPath>,
     pub(crate) served_roots: Vec<CanonicalPath>,
@@ -44,12 +43,12 @@ impl ServicePlan {
         let serve_inputs = bindings.serve_inputs(&served_roots)?;
         let ServeInputs {
             construction_arguments,
-            prelude,
+            reads,
         } = ServeInputs::resolve(&serve_inputs, bindings);
 
         Ok(Self {
             construction_arguments,
-            prelude,
+            reads,
             reads_clap_matches: serve_inputs
                 .iter()
                 .any(|slotted| slotted.input.reads_clap_matches()),

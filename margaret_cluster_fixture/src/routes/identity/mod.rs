@@ -1,4 +1,3 @@
-pub mod consent_required;
 pub mod get_authorize;
 pub mod get_discovery;
 pub mod get_jwks;
@@ -7,4 +6,5 @@ pub mod post_authorization_consent;
 pub mod post_authorize;
 pub mod post_introspect;
 pub mod post_revoke;
+pub mod post_staff_sign_out;
 pub mod post_token;

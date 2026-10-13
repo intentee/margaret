@@ -15,14 +15,8 @@ pub fn views() -> Views {
 
     Views {
         card_layout: card_layout.clone(),
-        consent_view: Arc::new(
-            ConsentView::create(card_layout.clone()).expect("the consent view is constructed"),
-        ),
-        farewell_view: Arc::new(
-            FarewellView::create(card_layout.clone()).expect("the farewell view is constructed"),
-        ),
-        greeting_view: Arc::new(
-            GreetingView::create(card_layout).expect("the greeting view is constructed"),
-        ),
+        consent_view: Arc::new(ConsentView::create(card_layout.clone())),
+        farewell_view: Arc::new(FarewellView::create(card_layout.clone())),
+        greeting_view: Arc::new(GreetingView::create(card_layout)),
     }
 }

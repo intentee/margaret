@@ -41,7 +41,7 @@ fn hands_the_routes_to_a_framework_constructor() {
             .expect("the consent page has planned serve inputs")
             .iter()
             .map(|slotted| slotted.input.name())
-            .collect::<Vec<&str>>(),
+            .collect::<Vec<String>>(),
         ["routes"]
     );
 }

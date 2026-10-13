@@ -7,6 +7,7 @@ use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
+use margaret_container::preparation_source::PreparationSource;
 use margaret_oidc_provider_codegen::authorization_endpoint_url_path::authorization_endpoint_url_path;
 use margaret_oidc_provider_codegen::authorization_handler_path::authorization_handler_path;
 use margaret_oidc_provider_codegen::consent_page::ConsentPage;
@@ -167,16 +168,20 @@ fn served_endpoint_providers(
     served.extend(
         endpoint_routes
             .serves(ProviderEndpoint::Discovery)
-            .then(|| {
-                served_endpoint(
-                    vec![
-                        aggregate(ProviderAggregate::ProviderSupport),
-                        FrameworkDependency::Constant(provider_endpoints_path()),
-                        FrameworkDependency::TokenIssuance,
+            .then(|| FrameworkProvider {
+                construction: FrameworkConstruction::Prepared {
+                    method: "create".to_string(),
+                    sources: vec![
+                        PreparationSource::Constant(provider_aggregate_path(
+                            ProviderAggregate::ProviderSupport,
+                        )),
+                        PreparationSource::Constant(provider_endpoints_path()),
+                        PreparationSource::TokenIssuance,
                     ],
-                    ConstructorOutcome::Fallible,
-                    OidcProviderItem::ProviderMetadataHandler,
-                )
+                },
+                enablement: FrameworkEnablement::Declared,
+                injection: FrameworkInjectionRole::FrameworkState,
+                provided: oidc_provider_item_path(OidcProviderItem::ProviderMetadataHandler),
             }),
     );
     served.extend(
@@ -266,11 +271,9 @@ pub(crate) fn oidc_provider_framework_providers(
             oidc_provider_item_path(OidcProviderItem::SubjectTokenExchangers),
         ),
         FrameworkProvider {
-            construction: FrameworkConstruction::Constructor {
-                dependencies: vec![FrameworkDependency::Constant(provider_endpoints_path())],
-                is_async: false,
+            construction: FrameworkConstruction::Prepared {
                 method: "of_provider".to_string(),
-                outcome: ConstructorOutcome::Fallible,
+                sources: vec![PreparationSource::Constant(provider_endpoints_path())],
             },
             enablement: FrameworkEnablement::Dependency,
             injection: FrameworkInjectionRole::Unmarked,

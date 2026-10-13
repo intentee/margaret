@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use margaret_attributes::name_allocator::NameAllocator;
+use margaret_codegen_tokens::positional_naming::PositionalNaming;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
@@ -19,13 +19,14 @@ use crate::server_layout::ServerLayout;
 fn forward_method(named: &NamedRoute<'_>) -> TokenStream {
     let method = format_ident!("{}", named.name);
     let name = named.name;
-    let mut allocator = NameAllocator::new();
-    let forwarded: Vec<ForwardedParameter<'_>> = named
-        .path
-        .parameters()
-        .map(|placeholder| ForwardedParameter {
+    let placeholders: Vec<&str> = named.path.parameters().collect();
+    let naming = PositionalNaming::route_parameters(placeholders.len());
+    let forwarded: Vec<ForwardedParameter<'_>> = placeholders
+        .into_iter()
+        .enumerate()
+        .map(|(position, placeholder)| ForwardedParameter {
             placeholder,
-            value: format_ident!("{}", allocator.allocate(placeholder).field()),
+            value: naming.ident(position),
         })
         .collect();
     let parameters = forwarded.iter().map(|ForwardedParameter { value, .. }| {
@@ -59,27 +60,19 @@ fn injects_forwarder(table: &HttpRouteTable, server: &HttpServer) -> bool {
         .any(|argument| matches!(argument.binding, RequestBinding::Forwarder))
 }
 
-fn server_forwarder(table: &HttpRouteTable, layout: &ServerLayout<'_>) -> TokenStream {
+fn server_forwarder(layout: &ServerLayout<'_>) -> TokenStream {
     let methods: Vec<TokenStream> = layout
         .named
         .iter()
         .filter(|named| named.route.method() == RouteMethod::Get)
         .map(forward_method)
         .collect();
-    let constructor = injects_forwarder(table, layout.server).then(|| {
-        quote! {
-            pub(in crate::margaret) fn new() -> Self {
-                Self(())
-            }
-        }
-    });
 
     quote! {
+        #[derive(Default)]
         pub struct Forwarder(());
 
         impl Forwarder {
-            #constructor
-
             #(#methods)*
         }
     }
@@ -94,7 +87,16 @@ pub(crate) fn render_forwarders(
     table: &HttpRouteTable,
     layouts: &[ServerLayout<'_>],
 ) -> Vec<GeneratedModuleTokens> {
-    let server_declarations = layouts.iter().map(|layout| {
+    let forwarding: Vec<&ServerLayout<'_>> = layouts
+        .iter()
+        .filter(|layout| injects_forwarder(table, layout.server))
+        .collect();
+
+    if forwarding.is_empty() {
+        return Vec::new();
+    }
+
+    let server_declarations = forwarding.iter().map(|layout| {
         let field = &layout.field;
 
         quote! {
@@ -109,7 +111,7 @@ pub(crate) fn render_forwarders(
         quote! { #(#server_declarations)* },
     )];
 
-    for layout in layouts {
+    for layout in forwarding {
         let server = forwarders.child(layout.field.to_string());
 
         modules.push(GeneratedModuleTokens::new(
@@ -121,7 +123,7 @@ pub(crate) fn render_forwarders(
         ));
         modules.push(GeneratedModuleTokens::new(
             server.child("forwarder"),
-            server_forwarder(table, layout),
+            server_forwarder(layout),
         ));
     }
 

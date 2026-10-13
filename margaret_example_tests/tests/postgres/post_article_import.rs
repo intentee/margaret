@@ -13,13 +13,9 @@ use margaret_example_tests::seeded_blog::seeded_blog;
 async fn responds_with_500_when_the_author_is_unknown() {
     let blog = seeded_blog().await;
     let responder = PostArticleImport::create(
-        Arc::new(
-            ArticleRepository::create(Arc::clone(&blog.database))
-                .expect("the article repository is constructed"),
-        ),
+        Arc::new(ArticleRepository::create(Arc::clone(&blog.database))),
         Arc::new(SystemClock),
-    )
-    .expect("the responder is constructed");
+    );
     let form = ValidationResult::Valid(PostArticleForm {
         title: "Title".to_string(),
         body: "Body".to_string(),

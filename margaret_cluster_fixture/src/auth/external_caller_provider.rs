@@ -1,4 +1,4 @@
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_presence::AuthenticatedUserPresence;
 use margaret::framework::jwt_verification::id_token_profile::IdTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 use margaret::framework::macros::infer_from_request;
@@ -13,21 +13,19 @@ use crate::models::external_caller::ExternalCaller;
 pub struct ExternalCallerProvider;
 
 impl ExternalCallerProvider {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[infer_from_request]
     pub fn infer_external_caller(
         &self,
         #[bearer_token(issuer = external)] token: Option<
             VerifiedJwt<ExternalClaims, IdTokenProfile>,
         >,
-    ) -> anyhow::Result<AuthenticatedUserOutcome<ExternalCaller>> {
-        Ok(match token {
-            Some(verified) => AuthenticatedUserOutcome::Authenticated(ExternalCaller {
+    ) -> AuthenticatedUserPresence<ExternalCaller> {
+        match token {
+            Some(verified) => AuthenticatedUserPresence::Authenticated(ExternalCaller {
                 subject: verified.claims.sub,
             }),
-            None => AuthenticatedUserOutcome::Anonymous,
-        })
+            None => AuthenticatedUserPresence::Anonymous,
+        }
     }
 }

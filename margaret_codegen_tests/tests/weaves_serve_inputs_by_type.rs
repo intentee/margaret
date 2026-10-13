@@ -10,8 +10,8 @@ fn weaves_each_serve_input_category_with_its_type_appropriate_operation() {
             .expect("the bootstrap arguments module is generated")
             .split_whitespace()
             .collect();
-    let serve: String = generated_module_source(&generated, "serve")
-        .expect("the serve module is generated")
+    let run: String = generated_module_source(&generated, "run")
+        .expect("the run module is generated")
         .split_whitespace()
         .collect();
 
@@ -22,14 +22,22 @@ fn weaves_each_serve_input_category_with_its_type_appropriate_operation() {
     assert!(construction.contains(":::std::option::Option<u16>,"));
     assert!(construction.contains(":::std::option::Option<::std::string::String>,"));
 
-    assert!(serve.contains(
-        r#"matches.get_one::<::std::string::String>("label"){Some(value)=>value.clone()"#
+    assert!(run.contains(
+        r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"label")"#
     ));
-    assert!(
-        serve.contains(
-            r#"matches.get_one::<::std::path::PathBuf>("root"){Some(value)=>value.clone()"#
-        )
-    );
-    assert!(serve.contains("Some(value)=>*value"));
-    assert!(serve.contains("matches.get_flag"));
+    assert!(run.contains(
+        r#"margaret::framework::console::required_argument::required_argument::<::std::path::PathBuf,>(matches,"root")"#
+    ));
+    assert!(run.contains(
+        r#"margaret::framework::console::required_argument::required_argument::<u16,>(matches,"retries")"#
+    ));
+    assert!(run.contains(
+        r#"margaret::framework::console::flag_argument::flag_argument(matches,"verbose",)"#
+    ));
+    assert!(run.contains(
+        r#"margaret::framework::console::optional_argument::optional_argument::<u16,>(matches,"optional-retries")"#
+    ));
+    assert!(run.contains(
+        r#"margaret::framework::console::optional_argument::optional_argument::<::std::string::String,>(matches,"note")"#
+    ));
 }

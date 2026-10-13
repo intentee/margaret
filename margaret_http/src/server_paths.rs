@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::route_entry::RouteEntry;
 use crate::route_position::RoutePosition;
 use crate::router_error::RouterError;
-use crate::server_routes::ServerRoutes;
+use crate::server_route_entries::ServerRouteEntries;
 
 pub struct ServerPaths<const COUNT: usize> {
     matcher: Arc<matchit::Router<RoutePosition>>,
@@ -27,11 +27,9 @@ impl<const COUNT: usize> ServerPaths<COUNT> {
         })
     }
 
-    /// # Errors
-    ///
-    /// Returns `RouterError::DuplicateMethod` when the entry of a path answers one method twice.
-    pub fn routes(&self, entries: [RouteEntry; COUNT]) -> Result<ServerRoutes, RouterError> {
-        ServerRoutes::build(Arc::clone(&self.matcher), self.paths, entries)
+    #[must_use]
+    pub fn routes(&self, entries: [RouteEntry; COUNT]) -> ServerRouteEntries {
+        ServerRouteEntries::new(Arc::clone(&self.matcher), self.paths, entries)
     }
 
     pub(crate) fn resolves_to(&self, path: &str, position: RoutePosition) -> bool {

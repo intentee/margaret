@@ -42,7 +42,7 @@ fn session_routes(
             sign_outs
                 .iter()
                 .map(|SessionSignOutRoute { handler, route, .. }| HandledRoute {
-                    handler: handler.handler_path(),
+                    handler: handler.handler_path().clone(),
                     input: FrameworkInput::Head,
                     route: route.clone(),
                 }),

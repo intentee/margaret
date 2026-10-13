@@ -18,12 +18,8 @@ pub fn environment_variable_read(
     };
 
     quote! {
-        match #reader::<#value_type>(#name) {
-            Ok(value) => value,
-            Err(error) => {
-                return margaret::framework::console::report_failure::report_failure(error);
-            }
-        }
+        #reader::<#value_type>(#name)
+            .map_err(margaret::framework::console::report_failure::report_failure)
     }
 }
 
@@ -76,9 +72,14 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_read_reports_the_failure_and_leaves_the_command() {
-        assert!(collapsed(&variable("DATABASE_URL", true, &["std", "string", "String"])).contains(
-            "Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}"
-        ));
+    fn reports_a_failed_read_through_the_framework_so_no_failure_branch_is_generated() {
+        assert!(
+            collapsed(&variable(
+                "DATABASE_URL",
+                true,
+                &["std", "string", "String"]
+            ))
+            .ends_with(".map_err(margaret::framework::console::report_failure::report_failure)")
+        );
     }
 }

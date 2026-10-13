@@ -70,7 +70,7 @@ fn reads_one_variable_shared_by_the_framework_and_the_application() {
         serve_inputs
             .iter()
             .map(|slotted| slotted.input.name())
-            .collect::<Vec<&str>>(),
+            .collect::<Vec<String>>(),
         ["VAULT_TOKEN"]
     );
 }

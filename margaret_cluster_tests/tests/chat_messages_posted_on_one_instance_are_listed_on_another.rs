@@ -1,10 +1,10 @@
 use margaret_cluster_tests::chat_socket::chat_socket;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::cluster_server::ClusterServer;
+use margaret_cluster_tests::listed_messages::listed_messages;
 use margaret_cluster_tests::posted_chat_message::posted_chat_message;
 
 use crate::cluster_binary::cluster_binary;
-use crate::listed_messages::listed_messages;
 
 #[tokio::test]
 async fn chat_messages_posted_on_one_instance_are_listed_on_another() {

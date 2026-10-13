@@ -37,7 +37,6 @@ async fn admits_a_token_addressed_to(key: &FixtureRsaKey, trusted_issuer: &Trust
     );
     let authorization = RequestAuthorization::parse(Some(&format!("Bearer {token}")));
     let BearerTokenRouting::Routed(routed) = route_bearer_token(&authorization, &[trusted_issuer])
-        .expect("the system clock reads as a numeric date")
     else {
         return false;
     };

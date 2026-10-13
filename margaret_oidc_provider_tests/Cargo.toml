@@ -50,6 +50,7 @@ margaret_oidc_sign_in = { workspace = true }
 margaret_oidc_sign_in_tests = { path = "../margaret_oidc_sign_in_tests" }
 margaret_registered_claims = { workspace = true }
 margaret_route_method = { workspace = true }
+margaret_server_origin = { workspace = true }
 margaret_sessions = { workspace = true }
 margaret_sql_identifier = { workspace = true }
 margaret_subject_token_exchange = { workspace = true }

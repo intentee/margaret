@@ -29,7 +29,6 @@ async fn admits_a_token_through_the_declaration_of_its_audience() {
     let authorization = RequestAuthorization::parse(Some(&format!("Bearer {token}")));
     let BearerTokenRouting::Routed(routed) =
         route_bearer_token(&authorization, &[&elsewhere, &audience])
-            .expect("the system clock reads as a numeric date")
     else {
         panic!("the token routes to the declaration of its audience");
     };

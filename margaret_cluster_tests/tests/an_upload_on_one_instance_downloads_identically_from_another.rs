@@ -2,9 +2,9 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 
-use crate::addressed_route::addressed_route;
 use crate::cluster_binary::cluster_binary;
 
 #[derive(Deserialize)]

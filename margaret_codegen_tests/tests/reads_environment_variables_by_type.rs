@@ -19,16 +19,12 @@ fn fixture() -> ModuleSources {
         run: without_formatting(
             generated_module_source(&generated, "run").expect("the run module is generated"),
         ),
-        serve: without_formatting(
-            generated_module_source(&generated, "serve").expect("the serve module is generated"),
-        ),
     }
 }
 
 struct ModuleSources {
     construction: String,
     run: String,
-    serve: String,
 }
 
 #[test]
@@ -45,29 +41,29 @@ fn declares_each_variable_with_its_canonical_value_type() {
 
 #[test]
 fn reads_a_required_variable_through_the_required_reader() {
-    assert!(fixture().serve.contains(
+    assert!(fixture().run.contains(
         "margaret::framework::environment_variable::read_required::read_required::<::std::string::String>(\"DATABASE_URL\")"
     ));
 }
 
 #[test]
 fn reads_an_optional_variable_through_the_optional_reader() {
-    assert!(fixture().serve.contains(
+    assert!(fixture().run.contains(
         "margaret::framework::environment_variable::read_optional::read_optional::<u16>(\"OPTIONAL_RETRIES\")"
     ));
 }
 
 #[test]
 fn reads_a_boolean_variable_as_an_ordinary_parsed_value() {
-    assert!(fixture().serve.contains(
+    assert!(fixture().run.contains(
         "margaret::framework::environment_variable::read_required::read_required::<bool>(\"WORKER_DEBUG\")"
     ));
 }
 
 #[test]
 fn reports_a_failed_read_and_leaves_the_command() {
-    assert!(fixture().serve.contains(
-        "Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}"
+    assert!(fixture().run.contains(
+        "margaret::framework::environment_variable::read_required::read_required::<::std::string::String>(\"DATABASE_URL\").map_err(margaret::framework::console::report_failure::report_failure,)"
     ));
 }
 
@@ -75,6 +71,8 @@ fn reports_a_failed_read_and_leaves_the_command() {
 fn registers_no_clap_argument_for_a_variable() {
     let run = fixture().run;
 
-    assert!(!run.contains("DATABASE_URL"));
-    assert!(!run.contains("WORKER_DEBUG"));
+    assert_eq!(run.matches("\"DATABASE_URL\"").count(), 1);
+    assert_eq!(run.matches("\"WORKER_DEBUG\"").count(), 1);
+    assert!(run.contains("read_required::<::std::string::String>(\"DATABASE_URL\")"));
+    assert!(run.contains("read_required::<bool>(\"WORKER_DEBUG\")"));
 }

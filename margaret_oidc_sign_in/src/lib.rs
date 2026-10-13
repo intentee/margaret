@@ -8,7 +8,6 @@ pub mod sign_in_callback_handler;
 pub mod sign_in_completion;
 pub mod sign_in_endpoint;
 pub mod sign_in_flow;
-pub mod sign_in_flow_error;
 pub mod sign_in_refusal;
 pub mod sign_in_start_handler;
 pub mod signed_in;

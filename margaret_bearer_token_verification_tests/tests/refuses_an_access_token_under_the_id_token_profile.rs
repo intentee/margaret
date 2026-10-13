@@ -21,7 +21,6 @@ async fn refuses_an_access_token_under_the_id_token_profile() {
     .signed_by(secret.current());
     let authorization = RequestAuthorization::parse(Some(&format!("Bearer {token}")));
     let BearerTokenRouting::Routed(routed) = route_bearer_token(&authorization, &[&trusted_issuer])
-        .expect("the system clock reads as a numeric date")
     else {
         panic!("the token routes to its issuer");
     };

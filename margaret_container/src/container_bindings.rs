@@ -9,11 +9,14 @@ use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
-use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
+use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::positional_naming::PositionalNaming;
+use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
 use crate::bootstrap_arguments_literal::bootstrap_arguments_literal;
 use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
+use crate::constructor_outcome::ConstructorOutcome;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::framework_injection_role::FrameworkInjectionRole;
@@ -22,6 +25,15 @@ use crate::provider_binding::ProviderBinding;
 use crate::serve_input_binding::ServeInputBinding;
 use crate::slotted_serve_input::SlottedServeInput;
 use crate::unify_serve_inputs::unify_serve_inputs;
+
+fn umbrella_arguments_type(function: &Ident) -> TokenStream {
+    path_tokens(&umbrella_item_path(&[
+        "container",
+        "build",
+        &bootstrap_arguments_module(function).to_string(),
+        &bootstrap_arguments_type(function).to_string(),
+    ]))
+}
 
 fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
     let module = bootstrap_arguments_module(function);
@@ -33,8 +45,9 @@ fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
 pub struct ContainerBindings {
     asynchronous_constructions: BTreeSet<CanonicalPath>,
     concrete_providers: BTreeMap<CanonicalPath, Arc<[SlottedServeInput]>>,
+    fallible_constructions: BTreeSet<CanonicalPath>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
-    serve_input_naming: ServeInputNaming,
+    serve_input_naming: PositionalNaming,
 }
 
 impl ContainerBindings {
@@ -42,10 +55,15 @@ impl ContainerBindings {
         let mut providers = BTreeMap::new();
         let mut asynchronous_constructions = BTreeSet::new();
         let mut concrete_providers = BTreeMap::new();
+        let mut fallible_constructions = BTreeSet::new();
 
         for entry in plan.planned_entries() {
             if entry.is_async {
                 asynchronous_constructions.insert(entry.key.clone());
+            }
+
+            if let ConstructorOutcome::Fallible = entry.outcome {
+                fallible_constructions.insert(entry.key.clone());
             }
 
             if plan.injectable(&entry.key) {
@@ -67,6 +85,7 @@ impl ContainerBindings {
         Self {
             asynchronous_constructions,
             concrete_providers,
+            fallible_constructions,
             providers,
             serve_input_naming: plan.serve_input_naming(),
         }
@@ -80,15 +99,26 @@ impl ContainerBindings {
     }
 
     #[must_use]
+    pub fn construction_arguments(
+        &self,
+        field_name: &str,
+        arguments: &[ServeInputBinding],
+    ) -> TokenStream {
+        bootstrap_arguments_literal(
+            &bootstrap_arguments_path(&format_ident!("construct_{field_name}")),
+            arguments,
+        )
+    }
+
+    #[must_use]
     pub fn construction_invocation(
         &self,
         root: &CanonicalPath,
         field_name: &str,
-        arguments: &[ServeInputBinding],
+        arguments: &TokenStream,
     ) -> TokenStream {
         let function = format_ident!("construct_{field_name}");
-        let literal = bootstrap_arguments_literal(&bootstrap_arguments_path(&function), arguments);
-        let invocation = quote! { super::container::build::#function(#literal) };
+        let invocation = quote! { super::container::build::#function(#arguments) };
 
         if self.construction_is_async(root) {
             quote! { #invocation.await }
@@ -100,6 +130,15 @@ impl ContainerBindings {
     #[must_use]
     pub fn construction_is_async(&self, root: &CanonicalPath) -> bool {
         self.asynchronous_constructions.contains(root)
+    }
+
+    #[must_use]
+    pub fn construction_outcome(&self, root: &CanonicalPath) -> ConstructorOutcome {
+        if self.fallible_constructions.contains(root) {
+            ConstructorOutcome::Fallible
+        } else {
+            ConstructorOutcome::Infallible
+        }
     }
 
     #[must_use]
@@ -135,7 +174,7 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn serve_input_naming(&self) -> ServeInputNaming {
+    pub fn serve_input_naming(&self) -> PositionalNaming {
         self.serve_input_naming
     }
 
@@ -155,16 +194,25 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn serve_invocation(
-        &self,
-        arguments: &[ServeInputBinding],
-        served_roots: &[CanonicalPath],
-    ) -> TokenStream {
-        let literal = bootstrap_arguments_literal(
+    pub fn serve_arguments(&self, arguments: &[ServeInputBinding]) -> TokenStream {
+        bootstrap_arguments_literal(
             &bootstrap_arguments_path(&format_ident!("serve")),
             arguments,
-        );
-        let invocation = quote! { super::container::build::serve(#literal) };
+        )
+    }
+
+    #[must_use]
+    pub fn serve_arguments_type(&self) -> TokenStream {
+        umbrella_arguments_type(&format_ident!("serve"))
+    }
+
+    #[must_use]
+    pub fn serve_invocation(
+        &self,
+        arguments: &TokenStream,
+        served_roots: &[CanonicalPath],
+    ) -> TokenStream {
+        let invocation = quote! { super::container::build::serve(#arguments) };
 
         if served_roots
             .iter()
@@ -174,6 +222,15 @@ impl ContainerBindings {
         } else {
             invocation
         }
+    }
+
+    #[must_use]
+    pub fn serve_outcome(&self, served_roots: &[CanonicalPath]) -> ConstructorOutcome {
+        served_roots
+            .iter()
+            .fold(ConstructorOutcome::Infallible, |outcome, root| {
+                outcome.combined_with(self.construction_outcome(root))
+            })
     }
 
     #[must_use]

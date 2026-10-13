@@ -11,13 +11,9 @@ use margaret_example_tests::seeded_blog::seeded_blog;
 async fn status_of(author_id: Uuid) -> u16 {
     let blog = seeded_blog().await;
     let responder = PostArticle::create(
-        Arc::new(
-            ArticleRepository::create(Arc::clone(&blog.database))
-                .expect("the article repository is constructed"),
-        ),
+        Arc::new(ArticleRepository::create(Arc::clone(&blog.database))),
         Arc::new(SystemClock),
-    )
-    .expect("the responder is constructed");
+    );
 
     responder
         .respond(PostArticleForm {
@@ -39,13 +35,9 @@ async fn responds_with_500_when_the_author_is_unknown() {
 async fn creates_a_draft_for_a_known_author() {
     let blog = seeded_blog().await;
     let responder = PostArticle::create(
-        Arc::new(
-            ArticleRepository::create(Arc::clone(&blog.database))
-                .expect("the article repository is constructed"),
-        ),
+        Arc::new(ArticleRepository::create(Arc::clone(&blog.database))),
         Arc::new(SystemClock),
-    )
-    .expect("the responder is constructed");
+    );
 
     assert_eq!(
         responder
@@ -61,7 +53,6 @@ async fn creates_a_draft_for_a_known_author() {
     );
     assert!(
         ArticleRepository::create(Arc::clone(&blog.database))
-            .expect("the article repository is constructed")
             .listed(Some("Milo".to_string()))
             .await
             .expect("the articles are listed")

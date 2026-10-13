@@ -43,6 +43,7 @@ impl RunningWebSocketServer {
             ServerPaths::build(["/ws"])
                 .expect("the route paths do not conflict")
                 .routes([RouteEntry::web_socket(upgrade, middleware)])
+                .build()
                 .expect("the route entries register cleanly")
                 .router,
         );

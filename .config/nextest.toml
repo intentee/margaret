@@ -11,6 +11,23 @@ slow-timeout = { period = "30s", terminate-after = 2 }
 threads-required = 'num-test-threads'
 
 [[profile.default.overrides]]
+filter = 'binary_id(margaret_codegen_tests::served_fixtures)'
+threads-required = 'num-test-threads'
+
+[[profile.default.overrides]]
+filter = 'package(margaret_coverage_fixture_tests)'
+threads-required = 'num-test-threads'
+
+[[profile.default.overrides]]
+filter = 'package(margaret_local_server_tests)'
+threads-required = 'num-test-threads'
+
+[[profile.default.overrides]]
+filter = 'package(margaret_coverage_spiffe_fixture_tests)'
+slow-timeout = { period = "1s", terminate-after = 2 }
+threads-required = 'num-test-threads'
+
+[[profile.default.overrides]]
 filter = 'test(~postgres)'
 slow-timeout = { period = "3s", terminate-after = 2 }
 threads-required = 'num-test-threads'

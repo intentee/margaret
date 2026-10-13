@@ -8,6 +8,12 @@ pub enum ServerOriginError {
         #[source]
         source: url::ParseError,
     },
+    #[error("the url '{url}' composed for a route of a server is malformed: {source}")]
+    MalformedRouteUrl {
+        #[source]
+        source: url::ParseError,
+        url: String,
+    },
     #[error("the server url {url} carries more than its scheme, host and port")]
     NotAnOrigin { url: Url },
 }

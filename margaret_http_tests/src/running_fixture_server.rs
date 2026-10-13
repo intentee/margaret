@@ -36,6 +36,7 @@ impl RunningFixtureServer {
         } = ServerPaths::build(paths)
             .expect("the route paths do not conflict")
             .routes(route_entries)
+            .build()
             .expect("the route entries register cleanly");
         let server = Server::new(address.to_string(), transport, upload_config, router);
         let forward_targets = Arc::new(ForwardTargets::new(named_handlers));

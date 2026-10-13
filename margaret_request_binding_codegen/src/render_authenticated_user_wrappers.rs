@@ -17,7 +17,10 @@ use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::binding_reads_request::binding_reads_request;
 use crate::bound_parameter::BoundParameter;
 use crate::extraction_context::ExtractionContext;
+use crate::inference_fallibility::InferenceFallibility;
+use crate::inference_shape::InferenceShape;
 use crate::render_request_extraction::render_request_extraction;
+use crate::render_route_inputs::render_route_inputs;
 use crate::request_binding::RequestBinding;
 
 fn provider_argument_value(parameter: &BoundParameter) -> TokenStream {
@@ -104,18 +107,14 @@ fn bearer_token_routing(
     });
     let request = context.request_local;
     let continuation_return = context.continuation_return;
-    let system_error_return = context.error_return;
 
     quote! {
         let #routed = match margaret::framework::bearer_token_verification::route_bearer_token::route_bearer_token(
             #request.inputs.server.authorization(),
             &[#(#trusted_issuers),*],
-        )
-        .map_err(margaret::framework::anyhow::Error::from)
-        {
-            ::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Refused(response)) => #continuation_return,
-            ::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Routed(routed)) => routed,
-            ::std::result::Result::Err(error) => #system_error_return,
+        ) {
+            margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Refused(response) => #continuation_return,
+            margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Routed(routed) => routed,
         };
     }
 }
@@ -182,36 +181,54 @@ fn introspected_token_extraction(
     }
 }
 
+fn returned(fallibility: InferenceFallibility, value: &TokenStream) -> TokenStream {
+    match fallibility {
+        InferenceFallibility::Fallible => quote! { return ::std::result::Result::Ok(#value) },
+        InferenceFallibility::Infallible => quote! { return #value },
+    }
+}
+
 fn session_resolution(
     sessions: &InjectedDependency,
     source: SessionSource,
-    cookie_changes: &Ident,
-    request_binding: &Ident,
+    InferenceSteps {
+        cookie_changes,
+        request_binding,
+        wrapper,
+        ..
+    }: &InferenceSteps<'_>,
     session: &Ident,
 ) -> TokenStream {
     let field = format_ident!("{}", sessions.field);
 
     match source {
-        SessionSource::Consumed => quote! {
-            let margaret::framework::sessions::resolved_session::ResolvedSession {
-                cookie_changes: #cookie_changes,
-                session: #session,
-            } = match self.#field.resolve(#request_binding).await {
-                margaret::framework::sessions::session_resolution::SessionResolution::Resolved(resolved) => resolved,
-                margaret::framework::sessions::session_resolution::SessionResolution::Unavailable(unavailability) => {
-                    return ::std::result::Result::Ok(
-                        margaret::framework::identity::session_user_inference::SessionUserInference {
-                            cookie_changes: margaret::framework::http::cookie_changes::CookieChanges {
-                                cookies: ::std::vec::Vec::new(),
-                            },
-                            outcome: margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
-                                margaret::framework::http::response_continuation::ResponseContinuation::from(unavailability),
-                            ),
+        SessionSource::Consumed => {
+            let unavailable = returned(
+                wrapper.fallibility,
+                &quote! {
+                    margaret::framework::identity::session_user_inference::SessionUserInference {
+                        cookie_changes: margaret::framework::http::cookie_changes::CookieChanges {
+                            cookies: ::std::vec::Vec::new(),
                         },
-                    );
-                }
-            };
-        },
+                        outcome: margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
+                            margaret::framework::http::response_continuation::ResponseContinuation::from(unavailability),
+                        ),
+                    }
+                },
+            );
+
+            quote! {
+                let margaret::framework::sessions::resolved_session::ResolvedSession {
+                    cookie_changes: #cookie_changes,
+                    session: #session,
+                } = match self.#field.resolve(#request_binding).await {
+                    margaret::framework::sessions::session_resolution::SessionResolution::Resolved(resolved) => resolved,
+                    margaret::framework::sessions::session_resolution::SessionResolution::Unavailable(unavailability) => {
+                        #unavailable;
+                    }
+                };
+            }
+        }
         SessionSource::Issued => quote! {
             let margaret::framework::sessions::resolved_session::ResolvedSession {
                 cookie_changes: #cookie_changes,
@@ -224,38 +241,170 @@ fn session_resolution(
 fn interruption_return(
     challenge: &AuthenticatedUserChallenge,
     cookie_changes: &Ident,
+    wrapper: InferenceShape,
 ) -> TokenStream {
+    let interrupted = quote! {
+        margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
+            response,
+        )
+    };
+
     match challenge {
-        AuthenticatedUserChallenge::Session { .. } => quote! {
-            return ::std::result::Result::Ok(
+        AuthenticatedUserChallenge::Session { .. } => returned(
+            wrapper.fallibility,
+            &quote! {
                 margaret::framework::identity::session_user_inference::SessionUserInference {
                     cookie_changes: #cookie_changes,
-                    outcome: margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
-                        response,
-                    ),
-                },
-            )
-        },
+                    outcome: #interrupted,
+                }
+            },
+        ),
         AuthenticatedUserChallenge::Bearer { .. }
         | AuthenticatedUserChallenge::Introspection { .. }
-        | AuthenticatedUserChallenge::Unchallenged => quote! {
-            return ::std::result::Result::Ok(
-                margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
-                    response,
-                ),
-            )
+        | AuthenticatedUserChallenge::Unchallenged => returned(wrapper.fallibility, &interrupted),
+    }
+}
+
+fn converted(steps: &InferenceSteps<'_>, value: &TokenStream) -> TokenStream {
+    if steps.declared.kind == steps.wrapper.kind {
+        value.clone()
+    } else {
+        quote! {
+            margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::from(#value)
+        }
+    }
+}
+
+fn session_inference(cookie_changes: &Ident, outcome: &TokenStream) -> TokenStream {
+    quote! {
+        margaret::framework::identity::session_user_inference::SessionUserInference {
+            cookie_changes: #cookie_changes,
+            outcome: #outcome,
+        }
+    }
+}
+
+fn concluded(steps: &InferenceSteps<'_>, conclusion: &Conclusion) -> TokenStream {
+    let infer_call = steps.infer_call;
+
+    match steps.declared.fallibility {
+        InferenceFallibility::Fallible => match conclusion {
+            Conclusion::Inference => {
+                if steps.declared.kind == steps.wrapper.kind {
+                    infer_call.clone()
+                } else {
+                    quote! {
+                        #infer_call.map(
+                            margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::from,
+                        )
+                    }
+                }
+            }
+            Conclusion::SessionInference => {
+                let cookie_changes = steps.cookie_changes;
+                let outcome = if steps.declared.kind == steps.wrapper.kind {
+                    quote! { outcome }
+                } else {
+                    quote! {
+                        outcome: margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::from(outcome)
+                    }
+                };
+
+                quote! {
+                    #infer_call.map(|outcome| {
+                        margaret::framework::identity::session_user_inference::SessionUserInference {
+                            cookie_changes: #cookie_changes,
+                            #outcome,
+                        }
+                    })
+                }
+            }
         },
+        InferenceFallibility::Infallible => {
+            let converted = converted(steps, infer_call);
+            let inferred = match conclusion {
+                Conclusion::Inference => converted,
+                Conclusion::SessionInference => session_inference(steps.cookie_changes, &converted),
+            };
+
+            match steps.wrapper.fallibility {
+                InferenceFallibility::Fallible => quote! { ::std::result::Result::Ok(#inferred) },
+                InferenceFallibility::Infallible => inferred,
+            }
+        }
+    }
+}
+
+fn inference_impl(
+    challenge: &AuthenticatedUserChallenge,
+    model: &TokenStream,
+    steps: &InferenceSteps<'_>,
+) -> InferenceImpl {
+    let InferenceSteps {
+        extractions,
+        routing,
+        wrapper,
+        ..
+    } = steps;
+
+    match challenge {
+        AuthenticatedUserChallenge::Session {
+            holder,
+            sessions,
+            source,
+        } => {
+            let resolution = session_resolution(sessions, *source, steps, holder);
+            let concluded = concluded(steps, &Conclusion::SessionInference);
+            let inferred = wrapper.kind.inferred_type(model);
+
+            InferenceImpl {
+                body: quote! {
+                    #resolution
+                    #extractions
+                    #concluded
+                },
+                output: wrapper.result_of(&quote! {
+                    margaret::framework::identity::session_user_inference::SessionUserInference<#inferred>
+                }),
+                trait_path: quote! {
+                    margaret::framework::identity::infers_session_user::InfersSessionUser
+                },
+            }
+        }
+        AuthenticatedUserChallenge::Bearer { .. }
+        | AuthenticatedUserChallenge::Introspection { .. }
+        | AuthenticatedUserChallenge::Unchallenged => {
+            let concluded = concluded(steps, &Conclusion::Inference);
+
+            InferenceImpl {
+                body: quote! {
+                    #routing
+                    #extractions
+                    #concluded
+                },
+                output: wrapper.inferred_type(model),
+                trait_path: quote! {
+                    margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser
+                },
+            }
+        }
     }
 }
 
 fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     let AuthenticatedUserProvider {
         application,
+        declared,
         is_async,
         method_name,
         parameters,
     } = provider;
-    let AuthenticatedUserApplication { model, wrapper, .. } = application;
+    let AuthenticatedUserApplication {
+        inference,
+        model,
+        wrapper,
+        ..
+    } = application;
     let wrapper_struct = wrapper_struct(application);
     let model = path_tokens(model);
     let mut allocator = NameAllocator::new();
@@ -275,7 +424,8 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
 
     let routed = format_ident!("{}", allocator.allocate("bearer_token").field());
     let cookie_changes = format_ident!("{}", allocator.allocate("changed_cookies").field());
-    let continuation_return = interruption_return(&application.challenge, &cookie_changes);
+    let continuation_return =
+        interruption_return(&application.challenge, &cookie_changes, *inference);
     let error_return = quote! { return ::std::result::Result::Err(error) };
     let provider_access = TokenStream::new();
     let context = ExtractionContext {
@@ -294,63 +444,68 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     } else {
         quote! { self.inner.#method_name(#(#call_arguments),*) }
     };
+    let InferenceImpl {
+        body,
+        output,
+        trait_path,
+    } = inference_impl(
+        &application.challenge,
+        &model,
+        &InferenceSteps {
+            cookie_changes: &cookie_changes,
+            declared: *declared,
+            extractions: &quote! { #(#extractions)* },
+            infer_call: &infer_call,
+            request_binding: &request_binding,
+            routing: &routing,
+            wrapper: *inference,
+        },
+    );
+    let body = render_route_inputs(
+        parameters,
+        &request_binding,
+        &quote! {
+            margaret::framework::identity::unverified_peer_inference::UnverifiedPeerInference::unverified_peer
+        },
+        &body,
+    );
 
-    match &application.challenge {
-        AuthenticatedUserChallenge::Session {
-            holder,
-            sessions,
-            source,
-        } => {
-            let resolution =
-                session_resolution(sessions, *source, &cookie_changes, &request_binding, holder);
+    quote! {
+        #wrapper_struct
 
-            quote! {
-                #wrapper_struct
+        #[async_trait::async_trait]
+        impl #trait_path for #wrapper {
+            type Inference = #output;
 
-                #[async_trait::async_trait]
-                impl margaret::framework::identity::infers_session_user::InfersSessionUser for #wrapper {
-                    type User = #model;
-
-                    async fn infer(
-                        &self,
-                        #request_binding: &margaret::framework::http::request::Request,
-                    ) -> margaret::framework::anyhow::Result<
-                        margaret::framework::identity::session_user_inference::SessionUserInference<Self::User>,
-                    > {
-                        #resolution
-                        #(#extractions)*
-                        #infer_call.map(|outcome| {
-                            margaret::framework::identity::session_user_inference::SessionUserInference {
-                                cookie_changes: #cookie_changes,
-                                outcome,
-                            }
-                        })
-                    }
-                }
+            async fn infer(
+                &self,
+                #request_binding: &margaret::framework::http::request::Request,
+            ) -> Self::Inference {
+                #body
             }
         }
-        AuthenticatedUserChallenge::Bearer { .. }
-        | AuthenticatedUserChallenge::Introspection { .. }
-        | AuthenticatedUserChallenge::Unchallenged => quote! {
-            #wrapper_struct
-
-            #[async_trait::async_trait]
-            impl margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser for #wrapper {
-                type User = #model;
-
-                async fn infer(
-                    &self,
-                    #request_binding: &margaret::framework::http::request::Request,
-                ) -> margaret::framework::anyhow::Result<
-                    margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User>,
-                > {
-                    #routing
-                    #(#extractions)*
-                    #infer_call
-                }
-            }
-        },
     }
+}
+
+enum Conclusion {
+    Inference,
+    SessionInference,
+}
+
+struct InferenceImpl {
+    body: TokenStream,
+    output: TokenStream,
+    trait_path: TokenStream,
+}
+
+struct InferenceSteps<'steps> {
+    cookie_changes: &'steps Ident,
+    declared: InferenceShape,
+    extractions: &'steps TokenStream,
+    infer_call: &'steps TokenStream,
+    request_binding: &'steps Ident,
+    routing: &'steps TokenStream,
+    wrapper: InferenceShape,
 }
 
 #[must_use]

@@ -31,6 +31,7 @@ margaret_jwt_verification = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_oidc_discovery = { workspace = true }
 margaret_registered_claims = { workspace = true }
+margaret_server_origin = { workspace = true }
 margaret_sessions = { workspace = true }
 margaret_subject_token_exchange = { workspace = true }
 margaret_token_digest = { workspace = true }

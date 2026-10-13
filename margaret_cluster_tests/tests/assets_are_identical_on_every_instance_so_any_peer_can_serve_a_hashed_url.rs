@@ -1,8 +1,8 @@
 use reqwest::StatusCode;
 
+use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 
-use crate::addressed_route::addressed_route;
 use crate::cluster_binary::cluster_binary;
 
 #[tokio::test]

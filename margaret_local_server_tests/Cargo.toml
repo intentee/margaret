@@ -1,0 +1,15 @@
+[package]
+name = "margaret_local_server_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+margaret_process_tests = { path = "../margaret_process_tests" }
+tokio = { workspace = true, features = ["macros", "time"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "signal"] }
+
+[lints]
+workspace = true

@@ -16,12 +16,10 @@ use crate::websocket::sessions::storyboard_session::StoryboardSession;
 pub struct TypingIndicator;
 
 impl TypingIndicator {
-    /// # Errors
-    ///
-    /// Returns an error propagated from the work it performs.
+    #[must_use]
     #[constructor]
-    pub fn create() -> anyhow::Result<Self> {
-        Ok(Self)
+    pub fn create() -> Self {
+        Self
     }
 }
 

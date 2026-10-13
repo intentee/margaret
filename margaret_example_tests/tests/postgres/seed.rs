@@ -48,7 +48,6 @@ async fn seeds_the_blog_again_without_duplicating_it() {
                 SESSION_AUDIENCE,
             )),
         )
-        .expect("the seed command is constructed")
         .run()
         .await
         .expect("the blog is seeded again"),
@@ -56,7 +55,6 @@ async fn seeds_the_blog_again_without_duplicating_it() {
     ));
     assert_eq!(
         ArticleRepository::create(Arc::clone(&blog.database))
-            .expect("the article repository is constructed")
             .listed(None)
             .await
             .expect("the articles are listed")
@@ -84,7 +82,6 @@ async fn seeds_the_blog_through_a_single_connection() {
                 SESSION_AUDIENCE,
             )),
         )
-        .expect("the seed command is constructed")
         .run()
         .await
         .expect("the blog is seeded"),

@@ -5,6 +5,7 @@ pub(crate) enum GeneratedFeature {
     AuthenticatedUsers,
     Console,
     Container,
+    Forwarders,
     Http,
     Jwks,
     Middleware,

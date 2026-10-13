@@ -38,7 +38,7 @@ fn refuses_a_token_addressed_to_two_declarations() {
 
     assert!(matches!(
         route_bearer_token(&authorization, &[&addressed, &elsewhere]),
-        Ok(BearerTokenRouting::Refused(ResponseContinuation::Done(response)))
+        BearerTokenRouting::Refused(ResponseContinuation::Done(response))
             if response.status() == 401
     ));
 }

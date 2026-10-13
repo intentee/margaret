@@ -27,6 +27,7 @@ use margaret_request_binding_codegen::injects_views::injects_views;
 use margaret_request_binding_codegen::render_authenticated_user_wrapper_construction::render_authenticated_user_wrapper_construction;
 use margaret_request_binding_codegen::render_content_extraction::render_content_extraction;
 use margaret_request_binding_codegen::render_head_extractions::render_head_extractions;
+use margaret_request_binding_codegen::render_route_inputs::render_route_inputs;
 use margaret_request_binding_codegen::render_session_user_inference::render_session_user_inference;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 use margaret_request_binding_codegen::session_user_parameter::session_user_parameter;
@@ -198,10 +199,10 @@ fn responder_body(
         margaret::framework::http::responded::responded(#respond_call)
     };
 
-    match session_user_parameter(&responder.arguments) {
+    let resolved = match session_user_parameter(&responder.arguments) {
         Some(session_user) => {
             let inference = render_session_user_inference(
-                session_user,
+                &session_user,
                 captured,
                 cookie_changes,
                 &extraction_context,
@@ -216,7 +217,14 @@ fn responder_body(
             }
         }
         None => continuation,
-    }
+    };
+
+    render_route_inputs(
+        &responder.arguments,
+        request_binding,
+        &quote! { ::std::result::Result::Ok },
+        &resolved,
+    )
 }
 
 fn framework_handler(
@@ -361,7 +369,7 @@ fn argument_value(
         RequestBinding::Routes => quote! { #routes_binding.as_ref() },
         RequestBinding::Views => quote! { #views_binding.as_ref() },
         RequestBinding::Forwarder => {
-            quote! { super::super::forwarders::#server::Forwarder::new() }
+            quote! { super::super::forwarders::#server::Forwarder::default() }
         }
         _ => {
             let holder = &argument.holder;
@@ -580,12 +588,8 @@ fn server_module(
         &route_entries,
     );
 
-    let inner_return = quote! {
-        ::std::result::Result<
-            margaret::framework::http::server_routes::ServerRoutes,
-            margaret::framework::http::router_error::RouterError,
-        >
-    };
+    let inner_return =
+        quote! { margaret::framework::http::server_route_entries::ServerRouteEntries };
     let body = quote! { #router };
     let too_many_lines = too_many_lines_allow();
     quote! {

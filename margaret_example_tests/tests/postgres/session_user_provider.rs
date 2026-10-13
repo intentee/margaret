@@ -13,11 +13,9 @@ use margaret_example_tests::seeded_blog::seeded_blog;
 async fn inferred(session: Option<Session>) -> AuthenticatedUserOutcome<User> {
     let blog = seeded_blog().await;
 
-    SessionUserProvider::create(Arc::new(
-        UserAccountRepository::create(Arc::clone(&blog.database))
-            .expect("the user account repository is constructed"),
-    ))
-    .expect("the provider is constructed")
+    SessionUserProvider::create(Arc::new(UserAccountRepository::create(Arc::clone(
+        &blog.database,
+    ))))
     .infer_session_user(session)
     .await
     .expect("the session is read")

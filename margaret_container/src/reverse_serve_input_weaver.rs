@@ -3,17 +3,17 @@ use std::collections::BTreeSet;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
+use margaret_codegen_tokens::positional_naming::PositionalNaming;
 use margaret_input_weaving::owned_weave::owned_weave;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 
 pub(crate) struct ReverseServeInputWeaver {
     moved_slots: BTreeSet<usize>,
-    naming: ServeInputNaming,
+    naming: PositionalNaming,
 }
 
 impl ReverseServeInputWeaver {
-    pub(crate) fn new(naming: ServeInputNaming) -> Self {
+    pub(crate) fn new(naming: PositionalNaming) -> Self {
         Self {
             moved_slots: BTreeSet::new(),
             naming,
@@ -33,7 +33,7 @@ mod tests {
     use proc_macro2::TokenStream;
 
     use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
+    use margaret_codegen_tokens::positional_naming::PositionalNaming;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_input_weaving::input_value::InputValue;
     use margaret_input_weaving::weaving_kind::WeavingKind;
@@ -68,14 +68,14 @@ mod tests {
 
     #[test]
     fn moves_the_first_non_copy_slot_encountered_from_the_end() {
-        let mut weaver = ReverseServeInputWeaver::new(ServeInputNaming::for_slot_count(2));
+        let mut weaver = ReverseServeInputWeaver::new(PositionalNaming::serve_inputs(2));
 
         assert_eq!(collapsed(&weaver.weave(&cloned(), 0)), "serve_input_0");
     }
 
     #[test]
     fn clones_earlier_non_copy_uses_after_the_last_use_has_been_seen() {
-        let mut weaver = ReverseServeInputWeaver::new(ServeInputNaming::for_slot_count(2));
+        let mut weaver = ReverseServeInputWeaver::new(PositionalNaming::serve_inputs(2));
 
         assert_eq!(collapsed(&weaver.weave(&cloned(), 0)), "serve_input_0");
         assert_eq!(
@@ -90,7 +90,7 @@ mod tests {
 
     #[test]
     fn weaves_a_copy_slot_by_value_on_every_use_since_copying_needs_no_clone() {
-        let mut weaver = ReverseServeInputWeaver::new(ServeInputNaming::for_slot_count(2));
+        let mut weaver = ReverseServeInputWeaver::new(PositionalNaming::serve_inputs(2));
 
         assert_eq!(collapsed(&weaver.weave(&flag(), 1)), "serve_input_1");
         assert_eq!(collapsed(&weaver.weave(&flag(), 1)), "serve_input_1");
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn moves_each_slot_on_its_own_last_use_regardless_of_other_slots_being_moved() {
-        let mut weaver = ReverseServeInputWeaver::new(ServeInputNaming::for_slot_count(2));
+        let mut weaver = ReverseServeInputWeaver::new(PositionalNaming::serve_inputs(2));
 
         assert_eq!(collapsed(&weaver.weave(&cloned(), 0)), "serve_input_0");
         assert_eq!(collapsed(&weaver.weave(&cloned(), 1)), "serve_input_1");

@@ -1,4 +1,11 @@
+mod argument_lookup;
+pub mod command_future;
 pub mod command_outcome;
-pub mod outcome_for_clap_error;
+pub mod flag_argument;
+mod missing_argument;
+pub mod optional_argument;
+mod outcome_for_clap_error;
+pub mod parsed_arguments;
 pub mod print_help;
 pub mod report_failure;
+pub mod required_argument;

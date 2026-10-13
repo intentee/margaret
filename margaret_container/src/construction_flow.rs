@@ -34,6 +34,7 @@ mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
 
     use super::construction_flow;
+    use crate::constructor_outcome::ConstructorOutcome;
     use crate::container_plan::ContainerPlan;
     use crate::dependency_kind::DependencyKind;
     use crate::direct_construction::DirectConstruction;
@@ -59,6 +60,7 @@ mod tests {
                     .collect(),
                 is_async: false,
                 method: "create".to_string(),
+                outcome: ConstructorOutcome::Fallible,
             },
             field_name: name.to_lowercase(),
             injection: FrameworkInjectionRole::Unmarked,

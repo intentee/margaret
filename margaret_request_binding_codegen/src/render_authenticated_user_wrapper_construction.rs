@@ -60,6 +60,9 @@ mod tests {
     use super::render_authenticated_user_wrapper_construction;
     use crate::authenticated_user_application::AuthenticatedUserApplication;
     use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
+    use crate::inference_fallibility::InferenceFallibility;
+    use crate::inference_kind::InferenceKind;
+    use crate::inference_shape::InferenceShape;
 
     fn path(name: &str) -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
@@ -74,6 +77,10 @@ mod tests {
             challenge,
             concrete: path("Provider"),
             field: "provider".to_string(),
+            inference: InferenceShape {
+                fallibility: InferenceFallibility::Fallible,
+                kind: InferenceKind::Outcome,
+            },
             injects_peer_spiffe_id: false,
             injects_routes,
             injects_views,

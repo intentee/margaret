@@ -42,7 +42,7 @@ impl ServeInputRegistry {
                 if registered.input != input {
                     return Err(ServeInputCodegenError::ConflictingServeInput {
                         first_owner: registered.owner.to_string(),
-                        name: input.name().to_string(),
+                        name: input.name(),
                         owner: owner.to_string(),
                     });
                 }
@@ -50,7 +50,7 @@ impl ServeInputRegistry {
                 if !input.is_shareable() {
                     return Err(ServeInputCodegenError::SharedPositionalConsoleArgument {
                         first_owner: registered.owner.to_string(),
-                        name: input.name().to_string(),
+                        name: input.name(),
                         owner: owner.to_string(),
                     });
                 }
