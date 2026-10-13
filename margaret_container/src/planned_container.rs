@@ -12,6 +12,7 @@ use crate::provider_requirement::ProviderRequirement;
 use crate::render::render;
 use crate::render_build::render_build;
 use crate::rendered_container::RenderedContainer;
+use crate::served_container::ServedContainer;
 
 pub struct PlannedContainer {
     bindings: ContainerBindings,
@@ -76,16 +77,24 @@ impl PlannedContainer {
             }
         }
 
-        let modules = if served_roots.is_empty() && builder_roots.is_empty() {
-            Vec::new()
+        let served = if served_roots.is_empty() {
+            ServedContainer::Unserved
         } else {
-            let mut modules = vec![GeneratedModuleTokens::new(
-                ModulePath::root("container"),
-                render(&served_roots),
-            )];
+            ServedContainer::Served {
+                roots: served_roots,
+            }
+        };
+        let modules = match served {
+            ServedContainer::Unserved if builder_roots.is_empty() => Vec::new(),
+            served => {
+                let mut modules = vec![GeneratedModuleTokens::new(
+                    ModulePath::root("container"),
+                    render(&served),
+                )];
 
-            modules.extend(render_build(&self.plan, &served_roots, &builder_roots));
-            modules
+                modules.extend(render_build(&self.plan, &served, &builder_roots));
+                modules
+            }
         };
 
         Ok(RenderedContainer {
