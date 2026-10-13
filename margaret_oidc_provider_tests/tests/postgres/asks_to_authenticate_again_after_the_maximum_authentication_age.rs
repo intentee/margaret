@@ -4,7 +4,7 @@ use chrono::Utc;
 use margaret_oidc_provider::authenticated_end_user::AuthenticatedEndUser;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
-use margaret_oidc_provider_tests::end_user_subject::END_USER_SUBJECT;
+use margaret_oidc_provider_tests::constants::END_USER_SUBJECT;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::validated_form::validated_form;

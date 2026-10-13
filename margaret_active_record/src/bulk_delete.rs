@@ -5,8 +5,8 @@ use margaret_sql::render_delete::render_delete;
 use margaret_sql::returning::Returning;
 
 use crate::active_record_error::ActiveRecordError;
-use crate::base_alias::BASE_ALIAS;
 use crate::clause::Clause;
+use crate::constants::BASE_ALIAS;
 use crate::executed_affected::executed_affected;
 use crate::statement_kind::StatementKind;
 use crate::table_source::table_source;

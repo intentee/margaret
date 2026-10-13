@@ -5,8 +5,8 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 use margaret_model_codegen::model::Model;
 
-use crate::models_module_name::MODELS_MODULE_NAME;
-use crate::table_module_name::TABLE_MODULE_NAME;
+use crate::constants::MODELS_MODULE_NAME;
+use crate::constants::TABLE_MODULE_NAME;
 
 #[must_use]
 pub fn render_tables(models: &[Model]) -> GeneratedModuleTokens {

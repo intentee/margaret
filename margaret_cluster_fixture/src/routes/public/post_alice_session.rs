@@ -8,7 +8,7 @@ use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 use margaret::framework::sessions::started_session::StartedSession;
 
-use crate::alice::ALICE;
+use crate::constants::ALICE;
 use crate::margaret::sessions::IssuedSessions;
 use crate::system_clock::SystemClock;
 

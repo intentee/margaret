@@ -7,12 +7,12 @@ use margaret_declaration_anchor::declaration_anchor::declaration_anchor;
 use margaret_http_codegen::declared_routes::DeclaredRoutes;
 use margaret_route_method::route_method::RouteMethod;
 
+use crate::constants::SIGN_IN_ENDPOINTS;
 use crate::marked_callback::MarkedCallback;
 use crate::marked_endpoint::MarkedEndpoint;
 use crate::marked_start::MarkedStart;
 use crate::sign_in_client::sign_in_client;
 use crate::sign_in_endpoint_variant::SignInEndpointVariant;
-use crate::sign_in_endpoints::SIGN_IN_ENDPOINTS;
 use crate::sign_in_endpoints_codegen_error::SignInEndpointsCodegenError;
 
 fn marked_endpoint(

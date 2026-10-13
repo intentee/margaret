@@ -1,8 +1,8 @@
 pub mod asset_bag_codegen_error;
 pub mod asset_bag_generation;
-pub mod asset_bag_module_name;
 pub mod asset_macro_canonical_suffix;
 pub mod asset_responder_canonical_suffix;
+pub mod constants;
 pub mod render_asset_bag;
 pub mod served_assets;
 

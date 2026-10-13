@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use tokio::time::Instant;
 
+use margaret_issuer_key_set::constants::KEY_SET_POLL_INTERVAL_AFTER_READY;
 use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
-use margaret_issuer_key_set::key_set_poll_interval_after_ready::KEY_SET_POLL_INTERVAL_AFTER_READY;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 

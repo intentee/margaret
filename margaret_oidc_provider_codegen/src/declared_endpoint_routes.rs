@@ -6,13 +6,13 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_declaration_anchor::declaration_anchor::declaration_anchor;
 use margaret_http_codegen::declared_routes::DeclaredRoutes;
 
+use crate::constants::OIDC_ENDPOINTS;
 use crate::declared_consent::DeclaredConsent;
 use crate::declared_consent_route::DeclaredConsentRoute;
 use crate::declared_endpoint_route::DeclaredEndpointRoute;
 use crate::endpoint_admission::EndpointAdmission;
 use crate::marked_endpoint::MarkedEndpoint;
 use crate::oidc_endpoint_marker::OidcEndpointMarker;
-use crate::oidc_endpoints::OIDC_ENDPOINTS;
 use crate::oidc_provider_codegen_error::OidcProviderCodegenError;
 use crate::provider_endpoint::ProviderEndpoint;
 

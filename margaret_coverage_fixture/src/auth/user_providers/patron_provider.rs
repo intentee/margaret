@@ -7,7 +7,7 @@ use margaret::framework::macros::infers_authenticated_user;
 use margaret::framework::macros::singleton;
 
 use crate::auth::authenticated_users::patron::Patron;
-use crate::auth::headers::patron_card::PATRON_CARD;
+use crate::constants::PATRON_CARD;
 
 #[singleton]
 #[infers_authenticated_user(user_model = Patron)]

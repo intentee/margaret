@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use margaret_identity_session::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
+use margaret_identity_session::constants::ACCESS_TOKEN_LIFETIME_SECS;
 use margaret_identity_session::session_access_token_claims::SessionAccessTokenClaims;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;

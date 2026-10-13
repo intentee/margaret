@@ -1,8 +1,8 @@
 use margaret::framework::active_record::change::Change;
 use margaret::framework::active_record::model::Model;
 use margaret_database::transaction::Transaction;
+use margaret_signing_keys::constants::SIGNING_KEY_SET_NAME;
 use margaret_signing_keys::signing_key_set::SigningKeySet;
-use margaret_signing_keys::signing_key_set_name::SIGNING_KEY_SET_NAME;
 
 /// # Panics
 ///

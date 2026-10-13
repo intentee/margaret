@@ -1,8 +1,8 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
+use crate::constants::SESSIONS_MODULE_NAME;
 use crate::sessions_item::SessionsItem;
-use crate::sessions_module_name::SESSIONS_MODULE_NAME;
 
 #[must_use]
 pub fn sessions_item_path(item: SessionsItem) -> CanonicalPath {

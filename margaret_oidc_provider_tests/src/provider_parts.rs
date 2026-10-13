@@ -24,10 +24,10 @@ use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchan
 use margaret_subject_token_exchange::subject_token_exchangers::SubjectTokenExchangers;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
+use crate::constants::FIXTURE_ACCEPTED_RESOURCES;
+use crate::constants::FIXTURE_ENDPOINT_PATHS;
+use crate::constants::FIXTURE_PROVIDER_SUPPORT;
 use crate::fixed_userinfo_claims::FixedUserinfoClaims;
-use crate::fixture_accepted_resources::FIXTURE_ACCEPTED_RESOURCES;
-use crate::fixture_endpoint_paths::FIXTURE_ENDPOINT_PATHS;
-use crate::fixture_provider_support::FIXTURE_PROVIDER_SUPPORT;
 
 const FORM_LIMIT: BodyLimit = BodyLimit::new(16_384);
 

@@ -2,8 +2,8 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
-use crate::oauth_clients_module_name::OAUTH_CLIENTS_MODULE_NAME;
-use crate::sign_in_scopes_module_name::SIGN_IN_SCOPES_MODULE_NAME;
+use crate::constants::OAUTH_CLIENTS_MODULE_NAME;
+use crate::constants::SIGN_IN_SCOPES_MODULE_NAME;
 
 #[must_use]
 pub fn oauth_client_sign_in_scopes_path(tag: &Tag) -> CanonicalPath {

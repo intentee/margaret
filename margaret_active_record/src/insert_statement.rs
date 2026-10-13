@@ -7,7 +7,7 @@ use margaret_sql::render_insert::render_insert;
 use margaret_sql::returning::Returning;
 use margaret_sql::statement::Statement;
 
-use crate::base_alias::BASE_ALIAS;
+use crate::constants::BASE_ALIAS;
 use crate::table_source::table_source;
 
 pub(crate) struct InsertStatement {

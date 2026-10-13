@@ -4,11 +4,11 @@ use std::path::Path;
 
 use margaret_attributes::crate_root::CrateRoot;
 use margaret_sql_identifier::table_namespace::TableNamespace;
-use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
+use margaret_umbrella_path::constants::UMBRELLA_MODULE_NAME;
 
-use crate::assets_directory_name::ASSETS_DIRECTORY_NAME;
 use crate::build::build;
 use crate::codegen_error::CodegenError;
+use crate::constants::ASSETS_DIRECTORY_NAME;
 
 fn read_metafile(metafile_path: &Path) -> Result<Option<String>, CodegenError> {
     match fs::read_to_string(metafile_path) {
@@ -65,7 +65,7 @@ mod tests {
     use margaret_attributes_tests::source_crate::SourceCrate;
     use margaret_container::container_error::ContainerError;
     use margaret_sql_identifier::table_namespace::TableNamespace;
-    use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
+    use margaret_umbrella_path::constants::UMBRELLA_MODULE_NAME;
 
     use super::generate_into;
     use crate::codegen_error::CodegenError;

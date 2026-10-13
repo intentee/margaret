@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
-use margaret_authorization_server_client_tests::fixture_client_id::FIXTURE_CLIENT_ID;
+use margaret_authorization_server_client_tests::constants::FIXTURE_CLIENT_ID;
 use margaret_authorization_server_client_tests::fixture_client_secret::fixture_client_secret;
 use margaret_authorization_server_client_tests::localhost_trust::localhost_trust;
 use margaret_http::head_handler::HeadHandler;

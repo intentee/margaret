@@ -8,7 +8,7 @@ use rustls::pki_types::UnixTime;
 use margaret_spiffe_svid::svid_crypto_provider::svid_crypto_provider;
 use margaret_spiffe_svid_client::svid_server_cert_verifier::SvidServerCertVerifier;
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
-use margaret_spiffe_svid_tests::leaf_spiffe_example_org_untrusted_der::LEAF_SPIFFE_EXAMPLE_ORG_UNTRUSTED_DER;
+use margaret_spiffe_svid_tests::constants::LEAF_SPIFFE_EXAMPLE_ORG_UNTRUSTED_DER;
 
 #[test]
 fn rejects_a_server_svid_signed_by_an_untrusted_ca_even_within_the_trust_domain() {

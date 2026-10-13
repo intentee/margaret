@@ -7,12 +7,12 @@ use margaret_attributes::tag::Tag;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 
+use crate::constants::TRUSTED_ISSUERS_MODULE_NAME;
 use crate::declared_trusts::DeclaredTrusts;
 use crate::own_trust::OwnTrust;
 use crate::trusted_issuer_constant::TrustedIssuerConstant;
 use crate::trusted_issuer_group::TrustedIssuerGroup;
 use crate::trusted_issuer_item::TrustedIssuerItem;
-use crate::trusted_issuers_module_name::TRUSTED_ISSUERS_MODULE_NAME;
 
 fn trust_module_path(tag: &Tag) -> ModulePath {
     ModulePath::root(TRUSTED_ISSUERS_MODULE_NAME).child(tag.ident().unraw().to_string())

@@ -4,21 +4,21 @@ use margaret_accepted_clients::registered_client::RegisteredClient;
 use margaret_accepted_clients_tests::asserting_client::AssertingClient;
 use margaret_database::database::Database;
 
-use crate::ledger_client::LEDGER_CLIENT;
-use crate::ledger_privileges::LEDGER_PRIVILEGES;
-use crate::portal_callback::PORTAL_CALLBACK;
-use crate::portal_client::PORTAL_CLIENT;
-use crate::portal_code_grant::PORTAL_CODE_GRANT;
-use crate::portal_privileges::PORTAL_PRIVILEGES;
-use crate::service_client::SERVICE_CLIENT;
-use crate::service_privileges::SERVICE_PRIVILEGES;
-use crate::spa_callback::SPA_CALLBACK;
-use crate::spa_client::SPA_CLIENT;
-use crate::spa_code_grant::SPA_CODE_GRANT;
-use crate::staff_callback::STAFF_CALLBACK;
-use crate::staff_client::STAFF_CLIENT;
-use crate::staff_code_grant::STAFF_CODE_GRANT;
-use crate::staff_privileges::STAFF_PRIVILEGES;
+use crate::constants::LEDGER_CLIENT;
+use crate::constants::LEDGER_PRIVILEGES;
+use crate::constants::PORTAL_CALLBACK;
+use crate::constants::PORTAL_CLIENT;
+use crate::constants::PORTAL_CODE_GRANT;
+use crate::constants::PORTAL_PRIVILEGES;
+use crate::constants::SERVICE_CLIENT;
+use crate::constants::SERVICE_PRIVILEGES;
+use crate::constants::SPA_CALLBACK;
+use crate::constants::SPA_CLIENT;
+use crate::constants::SPA_CODE_GRANT;
+use crate::constants::STAFF_CALLBACK;
+use crate::constants::STAFF_CLIENT;
+use crate::constants::STAFF_CODE_GRANT;
+use crate::constants::STAFF_PRIVILEGES;
 
 pub struct FixtureClients {
     pub asserting: Vec<AssertingClient>,

@@ -2,8 +2,8 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
-use crate::client_id_module_name::CLIENT_ID_MODULE_NAME;
-use crate::oauth_clients_module_name::OAUTH_CLIENTS_MODULE_NAME;
+use crate::constants::CLIENT_ID_MODULE_NAME;
+use crate::constants::OAUTH_CLIENTS_MODULE_NAME;
 
 #[must_use]
 pub fn oauth_client_id_path(tag: &Tag) -> CanonicalPath {

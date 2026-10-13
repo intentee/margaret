@@ -4,9 +4,9 @@ use quote::quote;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 
+use crate::constants::SHAPES_MODULE_NAME;
 use crate::render_shape::render_shape;
 use crate::shape_declaration::ShapeDeclaration;
-use crate::shapes_module_name::SHAPES_MODULE_NAME;
 
 #[must_use]
 pub fn render_shapes(shapes: &[ShapeDeclaration]) -> Vec<GeneratedModuleTokens> {

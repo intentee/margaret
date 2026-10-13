@@ -13,7 +13,7 @@ use margaret_http::route_entry::RouteEntry;
 use margaret_http_tests::mtls_fixture::MtlsFixture;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
-use margaret_jwt_verification_tests::fixture_audience::FIXTURE_AUDIENCE;
+use margaret_jwt_verification_tests::constants::FIXTURE_AUDIENCE;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 use margaret_route_method::content_method::ContentMethod;

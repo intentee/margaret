@@ -1,4 +1,4 @@
-use crate::space_delimiter::SPACE_DELIMITER;
+use crate::constants::SPACE_DELIMITER;
 
 #[must_use]
 pub fn space_joined<'value>(values: impl IntoIterator<Item = &'value str>) -> String {

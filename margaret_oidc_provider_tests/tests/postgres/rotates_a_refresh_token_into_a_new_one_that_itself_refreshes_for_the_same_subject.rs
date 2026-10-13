@@ -1,7 +1,7 @@
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
-use margaret_oidc_provider_tests::end_user_subject::END_USER_SUBJECT;
+use margaret_oidc_provider_tests::constants::END_USER_SUBJECT;
 use margaret_oidc_provider_tests::issued_code::issued_code;
 use margaret_oidc_provider_tests::jws_claims::jws_claims;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;

@@ -1,7 +1,7 @@
 use oauth2::PkceCodeChallenge;
 use oauth2::PkceCodeVerifier;
 
-use crate::pkce_verifier::PKCE_VERIFIER;
+use crate::constants::PKCE_VERIFIER;
 
 #[must_use]
 pub fn pkce_challenge() -> String {

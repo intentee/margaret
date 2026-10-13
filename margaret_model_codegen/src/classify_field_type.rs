@@ -10,20 +10,20 @@ use margaret_model::column_type::ColumnType;
 use margaret_syn_type_peeling::peel_standard_wrapper::peel_standard_wrapper;
 
 use crate::classified_field_type::ClassifiedFieldType;
-use crate::date_time_canonical_path::DATE_TIME_CANONICAL_PATH;
-use crate::decimal_canonical_path::DECIMAL_CANONICAL_PATH;
+use crate::constants::DATE_TIME_CANONICAL_PATH;
+use crate::constants::DECIMAL_CANONICAL_PATH;
+use crate::constants::JSON_CANONICAL_PATH;
+use crate::constants::KEY_CANONICAL_PATH;
+use crate::constants::SECRET_TEXT_CANONICAL_PATH;
+use crate::constants::UTC_CANONICAL_PATH;
+use crate::constants::UUID_CANONICAL_PATH;
 use crate::enum_variants::EnumVariants;
 use crate::field_type_shape::FieldTypeShape;
 use crate::field_value::FieldValue;
-use crate::json_canonical_path::JSON_CANONICAL_PATH;
-use crate::key_canonical_path::KEY_CANONICAL_PATH;
 use crate::model_codegen_error::ModelCodegenError;
 use crate::numeric_digits::NumericDigits;
 use crate::resolve_rust_type::resolve_rust_type;
 use crate::resolved_rust_type::ResolvedRustType;
-use crate::secret_text_canonical_path::SECRET_TEXT_CANONICAL_PATH;
-use crate::utc_canonical_path::UTC_CANONICAL_PATH;
-use crate::uuid_canonical_path::UUID_CANONICAL_PATH;
 
 fn scalar(column_type: ColumnType, rust_type: ResolvedRustType) -> FieldTypeShape {
     FieldTypeShape::Column {

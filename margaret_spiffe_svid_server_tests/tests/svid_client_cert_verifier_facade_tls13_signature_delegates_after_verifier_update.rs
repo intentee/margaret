@@ -9,7 +9,7 @@ use margaret_spiffe_svid_server::svid_client_cert_verifier::SvidClientCertVerifi
 use margaret_spiffe_svid_server::svid_client_cert_verifier_facade::SvidClientCertVerifierFacade;
 use margaret_spiffe_svid_tests::build_digitally_signed_struct::build_digitally_signed_struct;
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
-use margaret_spiffe_svid_tests::leaf_spiffe_example_org_client_der::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
+use margaret_spiffe_svid_tests::constants::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
 
 #[test]
 fn delegates_tls13_signatures_to_the_updated_verifier_so_forged_ones_fail() {

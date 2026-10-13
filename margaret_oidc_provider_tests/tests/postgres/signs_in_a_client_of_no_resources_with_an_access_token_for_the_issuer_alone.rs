@@ -1,11 +1,11 @@
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
+use margaret_oidc_provider_tests::constants::STAFF_CREDENTIALS;
 use margaret_oidc_provider_tests::issued_code::issued_code;
 use margaret_oidc_provider_tests::jws_claims::jws_claims;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::staff_code_exchange::staff_code_exchange;
-use margaret_oidc_provider_tests::staff_credentials::STAFF_CREDENTIALS;
 use margaret_oidc_provider_tests::staff_parameters::staff_parameters;
 
 #[tokio::test]

@@ -2,8 +2,8 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
-use crate::oidc_provider_module_name::OIDC_PROVIDER_MODULE_NAME;
-use crate::subject_token_exchangers_module_name::SUBJECT_TOKEN_EXCHANGERS_MODULE_NAME;
+use crate::constants::OIDC_PROVIDER_MODULE_NAME;
+use crate::constants::SUBJECT_TOKEN_EXCHANGERS_MODULE_NAME;
 
 #[must_use]
 pub fn subject_token_exchanger_path(issuer: &Tag) -> CanonicalPath {

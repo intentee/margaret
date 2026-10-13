@@ -2,7 +2,7 @@ use margaret_oidc_discovery::provider_endpoints::ProviderEndpoints;
 use margaret_oidc_discovery::served_endpoint::ServedEndpoint;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
-use crate::fixture_endpoint_paths::FIXTURE_ENDPOINT_PATHS;
+use crate::constants::FIXTURE_ENDPOINT_PATHS;
 use crate::published_endpoints::PublishedEndpoints;
 
 fn located(issuer: &IssuerIdentifier, path: &str) -> String {

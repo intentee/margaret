@@ -3,11 +3,11 @@ use std::sync::Arc;
 use serde_json::json;
 
 use margaret_accepted_clients_tests::asserting_client::AssertingClient;
+use margaret_oidc_provider_tests::constants::SERVICE_CLIENT;
+use margaret_oidc_provider_tests::constants::SERVICE_CREDENTIALS;
+use margaret_oidc_provider_tests::constants::SERVICE_PRIVILEGES;
 use margaret_oidc_provider_tests::fixture_clients::FixtureClients;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
-use margaret_oidc_provider_tests::service_client::SERVICE_CLIENT;
-use margaret_oidc_provider_tests::service_credentials::SERVICE_CREDENTIALS;
-use margaret_oidc_provider_tests::service_privileges::SERVICE_PRIVILEGES;
 use margaret_oidc_provider_tests::started_with_provider_state::started_with_provider_state;
 
 #[tokio::test]

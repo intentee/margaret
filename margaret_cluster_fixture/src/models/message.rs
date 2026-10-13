@@ -10,7 +10,7 @@ use margaret::framework::database::database::Database;
 use margaret::framework::macros::model;
 use margaret::framework::model::column_default::ColumnDefault;
 
-use crate::stream_batch::STREAM_BATCH;
+use crate::constants::STREAM_BATCH;
 
 #[model(table = "messages")]
 #[index(name = "messages_posted", fields = [posted_at, id])]

@@ -9,7 +9,7 @@ use margaret_authorization_server_client_tests::fixture_authorization_server::Fi
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::static_handler::StaticHandler;
-use margaret_issuer_request::issuer_response_max_bytes::ISSUER_RESPONSE_MAX_BYTES;
+use margaret_issuer_request::constants::ISSUER_RESPONSE_MAX_BYTES;
 use margaret_route_method::route_method::RouteMethod;
 
 #[tokio::test]

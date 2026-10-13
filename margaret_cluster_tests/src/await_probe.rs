@@ -3,7 +3,7 @@ use std::future::Future;
 use tokio::time::MissedTickBehavior;
 use tokio::time::interval;
 
-use margaret_local_server_tests::readiness_poll_interval::READINESS_POLL_INTERVAL;
+use margaret_local_server_tests::constants::READINESS_POLL_INTERVAL;
 
 use crate::cluster_instance::ClusterInstance;
 

@@ -9,14 +9,14 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 use margaret_umbrella_path::routes_path::routes_path;
 
-use crate::authorization_handler_module_name::AUTHORIZATION_HANDLER_MODULE_NAME;
 use crate::consent_page::ConsentPage;
+use crate::constants::AUTHORIZATION_HANDLER_MODULE_NAME;
+use crate::constants::OIDC_PROVIDER_MODULE_NAME;
+use crate::constants::PROVIDER_ENDPOINTS_MODULE_NAME;
+use crate::constants::SUBJECT_TOKEN_EXCHANGERS_MODULE_NAME;
 use crate::derived_authorization::DerivedAuthorization;
 use crate::oidc_provider_item::OidcProviderItem;
-use crate::oidc_provider_module_name::OIDC_PROVIDER_MODULE_NAME;
-use crate::provider_endpoints_module_name::PROVIDER_ENDPOINTS_MODULE_NAME;
 use crate::served_authorization::ServedAuthorization;
-use crate::subject_token_exchangers_module_name::SUBJECT_TOKEN_EXCHANGERS_MODULE_NAME;
 
 fn authorization_handler_module(
     ServedAuthorization {

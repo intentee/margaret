@@ -4,9 +4,9 @@ use margaret_cluster_fixture::margaret::routes::Routes;
 
 use crate::alice_session::AliceSession;
 use crate::cluster::Cluster;
+use crate::constants::SESSION_ACCESS_COOKIE;
+use crate::constants::SESSION_SECRET_COOKIE;
 use crate::response_cookie::response_cookie;
-use crate::session_access_cookie::SESSION_ACCESS_COOKIE;
-use crate::session_secret_cookie::SESSION_SECRET_COOKIE;
 
 /// # Panics
 ///

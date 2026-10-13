@@ -3,7 +3,7 @@ use quote::quote;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 
-use crate::jwks_module_name::JWKS_MODULE_NAME;
+use crate::constants::JWKS_MODULE_NAME;
 use crate::jwks_server_module::JwksServerModule;
 use crate::jwks_server_part::JwksServerPart;
 

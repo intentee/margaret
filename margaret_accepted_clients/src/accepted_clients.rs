@@ -12,17 +12,17 @@ use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_presentation::JwtPresentation;
 use margaret_jwt_verification::presented_jwt::PresentedJwt;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
-use margaret_oauth_vocabulary::jwt_bearer_client_assertion_type::JWT_BEARER_CLIENT_ASSERTION_TYPE;
+use margaret_oauth_vocabulary::constants::JWT_BEARER_CLIENT_ASSERTION_TYPE;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::token_digest::TokenDigest;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::accepted_clients_error::AcceptedClientsError;
 use crate::assertion_subject::AssertionSubject;
-use crate::client_assertion_max_lifetime::CLIENT_ASSERTION_MAX_LIFETIME;
 use crate::client_authentication_outcome::ClientAuthenticationOutcome;
 use crate::client_authentication_parameters::ClientAuthenticationParameters;
 use crate::client_refusal::ClientRefusal;
+use crate::constants::CLIENT_ASSERTION_MAX_LIFETIME;
 use crate::registered_authentication::RegisteredAuthentication;
 use crate::registered_client::RegisteredClient;
 

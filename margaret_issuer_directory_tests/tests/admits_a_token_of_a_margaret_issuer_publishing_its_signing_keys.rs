@@ -8,14 +8,14 @@ use margaret_http::request_authorization::RequestAuthorization;
 use margaret_http::token_admission::TokenAdmission;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_issuer_directory::jwks_endpoint_issuer::JwksEndpointIssuer;
+use margaret_issuer_directory_tests::constants::LOCALHOST_JWKS_ENDPOINT_ISSUER;
 use margaret_issuer_directory_tests::fixture_issuer_routes::FixtureIssuerRoutes;
 use margaret_issuer_directory_tests::json_handler::json_handler;
-use margaret_issuer_directory_tests::localhost_jwks_endpoint_issuer::LOCALHOST_JWKS_ENDPOINT_ISSUER;
 use margaret_issuer_directory_tests::polled_fixture::PolledFixture;
 use margaret_issuer_directory_tests::running_fixture_issuer::RunningFixtureIssuer;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
-use margaret_jwks_roller_server::jwks_curve::JWKS_CURVE;
+use margaret_jwks_roller_server::constants::JWKS_CURVE;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 

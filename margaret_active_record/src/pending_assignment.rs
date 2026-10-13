@@ -4,7 +4,7 @@ use margaret_sql::expression::Expression;
 
 use crate::active_record_error::ActiveRecordError;
 use crate::assigned_value::AssignedValue;
-use crate::base_alias::BASE_ALIAS;
+use crate::constants::BASE_ALIAS;
 use crate::encoded_values::encoded_values;
 
 pub struct PendingAssignment {

@@ -7,10 +7,10 @@ use reqwest::RequestBuilder;
 use reqwest::redirect::Policy;
 use tokio_util::sync::CancellationToken;
 
+use crate::constants::ISSUER_REQUEST_TIMEOUT;
 use crate::issuer_answer::IssuerAnswer;
 use crate::issuer_document::IssuerDocument;
 use crate::issuer_exchange_error::IssuerExchangeError;
-use crate::issuer_request_timeout::ISSUER_REQUEST_TIMEOUT;
 use crate::read_response_body::read_response_body;
 use crate::response_body::ResponseBody;
 

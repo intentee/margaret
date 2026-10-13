@@ -15,7 +15,7 @@ use margaret_subject_token_exchange::subject_token_profile::SubjectTokenProfile;
 use margaret_token_trust::token_trust::TokenTrust;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
-use crate::provider_audience::PROVIDER_AUDIENCE;
+use crate::constants::PROVIDER_AUDIENCE;
 use crate::repository_exchanger::RepositoryExchanger;
 use crate::signed_by::signed_by;
 

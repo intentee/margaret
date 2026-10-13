@@ -9,9 +9,9 @@ use margaret_route_method::route_method::RouteMethod;
 use margaret_sessions_codegen::declared_sessions::DeclaredSessions;
 use margaret_sessions_codegen::sign_out_endpoint_module::SignOutEndpointModule;
 
+use crate::constants::SESSION_ENDPOINTS;
 use crate::served_session_endpoint::ServedSessionEndpoint;
 use crate::session_endpoint_variant::SessionEndpointVariant;
-use crate::session_endpoints::SESSION_ENDPOINTS;
 use crate::session_endpoints_codegen_error::SessionEndpointsCodegenError;
 use crate::session_refresh_route::SessionRefreshRoute;
 use crate::session_sign_out_route::SessionSignOutRoute;

@@ -1,6 +1,6 @@
 use futures_util::future::join_all;
 
-use margaret_database_tests::racing_instances::RACING_INSTANCES;
+use margaret_database_tests::constants::RACING_INSTANCES;
 use margaret_jwks_keygen::signing_keys_generation::SigningKeysGeneration;
 use margaret_signing_keys::signing_key_set::SigningKeySet;
 use margaret_signing_keys::signing_keys_creation::SigningKeysCreation;

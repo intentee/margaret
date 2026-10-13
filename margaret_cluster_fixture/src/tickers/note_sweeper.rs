@@ -8,9 +8,9 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::scheduled_with_tick_timer;
 
+use crate::constants::NOTE_SWEEP_INTERVAL;
 use crate::models::note::Note;
 use crate::system_clock::SystemClock;
-use crate::tickers::note_sweep_interval::NOTE_SWEEP_INTERVAL;
 
 #[scheduled_with_tick_timer(interval = NOTE_SWEEP_INTERVAL, behavior = MissedTickBehavior::Delay)]
 pub struct NoteSweeper {

@@ -2,7 +2,7 @@ use serde_json::Value;
 use serde_json::json;
 
 use margaret_jose_parameters::jwt_type::JwtType;
-use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
+use margaret_jwks_keygen_tests::constants::FAR_FUTURE_EXPIRY;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwks_secret_store_tests::fixture_issuance::fixture_issuance;
 use margaret_jwks_secret_store_tests::peer_secrets::PeerSecrets;

@@ -25,7 +25,7 @@ use margaret_oauth_vocabulary::grant_type::GrantType;
 use margaret_oauth_vocabulary::resource_scope::ResourceScope;
 use margaret_oauth_vocabulary::resource_scope_parsing::ResourceScopeParsing;
 use margaret_oauth_vocabulary::scope::Scope;
-use margaret_oauth_vocabulary_codegen::client_authentication_methods::CLIENT_AUTHENTICATION_METHODS;
+use margaret_oauth_vocabulary_codegen::constants::CLIENT_AUTHENTICATION_METHODS;
 use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
 use margaret_oauth_vocabulary_codegen::scope_resolution::ScopeResolution;
 use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
@@ -33,10 +33,11 @@ use margaret_token_issuance_codegen::token_issuance_declaration::TokenIssuanceDe
 
 use crate::accepted_clients_codegen_error::AcceptedClientsCodegenError;
 use crate::admitted_resource::AdmittedResource;
-use crate::client_key_sources::CLIENT_KEY_SOURCES;
 use crate::client_resources::ClientResources;
-use crate::client_signing_algorithms::CLIENT_SIGNING_ALGORITHMS;
-use crate::consent_policies::CONSENT_POLICIES;
+use crate::constants::CLIENT_KEY_SOURCES;
+use crate::constants::CLIENT_SIGNING_ALGORITHMS;
+use crate::constants::CONSENT_POLICIES;
+use crate::constants::ID_TOKEN_SIGNINGS;
 use crate::declared_accepted_authentication::DeclaredAcceptedAuthentication;
 use crate::declared_client_credentials::DeclaredClientCredentials;
 use crate::declared_client_key_source::DeclaredClientKeySource;
@@ -46,7 +47,6 @@ use crate::declared_code_policy::DeclaredCodePolicy;
 use crate::declared_confidential_client::DeclaredConfidentialClient;
 use crate::declared_redirect_uri::declared_redirect_uri;
 use crate::declared_token_exchange::DeclaredTokenExchange;
-use crate::id_token_signings::ID_TOKEN_SIGNINGS;
 
 fn written(path: &Path) -> String {
     path.to_token_stream().to_string()

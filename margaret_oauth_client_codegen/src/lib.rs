@@ -1,4 +1,4 @@
-mod client_id_module_name;
+pub mod constants;
 pub mod declared_client_authentication;
 pub mod declared_client_registration;
 pub mod declared_oauth_clients;
@@ -15,9 +15,4 @@ pub mod oauth_client_resource_credentials_path;
 pub mod oauth_client_resource_grant_path;
 pub mod oauth_client_sign_in_callback_handler_path;
 pub mod oauth_client_sign_in_scopes_path;
-pub mod oauth_clients_module_name;
 pub mod render_oauth_clients;
-mod resource_grant_module_name;
-mod resources_module_name;
-mod sign_in_callback_handler_module_name;
-mod sign_in_scopes_module_name;

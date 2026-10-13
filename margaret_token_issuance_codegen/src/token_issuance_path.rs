@@ -1,7 +1,7 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
-use crate::token_issuance_module_name::TOKEN_ISSUANCE_MODULE_NAME;
+use crate::constants::TOKEN_ISSUANCE_MODULE_NAME;
 
 #[must_use]
 pub fn token_issuance_path() -> CanonicalPath {

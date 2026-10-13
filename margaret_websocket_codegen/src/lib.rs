@@ -6,6 +6,7 @@ pub mod web_socket_plan;
 mod build_for_session_method;
 mod build_websocket_plan;
 mod built_websocket_plan;
+mod constants;
 mod discovered_handler;
 mod handler_binding;
 mod handler_kind;
@@ -18,7 +19,6 @@ mod session_arguments;
 mod session_handler_plan;
 mod session_plan;
 mod web_socket_message;
-mod web_socket_responses;
 mod web_socket_session;
 mod websocket_handlers;
 mod websocket_messages;
@@ -1183,7 +1183,6 @@ use margaret::framework::macros::websocket_message;
 use margaret::framework::macros::websocket_session;
 use margaret::framework::http_validation::request_input::RequestInput;
 
-
 use margaret::framework::http::request::Request;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
@@ -1635,7 +1634,6 @@ use margaret::framework::macros::singleton;
 use margaret::framework::macros::websocket_session;
 use margaret::framework::http_validation::request_input::RequestInput;
 
-
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
 struct User;
@@ -1666,7 +1664,6 @@ impl Room {
     }
 
     const PARITY_SESSION: &str = r#"use margaret::framework::http_validation::request_input::RequestInput;
-
 
 use std::sync::Arc;
 use margaret::framework::macros::build_for_session;
@@ -1780,7 +1777,6 @@ impl RespondsToWebSocketMessage for Poster {
 use margaret::framework::macros::websocket_session;
 use margaret::framework::http_validation::request_input::RequestInput;
 
-
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
@@ -1804,7 +1800,6 @@ impl Bad {
                 r#"use margaret::framework::macros::build_for_session;
 use margaret::framework::macros::websocket_session;
 use margaret::framework::http_validation::request_input::RequestInput;
-
 
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;

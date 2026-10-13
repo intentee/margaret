@@ -34,6 +34,7 @@ use margaret_request_binding_codegen::session_user_parameter::session_user_param
 use margaret_route_method::route_method::RouteMethod;
 
 use crate::application_responder::ApplicationResponder;
+use crate::constants::ROUTE_METHODS;
 use crate::content_method_tokens::content_method_tokens;
 use crate::framework_route::FrameworkRoute;
 use crate::http_route::HttpRoute;
@@ -42,7 +43,6 @@ use crate::http_server::HttpServer;
 use crate::route_content::RouteContent;
 use crate::route_group::RouteGroup;
 use crate::route_handling::RouteHandling;
-use crate::route_methods::ROUTE_METHODS;
 use crate::route_responder::RouteResponder;
 use crate::server_layout::ServerLayout;
 

@@ -7,11 +7,11 @@ use rustls::pki_types::ServerName;
 
 use margaret_spiffe_svid_client_tests::build_mtls_client_config::build_mtls_client_config;
 use margaret_spiffe_svid_tests::build_mtls_server_config::build_mtls_server_config;
+use margaret_spiffe_svid_tests::constants::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
+use margaret_spiffe_svid_tests::constants::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_KEY_DER;
+use margaret_spiffe_svid_tests::constants::LEAF_SPIFFE_OTHER_ORG_SERVER_DER;
+use margaret_spiffe_svid_tests::constants::LEAF_SPIFFE_OTHER_ORG_SERVER_KEY_DER;
 use margaret_spiffe_svid_tests::handshake_error::HandshakeError;
-use margaret_spiffe_svid_tests::leaf_spiffe_example_org_client_der::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
-use margaret_spiffe_svid_tests::leaf_spiffe_example_org_client_key_der::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_KEY_DER;
-use margaret_spiffe_svid_tests::leaf_spiffe_other_org_server_der::LEAF_SPIFFE_OTHER_ORG_SERVER_DER;
-use margaret_spiffe_svid_tests::leaf_spiffe_other_org_server_key_der::LEAF_SPIFFE_OTHER_ORG_SERVER_KEY_DER;
 use margaret_spiffe_svid_tests::pump_tls_handshake::pump_tls_handshake;
 
 #[test]

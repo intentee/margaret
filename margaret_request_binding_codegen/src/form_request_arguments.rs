@@ -5,9 +5,9 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
+use crate::constants::REQUEST_INPUTS;
 use crate::request_binding_error::RequestBindingError;
 use crate::request_input_source::RequestInputSource;
-use crate::request_inputs::REQUEST_INPUTS;
 
 pub(crate) struct FormRequestArguments {
     pub(crate) source: RequestInputSource,

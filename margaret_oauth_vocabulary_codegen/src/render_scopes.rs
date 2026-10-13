@@ -4,9 +4,9 @@ use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 
+use crate::constants::SCOPES_MODULE_NAME;
 use crate::declared_scope_item::DeclaredScopeItem;
 use crate::declared_scopes::DeclaredScopes;
-use crate::scopes_module_name::SCOPES_MODULE_NAME;
 
 #[must_use]
 pub fn render_scopes(DeclaredScopes { scopes }: &DeclaredScopes) -> Vec<GeneratedModuleTokens> {

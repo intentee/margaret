@@ -8,7 +8,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 use margaret_model_codegen::field_value::FieldValue;
 use margaret_model_codegen::model::Model;
-use margaret_schema_codegen::models_module_name::MODELS_MODULE_NAME;
+use margaret_schema_codegen::constants::MODELS_MODULE_NAME;
 
 use crate::render_model_module::render_model_module;
 

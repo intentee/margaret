@@ -8,7 +8,7 @@ use margaret_peer_identity::spiffe_id_rejection::SpiffeIdRejection;
 use margaret_spiffe_svid::svid_crypto_provider::svid_crypto_provider;
 use margaret_spiffe_svid_server::svid_client_cert_verifier::SvidClientCertVerifier;
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
-use margaret_spiffe_svid_tests::leaf_dns_only_der::LEAF_DNS_ONLY_DER;
+use margaret_spiffe_svid_tests::constants::LEAF_DNS_ONLY_DER;
 
 #[test]
 fn rejects_a_cert_without_a_spiffe_uri_san_since_it_names_no_workload() {

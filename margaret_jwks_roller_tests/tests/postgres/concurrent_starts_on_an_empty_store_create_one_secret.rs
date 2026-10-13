@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures_util::future::join_all;
 
 use margaret::framework::database::isolation::Isolation;
-use margaret_database_tests::racing_instances::RACING_INSTANCES;
+use margaret_database_tests::constants::RACING_INSTANCES;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;

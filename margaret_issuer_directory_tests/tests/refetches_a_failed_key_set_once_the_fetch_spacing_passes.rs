@@ -5,7 +5,7 @@ use tokio::time::Instant;
 use margaret_issuer_directory::jwks_endpoint_issuer::JwksEndpointIssuer;
 use margaret_issuer_directory_tests::polled_directory::PolledDirectory;
 use margaret_issuer_directory_tests::polled_fixture::PolledFixture;
-use margaret_issuer_key_set::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
+use margaret_issuer_key_set::constants::ISSUER_FETCH_SPACING;
 use margaret_issuer_key_set::key_set_refresh::KeySetRefresh;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 

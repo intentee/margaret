@@ -9,10 +9,10 @@ use margaret_http_tests::fixture_client_builder::fixture_client_builder;
 use margaret_http_tests::hanging_handler::HangingHandler;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::tls_fixture::TlsFixture;
+use margaret_issuer_request::constants::ISSUER_REQUEST_TIMEOUT;
 use margaret_issuer_request::issuer_document::IssuerDocument;
 use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
-use margaret_issuer_request::issuer_request_timeout::ISSUER_REQUEST_TIMEOUT;
 use margaret_route_method::route_method::RouteMethod;
 
 #[tokio::test(start_paused = true)]

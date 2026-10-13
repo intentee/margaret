@@ -1,6 +1,6 @@
 use margaret::framework::active_record::model::Model;
+use margaret_signing_keys::constants::SIGNING_KEY_SET_NAME;
 use margaret_signing_keys::signing_key_set::SigningKeySet;
-use margaret_signing_keys::signing_key_set_name::SIGNING_KEY_SET_NAME;
 use margaret_signing_keys::signing_keys_error::SigningKeysError;
 use margaret_signing_keys_tests::contract_revision::contract_revision;
 use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;

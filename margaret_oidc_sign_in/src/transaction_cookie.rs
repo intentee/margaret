@@ -4,7 +4,7 @@ use cookie::Cookie;
 use cookie::time::Duration;
 
 use margaret_http::host_cookie::host_cookie;
-use margaret_identity_session::sign_in_transaction_lifetime_secs::SIGN_IN_TRANSACTION_LIFETIME_SECS;
+use margaret_identity_session::constants::SIGN_IN_TRANSACTION_LIFETIME_SECS;
 use margaret_token_digest::token_digest::TokenDigest;
 
 const TRANSACTION_COOKIE_PREFIX: &str = "__Host-margaret-sign-in-";

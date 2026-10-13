@@ -3,19 +3,19 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-use margaret_model_codegen::column_defaults::COLUMN_DEFAULTS;
+use margaret_model_codegen::constants::COLUMN_DEFAULTS;
+use margaret_model_codegen::constants::ON_DELETE_ACTIONS;
 use margaret_model_codegen::index_kind::IndexKind;
 use margaret_model_codegen::model::Model;
 use margaret_model_codegen::model_foreign_key::ModelForeignKey;
 use margaret_model_codegen::model_index::ModelIndex;
-use margaret_model_codegen::on_delete_actions::ON_DELETE_ACTIONS;
 use margaret_model_codegen::resolved_column::ResolvedColumn;
 
 use crate::column_check_tokens::column_check_tokens;
 use crate::column_type_tokens::column_type_tokens;
+use crate::constants::TABLE_MODULE_NAME;
 use crate::model_module_path::model_module_path;
 use crate::string_slice_tokens::string_slice_tokens;
-use crate::table_module_name::TABLE_MODULE_NAME;
 use crate::table_namespace_tokens::table_namespace_tokens;
 
 fn column_tokens(column: &ResolvedColumn) -> TokenStream {

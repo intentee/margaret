@@ -3,7 +3,7 @@ use cookie::Cookie;
 
 use margaret_sessions::issued_sessions::IssuedSessions;
 
-use crate::end_user_subject::END_USER_SUBJECT;
+use crate::constants::END_USER_SUBJECT;
 
 /// # Panics
 ///

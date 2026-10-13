@@ -2,9 +2,9 @@ use anyhow::Result;
 use spiffe::X509Context;
 
 use crate::build_x509_context::build_x509_context;
-use crate::ca_der::CA_DER;
-use crate::leaf_spiffe_example_org_workload_der::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_DER;
-use crate::leaf_spiffe_example_org_workload_key_der::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_KEY_DER;
+use crate::constants::CA_DER;
+use crate::constants::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_DER;
+use crate::constants::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_KEY_DER;
 
 /// # Errors
 ///

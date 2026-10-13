@@ -1,8 +1,8 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
-use crate::authorization_handler_module_name::AUTHORIZATION_HANDLER_MODULE_NAME;
-use crate::oidc_provider_module_name::OIDC_PROVIDER_MODULE_NAME;
+use crate::constants::AUTHORIZATION_HANDLER_MODULE_NAME;
+use crate::constants::OIDC_PROVIDER_MODULE_NAME;
 
 #[must_use]
 pub fn authorization_handler_path() -> CanonicalPath {

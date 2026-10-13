@@ -5,7 +5,7 @@ use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwk_pair::JwkPair;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 
-use crate::far_future_expiry::FAR_FUTURE_EXPIRY;
+use crate::constants::FAR_FUTURE_EXPIRY;
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct TestClaims {

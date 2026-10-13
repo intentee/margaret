@@ -12,8 +12,8 @@ use margaret::framework::macros::model;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::token_digest::TokenDigest;
 
+use crate::constants::SESSION_LIFETIME_SECS;
 use crate::session::Session;
-use crate::session_lifetime_secs::SESSION_LIFETIME_SECS;
 use crate::sessions_error::SessionsError;
 
 #[model(table = "sessions")]

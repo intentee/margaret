@@ -1,7 +1,7 @@
 use cookie::Cookie;
 use http::Method;
 
-use margaret_issuer_request::issuer_response_max_bytes::ISSUER_RESPONSE_MAX_BYTES;
+use margaret_issuer_request::constants::ISSUER_RESPONSE_MAX_BYTES;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 use margaret_sessions::session_resolution::SessionResolution;

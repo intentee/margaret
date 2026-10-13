@@ -43,7 +43,7 @@ mod tests {
     use margaret_registered_claims::registered_claims::RegisteredClaims;
 
     use super::IdTokenClaims;
-    use crate::id_token_members::ID_TOKEN_MEMBERS;
+    use crate::constants::ID_TOKEN_MEMBERS;
 
     #[test]
     fn issues_exactly_the_members_discovery_advertises_so_claims_supported_is_accurate() {

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use margaret_bearer_token_verification_tests::admit_access_token::admit_access_token;
 use margaret_bearer_token_verification_tests::held_key_set::held_key_set;
 use margaret_http::token_admission::TokenAdmission;
-use margaret_issuer_key_set::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
+use margaret_issuer_key_set::constants::ISSUER_FETCH_SPACING;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;

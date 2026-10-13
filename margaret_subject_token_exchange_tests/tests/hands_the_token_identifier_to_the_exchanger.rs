@@ -14,7 +14,7 @@ use margaret_subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectT
 use margaret_subject_token_exchange::subject_token_exchange::SubjectTokenExchange;
 use margaret_subject_token_exchange::subject_token_exchangers::SubjectTokenExchangers;
 use margaret_subject_token_exchange::subject_token_refusal::SubjectTokenRefusal;
-use margaret_subject_token_exchange_tests::exchanged_subject::EXCHANGED_SUBJECT;
+use margaret_subject_token_exchange_tests::constants::EXCHANGED_SUBJECT;
 use margaret_subject_token_exchange_tests::repository_claims::RepositoryClaims;
 use margaret_subject_token_exchange_tests::trusted_repository_issuer::TrustedRepositoryIssuer;
 

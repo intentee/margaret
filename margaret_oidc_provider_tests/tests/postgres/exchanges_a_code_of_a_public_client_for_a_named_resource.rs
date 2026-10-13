@@ -8,12 +8,12 @@ use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::consent_decision::ConsentDecision;
 use margaret_oidc_provider::consent_outcome::ConsentOutcome;
 use margaret_oidc_provider_tests::client_credentials::ClientCredentials;
+use margaret_oidc_provider_tests::constants::PKCE_VERIFIER;
+use margaret_oidc_provider_tests::constants::SPA_CALLBACK;
 use margaret_oidc_provider_tests::issued_code::issued_code;
 use margaret_oidc_provider_tests::jws_claims::jws_claims;
-use margaret_oidc_provider_tests::pkce_verifier::PKCE_VERIFIER;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::signed_in_end_user::signed_in_end_user;
-use margaret_oidc_provider_tests::spa_callback::SPA_CALLBACK;
 use margaret_oidc_provider_tests::spa_parameters::spa_parameters;
 
 #[tokio::test]

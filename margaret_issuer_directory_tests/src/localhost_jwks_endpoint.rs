@@ -1,4 +1,4 @@
-use crate::localhost_jwks_endpoint_issuer::LOCALHOST_JWKS_ENDPOINT_ISSUER;
+use crate::constants::LOCALHOST_JWKS_ENDPOINT_ISSUER;
 use crate::polled_fixture::PolledFixture;
 
 #[must_use]

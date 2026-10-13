@@ -4,7 +4,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_model::column_default::ColumnDefault;
 
-use crate::column_defaults::COLUMN_DEFAULTS;
+use crate::constants::COLUMN_DEFAULTS;
 
 pub(crate) enum ColumnDefaultArgument {
     Known(ColumnDefault),

@@ -16,7 +16,7 @@ use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
 use margaret_oidc_discovery::authorization_response_issuer::AuthorizationResponseIssuer;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
-use crate::fixture_client_id::FIXTURE_CLIENT_ID;
+use crate::constants::FIXTURE_CLIENT_ID;
 use crate::localhost_discovery_metadata::localhost_discovery_metadata;
 use crate::localhost_trust::localhost_trust;
 

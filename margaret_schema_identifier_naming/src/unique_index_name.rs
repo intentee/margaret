@@ -20,7 +20,7 @@ pub fn unique_index_name(
 #[cfg(test)]
 mod tests {
     use super::unique_index_name;
-    use crate::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
+    use crate::constants::MAX_IDENTIFIER_BYTES;
     use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
     #[test]

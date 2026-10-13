@@ -5,7 +5,7 @@ use margaret_jwt_verification::id_token_profile::IdTokenProfile;
 use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_subject_token_exchange::exchanged_subject::ExchangedSubject;
 use margaret_subject_token_exchange::subject_token_exchangers::SubjectTokenExchangers;
-use margaret_subject_token_exchange_tests::exchanged_subject::EXCHANGED_SUBJECT;
+use margaret_subject_token_exchange_tests::constants::EXCHANGED_SUBJECT;
 use margaret_subject_token_exchange_tests::trusted_repository_issuer::TrustedRepositoryIssuer;
 
 #[tokio::test]

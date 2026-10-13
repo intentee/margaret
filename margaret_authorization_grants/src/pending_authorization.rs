@@ -1,7 +1,7 @@
 use margaret_registered_claims::numeric_date::NumericDate;
 
 use crate::authorization_grant::AuthorizationGrant;
-use crate::pending_authorization_lifetime::PENDING_AUTHORIZATION_LIFETIME;
+use crate::constants::PENDING_AUTHORIZATION_LIFETIME;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PendingAuthorization {

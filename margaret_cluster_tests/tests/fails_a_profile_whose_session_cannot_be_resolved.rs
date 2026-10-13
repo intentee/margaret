@@ -3,7 +3,7 @@ use reqwest::header::COOKIE;
 
 use margaret::framework::sql_identifier::table_namespace::TableNamespace;
 use margaret_cluster_tests::cluster::Cluster;
-use margaret_cluster_tests::session_secret_cookie::SESSION_SECRET_COOKIE;
+use margaret_cluster_tests::constants::SESSION_SECRET_COOKIE;
 use margaret_database_tests::table_privilege::TablePrivilege;
 
 use crate::cluster_binary::cluster_binary;

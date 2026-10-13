@@ -10,8 +10,8 @@ use margaret_oidc_provider_tests::pkce_challenge::pkce_challenge;
 
 use crate::cluster::Cluster;
 use crate::consent_required::ConsentRequired;
+use crate::constants::PARTNER_REDIRECT_URI;
 use crate::endpoint_url::endpoint_url;
-use crate::partner_redirect_uri::PARTNER_REDIRECT_URI;
 
 /// # Panics
 ///

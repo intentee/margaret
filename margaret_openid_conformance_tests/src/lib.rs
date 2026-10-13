@@ -1,5 +1,6 @@
 pub mod compose_project;
 pub mod conformance_suite;
+pub mod constants;
 pub mod created_plan;
 pub mod docker_bridge_gateway;
 pub mod docker_output;
@@ -8,11 +9,4 @@ pub mod module_outcome;
 pub mod module_result;
 pub mod module_status;
 pub mod plan_module;
-pub mod provider_host;
-pub mod published_provider;
-pub mod relying_party_alias;
-pub mod relying_party_issuer;
 pub mod suite_api;
-pub mod suite_base_url;
-pub mod suite_host;
-pub mod suite_port;

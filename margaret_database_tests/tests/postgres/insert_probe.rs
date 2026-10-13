@@ -8,7 +8,7 @@ use margaret_sql::returning::Returning;
 use margaret_sql::sql_parameter::SqlParameter;
 use margaret_sql::statement::Statement;
 
-use crate::postgres::probes::PROBES;
+use crate::postgres::constants::PROBES;
 
 pub fn insert_probe(id: i64, amount: i64, conflict: ConflictAction) -> Statement {
     render_insert(&Insert {

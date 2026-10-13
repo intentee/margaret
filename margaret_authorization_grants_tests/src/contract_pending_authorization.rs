@@ -1,5 +1,5 @@
+use margaret_authorization_grants::constants::PENDING_AUTHORIZATION_LIFETIME;
 use margaret_authorization_grants::pending_authorization::PendingAuthorization;
-use margaret_authorization_grants::pending_authorization_lifetime::PENDING_AUTHORIZATION_LIFETIME;
 use margaret_database_tests::contract_moment::contract_moment;
 use margaret_registered_claims::numeric_date::NumericDate;
 

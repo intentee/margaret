@@ -3,8 +3,8 @@ use std::process::Command;
 
 use margaret_local_server_tests::reserved_address::reserved_address;
 
-use crate::cluster_database_max_connections_variable::CLUSTER_DATABASE_MAX_CONNECTIONS_VARIABLE;
-use crate::cluster_database_url_variable::CLUSTER_DATABASE_URL_VARIABLE;
+use crate::constants::CLUSTER_DATABASE_MAX_CONNECTIONS_VARIABLE;
+use crate::constants::CLUSTER_DATABASE_URL_VARIABLE;
 
 #[must_use]
 pub fn unreachable_database_command(binary: &Path) -> Command {

@@ -5,7 +5,7 @@ use margaret_handler_error::handler_error::HandlerError;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::handles_limited_content::HandlesLimitedContent;
 use margaret_http_tests::fixture_body::fixture_body;
-use margaret_jwt_verification_tests::fixture_audience::FIXTURE_AUDIENCE;
+use margaret_jwt_verification_tests::constants::FIXTURE_AUDIENCE;
 use margaret_sessions::issued_sessions::IssuedSessions;
 use margaret_sessions::session_refresh_endpoint::SessionRefreshEndpoint;
 use margaret_sessions::sessions_error::SessionsError;

@@ -1,7 +1,7 @@
 use rustls::RootCertStore;
 use rustls::pki_types::CertificateDer;
 
-use crate::ca_der::CA_DER;
+use crate::constants::CA_DER;
 
 #[must_use]
 /// # Panics

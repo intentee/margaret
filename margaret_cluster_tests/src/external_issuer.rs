@@ -8,7 +8,7 @@ use chrono::Utc;
 use rustls::ServerConfig;
 use serde_json::json;
 
-use margaret::framework::identity_session::id_token_lifetime_secs::ID_TOKEN_LIFETIME_SECS;
+use margaret::framework::identity_session::constants::ID_TOKEN_LIFETIME_SECS;
 use margaret::framework::registered_claims::numeric_date::NumericDate;
 use margaret_accepted_clients_tests::assertion_claims::assertion_claims;
 use margaret_cluster_fixture::margaret::accepted_clients::clients::auth_accepted_partner_client_accepted_partner_client;

@@ -5,9 +5,9 @@ use chrono::Utc;
 use serde::de::DeserializeOwned;
 
 use margaret_identity_session::access_token_claims_signed::AccessTokenClaimsSigned;
-use margaret_identity_session::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
+use margaret_identity_session::constants::ACCESS_TOKEN_LIFETIME_SECS;
+use margaret_identity_session::constants::ID_TOKEN_LIFETIME_SECS;
 use margaret_identity_session::id_token_claims::IdTokenClaims;
-use margaret_identity_session::id_token_lifetime_secs::ID_TOKEN_LIFETIME_SECS;
 use margaret_identity_session::issued_access_token_claims::IssuedAccessTokenClaims;
 use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
 use margaret_identity_session::session_access_token_claims::SessionAccessTokenClaims;

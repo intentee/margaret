@@ -8,7 +8,7 @@ use margaret_spiffe_svid::svid_crypto_provider::svid_crypto_provider;
 use margaret_spiffe_svid_server::svid_client_cert_verifier::SvidClientCertVerifier;
 use margaret_spiffe_svid_server::svid_client_cert_verifier_facade::SvidClientCertVerifierFacade;
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
-use margaret_spiffe_svid_tests::leaf_spiffe_example_org_client_der::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
+use margaret_spiffe_svid_tests::constants::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
 
 #[test]
 fn delegates_client_verification_to_the_verifier_installed_by_an_update_so_rotation_applies() {

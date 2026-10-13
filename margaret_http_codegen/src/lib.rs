@@ -1,5 +1,6 @@
 mod active_servers;
 mod application_responder;
+mod constants;
 mod content_method_tokens;
 mod content_reading;
 pub mod declared_route;
@@ -24,7 +25,6 @@ mod render_routes;
 mod route_content;
 mod route_group;
 mod route_handling;
-mod route_methods;
 mod route_responder;
 mod server_layout;
 mod server_layouts;
@@ -693,7 +693,6 @@ use margaret::framework::macros::provides_route_parameter;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::http_validation::request_input::RequestInput;
-
 
 struct User;
 

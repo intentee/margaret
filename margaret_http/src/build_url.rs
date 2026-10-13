@@ -1,10 +1,10 @@
 use margaret_url_path::admit_path_segment::admit_path_segment;
+use margaret_url_path::constants::PATH_SEPARATOR;
 use margaret_url_path::encode_url_path_segment::encode_url_path_segment;
 use margaret_url_path::path_segment::PathSegment;
 use margaret_url_path::path_segment_admission::PathSegmentAdmission;
 use margaret_url_path::path_segment_rejection::PathSegmentRejection;
 use margaret_url_path::path_segments::path_segments;
-use margaret_url_path::path_separator::PATH_SEPARATOR;
 
 use crate::route_addressing::RouteAddressing;
 use crate::route_position::RoutePosition;

@@ -5,7 +5,7 @@ use margaret::framework::macros::infers_authenticated_user;
 use margaret::framework::macros::singleton;
 
 use crate::auth::authenticated_users::visitor::Visitor;
-use crate::auth::headers::visitor_name::VISITOR_NAME;
+use crate::constants::VISITOR_NAME;
 
 #[singleton]
 #[infers_authenticated_user(user_model = Visitor)]

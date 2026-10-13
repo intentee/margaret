@@ -10,7 +10,7 @@ use margaret::framework::macros::infers_authenticated_user;
 use margaret::framework::macros::singleton;
 
 use crate::auth::authenticated_users::librarian::Librarian;
-use crate::auth::headers::librarian_badge::LIBRARIAN_BADGE;
+use crate::constants::LIBRARIAN_BADGE;
 use crate::singletons::roster::Roster;
 
 #[singleton]

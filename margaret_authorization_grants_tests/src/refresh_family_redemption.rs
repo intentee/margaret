@@ -1,10 +1,10 @@
 use uuid::Uuid;
 
 use margaret::framework::database::database::Database;
-use margaret_authorization_grants::authorization_code_lifetime::AUTHORIZATION_CODE_LIFETIME;
 use margaret_authorization_grants::authorization_code_record::AuthorizationCodeRecord;
 use margaret_authorization_grants::authorization_grants_error::AuthorizationGrantsError;
 use margaret_authorization_grants::code_redemption::CodeRedemption;
+use margaret_authorization_grants::constants::AUTHORIZATION_CODE_LIFETIME;
 use margaret_authorization_grants::family_opening::FamilyOpening;
 use margaret_authorization_grants::issued_code::IssuedCode;
 use margaret_authorization_grants::redemption_decision::RedemptionDecision;

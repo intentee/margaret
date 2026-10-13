@@ -2,6 +2,7 @@
 #[path = "../margaret/mod.rs"]
 pub mod margaret;
 
+pub mod constants;
 pub mod consumed_sessions;
 pub mod cookie_domain;
 pub mod issued_sessions;
@@ -10,7 +11,6 @@ pub mod session;
 mod session_cookie_jar;
 pub mod session_cookies;
 pub mod session_endpoint;
-pub mod session_lifetime_secs;
 pub mod session_record;
 mod session_refresh;
 pub mod session_refresh_answer;

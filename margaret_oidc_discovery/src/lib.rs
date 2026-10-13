@@ -1,7 +1,7 @@
 pub mod advertised_endpoint;
 pub mod authorization_response_issuer;
+pub mod constants;
 pub mod metadata_endpoint;
-pub mod oidc_discovery_path;
 pub mod oidc_discovery_url;
 pub mod provider_endpoints;
 pub mod provider_metadata;

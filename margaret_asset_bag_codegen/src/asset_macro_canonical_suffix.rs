@@ -1,4 +1,4 @@
-use crate::asset_bag_module_name::ASSET_BAG_MODULE_NAME;
+use crate::constants::ASSET_BAG_MODULE_NAME;
 
 const ASSET_MACRO_NAME: &str = "asset";
 

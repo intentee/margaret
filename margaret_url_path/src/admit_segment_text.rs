@@ -1,6 +1,6 @@
+use crate::constants::PATH_SEPARATOR;
 use crate::path_segment_admission::PathSegmentAdmission;
 use crate::path_segment_rejection::PathSegmentRejection;
-use crate::path_separator::PATH_SEPARATOR;
 
 #[must_use]
 pub fn admit_segment_text(text: &str) -> PathSegmentAdmission {

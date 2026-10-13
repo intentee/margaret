@@ -2,10 +2,10 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_generated_module::module_path::ModulePath;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
-use crate::sessions_module_name::SESSIONS_MODULE_NAME;
-use crate::sign_out_endpoints_module_name::SIGN_OUT_ENDPOINTS_MODULE_NAME;
-use crate::sign_out_handler_module_name::SIGN_OUT_HANDLER_MODULE_NAME;
-use crate::sign_out_handler_type_name::SIGN_OUT_HANDLER_TYPE_NAME;
+use crate::constants::SESSIONS_MODULE_NAME;
+use crate::constants::SIGN_OUT_ENDPOINTS_MODULE_NAME;
+use crate::constants::SIGN_OUT_HANDLER_MODULE_NAME;
+use crate::constants::SIGN_OUT_HANDLER_TYPE_NAME;
 
 pub struct SignOutEndpointModule {
     handler_path: CanonicalPath,

@@ -11,7 +11,7 @@ use margaret_sql::returning::Returning;
 use margaret_sql::update::Update;
 
 use crate::active_record_error::ActiveRecordError;
-use crate::base_alias::BASE_ALIAS;
+use crate::constants::BASE_ALIAS;
 use crate::deletion::Deletion;
 use crate::executed_affected::executed_affected;
 use crate::field_set::FieldSet;

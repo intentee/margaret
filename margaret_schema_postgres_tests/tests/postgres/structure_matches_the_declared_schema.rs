@@ -6,7 +6,7 @@ use tokio_postgres::Client;
 use margaret_database_tests::started_database::StartedDatabase;
 use margaret_model::schema::Schema;
 use margaret_model::table::Table;
-use margaret_sql_identifier::framework_namespace::FRAMEWORK_NAMESPACE;
+use margaret_sql_identifier::constants::FRAMEWORK_NAMESPACE;
 use margaret_sql_identifier::table_namespace::TableNamespace;
 
 const DECLARED: Schema = Schema {

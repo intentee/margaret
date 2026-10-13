@@ -7,7 +7,7 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::standard_library_item::StandardLibraryItem;
 use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
 
-use crate::children_canonical_path::CHILDREN_CANONICAL_PATH;
+use crate::constants::CHILDREN_CANONICAL_PATH;
 use crate::loaded_wrapper::LoadedWrapper;
 
 fn owned_path(declared: &Type) -> Option<&TypePath> {

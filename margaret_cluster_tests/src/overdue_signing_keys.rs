@@ -5,7 +5,7 @@ use zeroize::Zeroizing;
 use margaret::framework::active_record::model::Model;
 use margaret::framework::active_record::saving::Saving;
 use margaret::framework::active_record::secret_text::SecretText;
-use margaret::framework::jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
+use margaret::framework::jwks_roller::constants::JWKS_ROLL_INTERVAL;
 use margaret::framework::registered_claims::numeric_date::NumericDate;
 use margaret::framework::signing_keys::signing_key_set::SigningKeySet;
 

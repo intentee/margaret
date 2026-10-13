@@ -1,5 +1,5 @@
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
+use margaret_jwks_roller::constants::JWKS_ROLL_INTERVAL;
 
 use crate::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 

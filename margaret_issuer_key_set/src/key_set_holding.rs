@@ -1,8 +1,8 @@
 use tokio::time::Instant;
 
+use crate::constants::ISSUER_FETCH_SPACING;
+use crate::constants::KEY_SET_POLL_INTERVAL_AFTER_READY;
 use crate::held_key_set::HeldKeySet;
-use crate::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
-use crate::key_set_poll_interval_after_ready::KEY_SET_POLL_INTERVAL_AFTER_READY;
 
 #[derive(Clone)]
 pub enum KeySetHolding {

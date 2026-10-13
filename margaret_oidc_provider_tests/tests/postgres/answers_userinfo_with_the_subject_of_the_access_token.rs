@@ -3,7 +3,7 @@ use serde_json::json;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider_tests::answer::Answer;
 use margaret_oidc_provider_tests::client_credentials::ClientCredentials;
-use margaret_oidc_provider_tests::end_user_subject::END_USER_SUBJECT;
+use margaret_oidc_provider_tests::constants::END_USER_SUBJECT;
 use margaret_oidc_provider_tests::issued_code::issued_code;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
 use margaret_oidc_provider_tests::portal_tokens::portal_tokens;

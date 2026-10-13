@@ -12,13 +12,13 @@ use margaret_deadline::deadline_wake::DeadlineWake;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
+use margaret_jwks_roller::constants::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller::held_secret::HeldSecret;
-use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller::roll_due_at::roll_due_at;
 use margaret_jwks_roller::signing_keys_synchronizer::SigningKeysSynchronizer;
 use margaret_registered_claims::numeric_date::NumericDate;
 
-use crate::jwks_curve::JWKS_CURVE;
+use crate::constants::JWKS_CURVE;
 use crate::jwks_document_holder::JwksDocumentHolder;
 use crate::jwks_roller_server_error::JwksRollerServerError;
 use crate::public_jwks_handler::PublicJwksHandler;
@@ -142,7 +142,7 @@ mod tests {
 
     use margaret_jwks_keygen::signing_curve::SigningCurve;
     use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
-    use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
+    use margaret_jwks_roller::constants::JWKS_ROLL_INTERVAL;
     use margaret_jwks_roller::roll_due_at::roll_due_at;
     use margaret_registered_claims::numeric_date::NumericDate;
 

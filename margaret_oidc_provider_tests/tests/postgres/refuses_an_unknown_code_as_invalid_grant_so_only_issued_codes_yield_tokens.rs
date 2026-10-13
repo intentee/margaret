@@ -1,5 +1,5 @@
 use margaret_oidc_provider_tests::code_exchange::code_exchange;
-use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
+use margaret_oidc_provider_tests::constants::PORTAL_CREDENTIALS;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]

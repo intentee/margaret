@@ -4,7 +4,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_model::on_delete::OnDelete;
 
-use crate::on_delete_actions::ON_DELETE_ACTIONS;
+use crate::constants::ON_DELETE_ACTIONS;
 
 pub(crate) enum OnDeleteArgument {
     Known(OnDelete),

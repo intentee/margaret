@@ -1,5 +1,5 @@
 use margaret_http::response_continuation::ResponseContinuation;
-use margaret_oidc_provider_tests::end_user_subject::END_USER_SUBJECT;
+use margaret_oidc_provider_tests::constants::END_USER_SUBJECT;
 use margaret_oidc_provider_tests::unknown_userinfo_subject::UnknownUserinfoSubject;
 use margaret_oidc_provider_tests::userinfo_handled::userinfo_handled;
 

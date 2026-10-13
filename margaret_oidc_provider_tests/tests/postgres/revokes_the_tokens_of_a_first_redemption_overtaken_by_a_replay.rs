@@ -2,8 +2,8 @@ use serde_json::json;
 
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider_tests::code_exchange::code_exchange;
+use margaret_oidc_provider_tests::constants::PORTAL_CREDENTIALS;
 use margaret_oidc_provider_tests::issued_code::issued_code;
-use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_sql_identifier::qualified_table::qualified_table;

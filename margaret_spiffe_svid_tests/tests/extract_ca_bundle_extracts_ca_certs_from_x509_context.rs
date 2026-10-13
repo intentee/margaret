@@ -5,7 +5,7 @@ use spiffe::X509Context;
 
 use margaret_spiffe_svid::extract_ca_bundle::extract_ca_bundle;
 use margaret_spiffe_svid_tests::build_workload_svid::build_workload_svid;
-use margaret_spiffe_svid_tests::ca_der::CA_DER;
+use margaret_spiffe_svid_tests::constants::CA_DER;
 
 #[test]
 fn extracts_the_svid_trust_domain_cas_from_the_context_so_peers_can_be_verified() {

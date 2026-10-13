@@ -2,9 +2,9 @@ use serde_json::json;
 
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
+use margaret_oidc_provider_tests::constants::SERVICE_CREDENTIALS;
 use margaret_oidc_provider_tests::jws_claims::jws_claims;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
-use margaret_oidc_provider_tests::service_credentials::SERVICE_CREDENTIALS;
 
 #[tokio::test]
 async fn issues_a_client_credentials_access_token_for_the_client_itself_without_a_refresh_token() {

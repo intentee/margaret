@@ -9,7 +9,7 @@ use margaret_subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectT
 use margaret_subject_token_exchange::subject_token_exchange::SubjectTokenExchange;
 use margaret_subject_token_exchange::subject_token_profile::SubjectTokenProfile;
 
-use crate::exchanged_subject::EXCHANGED_SUBJECT;
+use crate::constants::EXCHANGED_SUBJECT;
 use crate::repository_claims::RepositoryClaims;
 
 fn exchanged_scope() -> Scope {

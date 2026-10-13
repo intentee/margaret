@@ -8,8 +8,8 @@ use margaret_jwks_roller::held_secret::HeldSecret;
 use margaret_jwks_roller::roller_error::RollerError;
 use margaret_jwks_roller_tests::fixture_synchronizer::fixture_synchronizer;
 use margaret_jwks_roller_tests::seeded_signing_keys::seeded_signing_keys;
+use margaret_signing_keys::constants::SIGNING_KEY_SET_NAME;
 use margaret_signing_keys::signing_key_set::SigningKeySet;
-use margaret_signing_keys::signing_key_set_name::SIGNING_KEY_SET_NAME;
 use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
 
 #[tokio::test]

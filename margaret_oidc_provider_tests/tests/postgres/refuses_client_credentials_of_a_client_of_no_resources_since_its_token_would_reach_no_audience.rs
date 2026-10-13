@@ -1,7 +1,7 @@
 use serde_json::json;
 
+use margaret_oidc_provider_tests::constants::STAFF_CREDENTIALS;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
-use margaret_oidc_provider_tests::staff_credentials::STAFF_CREDENTIALS;
 
 #[tokio::test]
 async fn refuses_client_credentials_of_a_client_of_no_resources_since_its_token_would_reach_no_audience()

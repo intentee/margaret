@@ -17,7 +17,7 @@ pub fn index_name(table: &str, columns: &[String]) -> Result<String, SchemaIdent
 #[cfg(test)]
 mod tests {
     use super::index_name;
-    use crate::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
+    use crate::constants::MAX_IDENTIFIER_BYTES;
     use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
     #[test]

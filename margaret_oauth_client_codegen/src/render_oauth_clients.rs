@@ -12,16 +12,16 @@ use margaret_oauth_vocabulary::resource_scope::ResourceScope;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_token_issuance_codegen::resource_audience_path::resource_audience_path;
 
-use crate::client_id_module_name::CLIENT_ID_MODULE_NAME;
+use crate::constants::CLIENT_ID_MODULE_NAME;
+use crate::constants::OAUTH_CLIENTS_MODULE_NAME;
+use crate::constants::RESOURCE_GRANT_MODULE_NAME;
+use crate::constants::RESOURCES_MODULE_NAME;
+use crate::constants::SIGN_IN_CALLBACK_HANDLER_MODULE_NAME;
+use crate::constants::SIGN_IN_SCOPES_MODULE_NAME;
 use crate::module_sign_in::ModuleSignIn;
 use crate::oauth_client_credentials::OAuthClientCredentials;
 use crate::oauth_client_item::OAuthClientItem;
 use crate::oauth_client_module::OAuthClientModule;
-use crate::oauth_clients_module_name::OAUTH_CLIENTS_MODULE_NAME;
-use crate::resource_grant_module_name::RESOURCE_GRANT_MODULE_NAME;
-use crate::resources_module_name::RESOURCES_MODULE_NAME;
-use crate::sign_in_callback_handler_module_name::SIGN_IN_CALLBACK_HANDLER_MODULE_NAME;
-use crate::sign_in_scopes_module_name::SIGN_IN_SCOPES_MODULE_NAME;
 
 fn sign_in_modules(
     client_module: &ModulePath,

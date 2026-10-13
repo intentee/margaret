@@ -3,10 +3,10 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use margaret_accepted_clients_tests::asserting_client::AssertingClient;
+use margaret_oidc_provider_tests::constants::RFC_EXAMPLE_CLIENT;
+use margaret_oidc_provider_tests::constants::RFC_EXAMPLE_PRIVILEGES;
 use margaret_oidc_provider_tests::fixture_clients::FixtureClients;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
-use margaret_oidc_provider_tests::rfc_example_client::RFC_EXAMPLE_CLIENT;
-use margaret_oidc_provider_tests::rfc_example_privileges::RFC_EXAMPLE_PRIVILEGES;
 use margaret_oidc_provider_tests::started_with_provider_state::started_with_provider_state;
 
 const INACTIVE_RESPONSE: &str =

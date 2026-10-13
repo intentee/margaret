@@ -6,9 +6,9 @@ use spiffe::X509Svid;
 use tokio::sync::broadcast;
 
 use margaret_spiffe_svid_tests::build_converter_service::build_converter_service;
-use margaret_spiffe_svid_tests::ca_der::CA_DER;
-use margaret_spiffe_svid_tests::leaf_spiffe_example_org_workload_der::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_DER;
-use margaret_spiffe_svid_tests::leaf_x25519_unsupported_signing_key_der::LEAF_X25519_UNSUPPORTED_SIGNING_KEY_DER;
+use margaret_spiffe_svid_tests::constants::CA_DER;
+use margaret_spiffe_svid_tests::constants::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_DER;
+use margaret_spiffe_svid_tests::constants::LEAF_X25519_UNSUPPORTED_SIGNING_KEY_DER;
 
 #[tokio::test]
 async fn convert_x509_context_errors_when_private_key_is_unsupported_for_signing() {

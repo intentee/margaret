@@ -4,13 +4,13 @@ pub mod margaret;
 
 pub mod boot;
 pub mod chat;
+pub mod constants;
 pub mod get_home;
 pub mod get_profile;
 pub mod get_user;
 pub mod guard;
 pub mod home_view;
 pub mod home_view_props;
-pub mod interval;
 pub mod pulse;
 pub mod result;
 pub mod secrets;

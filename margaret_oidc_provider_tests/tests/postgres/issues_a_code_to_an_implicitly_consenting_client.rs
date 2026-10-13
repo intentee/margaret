@@ -1,7 +1,7 @@
 use margaret_http_tests::redirection::Redirection;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
-use margaret_oidc_provider_tests::portal_callback::PORTAL_CALLBACK;
+use margaret_oidc_provider_tests::constants::PORTAL_CALLBACK;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::signed_in_end_user::signed_in_end_user;

@@ -26,7 +26,7 @@ use tokio_util::sync::CancellationToken;
 
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
-use crate::client_head_timeout::CLIENT_HEAD_TIMEOUT;
+use crate::constants::CLIENT_HEAD_TIMEOUT;
 use crate::drive_connection::drive_connection;
 use crate::forward_targets::ForwardTargets;
 use crate::one_shot_handler::OneShotHandler;
@@ -406,7 +406,7 @@ mod tests {
     use super::accept_outcome;
     use super::accepted_connection;
     use super::report_connection_task_outcome;
-    use crate::client_head_timeout::CLIENT_HEAD_TIMEOUT;
+    use crate::constants::CLIENT_HEAD_TIMEOUT;
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
     use crate::head_handler::HeadHandler;

@@ -7,8 +7,8 @@ use std::sync::OnceLock;
 use std::sync::atomic::AtomicU16;
 use std::sync::atomic::Ordering;
 
+use crate::constants::FIRST_UNPRIVILEGED_PORT;
 use crate::ephemeral_port_start::ephemeral_port_start;
-use crate::first_unprivileged_port::FIRST_UNPRIVILEGED_PORT;
 
 static NEXT_CANDIDATE: OnceLock<AtomicU16> = OnceLock::new();
 

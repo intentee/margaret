@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
+use crate::constants::MAX_IDENTIFIER_BYTES;
 
 #[derive(Debug, Error)]
 pub enum SchemaIdentifierNamingError {

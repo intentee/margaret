@@ -1,7 +1,7 @@
 use serde_json::json;
 
 use margaret_database_tests::table_privilege::TablePrivilege;
-use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
+use margaret_oidc_provider_tests::constants::PORTAL_CREDENTIALS;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_sql_identifier::table_namespace::TableNamespace;
 

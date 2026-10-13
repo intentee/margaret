@@ -2,8 +2,8 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
+use crate::constants::TRUSTED_ISSUERS_MODULE_NAME;
 use crate::trusted_issuer_constant::TrustedIssuerConstant;
-use crate::trusted_issuers_module_name::TRUSTED_ISSUERS_MODULE_NAME;
 
 #[must_use]
 pub fn trusted_issuer_constant_path(tag: &Tag, constant: TrustedIssuerConstant) -> CanonicalPath {

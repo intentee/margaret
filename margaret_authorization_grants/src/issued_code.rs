@@ -1,7 +1,7 @@
 use margaret_registered_claims::numeric_date::NumericDate;
 
-use crate::authorization_code_lifetime::AUTHORIZATION_CODE_LIFETIME;
 use crate::authorization_grant::AuthorizationGrant;
+use crate::constants::AUTHORIZATION_CODE_LIFETIME;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IssuedCode {

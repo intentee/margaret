@@ -1,6 +1,6 @@
 use tokio::time::Instant;
 
-use margaret_issuer_key_set::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
+use margaret_issuer_key_set::constants::ISSUER_FETCH_SPACING;
 use margaret_issuer_key_set::key_set_holding::KeySetHolding;
 
 #[test]

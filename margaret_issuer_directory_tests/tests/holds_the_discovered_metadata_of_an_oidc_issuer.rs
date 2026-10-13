@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use serde_json::json;
 
+use margaret_issuer_directory_tests::constants::LOCALHOST_DISCOVERED_ISSUER;
 use margaret_issuer_directory_tests::fixture_issuer_routes::FixtureIssuerRoutes;
 use margaret_issuer_directory_tests::json_handler::json_handler;
-use margaret_issuer_directory_tests::localhost_discovered_issuer::LOCALHOST_DISCOVERED_ISSUER;
 use margaret_issuer_directory_tests::polled_fixture::PolledFixture;
 use margaret_issuer_directory_tests::running_fixture_issuer::RunningFixtureIssuer;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;

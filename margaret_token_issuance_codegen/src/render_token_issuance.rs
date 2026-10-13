@@ -3,8 +3,8 @@ use quote::quote;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 
+use crate::constants::TOKEN_ISSUANCE_MODULE_NAME;
 use crate::token_issuance_declaration::TokenIssuanceDeclaration;
-use crate::token_issuance_module_name::TOKEN_ISSUANCE_MODULE_NAME;
 
 #[must_use]
 pub fn render_token_issuance(

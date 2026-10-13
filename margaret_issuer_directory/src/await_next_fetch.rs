@@ -3,7 +3,7 @@ use tokio_util::sync::CancellationToken;
 
 use margaret_deadline::await_deadline::await_deadline;
 use margaret_deadline::deadline_wake::DeadlineWake;
-use margaret_issuer_key_set::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
+use margaret_issuer_key_set::constants::ISSUER_FETCH_SPACING;
 use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 
 pub(crate) async fn await_next_fetch(
@@ -27,9 +27,9 @@ mod tests {
     use tokio::time::timeout;
     use tokio_util::sync::CancellationToken;
 
-    use margaret_issuer_key_set::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
+    use margaret_issuer_key_set::constants::ISSUER_FETCH_SPACING;
+    use margaret_issuer_key_set::constants::KEY_SET_POLL_INTERVAL_AFTER_READY;
     use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
-    use margaret_issuer_key_set::key_set_poll_interval_after_ready::KEY_SET_POLL_INTERVAL_AFTER_READY;
 
     use super::await_next_fetch;
     use margaret_deadline::deadline_wake::DeadlineWake;

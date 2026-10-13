@@ -51,7 +51,7 @@ mod tests {
     use std::task::Poll;
 
     use super::StallTimer;
-    use crate::client_body_timeout::CLIENT_BODY_TIMEOUT;
+    use crate::constants::CLIENT_BODY_TIMEOUT;
     use crate::stall_outcome::StallOutcome;
 
     async fn stalls_when(timer: &mut StallTimer, outcome: Poll<()>) -> bool {

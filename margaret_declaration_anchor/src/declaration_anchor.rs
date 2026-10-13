@@ -2,8 +2,8 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 
+use crate::constants::DECLARATION_ATTRIBUTES;
 use crate::declaration_anchor_error::DeclarationAnchorError;
-use crate::declaration_attributes::DECLARATION_ATTRIBUTES;
 use crate::declared_anchor::DeclaredAnchor;
 
 /// # Errors

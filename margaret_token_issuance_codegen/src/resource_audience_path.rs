@@ -2,8 +2,8 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
-use crate::resource_audience_module_name::RESOURCE_AUDIENCE_MODULE_NAME;
-use crate::resource_tokens_module_name::RESOURCE_TOKENS_MODULE_NAME;
+use crate::constants::RESOURCE_AUDIENCE_MODULE_NAME;
+use crate::constants::RESOURCE_TOKENS_MODULE_NAME;
 
 #[must_use]
 pub fn resource_audience_path(resource: &Tag) -> CanonicalPath {

@@ -1,7 +1,7 @@
 use reqwest::StatusCode;
 use tempfile::tempdir;
 
-use margaret_coverage_fixture::auth::headers::patron_card::PATRON_CARD;
+use margaret_coverage_fixture::constants::PATRON_CARD;
 use margaret_coverage_fixture::margaret::framework::console::command_outcome::CommandOutcome;
 use margaret_coverage_fixture_tests::answer::Answer;
 use margaret_coverage_fixture_tests::served_library::ServedLibrary;

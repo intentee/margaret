@@ -18,10 +18,10 @@ use margaret_oidc_sign_in::userinfo_fetch::UserinfoFetch;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::callback_request::callback_request;
 use margaret_openid_conformance_tests::conformance_suite::ConformanceSuite;
+use margaret_openid_conformance_tests::constants::RELYING_PARTY_ALIAS;
+use margaret_openid_conformance_tests::constants::RELYING_PARTY_ISSUER;
 use margaret_openid_conformance_tests::module_result::ModuleResult;
 use margaret_openid_conformance_tests::module_status::ModuleStatus;
-use margaret_openid_conformance_tests::relying_party_alias::RELYING_PARTY_ALIAS;
-use margaret_openid_conformance_tests::relying_party_issuer::RELYING_PARTY_ISSUER;
 
 const SUITE_CLIENT_CALLBACK: &str = "https://margaret-client.test/callback";
 const SUITE_CLIENT_ID: &str = "margaret";

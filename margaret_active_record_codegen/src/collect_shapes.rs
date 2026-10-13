@@ -15,7 +15,7 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_model_codegen::field_value::FieldValue;
 use margaret_model_codegen::model::Model;
 use margaret_model_codegen::relation_kind::RelationKind;
-use margaret_sql::maximum_limit::MAXIMUM_LIMIT;
+use margaret_sql::constants::MAXIMUM_LIMIT;
 
 use crate::active_record_codegen_error::ActiveRecordCodegenError;
 use crate::loaded_target::LoadedTarget;

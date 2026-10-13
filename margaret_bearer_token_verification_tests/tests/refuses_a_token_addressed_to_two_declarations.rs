@@ -7,7 +7,7 @@ use margaret_http::request_authorization::RequestAuthorization;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
-use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
+use margaret_jwks_keygen_tests::constants::FAR_FUTURE_EXPIRY;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_token_trust::token_trust::TokenTrust;

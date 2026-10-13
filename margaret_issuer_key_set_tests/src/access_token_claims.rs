@@ -1,8 +1,8 @@
 use serde_json::Value;
 use serde_json::json;
 
-use crate::access_token_audience::ACCESS_TOKEN_AUDIENCE;
-use crate::access_token_issuer::ACCESS_TOKEN_ISSUER;
+use crate::constants::ACCESS_TOKEN_AUDIENCE;
+use crate::constants::ACCESS_TOKEN_ISSUER;
 use crate::fixture_now::fixture_now;
 
 #[must_use]

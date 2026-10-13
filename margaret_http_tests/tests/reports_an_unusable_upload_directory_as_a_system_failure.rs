@@ -1,9 +1,9 @@
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::read_uploaded_files::read_uploaded_files;
+use margaret_http_tests::constants::MULTIPART_CONTENT_TYPE;
+use margaret_http_tests::constants::MULTIPART_FILES;
 use margaret_http_tests::content_type_request::content_type_request;
 use margaret_http_tests::fixture_body::fixture_body;
-use margaret_http_tests::multipart_content_type::MULTIPART_CONTENT_TYPE;
-use margaret_http_tests::multipart_files::MULTIPART_FILES;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 

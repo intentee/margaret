@@ -10,8 +10,8 @@ use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::client_async;
 use url::Url;
 
-use crate::chat_path::CHAT_PATH;
 use crate::cluster::Cluster;
+use crate::constants::CHAT_PATH;
 
 /// # Panics
 ///

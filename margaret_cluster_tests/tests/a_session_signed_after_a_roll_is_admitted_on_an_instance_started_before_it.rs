@@ -2,10 +2,10 @@ use reqwest::StatusCode;
 use reqwest::header::COOKIE;
 
 use margaret_cluster_tests::cluster::Cluster;
+use margaret_cluster_tests::constants::SESSION_ACCESS_COOKIE;
 use margaret_cluster_tests::overdue_signing_keys::overdue_signing_keys;
 use margaret_cluster_tests::profile_status::profile_status;
 use margaret_cluster_tests::response_cookie::response_cookie;
-use margaret_cluster_tests::session_access_cookie::SESSION_ACCESS_COOKIE;
 use margaret_cluster_tests::signing_key_generations::signing_key_generations;
 use margaret_cluster_tests::started_alice_session::started_alice_session;
 

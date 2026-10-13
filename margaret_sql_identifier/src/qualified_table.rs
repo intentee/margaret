@@ -1,4 +1,4 @@
-use crate::framework_namespace::FRAMEWORK_NAMESPACE;
+use crate::constants::FRAMEWORK_NAMESPACE;
 use crate::quote_identifier::quote_identifier;
 use crate::table_namespace::TableNamespace;
 

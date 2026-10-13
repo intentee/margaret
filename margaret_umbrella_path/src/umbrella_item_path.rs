@@ -1,6 +1,6 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 
-use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
+use crate::constants::UMBRELLA_MODULE_NAME;
 
 #[must_use]
 pub fn umbrella_item_path(segments: &[&str]) -> CanonicalPath {

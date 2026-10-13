@@ -9,7 +9,7 @@ use margaret_sql::sql_parameter::SqlParameter;
 use margaret_sql::statement::Statement;
 use margaret_sql::update::Update;
 
-use crate::postgres::probes::PROBES;
+use crate::postgres::constants::PROBES;
 
 pub fn update_probe_amount(id: i64, amount: i64) -> Statement {
     render_update(&Update {

@@ -11,7 +11,7 @@ pub fn primary_key_index_name(table: &str) -> Result<String, SchemaIdentifierNam
 #[cfg(test)]
 mod tests {
     use super::primary_key_index_name;
-    use crate::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
+    use crate::constants::MAX_IDENTIFIER_BYTES;
     use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
     #[test]

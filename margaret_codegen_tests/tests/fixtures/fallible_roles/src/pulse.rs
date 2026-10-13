@@ -1,7 +1,7 @@
 use margaret::framework::macros::process;
 use margaret::framework::macros::scheduled_with_tick_timer;
 
-use crate::interval::INTERVAL;
+use crate::constants::INTERVAL;
 
 #[scheduled_with_tick_timer(interval = INTERVAL)]
 pub struct Pulse;

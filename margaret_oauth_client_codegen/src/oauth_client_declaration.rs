@@ -14,7 +14,7 @@ use margaret_oauth_vocabulary::client_authentication_method::ClientAuthenticatio
 use margaret_oauth_vocabulary::client_id::ClientId;
 use margaret_oauth_vocabulary::client_id_parsing::ClientIdParsing;
 use margaret_oauth_vocabulary::scope::Scope;
-use margaret_oauth_vocabulary_codegen::client_authentication_methods::CLIENT_AUTHENTICATION_METHODS;
+use margaret_oauth_vocabulary_codegen::constants::CLIENT_AUTHENTICATION_METHODS;
 use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
 use margaret_oauth_vocabulary_codegen::scope_resolution::ScopeResolution;
 

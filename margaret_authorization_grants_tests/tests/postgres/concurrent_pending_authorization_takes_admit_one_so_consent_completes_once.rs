@@ -6,8 +6,8 @@ use margaret_authorization_grants::pending_authorization_record::PendingAuthoriz
 use margaret_authorization_grants::pending_authorization_take::PendingAuthorizationTake;
 use margaret_authorization_grants_tests::contract_pending_authorization::contract_pending_authorization;
 use margaret_authorization_grants_tests::started_with_authorization_grants::started_with_authorization_grants;
+use margaret_database_tests::constants::RACING_INSTANCES;
 use margaret_database_tests::contract_instant::contract_instant;
-use margaret_database_tests::racing_instances::RACING_INSTANCES;
 
 #[tokio::test]
 async fn concurrent_pending_authorization_takes_admit_one_so_consent_completes_once() {

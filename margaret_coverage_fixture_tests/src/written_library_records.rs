@@ -1,10 +1,10 @@
 use std::fs;
 use std::path::Path;
 
-use crate::catalogued_shelf::CATALOGUED_SHELF;
+use crate::constants::CATALOGUED_SHELF;
+use crate::constants::LISTED_COURIER;
+use crate::constants::LISTED_LIBRARIAN;
 use crate::library_records::LibraryRecords;
-use crate::listed_courier::LISTED_COURIER;
-use crate::listed_librarian::LISTED_LIBRARIAN;
 
 /// # Panics
 ///

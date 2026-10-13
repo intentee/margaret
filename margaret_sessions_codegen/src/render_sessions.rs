@@ -5,14 +5,14 @@ use quote::quote;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 
+use crate::constants::SESSIONS_MODULE_NAME;
+use crate::constants::SIGN_OUT_ENDPOINTS_MODULE_NAME;
 use crate::consumed_sessions_declaration::ConsumedSessionsDeclaration;
 use crate::declared_sessions::DeclaredSessions;
 use crate::issued_sessions_declaration::IssuedSessionsDeclaration;
 use crate::render_sign_out_endpoints::render_sign_out_endpoints;
 use crate::sessions_item::SessionsItem;
-use crate::sessions_module_name::SESSIONS_MODULE_NAME;
 use crate::sign_out_endpoint_module::SignOutEndpointModule;
-use crate::sign_out_endpoints_module_name::SIGN_OUT_ENDPOINTS_MODULE_NAME;
 
 #[must_use]
 pub fn render_sessions(

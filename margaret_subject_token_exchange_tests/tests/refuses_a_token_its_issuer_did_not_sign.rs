@@ -9,7 +9,7 @@ use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_subject_token_exchange::exchanged_subject::ExchangedSubject;
 use margaret_subject_token_exchange::subject_token_exchangers::SubjectTokenExchangers;
 use margaret_subject_token_exchange::subject_token_refusal::SubjectTokenRefusal;
-use margaret_subject_token_exchange_tests::provider_audience::PROVIDER_AUDIENCE;
+use margaret_subject_token_exchange_tests::constants::PROVIDER_AUDIENCE;
 use margaret_subject_token_exchange_tests::signed_by::signed_by;
 use margaret_subject_token_exchange_tests::trusted_repository_issuer::TrustedRepositoryIssuer;
 

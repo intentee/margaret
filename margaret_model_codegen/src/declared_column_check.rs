@@ -124,7 +124,7 @@ impl DeclaredColumnCheck {
 mod tests {
     use margaret_model::check_predicate::CheckPredicate;
     use margaret_model::column_type::ColumnType;
-    use margaret_schema_identifier_naming::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
+    use margaret_schema_identifier_naming::constants::MAX_IDENTIFIER_BYTES;
 
     use crate::declared_column_check::DeclaredColumnCheck;
     use crate::model_codegen_error::ModelCodegenError;

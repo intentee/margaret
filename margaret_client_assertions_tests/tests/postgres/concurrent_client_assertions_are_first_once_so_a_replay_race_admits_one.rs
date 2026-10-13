@@ -4,9 +4,9 @@ use margaret_client_assertions::assertion_memory::AssertionMemory;
 use margaret_client_assertions::client_assertion::ClientAssertion;
 use margaret_client_assertions_tests::contract_assertion_expiry::contract_assertion_expiry;
 use margaret_client_assertions_tests::started_with_client_assertions::started_with_client_assertions;
+use margaret_database_tests::constants::RACING_INSTANCES;
 use margaret_database_tests::contract_instant::contract_instant;
 use margaret_database_tests::contract_token::contract_token;
-use margaret_database_tests::racing_instances::RACING_INSTANCES;
 
 #[tokio::test]
 async fn concurrent_client_assertions_are_first_once_so_a_replay_race_admits_one() {

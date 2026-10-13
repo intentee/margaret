@@ -14,7 +14,7 @@ pub fn minimum_constraint_name(
 #[cfg(test)]
 mod tests {
     use super::minimum_constraint_name;
-    use crate::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
+    use crate::constants::MAX_IDENTIFIER_BYTES;
     use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
     #[test]

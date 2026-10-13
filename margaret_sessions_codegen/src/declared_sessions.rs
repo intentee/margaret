@@ -14,10 +14,10 @@ use margaret_registered_claims::audience_parsing::AudienceParsing;
 use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
 use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
+use crate::constants::SESSION_COOKIES;
 use crate::consumed_sessions_declaration::ConsumedSessionsDeclaration;
 use crate::declared_session_cookies::DeclaredSessionCookies;
 use crate::issued_sessions_declaration::IssuedSessionsDeclaration;
-use crate::session_cookies::SESSION_COOKIES;
 use crate::session_cookies_variant::SessionCookiesVariant;
 use crate::sessions_codegen_error::SessionsCodegenError;
 use crate::sessions_declaration::SessionsDeclaration;

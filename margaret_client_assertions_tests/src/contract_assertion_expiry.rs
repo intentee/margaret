@@ -1,4 +1,4 @@
-use margaret_accepted_clients::client_assertion_max_lifetime::CLIENT_ASSERTION_MAX_LIFETIME;
+use margaret_accepted_clients::constants::CLIENT_ASSERTION_MAX_LIFETIME;
 use margaret_database_tests::contract_moment::contract_moment;
 use margaret_registered_claims::numeric_date::NumericDate;
 

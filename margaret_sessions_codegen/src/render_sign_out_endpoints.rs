@@ -4,11 +4,11 @@ use quote::quote;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 
-use crate::sessions_module_name::SESSIONS_MODULE_NAME;
+use crate::constants::SESSIONS_MODULE_NAME;
+use crate::constants::SIGN_OUT_ENDPOINTS_MODULE_NAME;
+use crate::constants::SIGN_OUT_HANDLER_MODULE_NAME;
+use crate::constants::SIGN_OUT_HANDLER_TYPE_NAME;
 use crate::sign_out_endpoint_module::SignOutEndpointModule;
-use crate::sign_out_endpoints_module_name::SIGN_OUT_ENDPOINTS_MODULE_NAME;
-use crate::sign_out_handler_module_name::SIGN_OUT_HANDLER_MODULE_NAME;
-use crate::sign_out_handler_type_name::SIGN_OUT_HANDLER_TYPE_NAME;
 
 fn endpoint_modules(endpoint: &SignOutEndpointModule) -> [GeneratedModuleTokens; 2] {
     let handler_module = format_ident!("{SIGN_OUT_HANDLER_MODULE_NAME}");

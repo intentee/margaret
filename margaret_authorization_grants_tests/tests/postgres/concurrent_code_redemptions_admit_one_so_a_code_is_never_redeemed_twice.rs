@@ -7,9 +7,9 @@ use margaret_authorization_grants::code_redemption::CodeRedemption;
 use margaret_authorization_grants::redemption_decision::RedemptionDecision;
 use margaret_authorization_grants_tests::contract_issued_code::contract_issued_code;
 use margaret_authorization_grants_tests::started_with_authorization_grants::started_with_authorization_grants;
+use margaret_database_tests::constants::RACING_INSTANCES;
 use margaret_database_tests::contract_instant::contract_instant;
 use margaret_database_tests::contract_token::contract_token;
-use margaret_database_tests::racing_instances::RACING_INSTANCES;
 
 struct RacedRedemption {
     family: Uuid,

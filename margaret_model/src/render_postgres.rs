@@ -1,4 +1,4 @@
-use margaret_sql_identifier::framework_namespace::FRAMEWORK_NAMESPACE;
+use margaret_sql_identifier::constants::FRAMEWORK_NAMESPACE;
 use margaret_sql_identifier::qualified_table::qualified_table;
 use margaret_sql_identifier::quote_identifier::quote_identifier;
 use margaret_sql_identifier::table_namespace::TableNamespace;

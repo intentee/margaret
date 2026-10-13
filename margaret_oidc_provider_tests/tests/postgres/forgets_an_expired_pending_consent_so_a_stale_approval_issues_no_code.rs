@@ -5,10 +5,10 @@ use margaret_authorization_grants::pending_authorization::PendingAuthorization;
 use margaret_authorization_grants::pending_authorization_record::PendingAuthorizationRecord;
 use margaret_oidc_provider::consent_decision::ConsentDecision;
 use margaret_oidc_provider::consent_outcome::ConsentOutcome;
+use margaret_oidc_provider_tests::constants::SPA_CALLBACK;
 use margaret_oidc_provider_tests::fixture_authorization_grant::fixture_authorization_grant;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::signed_in_end_user::signed_in_end_user;
-use margaret_oidc_provider_tests::spa_callback::SPA_CALLBACK;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[tokio::test]

@@ -7,7 +7,7 @@ use margaret_authorization_grants::authorization_grant::AuthorizationGrant;
 use margaret_oauth_vocabulary::code_challenge::CodeChallenge;
 use margaret_oauth_vocabulary::scope::Scope;
 
-use crate::pkce_verifier::PKCE_VERIFIER;
+use crate::constants::PKCE_VERIFIER;
 use crate::signed_in_end_user::signed_in_end_user;
 
 /// # Panics

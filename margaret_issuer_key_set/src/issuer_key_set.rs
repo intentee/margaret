@@ -13,8 +13,8 @@ use margaret_jwt_verification::jwt_profiling::JwtProfiling;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_registered_claims::numeric_date::NumericDate;
 
+use crate::constants::ISSUER_FETCH_SPACING;
 use crate::held_key_set::HeldKeySet;
-use crate::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
 use crate::issuer_verification::IssuerVerification;
 use crate::key_set_holding::KeySetHolding;
 use crate::key_set_polling::KeySetPolling;

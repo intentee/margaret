@@ -4,7 +4,7 @@ use reqwest::StatusCode;
 use url::Url;
 
 use margaret::framework::oauth_vocabulary::grant_type::GrantType;
-use margaret::framework::oauth_vocabulary::jwt_bearer_client_assertion_type::JWT_BEARER_CLIENT_ASSERTION_TYPE;
+use margaret::framework::oauth_vocabulary::constants::JWT_BEARER_CLIENT_ASSERTION_TYPE;
 use margaret_cluster_fixture::margaret::accepted_clients::clients::auth_accepted_partner_client_accepted_partner_client::accepted_client::ACCEPTED_CLIENT;
 use margaret_cluster_fixture::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS;
 

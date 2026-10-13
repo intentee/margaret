@@ -7,7 +7,7 @@ use margaret::framework::database::database::Database;
 use margaret::framework::macros::model;
 use margaret_jwks_keygen::signing_keys_generation::SigningKeysGeneration;
 
-use crate::signing_key_set_name::SIGNING_KEY_SET_NAME;
+use crate::constants::SIGNING_KEY_SET_NAME;
 use crate::signing_keys_creation::SigningKeysCreation;
 use crate::signing_keys_error::SigningKeysError;
 use crate::signing_keys_replacement::SigningKeysReplacement;

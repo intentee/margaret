@@ -1,8 +1,8 @@
 use serde_json::Value;
 use serde_json::json;
 
-use crate::pkce_verifier::PKCE_VERIFIER;
-use crate::portal_callback::PORTAL_CALLBACK;
+use crate::constants::PKCE_VERIFIER;
+use crate::constants::PORTAL_CALLBACK;
 
 #[must_use]
 pub fn code_exchange(code: &str) -> Value {

@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use margaret_oidc_provider_tests::ledger_credentials::LEDGER_CREDENTIALS;
+use margaret_oidc_provider_tests::constants::LEDGER_CREDENTIALS;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]

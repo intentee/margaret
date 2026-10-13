@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 
-use crate::localhost_discovered_issuer::LOCALHOST_DISCOVERED_ISSUER;
+use crate::constants::LOCALHOST_DISCOVERED_ISSUER;
 use crate::polled_fixture::PolledFixture;
 
 #[must_use]

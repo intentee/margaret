@@ -2,10 +2,10 @@ use serde_json::json;
 
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_openid_conformance_tests::conformance_suite::ConformanceSuite;
+use margaret_openid_conformance_tests::constants::PUBLISHED_PROVIDER;
 use margaret_openid_conformance_tests::docker_bridge_gateway::docker_bridge_gateway;
 use margaret_openid_conformance_tests::module_result::ModuleResult;
 use margaret_openid_conformance_tests::module_status::ModuleStatus;
-use margaret_openid_conformance_tests::published_provider::PUBLISHED_PROVIDER;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn passes_the_openid_connect_config_certification_plan() {

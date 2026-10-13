@@ -7,7 +7,7 @@ use uuid::Uuid;
 use margaret_authorization_grants::refresh_family::RefreshFamily;
 use margaret_authorization_grants_tests::opened_refresh_family::opened_refresh_family;
 use margaret_oauth_vocabulary::scope::Scope;
-use margaret_oidc_provider_tests::end_user_subject::END_USER_SUBJECT;
+use margaret_oidc_provider_tests::constants::END_USER_SUBJECT;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::refreshed_tokens::refreshed_tokens;
 use margaret_registered_claims::numeric_date::NumericDate;

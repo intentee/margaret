@@ -9,7 +9,7 @@ use http_body::Frame;
 use http_body::SizeHint;
 use http_body_util::combinators::UnsyncBoxBody;
 
-use crate::client_body_timeout::CLIENT_BODY_TIMEOUT;
+use crate::constants::CLIENT_BODY_TIMEOUT;
 use crate::stall_outcome::StallOutcome;
 use crate::stall_timer::StallTimer;
 

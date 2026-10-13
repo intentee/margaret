@@ -8,7 +8,7 @@ use margaret_oauth_vocabulary::scope::Scope;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 use crate::authorization_grant::AuthorizationGrant;
-use crate::refresh_family_lifetime::REFRESH_FAMILY_LIFETIME;
+use crate::constants::REFRESH_FAMILY_LIFETIME;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RefreshFamily {

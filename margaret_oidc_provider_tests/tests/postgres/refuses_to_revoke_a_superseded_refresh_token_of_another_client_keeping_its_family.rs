@@ -1,12 +1,12 @@
 use serde_json::json;
 
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
+use margaret_oidc_provider_tests::constants::SERVICE_CREDENTIALS;
 use margaret_oidc_provider_tests::issued_code::issued_code;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
 use margaret_oidc_provider_tests::portal_tokens::portal_tokens;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::refreshed_tokens::refreshed_tokens;
-use margaret_oidc_provider_tests::service_credentials::SERVICE_CREDENTIALS;
 
 #[tokio::test]
 async fn refuses_to_revoke_a_superseded_refresh_token_of_another_client_keeping_its_family() {

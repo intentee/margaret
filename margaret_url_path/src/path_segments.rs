@@ -1,7 +1,7 @@
 use std::iter;
 
+use crate::constants::PATH_SEPARATOR;
 use crate::path_segment::PathSegment;
-use crate::path_separator::PATH_SEPARATOR;
 
 pub fn path_segments(path: &str) -> impl Iterator<Item = PathSegment<'_>> {
     let mut components = path.split(PATH_SEPARATOR).peekable();

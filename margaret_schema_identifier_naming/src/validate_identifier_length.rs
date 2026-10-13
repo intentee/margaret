@@ -1,4 +1,4 @@
-use crate::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
+use crate::constants::MAX_IDENTIFIER_BYTES;
 use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
 /// # Errors
@@ -20,7 +20,7 @@ pub fn validate_identifier_length(identifier: &str) -> Result<(), SchemaIdentifi
 #[cfg(test)]
 mod tests {
     use super::validate_identifier_length;
-    use crate::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
+    use crate::constants::MAX_IDENTIFIER_BYTES;
     use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
     #[test]

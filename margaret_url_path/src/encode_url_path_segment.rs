@@ -1,6 +1,6 @@
 use percent_encoding::utf8_percent_encode;
 
-use crate::non_pchar::NON_PCHAR;
+use crate::constants::NON_PCHAR;
 
 #[must_use]
 pub fn encode_url_path_segment(segment: &str) -> String {

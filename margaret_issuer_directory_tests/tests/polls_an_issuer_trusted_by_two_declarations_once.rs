@@ -9,10 +9,10 @@ use margaret_bearer_token_verification::bearer_token_routing::BearerTokenRouting
 use margaret_bearer_token_verification::route_bearer_token::route_bearer_token;
 use margaret_http::request_authorization::RequestAuthorization;
 use margaret_http::token_admission::TokenAdmission;
+use margaret_issuer_directory_tests::constants::LOCALHOST_DISCOVERED_ISSUER;
 use margaret_issuer_directory_tests::counted_handler::CountedHandler;
 use margaret_issuer_directory_tests::fixture_issuer_routes::FixtureIssuerRoutes;
 use margaret_issuer_directory_tests::json_handler::json_handler;
-use margaret_issuer_directory_tests::localhost_discovered_issuer::LOCALHOST_DISCOVERED_ISSUER;
 use margaret_issuer_directory_tests::localhost_discovery::localhost_discovery;
 use margaret_issuer_directory_tests::localhost_trust::localhost_trust;
 use margaret_issuer_directory_tests::polled_directory::PolledDirectory;

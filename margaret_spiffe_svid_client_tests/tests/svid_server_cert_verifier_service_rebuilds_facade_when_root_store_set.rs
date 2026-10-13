@@ -13,7 +13,7 @@ use margaret_spiffe_svid::svid_crypto_provider::svid_crypto_provider;
 use margaret_spiffe_svid_client::svid_server_cert_verifier_facade::SvidServerCertVerifierFacade;
 use margaret_spiffe_svid_client::svid_server_cert_verifier_service::SvidServerCertVerifierService;
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
-use margaret_spiffe_svid_tests::leaf_spiffe_example_org_server_der::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
+use margaret_spiffe_svid_tests::constants::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
 
 #[tokio::test]
 async fn rebuilds_facade_when_root_store_set_so_new_trust_bundles_apply_without_restart() {

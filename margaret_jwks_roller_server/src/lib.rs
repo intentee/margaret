@@ -1,4 +1,4 @@
-pub mod jwks_curve;
+pub mod constants;
 pub mod jwks_document_holder;
 pub mod jwks_roller;
 pub mod jwks_roller_server_error;

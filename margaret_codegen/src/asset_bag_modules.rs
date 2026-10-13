@@ -9,8 +9,8 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::asset_macro_canonical_path::asset_macro_canonical_path;
 use crate::asset_responder_canonical_path::asset_responder_canonical_path;
-use crate::assets_directory_name::ASSETS_DIRECTORY_NAME;
 use crate::codegen_error::CodegenError;
+use crate::constants::ASSETS_DIRECTORY_NAME;
 use crate::walk_asset_directory::walk_asset_directory;
 
 fn served_assets(assets_directory: &Path) -> Result<ServedAssets, CodegenError> {

@@ -4,9 +4,9 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::http::StatusCode;
 
-use margaret_coverage_fixture::auth::headers::librarian_badge::LIBRARIAN_BADGE;
+use margaret_coverage_fixture::constants::LIBRARIAN_BADGE;
 use margaret_coverage_fixture::margaret::framework::console::command_outcome::CommandOutcome;
-use margaret_coverage_fixture_tests::listed_librarian::LISTED_LIBRARIAN;
+use margaret_coverage_fixture_tests::constants::LISTED_LIBRARIAN;
 use margaret_coverage_fixture_tests::open_websocket::open_websocket;
 use margaret_coverage_fixture_tests::served_library::ServedLibrary;
 use margaret_coverage_fixture_tests::visit_library::visit_library;

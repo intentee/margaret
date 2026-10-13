@@ -13,12 +13,12 @@ use margaret_http_tests::issued_pem_certificate::IssuedPemCertificate;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 
 use crate::compose_project::ComposeProject;
+use crate::constants::PROVIDER_HOST;
+use crate::constants::SUITE_BASE_URL;
+use crate::constants::SUITE_HOST;
+use crate::constants::SUITE_PORT;
 use crate::docker_output::docker_output;
-use crate::provider_host::PROVIDER_HOST;
 use crate::suite_api::SuiteApi;
-use crate::suite_base_url::SUITE_BASE_URL;
-use crate::suite_host::SUITE_HOST;
-use crate::suite_port::SUITE_PORT;
 
 const PROVIDER_RELAY_COMPOSE: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/compose/provider_relay.yml");

@@ -7,9 +7,9 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
+use crate::constants::WEB_SOCKET_RESPONSES;
 use crate::message_cardinality::MessageCardinality;
 use crate::web_socket_codegen_error::WebSocketCodegenError;
-use crate::web_socket_responses::WEB_SOCKET_RESPONSES;
 
 fn cardinality(
     reader: &mut AttributeArgumentsReader,

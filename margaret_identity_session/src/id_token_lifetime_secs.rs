@@ -1,1 +1,0 @@
-pub const ID_TOKEN_LIFETIME_SECS: u32 = 15 * 60;

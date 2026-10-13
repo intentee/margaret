@@ -15,9 +15,9 @@ use margaret_registered_claims::audience::Audience;
 use margaret_registered_claims::audience_parsing::AudienceParsing;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
+use crate::constants::ISSUER_KEY_SOURCES;
 use crate::declared_issuer_keys::DeclaredIssuerKeys;
 use crate::declared_trust::DeclaredTrust;
-use crate::issuer_key_sources::ISSUER_KEY_SOURCES;
 use crate::trust_source::TrustSource;
 use crate::trusted_issuer_codegen_error::TrustedIssuerCodegenError;
 

@@ -1,6 +1,6 @@
 use url::Url;
 
-use margaret::framework::oidc_discovery::oidc_discovery_path::OIDC_DISCOVERY_PATH;
+use margaret::framework::oidc_discovery::constants::OIDC_DISCOVERY_PATH;
 
 /// # Panics
 ///

@@ -15,7 +15,7 @@ pub fn schema_identifier(segments: &[&str]) -> Result<String, SchemaIdentifierNa
 #[cfg(test)]
 mod tests {
     use super::schema_identifier;
-    use crate::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
+    use crate::constants::MAX_IDENTIFIER_BYTES;
     use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
     #[test]

@@ -1,7 +1,7 @@
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-use margaret_issuer_key_set::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
+use margaret_issuer_key_set::constants::ISSUER_FETCH_SPACING;
 use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_issuer_key_set::issuer_verification::IssuerVerification;
 use margaret_issuer_key_set_tests::access_token_expectation::access_token_expectation;

@@ -4,10 +4,10 @@ use cookie::SameSite;
 
 use margaret_http::cookie_changes::CookieChanges;
 use margaret_http::request::Request;
-use margaret_identity_session::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
+use margaret_identity_session::constants::ACCESS_TOKEN_LIFETIME_SECS;
 
+use crate::constants::SESSION_LIFETIME_SECS;
 use crate::cookie_domain::CookieDomain;
-use crate::session_lifetime_secs::SESSION_LIFETIME_SECS;
 
 fn max_age(lifetime_secs: u32) -> cookie::time::Duration {
     cookie::time::Duration::seconds(i64::from(lifetime_secs))

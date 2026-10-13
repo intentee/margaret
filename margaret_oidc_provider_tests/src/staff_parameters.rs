@@ -1,8 +1,8 @@
 use serde_json::Value;
 use serde_json::json;
 
+use crate::constants::STAFF_CALLBACK;
 use crate::pkce_challenge::pkce_challenge;
-use crate::staff_callback::STAFF_CALLBACK;
 
 #[must_use]
 pub fn staff_parameters(scope: &str) -> Value {

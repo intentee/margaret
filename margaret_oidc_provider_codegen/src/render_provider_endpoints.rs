@@ -5,12 +5,12 @@ use quote::quote;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 
-use crate::authorization_endpoint_url_module_name::AUTHORIZATION_ENDPOINT_URL_MODULE_NAME;
+use crate::constants::AUTHORIZATION_ENDPOINT_URL_MODULE_NAME;
+use crate::constants::OIDC_PROVIDER_MODULE_NAME;
+use crate::constants::PROVIDER_ENDPOINTS_MODULE_NAME;
 use crate::derived_authorization::DerivedAuthorization;
 use crate::derived_endpoint::DerivedEndpoint;
 use crate::derived_provider_endpoints::DerivedProviderEndpoints;
-use crate::oidc_provider_module_name::OIDC_PROVIDER_MODULE_NAME;
-use crate::provider_endpoints_module_name::PROVIDER_ENDPOINTS_MODULE_NAME;
 use crate::served_authorization::ServedAuthorization;
 
 fn served(endpoint: &TokenStream) -> TokenStream {

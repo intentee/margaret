@@ -11,8 +11,8 @@ use margaret_model::schema::Schema;
 use margaret_sql_identifier::quote_identifier::quote_identifier;
 
 use crate::connected_client::connected_client;
+use crate::constants::RACING_INSTANCES;
 use crate::database_administration::DatabaseAdministration;
-use crate::racing_instances::RACING_INSTANCES;
 use crate::test_postgres_url::test_postgres_url;
 
 fn racing_pool_size() -> MaxConnections {

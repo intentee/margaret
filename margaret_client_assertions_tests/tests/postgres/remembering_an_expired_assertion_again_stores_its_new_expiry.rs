@@ -1,6 +1,6 @@
 use margaret::framework::active_record::lookup::Lookup;
 use margaret::framework::active_record::model::Model;
-use margaret_accepted_clients::client_assertion_max_lifetime::CLIENT_ASSERTION_MAX_LIFETIME;
+use margaret_accepted_clients::constants::CLIENT_ASSERTION_MAX_LIFETIME;
 use margaret_client_assertions::assertion_memory::AssertionMemory;
 use margaret_client_assertions::client_assertion::ClientAssertion;
 use margaret_client_assertions::remembered_assertion_key::RememberedAssertionKey;

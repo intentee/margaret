@@ -4,13 +4,13 @@ use futures_util::future::join_all;
 
 use margaret::framework::active_record::change::Change;
 use margaret::framework::database::isolation::Isolation;
-use margaret_database_tests::racing_instances::RACING_INSTANCES;
+use margaret_database_tests::constants::RACING_INSTANCES;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen::signing_keys_generation::SigningKeysGeneration;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
+use margaret_jwks_roller::constants::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller::held_secret::HeldSecret;
-use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller_tests::converged::converged;
 use margaret_jwks_roller_tests::fixture_synchronizer::fixture_synchronizer;
 use margaret_jwks_roller_tests::locked_signing_keys::locked_signing_keys;

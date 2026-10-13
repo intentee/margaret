@@ -8,8 +8,8 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 use margaret_route_method::route_method::RouteMethod;
 
+use crate::constants::ROUTE_METHODS;
 use crate::http_codegen_error::HttpCodegenError;
-use crate::route_methods::ROUTE_METHODS;
 
 pub(crate) struct HttpResponderArguments {
     pub(crate) max_body_bytes: Option<NonZeroU64>,

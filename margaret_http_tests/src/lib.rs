@@ -1,3 +1,4 @@
+pub mod constants;
 pub mod content_type_request;
 pub mod cookie_changing_forward_handler;
 pub mod delegating_middleware;
@@ -22,10 +23,6 @@ pub mod met_verified_peer;
 pub mod mtls_client_request;
 pub mod mtls_connect;
 pub mod mtls_fixture;
-pub mod multipart_content_type;
-pub mod multipart_fields;
-pub mod multipart_fields_and_files;
-pub mod multipart_files;
 pub mod path_param_echo_handler;
 pub mod raw_exchange;
 pub mod redirecting_handler;

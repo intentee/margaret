@@ -2,9 +2,9 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
-use crate::oauth_clients_module_name::OAUTH_CLIENTS_MODULE_NAME;
-use crate::resource_grant_module_name::RESOURCE_GRANT_MODULE_NAME;
-use crate::resources_module_name::RESOURCES_MODULE_NAME;
+use crate::constants::OAUTH_CLIENTS_MODULE_NAME;
+use crate::constants::RESOURCE_GRANT_MODULE_NAME;
+use crate::constants::RESOURCES_MODULE_NAME;
 
 #[must_use]
 pub fn oauth_client_resource_grant_path(client: &Tag, resource: &Tag) -> CanonicalPath {

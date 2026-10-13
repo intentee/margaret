@@ -6,7 +6,7 @@ use futures_util::stream::iter;
 use futures_util::stream::try_unfold;
 
 use margaret_database::executor::Executor;
-use margaret_sql::maximum_limit::MAXIMUM_LIMIT;
+use margaret_sql::constants::MAXIMUM_LIMIT;
 
 use crate::active_record_error::ActiveRecordError;
 use crate::bounded::Bounded;

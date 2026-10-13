@@ -69,8 +69,8 @@ use margaret_token_issuance_codegen::render_resource_tokens::render_resource_tok
 use margaret_token_issuance_codegen::render_token_issuance::render_token_issuance;
 use margaret_trusted_issuer_codegen::trusted_issuer_item::TrustedIssuerItem;
 use margaret_trusted_issuer_codegen::trusted_issuer_item_path::trusted_issuer_item_path;
+use margaret_umbrella_path::constants::UMBRELLA_MODULE_NAME;
 use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
-use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 use margaret_views_codegen::render_views::render_views;
 use margaret_views_codegen::views_artifacts::ViewsArtifacts;
 use margaret_views_codegen::views_plan::ViewsPlan;
@@ -770,7 +770,7 @@ mod tests {
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_sql_identifier::table_namespace::TableNamespace;
     use margaret_tag_codegen::tag_error::TagError;
-    use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
+    use margaret_umbrella_path::constants::UMBRELLA_MODULE_NAME;
 
     use super::build;
     use crate::codegen_error::CodegenError;

@@ -1,4 +1,4 @@
-use margaret_authorization_grants::authorization_code_lifetime::AUTHORIZATION_CODE_LIFETIME;
+use margaret_authorization_grants::constants::AUTHORIZATION_CODE_LIFETIME;
 use margaret_authorization_grants::issued_code::IssuedCode;
 use margaret_database_tests::contract_moment::contract_moment;
 use margaret_registered_claims::numeric_date::NumericDate;

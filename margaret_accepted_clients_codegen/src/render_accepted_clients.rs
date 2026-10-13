@@ -8,15 +8,16 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 use margaret_oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;
 use margaret_oauth_vocabulary::grant_type::GrantType;
-use margaret_oauth_vocabulary_codegen::client_authentication_methods::CLIENT_AUTHENTICATION_METHODS;
+use margaret_oauth_vocabulary_codegen::constants::CLIENT_AUTHENTICATION_METHODS;
 
 use crate::accepted_client_constant::AcceptedClientConstant;
 use crate::accepted_client_declaration::AcceptedClientDeclaration;
 use crate::accepted_client_item::AcceptedClientItem;
-use crate::accepted_clients_module_name::ACCEPTED_CLIENTS_MODULE_NAME;
-use crate::client_signing_algorithms::CLIENT_SIGNING_ALGORITHMS;
-use crate::clients_module_name::CLIENTS_MODULE_NAME;
-use crate::consent_policies::CONSENT_POLICIES;
+use crate::constants::ACCEPTED_CLIENTS_MODULE_NAME;
+use crate::constants::CLIENT_SIGNING_ALGORITHMS;
+use crate::constants::CLIENTS_MODULE_NAME;
+use crate::constants::CONSENT_POLICIES;
+use crate::constants::ID_TOKEN_SIGNINGS;
 use crate::declared_accepted_authentication::DeclaredAcceptedAuthentication;
 use crate::declared_accepted_clients::DeclaredAcceptedClients;
 use crate::declared_client_credentials::DeclaredClientCredentials;
@@ -25,7 +26,6 @@ use crate::declared_code_grant::DeclaredCodeGrant;
 use crate::declared_code_policy::DeclaredCodePolicy;
 use crate::declared_confidential_client::DeclaredConfidentialClient;
 use crate::declared_token_exchange::DeclaredTokenExchange;
-use crate::id_token_signings::ID_TOKEN_SIGNINGS;
 use crate::provider_aggregate::ProviderAggregate;
 
 fn grant_type_tokens(grant_type: GrantType) -> TokenStream {

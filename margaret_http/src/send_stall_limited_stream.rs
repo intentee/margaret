@@ -8,7 +8,7 @@ use tokio::io::AsyncRead;
 use tokio::io::AsyncWrite;
 use tokio::io::ReadBuf;
 
-use crate::client_send_timeout::CLIENT_SEND_TIMEOUT;
+use crate::constants::CLIENT_SEND_TIMEOUT;
 use crate::stall_outcome::StallOutcome;
 use crate::stall_timer::StallTimer;
 

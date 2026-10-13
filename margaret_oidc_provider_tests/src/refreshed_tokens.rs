@@ -2,7 +2,7 @@ use serde_json::Value;
 use serde_json::json;
 
 use crate::answer::Answer;
-use crate::portal_credentials::PORTAL_CREDENTIALS;
+use crate::constants::PORTAL_CREDENTIALS;
 use crate::provider_fixture::ProviderFixture;
 
 pub async fn refreshed_tokens(

@@ -5,8 +5,8 @@ use quote::quote;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_model_codegen::model::Model;
+use margaret_schema_codegen::constants::TABLE_MODULE_NAME;
 use margaret_schema_codegen::model_module_path::model_module_path;
-use margaret_schema_codegen::table_module_name::TABLE_MODULE_NAME;
 
 use crate::bound_read::BoundRead;
 use crate::chained_construction::chained_construction;

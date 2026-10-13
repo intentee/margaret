@@ -1,6 +1,6 @@
 use reqwest::StatusCode;
 
-use margaret_coverage_spiffe_fixture::auth::headers::mesh_role::MESH_ROLE;
+use margaret_coverage_spiffe_fixture::constants::MESH_ROLE;
 use margaret_coverage_spiffe_fixture::margaret::framework::console::command_outcome::CommandOutcome;
 use margaret_coverage_spiffe_fixture_tests::served_mesh::ServedMesh;
 use margaret_coverage_spiffe_fixture_tests::visit_mesh::visit_mesh;

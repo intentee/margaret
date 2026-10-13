@@ -2,7 +2,7 @@ use cookie::Cookie;
 use http::Method;
 
 use margaret_database_tests::started_database::StartedDatabase;
-use margaret_jwt_verification_tests::fixture_audience::FIXTURE_AUDIENCE;
+use margaret_jwt_verification_tests::constants::FIXTURE_AUDIENCE;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 use margaret_sessions::issued_sessions::IssuedSessions;
 use margaret_sessions::sessions_error::SessionsError;

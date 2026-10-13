@@ -1,8 +1,8 @@
 use serde_json::Value;
 use serde_json::json;
 
+use crate::constants::PORTAL_CALLBACK;
 use crate::pkce_challenge::pkce_challenge;
-use crate::portal_callback::PORTAL_CALLBACK;
 
 #[must_use]
 pub fn portal_parameters() -> Value {

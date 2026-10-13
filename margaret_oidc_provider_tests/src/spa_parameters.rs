@@ -1,8 +1,8 @@
 use serde_json::Value;
 use serde_json::json;
 
+use crate::constants::SPA_CALLBACK;
 use crate::pkce_challenge::pkce_challenge;
-use crate::spa_callback::SPA_CALLBACK;
 
 #[must_use]
 pub fn spa_parameters() -> Value {

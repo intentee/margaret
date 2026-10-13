@@ -7,7 +7,7 @@ use oauth2::basic::BasicTokenResponse;
 use margaret_authorization_server_client::endpoint_outcome::EndpointOutcome;
 
 use crate::acquired_token::AcquiredToken;
-use crate::acquired_token_refresh_margin::ACQUIRED_TOKEN_REFRESH_MARGIN;
+use crate::constants::ACQUIRED_TOKEN_REFRESH_MARGIN;
 
 #[derive(Clone)]
 pub(crate) struct CachedAcquisition {

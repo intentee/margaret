@@ -7,7 +7,7 @@ use http::header::SET_COOKIE;
 
 use margaret_http::head_handler::HeadHandler;
 use margaret_http::response_continuation::ResponseContinuation;
-use margaret_jwt_verification_tests::fixture_audience::FIXTURE_AUDIENCE;
+use margaret_jwt_verification_tests::constants::FIXTURE_AUDIENCE;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 use margaret_server_origin::route_url::RouteUrl;
 use margaret_sessions::issued_sessions::IssuedSessions;

@@ -6,10 +6,10 @@ use syn::ext::IdentExt as _;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_generated_module::module_path::ModulePath;
 
+use crate::constants::RESOURCE_AUDIENCE_MODULE_NAME;
+use crate::constants::RESOURCE_TOKENS_MODULE_NAME;
 use crate::declared_resource_issuances::DeclaredResourceIssuances;
-use crate::resource_audience_module_name::RESOURCE_AUDIENCE_MODULE_NAME;
 use crate::resource_issuance_declaration::ResourceIssuanceDeclaration;
-use crate::resource_tokens_module_name::RESOURCE_TOKENS_MODULE_NAME;
 
 fn resource_modules(
     ResourceIssuanceDeclaration { audience, tag, .. }: &ResourceIssuanceDeclaration,

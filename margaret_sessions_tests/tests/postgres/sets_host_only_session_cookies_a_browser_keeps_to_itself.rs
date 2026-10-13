@@ -3,10 +3,10 @@ use cookie::SameSite;
 use cookie::time::Duration;
 use uuid::Uuid;
 
-use margaret_identity_session::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
-use margaret_jwt_verification_tests::fixture_audience::FIXTURE_AUDIENCE;
+use margaret_identity_session::constants::ACCESS_TOKEN_LIFETIME_SECS;
+use margaret_jwt_verification_tests::constants::FIXTURE_AUDIENCE;
+use margaret_sessions::constants::SESSION_LIFETIME_SECS;
 use margaret_sessions::issued_sessions::IssuedSessions;
-use margaret_sessions::session_lifetime_secs::SESSION_LIFETIME_SECS;
 use margaret_sessions_tests::session_store::session_store;
 use margaret_sessions_tests::started_with_sessions::started_with_sessions;
 

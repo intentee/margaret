@@ -1,5 +1,5 @@
 use margaret_accepted_clients::client_authentication_parameters::ClientAuthenticationParameters;
-use margaret_oauth_vocabulary::jwt_bearer_client_assertion_type::JWT_BEARER_CLIENT_ASSERTION_TYPE;
+use margaret_oauth_vocabulary::constants::JWT_BEARER_CLIENT_ASSERTION_TYPE;
 
 #[must_use]
 pub fn asserted_parameters(assertion: String) -> ClientAuthenticationParameters {

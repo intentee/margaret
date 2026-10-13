@@ -2,7 +2,7 @@ use chrono::Utc;
 use reqwest::StatusCode;
 use serde_json::json;
 
-use margaret_cluster_fixture::tickers::note_sweep_interval::NOTE_SWEEP_INTERVAL;
+use margaret_cluster_fixture::constants::NOTE_SWEEP_INTERVAL;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::stored_note::StoredNote;

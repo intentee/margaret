@@ -8,7 +8,7 @@ use margaret_sql_identifier::quote_identifier::quote_identifier;
 use margaret_sql_identifier::table_namespace::TableNamespace;
 
 use crate::connected_client::connected_client;
-use crate::lock_waiters_poll_interval::LOCK_WAITERS_POLL_INTERVAL;
+use crate::constants::LOCK_WAITERS_POLL_INTERVAL;
 use crate::table_privilege::TablePrivilege;
 
 pub struct DatabaseAdministration {

@@ -2,7 +2,7 @@ use url::Url;
 
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
-use crate::oidc_discovery_path::OIDC_DISCOVERY_PATH;
+use crate::constants::OIDC_DISCOVERY_PATH;
 
 #[must_use]
 pub fn oidc_discovery_url(issuer: &IssuerIdentifier) -> Url {

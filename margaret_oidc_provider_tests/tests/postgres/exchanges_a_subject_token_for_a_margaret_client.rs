@@ -8,7 +8,7 @@ use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_oidc_provider_tests::ci_issuer::CiIssuer;
-use margaret_oidc_provider_tests::ci_subject::CI_SUBJECT;
+use margaret_oidc_provider_tests::constants::CI_SUBJECT;
 use margaret_oidc_provider_tests::jws_claims::jws_claims;
 use margaret_oidc_provider_tests::margaret_client::MargaretClient;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;

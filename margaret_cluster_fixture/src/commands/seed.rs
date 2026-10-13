@@ -9,7 +9,7 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::singleton;
 
-use crate::alice::ALICE;
+use crate::constants::ALICE;
 use crate::models::user_account::UserAccount;
 
 #[singleton]

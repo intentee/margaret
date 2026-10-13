@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use margaret_oidc_provider_tests::service_credentials::SERVICE_CREDENTIALS;
+use margaret_oidc_provider_tests::constants::SERVICE_CREDENTIALS;
 use margaret_oidc_provider_tests::serving_unreachable_assertions::serving_unreachable_assertions;
 
 #[tokio::test]

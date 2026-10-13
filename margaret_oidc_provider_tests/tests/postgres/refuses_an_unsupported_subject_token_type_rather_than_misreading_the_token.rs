@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
+use margaret_oidc_provider_tests::constants::PORTAL_CREDENTIALS;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]

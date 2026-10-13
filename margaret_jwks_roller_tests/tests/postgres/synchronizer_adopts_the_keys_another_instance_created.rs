@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use margaret_jwks_roller::constants::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller::held_secret::HeldSecret;
-use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller_tests::fixture_synchronizer::fixture_synchronizer;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_signing_keys::signing_keys_revision::SigningKeysRevision;

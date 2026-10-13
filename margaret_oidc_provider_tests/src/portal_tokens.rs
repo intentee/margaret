@@ -1,6 +1,6 @@
 use crate::answer::Answer;
 use crate::code_exchange::code_exchange;
-use crate::portal_credentials::PORTAL_CREDENTIALS;
+use crate::constants::PORTAL_CREDENTIALS;
 use crate::provider_fixture::ProviderFixture;
 
 /// # Panics

@@ -7,9 +7,9 @@ use margaret_authorization_grants::refresh_token_record::RefreshTokenRecord;
 use margaret_authorization_grants_tests::contract_refresh_family::contract_refresh_family;
 use margaret_authorization_grants_tests::opened_refresh_family::opened_refresh_family;
 use margaret_authorization_grants_tests::started_with_authorization_grants::started_with_authorization_grants;
+use margaret_database_tests::constants::RACING_INSTANCES;
 use margaret_database_tests::contract_instant::contract_instant;
 use margaret_database_tests::contract_token::contract_token;
-use margaret_database_tests::racing_instances::RACING_INSTANCES;
 use margaret_token_digest::token_digest::TokenDigest;
 
 struct RacedRotation {

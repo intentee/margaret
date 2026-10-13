@@ -4,7 +4,7 @@ use margaret_sql::insert_source::InsertSource;
 use margaret_sql::returning::Returning;
 
 use crate::active_record_error::ActiveRecordError;
-use crate::base_alias::BASE_ALIAS;
+use crate::constants::BASE_ALIAS;
 use crate::creatable::Creatable;
 use crate::creation::Creation;
 use crate::detached::Detached;

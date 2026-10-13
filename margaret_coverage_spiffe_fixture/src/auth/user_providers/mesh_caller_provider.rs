@@ -7,7 +7,7 @@ use margaret::framework::macros::infers_authenticated_user;
 use margaret::framework::macros::singleton;
 
 use crate::auth::authenticated_users::mesh_caller::MeshCaller;
-use crate::auth::headers::mesh_role::MESH_ROLE;
+use crate::constants::MESH_ROLE;
 
 #[singleton]
 #[infers_authenticated_user(user_model = MeshCaller)]

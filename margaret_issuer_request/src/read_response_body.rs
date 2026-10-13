@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 use reqwest::Response;
 
-use crate::issuer_response_max_bytes::ISSUER_RESPONSE_MAX_BYTES;
+use crate::constants::ISSUER_RESPONSE_MAX_BYTES;
 use crate::response_body::ResponseBody;
 
 pub(crate) async fn read_response_body(mut response: Response) -> ResponseBody {

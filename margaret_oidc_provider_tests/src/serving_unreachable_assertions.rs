@@ -4,10 +4,10 @@ use margaret_accepted_clients_tests::asserting_client::AssertingClient;
 use margaret_database_tests::table_privilege::TablePrivilege;
 use margaret_sql_identifier::table_namespace::TableNamespace;
 
+use crate::constants::SERVICE_CLIENT;
+use crate::constants::SERVICE_PRIVILEGES;
 use crate::fixture_clients::FixtureClients;
 use crate::provider_fixture::ProviderFixture;
-use crate::service_client::SERVICE_CLIENT;
-use crate::service_privileges::SERVICE_PRIVILEGES;
 use crate::started_with_provider_state::started_with_provider_state;
 
 pub async fn serving_unreachable_assertions() -> ProviderFixture {

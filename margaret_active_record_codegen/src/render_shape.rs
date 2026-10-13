@@ -9,6 +9,7 @@ use margaret_generated_module::module_path::ModulePath;
 
 use crate::bound_read::BoundRead;
 use crate::chained_construction::chained_construction;
+use crate::constants::SHAPES_MODULE_NAME;
 use crate::key_block_tokens::KeyBlockTokens;
 use crate::loaded_field_tokens::loaded_field_tokens;
 use crate::loaded_target::LoadedTarget;
@@ -17,7 +18,6 @@ use crate::shape_read::ShapeRead;
 use crate::shape_relation::ShapeRelation;
 use crate::shape_relation_kind::ShapeRelationKind;
 use crate::shape_relation_tokens::ShapeRelationTokens;
-use crate::shapes_module_name::SHAPES_MODULE_NAME;
 use crate::value_identifier::value_identifier;
 
 fn preloaded_type(relation: &ShapeRelation) -> TokenStream {

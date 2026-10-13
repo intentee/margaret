@@ -2,8 +2,8 @@ use margaret_model::table::Table;
 use margaret_sql::conflict_filter::ConflictFilter;
 
 use crate::active_record_error::ActiveRecordError;
-use crate::base_alias::BASE_ALIAS;
 use crate::clause::Clause;
+use crate::constants::BASE_ALIAS;
 use crate::predicate::Predicate;
 
 pub trait RowGuard {

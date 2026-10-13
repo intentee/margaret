@@ -9,7 +9,7 @@ use margaret_sql::select_limit::SelectLimit;
 use margaret_sql::select_lock::SelectLock;
 use margaret_sql::statement::Statement;
 
-use crate::postgres::probes::PROBES;
+use crate::postgres::constants::PROBES;
 
 pub fn select_probe_amounts() -> Statement {
     render_select(&Select {

@@ -2,7 +2,7 @@ use margaret_model::table::Table;
 use margaret_sql::select_filter::SelectFilter;
 
 use crate::active_record_error::ActiveRecordError;
-use crate::base_alias::BASE_ALIAS;
+use crate::constants::BASE_ALIAS;
 use crate::selection::Selection;
 
 pub(crate) fn select_filter(

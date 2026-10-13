@@ -15,8 +15,8 @@ use margaret_sql::select_lock::SelectLock;
 use margaret_sql::statement::Statement;
 
 use crate::active_record_error::ActiveRecordError;
-use crate::base_alias::BASE_ALIAS;
 use crate::clause::Clause;
+use crate::constants::BASE_ALIAS;
 use crate::executed_rows::executed_rows;
 use crate::join_context::JoinContext;
 use crate::joined_source::JoinedSource;

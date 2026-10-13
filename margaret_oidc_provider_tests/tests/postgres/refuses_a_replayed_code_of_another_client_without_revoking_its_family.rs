@@ -3,19 +3,19 @@ use std::sync::Arc;
 use margaret_accepted_clients_tests::asserting_client::AssertingClient;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider_tests::code_exchange::code_exchange;
+use margaret_oidc_provider_tests::constants::PORTAL_CALLBACK;
+use margaret_oidc_provider_tests::constants::PORTAL_CLIENT;
+use margaret_oidc_provider_tests::constants::PORTAL_CODE_GRANT;
+use margaret_oidc_provider_tests::constants::PORTAL_PRIVILEGES;
+use margaret_oidc_provider_tests::constants::SERVICE_CLIENT;
+use margaret_oidc_provider_tests::constants::SERVICE_CREDENTIALS;
+use margaret_oidc_provider_tests::constants::SERVICE_PRIVILEGES;
 use margaret_oidc_provider_tests::fixture_clients::FixtureClients;
 use margaret_oidc_provider_tests::issued_code::issued_code;
-use margaret_oidc_provider_tests::portal_callback::PORTAL_CALLBACK;
-use margaret_oidc_provider_tests::portal_client::PORTAL_CLIENT;
-use margaret_oidc_provider_tests::portal_code_grant::PORTAL_CODE_GRANT;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
-use margaret_oidc_provider_tests::portal_privileges::PORTAL_PRIVILEGES;
 use margaret_oidc_provider_tests::portal_tokens::portal_tokens;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::refreshed_tokens::refreshed_tokens;
-use margaret_oidc_provider_tests::service_client::SERVICE_CLIENT;
-use margaret_oidc_provider_tests::service_credentials::SERVICE_CREDENTIALS;
-use margaret_oidc_provider_tests::service_privileges::SERVICE_PRIVILEGES;
 use margaret_oidc_provider_tests::started_with_provider_state::started_with_provider_state;
 
 #[tokio::test]

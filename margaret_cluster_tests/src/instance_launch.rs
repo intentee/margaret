@@ -4,11 +4,11 @@ use tempfile::NamedTempFile;
 use tokio::process::Command;
 use url::Url;
 
-use margaret_database_tests::racing_instances::RACING_INSTANCES;
+use margaret_database_tests::constants::RACING_INSTANCES;
 
-use crate::cluster_database_max_connections_variable::CLUSTER_DATABASE_MAX_CONNECTIONS_VARIABLE;
-use crate::cluster_database_url_variable::CLUSTER_DATABASE_URL_VARIABLE;
-use crate::trusted_certificates_variable::TRUSTED_CERTIFICATES_VARIABLE;
+use crate::constants::CLUSTER_DATABASE_MAX_CONNECTIONS_VARIABLE;
+use crate::constants::CLUSTER_DATABASE_URL_VARIABLE;
+use crate::constants::TRUSTED_CERTIFICATES_VARIABLE;
 
 pub struct InstanceLaunch {
     pub binary: PathBuf,

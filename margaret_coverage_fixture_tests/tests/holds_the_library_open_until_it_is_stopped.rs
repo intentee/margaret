@@ -5,7 +5,7 @@ use tokio::time::interval;
 use margaret_coverage_fixture::margaret::framework::console::command_outcome::CommandOutcome;
 use margaret_coverage_fixture::margaret::framework::service::install::install;
 use margaret_coverage_fixture::margaret::run::run;
-use margaret_local_server_tests::readiness_poll_interval::READINESS_POLL_INTERVAL;
+use margaret_local_server_tests::constants::READINESS_POLL_INTERVAL;
 use margaret_process_tests::process_signal::ProcessSignal;
 use margaret_process_tests::signal_process::signal_process;
 

@@ -8,7 +8,7 @@ use margaret::framework::macros::infers_authenticated_user;
 use margaret::framework::macros::singleton;
 
 use crate::auth::authenticated_users::courier::Courier;
-use crate::auth::headers::courier_name::COURIER_NAME;
+use crate::constants::COURIER_NAME;
 use crate::singletons::roster::Roster;
 
 #[singleton]

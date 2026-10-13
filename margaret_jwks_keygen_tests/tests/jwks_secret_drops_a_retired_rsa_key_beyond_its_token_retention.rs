@@ -4,7 +4,7 @@ use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_keygen_tests::rolled_secret::rolled_secret;
-use margaret_jwks_roller::jwks_roll_interval::JWKS_ROLL_INTERVAL;
+use margaret_jwks_roller::constants::JWKS_ROLL_INTERVAL;
 use margaret_jwks_roller::signing_key_retention::signing_key_retention;
 use margaret_jws_verification::jwk::Jwk;
 
