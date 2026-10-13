@@ -1,6 +1,6 @@
 [package]
 name = "margaret_claims_merge"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "Merging of application claims into the registered JSON web token members of the Margaret application framework."

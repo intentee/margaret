@@ -1,6 +1,6 @@
 [package]
 name = "margaret_umbrella_path"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "Names the generated umbrella module and the canonical paths below it for the Margaret application framework."

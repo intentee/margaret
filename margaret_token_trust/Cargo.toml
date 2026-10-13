@@ -1,6 +1,6 @@
 [package]
 name = "margaret_token_trust"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "The issuer and audience whose tokens a Margaret application trusts."

@@ -1,6 +1,6 @@
 [package]
 name = "margaret_jose_parameters"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "IANA registered JOSE parameter values used by the Margaret application framework."

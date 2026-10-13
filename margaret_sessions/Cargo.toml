@@ -16,7 +16,7 @@ chrono = { workspace = true }
 cookie = { workspace = true }
 futures-util = { workspace = true }
 http = { workspace = true }
-margaret = { package = "margaret_model_facade", path = "../margaret_model_facade", version = "0.1.0" }
+margaret = { package = "margaret_model_facade", path = "../margaret_model_facade", version = "0.5.0" }
 margaret_handler_error = { workspace = true }
 margaret_http = { workspace = true }
 margaret_http_validation = { workspace = true }

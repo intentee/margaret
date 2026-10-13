@@ -1,6 +1,6 @@
 [package]
 name = "margaret_registered_claims"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "Registered JSON web token claims that the Margaret application framework owns."

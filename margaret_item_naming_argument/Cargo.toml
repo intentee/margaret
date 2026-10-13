@@ -1,6 +1,6 @@
 [package]
 name = "margaret_item_naming_argument"
-version = "0.4.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "Attribute arguments that name Rust items in the Margaret application framework."

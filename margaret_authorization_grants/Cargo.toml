@@ -12,7 +12,7 @@ publish.workspace = true
 [dependencies]
 chrono = { workspace = true, features = ["serde"] }
 futures-util = { workspace = true }
-margaret = { package = "margaret_model_facade", path = "../margaret_model_facade", version = "0.1.0" }
+margaret = { package = "margaret_model_facade", path = "../margaret_model_facade", version = "0.5.0" }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_token_digest = { workspace = true }
