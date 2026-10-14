@@ -2,6 +2,7 @@ use reqwest::StatusCode;
 use uuid::Uuid;
 
 use margaret::framework::sql_identifier::table_namespace::TableNamespace;
+use margaret_cluster_fixture::margaret::routes::props::GetUploadRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_database_tests::table_privilege::TablePrivilege;
@@ -29,7 +30,10 @@ async fn fails_downloading_an_upload_the_database_refuses() {
                     cluster
                         .routes()
                         .public
-                        .get_upload(Uuid::new_v4().to_string())
+                        .get_upload
+                        .address(GetUploadRouteProps {
+                            upload: Uuid::new_v4().to_string()
+                        })
                 )
                 .url()
             )

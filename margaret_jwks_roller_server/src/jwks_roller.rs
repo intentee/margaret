@@ -17,6 +17,7 @@ use margaret_jwks_roller::held_secret::HeldSecret;
 use margaret_jwks_roller::roll_due_at::roll_due_at;
 use margaret_jwks_roller::signing_keys_synchronizer::SigningKeysSynchronizer;
 use margaret_registered_claims::numeric_date::NumericDate;
+use margaret_signing_keys_encryption::signing_keys_encryption_key::SigningKeysEncryptionKey;
 
 use crate::constants::JWKS_CURVE;
 use crate::jwks_document_holder::JwksDocumentHolder;
@@ -61,10 +62,12 @@ impl JwksRoller {
     pub async fn create(
         database: Arc<Database>,
         rsa_keys: Arc<dyn ProvidesRsaSigningKeys>,
+        encryption_key: Arc<SigningKeysEncryptionKey>,
     ) -> Result<Self, JwksRollerServerError> {
         let synchronizer = SigningKeysSynchronizer {
             curve: JWKS_CURVE,
             database,
+            encryption_key,
             rsa_keys,
         };
         let secret = synchronizer

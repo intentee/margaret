@@ -1,5 +1,6 @@
 use cookie::Cookie;
 
+use crate::response::Response;
 use crate::response_continuation::ResponseContinuation;
 
 #[derive(Clone)]
@@ -16,25 +17,31 @@ impl CookieChanges {
     }
 
     #[must_use]
-    pub fn precede(&self, continuation: ResponseContinuation) -> ResponseContinuation {
+    pub fn precede<TTarget>(
+        &self,
+        continuation: ResponseContinuation<TTarget>,
+    ) -> ResponseContinuation<TTarget> {
         match continuation {
             ResponseContinuation::Done(response) => {
-                ResponseContinuation::Done(response.preceded_by_cookies(&self.cookies))
+                ResponseContinuation::Done(self.precede_response(response))
             }
             ResponseContinuation::Forward(forward) => {
                 ResponseContinuation::Forward(forward.preceded_by(&self.cookies))
             }
-            ResponseContinuation::Redirect(redirect) => ResponseContinuation::Done(
-                redirect.into_response().preceded_by_cookies(&self.cookies),
-            ),
+            ResponseContinuation::Redirect(redirect) => {
+                ResponseContinuation::Done(self.precede_response(redirect.into_response()))
+            }
         }
+    }
+
+    #[must_use]
+    pub fn precede_response(&self, response: Response) -> Response {
+        response.preceded_by_cookies(&self.cookies)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use cookie::Cookie;
     use http::header::LOCATION;
     use http::header::SET_COOKIE;
@@ -60,7 +67,7 @@ mod tests {
             CookieChanges {
                 cookies: vec![Cookie::new("access", "token"), Cookie::new("secret", "value")],
             }
-            .precede(ResponseContinuation::from(Response::text(200, ""))),
+            .precede(ResponseContinuation::<()>::from(Response::text(200, ""))),
             ResponseContinuation::Done(response)
                 if set_cookies(&response) == ["access=token", "secret=value"]
         ));
@@ -88,7 +95,7 @@ mod tests {
             CookieChanges {
                 cookies: vec![Cookie::new("session", "removed")],
             }
-            .precede(ResponseContinuation::from(
+            .precede(ResponseContinuation::<()>::from(
                 Response::text(200, "").set_cookie(&Cookie::new("session", "started"))
             )),
             ResponseContinuation::Done(response)
@@ -101,10 +108,10 @@ mod tests {
         let carrying_the_start = CookieChanges {
             cookies: vec![Cookie::new("session", "started")],
         }
-        .precede(ResponseContinuation::from(Forward::new(
-            "target",
-            HashMap::new(),
-        )));
+        .precede(ResponseContinuation::from(Forward {
+            cookies: Vec::new(),
+            target: "target",
+        }));
 
         assert!(matches!(
             CookieChanges {
@@ -113,7 +120,7 @@ mod tests {
             .precede(carrying_the_start),
             ResponseContinuation::Forward(forward)
                 if forward
-                    .carried_cookies()
+                    .cookies
                     .iter()
                     .map(Cookie::value)
                     .eq(["removed", "started"])
@@ -127,7 +134,7 @@ mod tests {
                 cookies: vec![Cookie::new("access", "token")],
             }
             .precede(
-                ResponseContinuation::from(Redirect::see_other("https://fixture.test/".to_string())),
+                ResponseContinuation::<()>::from(Redirect::see_other("https://fixture.test/".to_string())),
             ),
             ResponseContinuation::Done(response)
                 if response.status() == 303

@@ -8,7 +8,8 @@ use margaret_jwks_roller::held_secret::HeldSecret;
 use margaret_jwks_roller::roll_due_at::roll_due_at;
 use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_jwks_roller_tests::fixture_synchronizer::fixture_synchronizer;
-use margaret_signing_keys::signing_keys_revision::SigningKeysRevision;
+use margaret_signing_keys_tests::fixture_signing_keys_encryption_key::fixture_signing_keys_encryption_key;
+use margaret_signing_keys_tests::sealed_revision::sealed_revision;
 use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
 use margaret_signing_keys_tests::stored_revision::StoredRevision;
 
@@ -19,6 +20,7 @@ async fn jwks_roller_adopts_the_roll_of_a_peer_once_its_keys_are_due() {
         JwksRoller::create(
             Arc::clone(&started.database),
             Arc::new(FixtureRsaSigningKeys::default()),
+            fixture_signing_keys_encryption_key(),
         )
         .await
         .expect("the roller starts"),
@@ -56,8 +58,6 @@ async fn jwks_roller_adopts_the_roll_of_a_peer_once_its_keys_are_due() {
     );
     assert_eq!(
         StoredRevision::loaded(&started.database).await,
-        StoredRevision::of(
-            &SigningKeysRevision::from_secret(&peer_rolled).expect("the keys serialize")
-        )
+        StoredRevision::of(&sealed_revision(&peer_rolled))
     );
 }

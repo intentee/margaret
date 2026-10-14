@@ -110,7 +110,7 @@ impl Response {
     }
 
     pub fn text(status: u16, body: impl Into<String>) -> Self {
-        Self::new(status, buffered(Bytes::from(body.into())))
+        Self::bytes(status, "text/plain; charset=utf-8", body.into())
     }
 
     #[must_use]
@@ -222,6 +222,19 @@ mod tests {
             .to_bytes();
 
         assert_eq!(body.as_ref(), PNG_MAGIC);
+    }
+
+    #[test]
+    fn declares_a_text_response_as_plain_utf8_text_so_browsers_never_sniff_its_body() {
+        let response = Response::text(400, "<script>").into_http();
+
+        assert_eq!(
+            response
+                .headers()
+                .get("content-type")
+                .expect("the content type header is present"),
+            "text/plain; charset=utf-8"
+        );
     }
 
     #[test]

@@ -7,24 +7,30 @@ use crate::layered_content_handler::LayeredContentHandler;
 use crate::layered_head_handler::LayeredHeadHandler;
 
 pub trait LayerableHandler: Send + Sync {
+    type Target;
+
     fn layered<TMiddleware>(middleware: Arc<TMiddleware>, inner: Arc<Self>) -> Arc<Self>
     where
-        TMiddleware: HttpMiddleware + Send + Sync + ?Sized + 'static;
+        TMiddleware: HttpMiddleware<Self::Target> + Send + Sync + ?Sized + 'static;
 }
 
-impl LayerableHandler for dyn ContentHandler {
+impl<TTarget: Send + 'static> LayerableHandler for dyn ContentHandler<TTarget> {
+    type Target = TTarget;
+
     fn layered<TMiddleware>(middleware: Arc<TMiddleware>, inner: Arc<Self>) -> Arc<Self>
     where
-        TMiddleware: HttpMiddleware + Send + Sync + ?Sized + 'static,
+        TMiddleware: HttpMiddleware<TTarget> + Send + Sync + ?Sized + 'static,
     {
         Arc::new(LayeredContentHandler { inner, middleware })
     }
 }
 
-impl LayerableHandler for dyn HeadHandler {
+impl<TTarget: Send + 'static> LayerableHandler for dyn HeadHandler<TTarget> {
+    type Target = TTarget;
+
     fn layered<TMiddleware>(middleware: Arc<TMiddleware>, inner: Arc<Self>) -> Arc<Self>
     where
-        TMiddleware: HttpMiddleware + Send + Sync + ?Sized + 'static,
+        TMiddleware: HttpMiddleware<TTarget> + Send + Sync + ?Sized + 'static,
     {
         Arc::new(LayeredHeadHandler { inner, middleware })
     }

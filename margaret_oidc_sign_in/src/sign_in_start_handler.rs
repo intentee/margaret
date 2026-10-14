@@ -3,10 +3,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use margaret_handler_error::handler_error::HandlerError;
-use margaret_http::head_handler::HeadHandler;
+use margaret_http::handles_head::HandlesHead;
+use margaret_http::reported_unavailability::reported_unavailability;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 
 use crate::sign_in_beginning::SignInBeginning;
 use crate::sign_in_flow::SignInFlow;
@@ -23,13 +23,13 @@ impl SignInStartHandler {
 }
 
 #[async_trait]
-impl HeadHandler for SignInStartHandler {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
-        Ok(ResponseContinuation::from(match self.flow.begin().await {
+impl HandlesHead for SignInStartHandler {
+    async fn handle(&self, _request: &Request) -> Result<Response, HandlerError> {
+        Ok(match self.flow.begin().await {
             SignInBeginning::Redirected(response) => response,
             SignInBeginning::Unavailable(unavailability) => {
-                Response::text(503, unavailability.to_string())
+                reported_unavailability(&unavailability)
             }
-        }))
+        })
     }
 }

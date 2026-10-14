@@ -1,6 +1,9 @@
 use reqwest::StatusCode;
 use serde_json::json;
 
+use margaret_cluster_fixture::margaret::routes::props::DeleteNoteRouteProps;
+use margaret_cluster_fixture::margaret::routes::props::GetNoteRouteProps;
+use margaret_cluster_fixture::margaret::routes::props::PatchNoteRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::note_written::note_written;
@@ -16,7 +19,12 @@ async fn notes_are_written_read_updated_and_deleted_across_instances() {
     let read = |index: usize| {
         cluster
             .client
-            .get(addressed_route(routes(index).public.get_note(id.to_string())).url())
+            .get(
+                addressed_route(routes(index).public.get_note.address(GetNoteRouteProps {
+                    note: id.to_string(),
+                }))
+                .url(),
+            )
             .send()
     };
 
@@ -35,7 +43,12 @@ async fn notes_are_written_read_updated_and_deleted_across_instances() {
     assert_eq!(
         cluster
             .client
-            .patch(addressed_route(routes(2).public.patch_note(id.to_string())).url())
+            .patch(
+                addressed_route(routes(2).public.patch_note.address(PatchNoteRouteProps {
+                    note: id.to_string()
+                }))
+                .url()
+            )
             .json(&json!({ "body": "second draft" }))
             .send()
             .await
@@ -56,7 +69,12 @@ async fn notes_are_written_read_updated_and_deleted_across_instances() {
     assert_eq!(
         cluster
             .client
-            .delete(addressed_route(routes(1).public.delete_note(id.to_string())).url())
+            .delete(
+                addressed_route(routes(1).public.delete_note.address(DeleteNoteRouteProps {
+                    note: id.to_string()
+                }))
+                .url()
+            )
             .send()
             .await
             .expect("the note is deleted")

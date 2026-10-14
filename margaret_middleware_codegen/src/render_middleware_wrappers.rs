@@ -1,4 +1,3 @@
-use heck::ToSnakeCase;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -35,6 +34,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
         concrete,
         injections,
         parameters,
+        target,
         wrapper,
         ..
     } = plan;
@@ -70,7 +70,8 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
         format_ident!("_next")
     };
 
-    let continuation_return = quote! { return ::std::result::Result::Ok(response) };
+    let continuation_return =
+        quote! { return margaret::framework::http::refusal::refusal(response) };
     let error_return = quote! {
         return ::std::result::Result::Err(
             margaret::framework::handler_error::handler_error::HandlerError::consumer(error),
@@ -100,13 +101,16 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     let body = render_route_inputs(
         parameters,
         &request_binding,
-        &quote! { ::std::result::Result::Ok },
+        &quote! { margaret::framework::http::refusal::refusal },
         &quote! {
             #(#extractions)*
             #process_call
                 .map_err(margaret::framework::handler_error::handler_error::HandlerError::consumer)
         },
     );
+
+    let impl_generics = target.impl_generics();
+    let target_type = target.target_type();
 
     quote! {
         pub struct #wrapper {
@@ -116,13 +120,13 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
         }
 
         #[async_trait::async_trait]
-        impl margaret::framework::http::http_middleware::HttpMiddleware for #wrapper {
+        impl #impl_generics margaret::framework::http::http_middleware::HttpMiddleware<#target_type> for #wrapper {
             async fn process(
                 &self,
                 #request_binding: &margaret::framework::http::request::Request,
-                #next_binding: margaret::framework::http::next::Next,
+                #next_binding: margaret::framework::http::next::Next<#target_type>,
             ) -> ::std::result::Result<
-                margaret::framework::http::response_continuation::ResponseContinuation,
+                margaret::framework::http::response_continuation::ResponseContinuation<#target_type>,
                 margaret::framework::handler_error::handler_error::HandlerError,
             > {
                 #body
@@ -133,13 +137,10 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
 
 #[must_use]
 pub fn render_middleware_wrappers(plans: &[MiddlewarePlan]) -> Vec<GeneratedModuleTokens> {
-    let modules = plans.iter().map(|plan| {
-        let wrapper = &plan.wrapper;
-        format_ident!("{}", wrapper.to_string().to_snake_case())
-    });
+    let modules = plans.iter().map(|plan| &plan.field);
     let exports = plans.iter().map(|plan| {
+        let module = &plan.field;
         let wrapper = &plan.wrapper;
-        let module = format_ident!("{}", wrapper.to_string().to_snake_case());
 
         quote! { pub use #module::#wrapper; }
     });
@@ -153,10 +154,10 @@ pub fn render_middleware_wrappers(plans: &[MiddlewarePlan]) -> Vec<GeneratedModu
     )];
 
     generated.extend(plans.iter().map(|plan| {
-        let wrapper = &plan.wrapper;
-        let module = wrapper.to_string().to_snake_case();
-
-        GeneratedModuleTokens::new(middleware.child(module), middleware_wrapper(plan))
+        GeneratedModuleTokens::new(
+            middleware.child(plan.field.to_string()),
+            middleware_wrapper(plan),
+        )
     }));
 
     generated

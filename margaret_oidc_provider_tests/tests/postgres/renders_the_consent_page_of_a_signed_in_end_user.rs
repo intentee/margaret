@@ -5,6 +5,7 @@ use http::header::SET_COOKIE;
 
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::route_entry::RouteEntry;
+use margaret_http::terminal_head_handler::terminal_head_handler;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 use margaret_oidc_provider_tests::fixture_authorization_handler::fixture_authorization_handler;
@@ -27,7 +28,10 @@ async fn renders_the_consent_page_of_a_signed_in_end_user() {
         ["/authorize"],
         [RouteEntry::new(vec![MethodHandler::head(
             RouteMethod::Get,
-            Arc::new(fixture_authorization_handler(&fixture, FixtureConsentView)),
+            terminal_head_handler(Arc::new(fixture_authorization_handler(
+                &fixture,
+                FixtureConsentView,
+            ))),
         )])],
     )
     .await;

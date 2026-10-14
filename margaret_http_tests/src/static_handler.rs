@@ -13,8 +13,11 @@ pub struct StaticHandler {
 }
 
 #[async_trait]
-impl HeadHandler for StaticHandler {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TTarget> HeadHandler<TTarget> for StaticHandler {
+    async fn handle(
+        &self,
+        _request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         Ok(ResponseContinuation::Done(Response::bytes(
             self.status,
             self.content_type,

@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::io;
 use std::sync::Arc;
 
@@ -24,8 +25,11 @@ struct FailingDownload {
 }
 
 #[async_trait]
-impl HeadHandler for FailingDownload {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl HeadHandler<Infallible> for FailingDownload {
+    async fn handle(
+        &self,
+        _request: &Request,
+    ) -> Result<ResponseContinuation<Infallible>, HandlerError> {
         let gate = self.gate.clone();
         let chunks =
             stream::iter([Ok(Bytes::from_static(b"partial"))]).chain(stream::once(async move {

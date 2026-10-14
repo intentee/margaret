@@ -1,5 +1,4 @@
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_http_tests::redirection::Redirection;
 use margaret_oidc_provider_tests::authorization_page_request::authorization_page_request;
 use margaret_oidc_provider_tests::constants::PORTAL_CALLBACK;
@@ -23,7 +22,7 @@ async fn redirects_an_implicitly_consenting_client_from_the_authorization_page()
 
     fixture.stop().await;
 
-    let Ok(ResponseContinuation::Done(response)) = answered else {
+    let Ok(response) = answered else {
         panic!("the authorization page is answered");
     };
     let redirection = Redirection::of(&response);

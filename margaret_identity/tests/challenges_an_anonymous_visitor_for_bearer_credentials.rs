@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -24,8 +25,11 @@ use margaret_route_method::route_method::RouteMethod;
 struct BearerGreeting;
 
 #[async_trait]
-impl HeadHandler for BearerGreeting {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl HeadHandler<Infallible> for BearerGreeting {
+    async fn handle(
+        &self,
+        request: &Request,
+    ) -> Result<ResponseContinuation<Infallible>, HandlerError> {
         let outcome = match request.inputs.server.authorization().bearer() {
             ControlFlow::Continue(token) => {
                 AuthenticatedUserOutcome::Authenticated(token.as_str().to_string())
@@ -33,10 +37,12 @@ impl HeadHandler for BearerGreeting {
             ControlFlow::Break(_) => AuthenticatedUserOutcome::Anonymous,
         };
 
-        Ok(match require_bearer_authenticated_user(outcome) {
-            Requirement::Met(runner) => ResponseContinuation::Done(Response::text(200, runner)),
-            Requirement::Unmet(continuation) => continuation,
-        })
+        Ok(ResponseContinuation::Done(
+            match require_bearer_authenticated_user(outcome) {
+                Requirement::Met(runner) => Response::text(200, runner),
+                Requirement::Unmet(response) => response,
+            },
+        ))
     }
 }
 

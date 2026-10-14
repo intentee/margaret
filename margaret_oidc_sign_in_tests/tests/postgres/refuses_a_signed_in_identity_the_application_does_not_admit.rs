@@ -1,6 +1,5 @@
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::clears_the_transaction::clears_the_transaction;
@@ -30,7 +29,7 @@ async fn refuses_a_signed_in_identity_the_application_does_not_admit() {
 
     assert!(matches!(
         answered,
-        Ok(ResponseContinuation::Done(response))
+        Ok(response)
             if response.status() == 403 && clears_the_transaction(&response)
     ));
 }

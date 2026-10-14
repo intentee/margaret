@@ -63,12 +63,25 @@ fn scan_item(
         let arguments = attribute.args()?;
 
         let input = match declared_by {
-            FrameworkAttribute::ConsoleArgument => ServeInput::ConsoleArgument(
-                read_console_argument(index, item, arguments, view.declared, &site, scope)?,
-            ),
-            FrameworkAttribute::EnvironmentVariable => ServeInput::EnvironmentVariable(
-                read_environment_variable(index, item, arguments, view.declared, &site)?,
-            ),
+            FrameworkAttribute::ConsoleArgument => {
+                ServeInput::ConsoleArgument(read_console_argument(
+                    index,
+                    constructor.module_path(),
+                    arguments,
+                    view.declared,
+                    &site,
+                    scope,
+                )?)
+            }
+            FrameworkAttribute::EnvironmentVariable => {
+                ServeInput::EnvironmentVariable(read_environment_variable(
+                    index,
+                    constructor.module_path(),
+                    arguments,
+                    view.declared,
+                    &site,
+                )?)
+            }
             _ if attribute.is_bare() => ServeInput::SpiffeHttpClient,
             _ => {
                 return Err(ServeInputCodegenError::SpiffeHttpClientTakesNoArguments { site });

@@ -1,6 +1,5 @@
 use crate::body_rejection::BodyRejection;
 use crate::requirement::Requirement;
-use crate::response_continuation::ResponseContinuation;
 
 #[derive(Debug)]
 pub enum BodyReading<Content> {
@@ -13,9 +12,7 @@ impl<Content> BodyReading<Content> {
     pub fn into_requirement(self) -> Requirement<Content> {
         match self {
             Self::Read(content) => Requirement::Met(content),
-            Self::Rejected(rejection) => {
-                Requirement::Unmet(ResponseContinuation::from(rejection.into_response()))
-            }
+            Self::Rejected(rejection) => Requirement::Unmet(rejection.into_response()),
         }
     }
 }

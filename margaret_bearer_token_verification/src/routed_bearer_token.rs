@@ -4,7 +4,6 @@ use serde::de::DeserializeOwned;
 
 use margaret_http::bearer_challenge::BearerChallenge;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::token_admission::TokenAdmission;
 use margaret_issuer_key_set::issuer_verification::IssuerVerification;
 use margaret_jwt_verification::bearer_token_profile::BearerTokenProfile;
@@ -37,15 +36,13 @@ impl RoutedBearerToken<'_, '_> {
         }
 
         match trusted_issuer.verify(jwt, *presented_at).await {
-            IssuerVerification::KeysAwaited => {
-                TokenAdmission::Refused(ResponseContinuation::from(Response::text(
-                    503,
-                    "The signing keys of the token issuer are not available yet",
-                )))
-            }
-            IssuerVerification::Rejected(_) => TokenAdmission::Refused(ResponseContinuation::from(
-                BearerChallenge::InvalidToken.response(),
+            IssuerVerification::KeysAwaited => TokenAdmission::Refused(Response::text(
+                503,
+                "The signing keys of the token issuer are not available yet",
             )),
+            IssuerVerification::Rejected(_) => {
+                TokenAdmission::Refused(BearerChallenge::InvalidToken.response())
+            }
             IssuerVerification::Verified(verified) => TokenAdmission::Admitted(verified),
         }
     }

@@ -7,23 +7,22 @@ use margaret_http::read_form_fields::read_form_fields;
 use margaret_http::request::Request;
 use margaret_http::request_body::RequestBody;
 use margaret_http::requirement::Requirement;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::response::Response;
 use margaret_validation::validate::validate;
 use margaret_validation::validation_result::ValidationResult;
 
 /// # Errors
 ///
 /// Returns `HandlerError::Consumer` carrying the error the answer reported.
-pub async fn responded_to_form<TForm, TAnswer, TResponse, TError>(
+pub async fn responded_to_form<TForm, TAnswer, TError>(
     request: &Request,
     body: RequestBody,
     limit: BodyLimit,
     answer: impl FnOnce(ValidationResult<TForm>) -> TAnswer,
-) -> Result<ResponseContinuation, HandlerError>
+) -> Result<Response, HandlerError>
 where
     TForm: DeserializeOwned + Validate,
-    TAnswer: Future<Output = Result<TResponse, TError>>,
-    TResponse: Into<ResponseContinuation>,
+    TAnswer: Future<Output = Result<Response, TError>>,
     TError: Into<anyhow::Error>,
 {
     match read_form_fields(request, body, limit)
@@ -32,7 +31,6 @@ where
     {
         Requirement::Met(fields) => answer(validate(&fields))
             .await
-            .map(Into::into)
             .map_err(|error| HandlerError::consumer(error.into())),
         Requirement::Unmet(refusal) => Ok(refusal),
     }
@@ -52,7 +50,6 @@ mod tests {
     use margaret_http::body_limit::BodyLimit;
     use margaret_http::request::Request;
     use margaret_http::response::Response;
-    use margaret_http::response_continuation::ResponseContinuation;
     use margaret_http_tests::fixture_body::fixture_body;
     use margaret_http_tests::fixture_request::FixtureRequest;
     use margaret_validation::validation_result::ValidationResult;
@@ -75,10 +72,7 @@ mod tests {
         fixture.into_request()
     }
 
-    async fn answered(
-        content: &'static [u8],
-        limit: usize,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    async fn answered(content: &'static [u8], limit: usize) -> Result<Response, HandlerError> {
         responded_to_form(
             &form_request(),
             fixture_body(content),
@@ -99,7 +93,7 @@ mod tests {
     async fn hands_a_valid_form_to_the_answer_and_responds_with_what_it_returns() {
         assert!(matches!(
             answered(b"name=ada", 64).await,
-            Ok(ResponseContinuation::Done(response)) if response.status() == 200
+            Ok(response) if response.status() == 200
         ));
     }
 
@@ -115,7 +109,7 @@ mod tests {
     async fn refuses_a_form_larger_than_its_limit() {
         assert!(matches!(
             answered(b"name=ada", 4).await,
-            Ok(ResponseContinuation::Done(response)) if response.status() == 413
+            Ok(response) if response.status() == 413
         ));
     }
 }

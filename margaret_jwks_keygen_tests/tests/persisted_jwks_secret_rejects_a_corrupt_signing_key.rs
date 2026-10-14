@@ -11,7 +11,7 @@ fn persisted_jwks_secret_rejects_a_corrupt_signing_key() {
     for slot in ["current", "next"] {
         let mut document = persisted.clone();
 
-        document["ec"][slot]["pem"] = "not a pkcs8 pem".into();
+        document["ec"][slot]["pkcs8"] = "bm90IGEga2V5".into();
 
         assert!(matches!(
             restored_document(document),

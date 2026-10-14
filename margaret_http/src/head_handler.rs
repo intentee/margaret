@@ -6,6 +6,9 @@ use crate::request::Request;
 use crate::response_continuation::ResponseContinuation;
 
 #[async_trait]
-pub trait HeadHandler: Send + Sync {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError>;
+pub trait HeadHandler<TTarget>: Send + Sync {
+    async fn handle(
+        &self,
+        request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError>;
 }

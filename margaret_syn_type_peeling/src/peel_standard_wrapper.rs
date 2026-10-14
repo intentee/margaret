@@ -1,29 +1,23 @@
 use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::standard_library_item::StandardLibraryItem;
 
-use crate::single_generic_argument::single_generic_argument;
+use crate::single_type_argument::single_type_argument;
 
 #[must_use]
 pub fn peel_standard_wrapper<'declared>(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     declared: &'declared Type,
     wrappers: &[StandardLibraryItem],
 ) -> Option<&'declared Type> {
-    let Type::Path(type_path) = declared else {
-        return None;
-    };
-
     index
-        .resolve_item_type(item, declared)
+        .resolve_module_type(module_path, declared)
         .as_ref()
         .and_then(StandardLibraryItem::from_canonical)
         .filter(|wrapper| wrappers.contains(wrapper))
-        .and_then(|_| type_path.path.segments.last())
-        .and_then(single_generic_argument)
+        .and_then(|_| single_type_argument(declared))
 }
 
 #[cfg(test)]
@@ -44,8 +38,13 @@ mod tests {
         let indexed = IndexedSource::new(&format!("{lib_source}\nstruct Probe;\n"));
         let declared: Type = syn::parse_str(type_source).expect("the type fixture parses");
 
-        peel_standard_wrapper(&indexed.index, indexed.item("Probe"), &declared, wrappers)
-            .map(|inner| quote!(#inner).to_string())
+        peel_standard_wrapper(
+            &indexed.index,
+            indexed.item("Probe").module_path(),
+            &declared,
+            wrappers,
+        )
+        .map(|inner| quote!(#inner).to_string())
     }
 
     #[test]

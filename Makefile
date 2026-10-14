@@ -113,6 +113,7 @@ COVERAGE_REPORTED_PACKAGES := \
 	-p margaret_sessions_tests \
 	-p margaret_sign_in_endpoints_codegen \
 	-p margaret_signing_keys \
+	-p margaret_signing_keys_encryption \
 	-p margaret_signing_keys_tests \
 	-p margaret_spiffe_svid \
 	-p margaret_spiffe_svid_bundle \
@@ -262,6 +263,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_sessions_codegen \
 	-p margaret_sign_in_endpoints_codegen \
 	-p margaret_signing_keys \
+	-p margaret_signing_keys_encryption \
 	-p margaret_spiffe_svid \
 	-p margaret_spiffe_svid_bundle \
 	-p margaret_spiffe_svid_client \
@@ -346,6 +348,8 @@ EXAMPLE_COMPOSE := docker compose --file margaret_example/compose.yml
 EXAMPLE_SEED_DATABASE_MAX_CONNECTIONS := 1
 
 EXAMPLE_DATABASE_URL = postgresql://margaret_example:margaret_example@$$($(EXAMPLE_COMPOSE) port postgres 5432)/margaret_example
+
+EXAMPLE_SIGNING_KEYS_ENCRYPTION_KEY := 5QnT5kSTVpMHdtap9rytca6dXb6Qdcp2UEBCeX6wBiM=
 
 SPIRE_FEATURES := \
 	--features margaret_coverage_spiffe_fixture_tests/tests_that_use_spire \
@@ -505,6 +509,7 @@ coverage: node_modules openid-conformance-images
 		--gated margaret_sessions_tests=100 \
 		--gated margaret_sign_in_endpoints_codegen=100 \
 		--gated margaret_signing_keys=100 \
+		--gated margaret_signing_keys_encryption=100 \
 		--gated margaret_signing_keys_tests=100 \
 		--gated margaret_spiffe_svid=100 \
 		--gated margaret_spiffe_svid_bundle=100 \
@@ -556,7 +561,7 @@ example.migrate:
 
 .PHONY: example.seed
 example.seed:
-	MARGARET_EXAMPLE_DATABASE_URL=$(EXAMPLE_DATABASE_URL) MARGARET_EXAMPLE_DATABASE_MAX_CONNECTIONS=$(EXAMPLE_SEED_DATABASE_MAX_CONNECTIONS) cargo run --quiet -p margaret_example -- seed
+	MARGARET_EXAMPLE_DATABASE_URL=$(EXAMPLE_DATABASE_URL) MARGARET_EXAMPLE_DATABASE_MAX_CONNECTIONS=$(EXAMPLE_SEED_DATABASE_MAX_CONNECTIONS) MARGARET_EXAMPLE_SIGNING_KEYS_ENCRYPTION_KEY=$(EXAMPLE_SIGNING_KEYS_ENCRYPTION_KEY) cargo run --quiet -p margaret_example -- seed
 
 .PHONY: fmt
 fmt:

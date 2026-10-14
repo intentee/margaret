@@ -140,12 +140,11 @@ pub fn authenticated_user_providers(
             )?;
 
         let method = infer_from_request_method(item, &provider)?;
-        let declared = declared_inference(index, item, method, &provider)?;
+        let declared = declared_inference(index, method, &provider)?;
 
         let subject = format!("authenticated user provider '{provider}'");
         let parameters = classify_parameters(
             index,
-            item,
             method,
             &BindingContext::AuthenticatedUserProvider {
                 container_bindings,

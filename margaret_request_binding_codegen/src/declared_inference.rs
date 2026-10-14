@@ -5,7 +5,6 @@ use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 
 use crate::inference_fallibility::InferenceFallibility;
@@ -25,10 +24,10 @@ fn identity_path(module: &str, name: &str) -> CanonicalPath {
 
 fn inference_kind(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     declared: &Type,
 ) -> Option<InferenceKind> {
-    let resolved = index.resolve_item_type(item, declared)?;
+    let resolved = index.resolve_module_type(module_path, declared)?;
 
     if resolved == identity_path("authenticated_user_outcome", "AuthenticatedUserOutcome") {
         Some(InferenceKind::Outcome)
@@ -66,7 +65,6 @@ fn result_success_type(declared: &Type) -> Option<&Type> {
 /// result.
 pub fn declared_inference(
     index: &AttributeIndex,
-    item: &IndexedItem,
     method: &IndexedMethod,
     provider: &str,
 ) -> Result<InferenceShape, RequestBindingError> {
@@ -78,7 +76,7 @@ pub fn declared_inference(
         return Err(unsupported());
     };
 
-    if let Some(kind) = inference_kind(index, item, declared) {
+    if let Some(kind) = inference_kind(index, method.module_path(), declared) {
         return Ok(InferenceShape {
             fallibility: InferenceFallibility::Infallible,
             kind,
@@ -86,7 +84,7 @@ pub fn declared_inference(
     }
 
     result_success_type(declared)
-        .and_then(|success| inference_kind(index, item, success))
+        .and_then(|success| inference_kind(index, method.module_path(), success))
         .map(|kind| InferenceShape {
             fallibility: InferenceFallibility::Fallible,
             kind,

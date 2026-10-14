@@ -5,10 +5,9 @@ use bytes::Bytes;
 
 use margaret_accepted_clients::assertion_signing::AssertionSigning;
 use margaret_handler_error::handler_error::HandlerError;
-use margaret_http::head_handler::HeadHandler;
+use margaret_http::handles_head::HandlesHead;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_identity_session::constants::ID_TOKEN_MEMBERS;
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 use margaret_jwks_roller_server::constants::JWKS_CURVE;
@@ -166,13 +165,13 @@ impl ProviderMetadataHandler {
 }
 
 #[async_trait]
-impl HeadHandler for ProviderMetadataHandler {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
-        Ok(ResponseContinuation::from(Response::bytes(
+impl HandlesHead for ProviderMetadataHandler {
+    async fn handle(&self, _request: &Request) -> Result<Response, HandlerError> {
+        Ok(Response::bytes(
             200,
             "application/json",
             self.document.clone(),
-        )))
+        ))
     }
 }
 

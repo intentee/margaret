@@ -4,7 +4,9 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
 
-use crate::margaret::forwarders::public::Forwarder;
+use crate::margaret::routes::Routes;
+use crate::margaret::routes::forward_targets::PublicForwardTarget;
+use crate::margaret::routes::props::GetNoteRouteProps;
 
 #[singleton]
 #[responds_to_http(
@@ -22,9 +24,12 @@ impl GetForwardedNote {
     #[process]
     pub fn respond(
         &self,
-        forward: Forwarder,
+        routes: &Routes,
         #[route_parameter(from = "note_id")] note_id: String,
-    ) -> anyhow::Result<Forward> {
-        Ok(forward.get_note(note_id))
+    ) -> anyhow::Result<Forward<PublicForwardTarget>> {
+        Ok(routes
+            .public
+            .get_note
+            .forward_to(GetNoteRouteProps { note: note_id }))
     }
 }

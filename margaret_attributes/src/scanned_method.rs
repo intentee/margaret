@@ -75,6 +75,7 @@ impl ScannedMethod {
         Ok(IndexedMethod::from_parts(
             attributes,
             self.identifier,
+            self.module_path,
             parameters,
             self.signature,
         ))

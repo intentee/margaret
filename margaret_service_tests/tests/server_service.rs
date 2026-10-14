@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
@@ -39,7 +40,7 @@ async fn binds_and_drains_on_cancellation_so_shutdown_finishes_without_error() {
         listener(),
         ServerPaths::build([])
             .expect("an empty path set builds")
-            .routes([]),
+            .routes::<Infallible>([], ()),
     ))
     .run(cancellation_token)
     .await
@@ -52,10 +53,13 @@ async fn fails_to_start_when_a_route_path_answers_one_method_twice() {
         listener(),
         ServerPaths::build(["/items"])
             .expect("the route paths do not conflict")
-            .routes([RouteEntry::new(vec![
-                MethodHandler::head(RouteMethod::Get, not_found()),
-                MethodHandler::head(RouteMethod::Get, not_found()),
-            ])]),
+            .routes::<Infallible>(
+                [RouteEntry::new(vec![
+                    MethodHandler::head(RouteMethod::Get, not_found()),
+                    MethodHandler::head(RouteMethod::Get, not_found()),
+                ])],
+                (),
+            ),
     ))
     .run(CancellationToken::new())
     .await;

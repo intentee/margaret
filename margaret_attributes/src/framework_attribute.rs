@@ -16,6 +16,7 @@ pub enum FrameworkAttribute {
     Constructor,
     ConsumesSessions,
     EagerLoad,
+    EncryptsSigningKeys,
     EnvironmentVariable,
     ExchangesTokensFrom,
     ForeignKey,
@@ -58,7 +59,7 @@ pub enum FrameworkAttribute {
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 51] = [
+    pub const ALL: [Self; 52] = [
         Self::AdmitsOAuthClient,
         Self::AdmitsSignIn,
         Self::AuthenticatedUser,
@@ -71,6 +72,7 @@ impl FrameworkAttribute {
         Self::Constructor,
         Self::ConsumesSessions,
         Self::EagerLoad,
+        Self::EncryptsSigningKeys,
         Self::EnvironmentVariable,
         Self::ExchangesTokensFrom,
         Self::ForeignKey,
@@ -179,6 +181,7 @@ impl FrameworkAttribute {
             Self::Constructor => "constructor",
             Self::ConsumesSessions => "consumes_sessions",
             Self::EagerLoad => "eager_load",
+            Self::EncryptsSigningKeys => "encrypts_signing_keys",
             Self::EnvironmentVariable => "environment_variable",
             Self::ExchangesTokensFrom => "exchanges_tokens_from",
             Self::ForeignKey => "foreign_key",

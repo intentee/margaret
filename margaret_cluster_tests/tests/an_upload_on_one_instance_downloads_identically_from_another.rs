@@ -2,6 +2,7 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use margaret_cluster_fixture::margaret::routes::props::GetUploadRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 
@@ -32,7 +33,12 @@ async fn an_upload_on_one_instance_downloads_identically_from_another() {
         cluster
             .client
             .get(
-                addressed_route(cluster.instance_routes(1).public.get_upload(id.to_string())).url()
+                addressed_route(cluster.instance_routes(1).public.get_upload.address(
+                    GetUploadRouteProps {
+                        upload: id.to_string()
+                    }
+                ))
+                .url()
             )
             .send()
             .await

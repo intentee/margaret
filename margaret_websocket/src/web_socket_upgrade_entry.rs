@@ -12,7 +12,6 @@ use tokio_util::sync::CancellationToken;
 
 use margaret_http::request::Request;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::web_socket_driver_sender::WebSocketDriverSender;
 use margaret_http::web_socket_upgrade::WebSocketUpgrade;
 use margaret_websocket_session::created_web_socket_session::CreatedWebSocketSession;
@@ -75,21 +74,21 @@ where
         on_upgrade: OnUpgrade,
         cancellation_token: CancellationToken,
         driver_sender: WebSocketDriverSender,
-    ) -> ResponseContinuation {
+    ) -> Response {
         let Some(key) = handshake.inputs.server.header(&SEC_WEBSOCKET_KEY) else {
-            return ResponseContinuation::from(Response::text(
+            return Response::text(
                 400,
                 "the websocket handshake is missing the Sec-WebSocket-Key header",
-            ));
+            );
         };
 
         match handshake.inputs.server.header(&SEC_WEBSOCKET_VERSION) {
             Some(SUPPORTED_WEB_SOCKET_VERSION) => {}
             _ => {
-                return ResponseContinuation::from(Response::text(
+                return Response::text(
                     400,
                     "the websocket handshake must request Sec-WebSocket-Version 13",
-                ));
+                );
             }
         }
 
@@ -99,11 +98,11 @@ where
             session,
         } = match self.factory.create(handshake).await {
             Ok(WebSocketSessionCreationOutcome::Created(created)) => created,
-            Ok(WebSocketSessionCreationOutcome::Interrupted(continuation)) => return continuation,
+            Ok(WebSocketSessionCreationOutcome::Interrupted(response)) => return response,
             Err(error) => {
                 eprintln!("margaret_websocket: session creation failed: {error:#}");
 
-                return ResponseContinuation::from(Response::text(500, "Internal Server Error"));
+                return Response::text(500, "Internal Server Error");
             }
         };
 
@@ -114,15 +113,15 @@ where
             self.dispatch_table.clone(),
         ));
         if driver_sender.send(driver).await.is_err() {
-            return ResponseContinuation::from(Response::text(500, "Internal Server Error"));
+            return Response::text(500, "Internal Server Error");
         }
 
-        cookie_changes.precede(ResponseContinuation::from(
+        cookie_changes.precede_response(
             Response::text(101, "")
                 .header("connection", "Upgrade")
                 .header("sec-websocket-accept", accept)
                 .header("upgrade", "websocket"),
-        ))
+        )
     }
 }
 

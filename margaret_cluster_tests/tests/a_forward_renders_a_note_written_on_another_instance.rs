@@ -1,3 +1,4 @@
+use margaret_cluster_fixture::margaret::routes::props::GetForwardedNoteRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::note_written::note_written;
@@ -18,7 +19,10 @@ async fn a_forward_renders_a_note_written_on_another_instance() {
                     cluster
                         .instance_routes(1)
                         .public
-                        .get_forwarded_note(id.to_string())
+                        .get_forwarded_note
+                        .address(GetForwardedNoteRouteProps {
+                            note_id: id.to_string()
+                        })
                 )
                 .url()
             )

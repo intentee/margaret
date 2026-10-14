@@ -5,8 +5,7 @@ use http::Method;
 use http::header::LOCATION;
 use http::header::SET_COOKIE;
 
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_jwt_verification_tests::constants::FIXTURE_AUDIENCE;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 use margaret_server_origin::route_url::RouteUrl;
@@ -36,7 +35,7 @@ async fn redirects_a_signed_out_visitor_to_the_landing_route() {
 
     assert!(matches!(
         signed_out,
-        Ok(ResponseContinuation::Done(response))
+        Ok(response)
             if response.status() == 303
                 && response.header_value(&LOCATION) == Some("https://blog.example/welcome")
                 && response

@@ -13,10 +13,9 @@ use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 use margaret_oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;
 use margaret_oauth_vocabulary::client_id::ClientId;
 use margaret_oauth_vocabulary::client_id_parsing::ClientIdParsing;
-use margaret_oauth_vocabulary::scope::Scope;
 use margaret_oauth_vocabulary_codegen::constants::CLIENT_AUTHENTICATION_METHODS;
 use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
-use margaret_oauth_vocabulary_codegen::scope_resolution::ScopeResolution;
+use margaret_oauth_vocabulary_codegen::scope_list_resolution::ScopeListResolution;
 
 use crate::declared_client_authentication::DeclaredClientAuthentication;
 use crate::declared_client_registration::DeclaredClientRegistration;
@@ -85,22 +84,26 @@ fn sign_in(
     let anchor = item.canonical_path().to_string();
     let anchor = anchor.as_str();
     let declared = reader.take_group("sign_in", |group| {
-        let scopes = group
-            .take_path_array("scopes")?
-            .ok_or_else(|| OAuthClientCodegenError::MissingSignInScopes {
+        let written_scopes = group.take_path_array("scopes")?.ok_or_else(|| {
+            OAuthClientCodegenError::MissingSignInScopes {
                 anchor: anchor.to_string(),
-            })?
-            .iter()
-            .map(
-                |written_scope| match declared_scopes.resolve(index, item, written_scope) {
-                    ScopeResolution::Declared(scope) => Ok(scope),
-                    ScopeResolution::Unknown => Err(OAuthClientCodegenError::UnknownSignInScope {
-                        anchor: anchor.to_string(),
-                        written: written_scope.to_token_stream().to_string(),
-                    }),
-                },
-            )
-            .collect::<Result<Vec<Scope>, OAuthClientCodegenError>>()?;
+            }
+        })?;
+        let scopes = match declared_scopes.resolve_list(index, item, &written_scopes) {
+            ScopeListResolution::Declared(scopes) => scopes,
+            ScopeListResolution::Repeated(written_scope) => {
+                return Err(OAuthClientCodegenError::RepeatedSignInScope {
+                    anchor: anchor.to_string(),
+                    written: written_scope.to_token_stream().to_string(),
+                });
+            }
+            ScopeListResolution::Unknown(written_scope) => {
+                return Err(OAuthClientCodegenError::UnknownSignInScope {
+                    anchor: anchor.to_string(),
+                    written: written_scope.to_token_stream().to_string(),
+                });
+            }
+        };
 
         Ok::<DeclaredSignIn, OAuthClientCodegenError>(DeclaredSignIn::Declared { scopes })
     })?;
@@ -288,6 +291,17 @@ mod tests {
             rejection(&signing_in("sign_in()")).to_string(),
             "#[oauth_client] on 'crate::Client' signs in without declaring the scopes it requests"
         );
+    }
+
+    #[test]
+    fn rejects_a_sign_in_scope_listed_twice_since_a_client_requests_each_scope_once() {
+        assert!(matches!(
+            rejection(&signing_in(
+                "sign_in(scopes = [ProfileScope, crate::ProfileScope])"
+            )),
+            OAuthClientCodegenError::RepeatedSignInScope { anchor, written }
+                if anchor == "crate::Client" && written == "crate :: ProfileScope"
+        ));
     }
 
     #[test]

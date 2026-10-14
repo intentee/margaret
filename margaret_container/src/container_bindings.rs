@@ -30,6 +30,7 @@ fn umbrella_arguments_type(function: &Ident) -> TokenStream {
     path_tokens(&umbrella_item_path(&[
         "container",
         "build",
+        "arguments",
         &bootstrap_arguments_module(function).to_string(),
         &bootstrap_arguments_type(function).to_string(),
     ]))
@@ -39,7 +40,7 @@ fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
     let module = bootstrap_arguments_module(function);
     let arguments_type = bootstrap_arguments_type(function);
 
-    quote! { super::container::build::#module::#arguments_type }
+    quote! { super::container::build::arguments::#module::#arguments_type }
 }
 
 pub struct ContainerBindings {
@@ -174,6 +175,19 @@ impl ContainerBindings {
     }
 
     #[must_use]
+    pub fn serve_arguments(&self, arguments: &[ServeInputBinding]) -> TokenStream {
+        bootstrap_arguments_literal(
+            &bootstrap_arguments_path(&format_ident!("serve")),
+            arguments,
+        )
+    }
+
+    #[must_use]
+    pub fn serve_arguments_type(&self) -> TokenStream {
+        umbrella_arguments_type(&format_ident!("serve"))
+    }
+
+    #[must_use]
     pub fn serve_input_naming(&self) -> PositionalNaming {
         self.serve_input_naming
     }
@@ -191,19 +205,6 @@ impl ContainerBindings {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(unify_serve_inputs(provided.into_iter().flatten()))
-    }
-
-    #[must_use]
-    pub fn serve_arguments(&self, arguments: &[ServeInputBinding]) -> TokenStream {
-        bootstrap_arguments_literal(
-            &bootstrap_arguments_path(&format_ident!("serve")),
-            arguments,
-        )
-    }
-
-    #[must_use]
-    pub fn serve_arguments_type(&self) -> TokenStream {
-        umbrella_arguments_type(&format_ident!("serve"))
     }
 
     #[must_use]

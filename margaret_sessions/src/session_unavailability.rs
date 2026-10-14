@@ -4,8 +4,6 @@ use std::fmt::Result;
 
 use http::StatusCode;
 
-use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 
@@ -45,11 +43,5 @@ impl Display for SessionUnavailability {
                 "the session issuer refreshed the session with an access token that does not verify: {rejection}"
             ),
         }
-    }
-}
-
-impl From<SessionUnavailability> for ResponseContinuation {
-    fn from(unavailability: SessionUnavailability) -> Self {
-        Self::from(Response::text(503, unavailability.to_string()))
     }
 }

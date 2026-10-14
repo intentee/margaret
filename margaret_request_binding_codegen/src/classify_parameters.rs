@@ -9,7 +9,6 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_attribute::IndexedAttribute;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::injectable_resolution::InjectableResolution;
 use margaret_container::injected_dependency::InjectedDependency;
@@ -46,23 +45,9 @@ use crate::route_parameter_resolution::RouteParameterResolution;
 use crate::session_marker::SessionMarker;
 use crate::views_availability::ViewsAvailability;
 
-fn forwarder_path(server: &str) -> CanonicalPath {
-    CanonicalPath::new(vec![
-        "crate".to_string(),
-        "margaret".to_string(),
-        "forwarders".to_string(),
-        server.to_string(),
-        "Forwarder".to_string(),
-    ])
-}
-
-fn is_forwarder(resolved: Option<&CanonicalPath>, is_reference: bool, server: &str) -> bool {
-    resolved == Some(&forwarder_path(server)) && !is_reference
-}
-
 fn classify_authenticated_user(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     declared: &Type,
     context: &BindingContext,
     position: usize,
@@ -83,7 +68,7 @@ fn classify_authenticated_user(
     let OptionalParameter {
         required,
         value_type,
-    } = OptionalParameter::from_type(index, item, declared);
+    } = OptionalParameter::from_type(index, module_path, declared);
 
     if matches!(value_type, Type::Reference(_)) {
         return Err(RequestBindingError::AuthenticatedUserByReference {
@@ -92,13 +77,13 @@ fn classify_authenticated_user(
         });
     }
 
-    let model = index.resolve_item_type(item, &value_type).ok_or_else(|| {
-        RequestBindingError::UnknownAuthenticatedUserModel {
+    let model = index
+        .resolve_module_type(module_path, &value_type)
+        .ok_or_else(|| RequestBindingError::UnknownAuthenticatedUserModel {
             subject: subject.to_string(),
             parameter: position.to_string(),
             written: value_type.to_token_stream().to_string(),
-        }
-    })?;
+        })?;
     let provider = providers.get(&model).ok_or_else(|| {
         RequestBindingError::MissingAuthenticatedUserProvider {
             subject: subject.to_string(),
@@ -152,10 +137,8 @@ fn classify_views(
 
 fn classify_context_specific(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     declared: &Type,
-    resolved: Option<&CanonicalPath>,
-    is_reference: bool,
     context: &BindingContext,
     position: usize,
 ) -> Result<RequestBinding, RequestBindingError> {
@@ -168,52 +151,33 @@ fn classify_context_specific(
                 parameter: position.to_string(),
             })
         }
-        BindingContext::Responder { server, .. } => {
-            if is_forwarder(resolved, is_reference, server) {
-                Ok(RequestBinding::Forwarder)
-            } else {
-                Err(RequestBindingError::UnmarkedParameter {
+        BindingContext::Responder { .. } => Err(RequestBindingError::UnmarkedParameter {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        }),
+        BindingContext::Handshake {
+            container_bindings, ..
+        } => match resolve_injectable(index, module_path, declared, container_bindings) {
+            InjectableResolution::Resolved(dependency) => {
+                Ok(RequestBinding::Injectable { dependency })
+            }
+            InjectableResolution::UnsupportedShape => {
+                Err(RequestBindingError::UnsupportedParameterShape {
                     subject: subject.to_string(),
                     parameter: position.to_string(),
                 })
             }
-        }
-        BindingContext::Handshake {
-            container_bindings,
-            server,
-            ..
-        } => {
-            if is_forwarder(resolved, is_reference, server) {
-                return Err(RequestBindingError::ForwarderUnavailable {
+            InjectableResolution::MissingProvider => Err(RequestBindingError::MissingProvider {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+            }),
+            InjectableResolution::FrameworkOnly => {
+                Err(RequestBindingError::FrameworkOnlyProviderInjected {
                     subject: subject.to_string(),
                     parameter: position.to_string(),
-                });
+                })
             }
-
-            match resolve_injectable(index, item, declared, container_bindings) {
-                InjectableResolution::Resolved(dependency) => {
-                    Ok(RequestBinding::Injectable { dependency })
-                }
-                InjectableResolution::UnsupportedShape => {
-                    Err(RequestBindingError::UnsupportedParameterShape {
-                        subject: subject.to_string(),
-                        parameter: position.to_string(),
-                    })
-                }
-                InjectableResolution::MissingProvider => {
-                    Err(RequestBindingError::MissingProvider {
-                        subject: subject.to_string(),
-                        parameter: position.to_string(),
-                    })
-                }
-                InjectableResolution::FrameworkOnly => {
-                    Err(RequestBindingError::FrameworkOnlyProviderInjected {
-                        subject: subject.to_string(),
-                        parameter: position.to_string(),
-                    })
-                }
-            }
-        }
+        },
         BindingContext::Middleware { .. } => {
             Err(RequestBindingError::UnmarkedMiddlewareParameter {
                 subject: subject.to_string(),
@@ -240,7 +204,7 @@ fn require_responder_context(
 
 fn classify_form_request(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     attribute: &IndexedAttribute,
     declared: &Type,
     context: &BindingContext,
@@ -248,8 +212,8 @@ fn classify_form_request(
 ) -> Result<RequestBinding, RequestBindingError> {
     let arguments = attribute.args()?;
     let FormRequestArguments { source } =
-        FormRequestArguments::parse(arguments, index, item, context.subject(), position)?;
-    let resolved = index.resolve_item_type(item, declared);
+        FormRequestArguments::parse(arguments, index, module_path, context.subject(), position)?;
+    let resolved = index.resolve_module_type(module_path, declared);
     let is_reference = matches!(declared, Type::Reference(_));
     let extraction = if RequestInjectable::ValidationResult.matches(resolved.as_ref(), is_reference)
     {
@@ -381,7 +345,7 @@ fn classify_route_parameter(
 
 fn classify_bearer_token(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     marker: BearerTokenMarker,
     declared: &Type,
     context: &BindingContext,
@@ -404,7 +368,7 @@ fn classify_bearer_token(
         addressee,
         container_bindings,
         index,
-        item,
+        module_path,
         position,
         subject,
     }
@@ -463,7 +427,7 @@ fn session_marker<'marker>(
 
 fn classify_session(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     marker: SessionMarker,
     declared: &Type,
     context: &BindingContext,
@@ -484,11 +448,11 @@ fn classify_session(
     let OptionalParameter {
         required,
         value_type,
-    } = OptionalParameter::from_type(index, item, declared);
+    } = OptionalParameter::from_type(index, module_path, declared);
 
     if required
         || !RequestInjectable::Session.matches(
-            index.resolve_item_type(item, &value_type).as_ref(),
+            index.resolve_module_type(module_path, &value_type).as_ref(),
             matches!(value_type, Type::Reference(_)),
         )
     {
@@ -619,7 +583,7 @@ fn classify_next(
 
 fn classify_parameter(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     ParameterView {
         attributes,
         declared,
@@ -632,7 +596,7 @@ fn classify_parameter(
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
     let position = *position;
-    let resolved = index.resolve_item_type(item, declared);
+    let resolved = index.resolve_module_type(module_path, declared);
     let is_reference = matches!(declared, Type::Reference(_));
     let injectable = RequestInjectable::resolve(resolved.as_ref(), is_reference);
     let is_peer_spiffe_id = matches!(injectable, Some(RequestInjectable::PeerSpiffeId));
@@ -647,7 +611,7 @@ fn classify_parameter(
         )? {
             ParameterMarker::AuthenticatedUser => classify_authenticated_user(
                 index,
-                item,
+                module_path,
                 declared,
                 context,
                 position,
@@ -655,7 +619,7 @@ fn classify_parameter(
             )?,
             ParameterMarker::BearerToken(marker) => classify_bearer_token(
                 index,
-                item,
+                module_path,
                 marker,
                 declared,
                 context,
@@ -663,11 +627,11 @@ fn classify_parameter(
                 &mut bound.credentials,
             )?,
             ParameterMarker::FormRequest(attribute) => {
-                classify_form_request(index, item, attribute, declared, context, position)?
+                classify_form_request(index, module_path, attribute, declared, context, position)?
             }
             ParameterMarker::Session(marker) => classify_session(
                 index,
-                item,
+                module_path,
                 marker,
                 declared,
                 context,
@@ -708,15 +672,9 @@ fn classify_parameter(
                     | RequestInjectable::ValidationResult
                     | RequestInjectable::VerifiedJwt,
                 )
-                | None => classify_context_specific(
-                    index,
-                    item,
-                    declared,
-                    resolved.as_ref(),
-                    is_reference,
-                    context,
-                    position,
-                )?,
+                | None => {
+                    classify_context_specific(index, module_path, declared, context, position)?
+                }
             },
         },
     )
@@ -736,7 +694,6 @@ enum ParameterMarker<'marker> {
 /// Returns `RequestBindingError` propagated from the work it performs.
 pub fn classify_parameters(
     index: &AttributeIndex,
-    item: &IndexedItem,
     method: &IndexedMethod,
     context: &BindingContext,
     registries: &BindingRegistries,
@@ -750,7 +707,14 @@ pub fn classify_parameters(
     };
 
     for view in parameters(method) {
-        let binding = classify_parameter(index, item, &view, context, registries, &mut bound)?;
+        let binding = classify_parameter(
+            index,
+            method.module_path(),
+            &view,
+            context,
+            registries,
+            &mut bound,
+        )?;
 
         exclusive.admit(&binding, subject)?;
         classified.push(BoundParameter {

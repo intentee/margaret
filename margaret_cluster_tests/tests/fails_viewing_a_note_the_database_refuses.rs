@@ -2,6 +2,7 @@ use reqwest::StatusCode;
 use uuid::Uuid;
 
 use margaret::framework::sql_identifier::table_namespace::TableNamespace;
+use margaret_cluster_fixture::margaret::routes::props::GetNoteViewRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_database_tests::table_privilege::TablePrivilege;
@@ -21,12 +22,11 @@ async fn fails_viewing_a_note_the_database_refuses() {
         cluster
             .client
             .get(
-                addressed_route(
-                    cluster
-                        .routes()
-                        .public
-                        .get_note_view(Uuid::new_v4().to_string())
-                )
+                addressed_route(cluster.routes().public.get_note_view.address(
+                    GetNoteViewRouteProps {
+                        note: Uuid::new_v4().to_string()
+                    }
+                ))
                 .url()
             )
             .send()

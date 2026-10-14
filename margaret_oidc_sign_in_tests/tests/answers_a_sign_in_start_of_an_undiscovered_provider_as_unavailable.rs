@@ -4,8 +4,7 @@ use margaret_authorization_server_client::authorization_server_client::Authoriza
 use margaret_authorization_server_client_tests::constants::FIXTURE_CLIENT_ID;
 use margaret_authorization_server_client_tests::fixture_client_secret::fixture_client_secret;
 use margaret_authorization_server_client_tests::localhost_trust::localhost_trust;
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_http_tests::fixture_request::FixtureRequest;
 use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
@@ -35,6 +34,6 @@ async fn answers_a_sign_in_start_of_an_undiscovered_provider_as_unavailable() {
         SignInStartHandler::create(flow)
             .handle(&FixtureRequest::new(http::Method::GET, "/sign-in").into_request())
             .await,
-        Ok(ResponseContinuation::Done(response)) if response.status() == 503
+        Ok(response) if response.status() == 503
     ));
 }

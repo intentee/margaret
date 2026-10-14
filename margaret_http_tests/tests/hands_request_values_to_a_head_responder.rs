@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use margaret_http::handler_future::HandlerFuture;
@@ -20,7 +21,7 @@ struct Echo {
 async fn hands_request_values_to_a_head_responder() {
     let handler = head_responder(
         Arc::new(Echo { prefix: "echo-" }),
-        |responder: Arc<Echo>, request: &Request| -> HandlerFuture<'_> {
+        |responder: Arc<Echo>, request: &Request| -> HandlerFuture<'_, Infallible> {
             Box::pin(async move {
                 Ok(ResponseContinuation::from(Response::text(
                     200,

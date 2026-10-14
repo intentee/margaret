@@ -1,15 +1,12 @@
 use margaret_http::requirement::Requirement;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 
 use crate::authenticated_user_presence::AuthenticatedUserPresence;
 
 #[must_use]
 pub fn require_present_user<User>(presence: AuthenticatedUserPresence<User>) -> Requirement<User> {
     match presence {
-        AuthenticatedUserPresence::Anonymous => {
-            Requirement::Unmet(ResponseContinuation::from(Response::unauthorized()))
-        }
+        AuthenticatedUserPresence::Anonymous => Requirement::Unmet(Response::unauthorized()),
         AuthenticatedUserPresence::Authenticated(user) => Requirement::Met(user),
     }
 }
@@ -17,7 +14,6 @@ pub fn require_present_user<User>(presence: AuthenticatedUserPresence<User>) -> 
 #[cfg(test)]
 mod tests {
     use margaret_http::requirement::Requirement;
-    use margaret_http::response_continuation::ResponseContinuation;
 
     use super::require_present_user;
     use crate::authenticated_user_presence::AuthenticatedUserPresence;
@@ -34,7 +30,7 @@ mod tests {
     fn answers_an_anonymous_visitor_as_unauthorized() {
         assert!(matches!(
             require_present_user::<&str>(AuthenticatedUserPresence::Anonymous),
-            Requirement::Unmet(ResponseContinuation::Done(response)) if response.status() == 401
+            Requirement::Unmet(response) if response.status() == 401
         ));
     }
 }

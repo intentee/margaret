@@ -11,8 +11,8 @@ pub(crate) fn serve_invocation_fields(
     plan: &ServicePlan,
     servers: &[HttpServer],
     bindings: &ContainerBindings,
+    activation: SpiffeActivation,
 ) -> Vec<ServeInvocationField> {
-    let activation = SpiffeActivation::of(plan, servers);
     let mut fields = Vec::new();
 
     if !plan.construction_arguments.is_empty() {

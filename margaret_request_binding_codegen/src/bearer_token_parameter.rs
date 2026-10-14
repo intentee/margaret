@@ -3,7 +3,6 @@ use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::tag::Tag;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_injection_codegen::optional_parameter::OptionalParameter;
@@ -22,7 +21,7 @@ pub(crate) struct BearerTokenParameter<'classified> {
     pub(crate) addressee: &'classified BearerTokenAddressee,
     pub(crate) container_bindings: &'classified ContainerBindings,
     pub(crate) index: &'classified AttributeIndex,
-    pub(crate) item: &'classified IndexedItem,
+    pub(crate) module_path: &'classified [String],
     pub(crate) position: usize,
     pub(crate) subject: &'classified str,
 }
@@ -36,12 +35,14 @@ impl BearerTokenParameter<'_> {
         let OptionalParameter {
             required,
             value_type,
-        } = OptionalParameter::from_type(self.index, self.item, declared);
+        } = OptionalParameter::from_type(self.index, self.module_path, declared);
         let carrier_segment = match &value_type {
             Type::Path(carrier) if !required => carrier.path.segments.last(),
             _ => None,
         };
-        let carrier = self.index.resolve_item_type(self.item, &value_type);
+        let carrier = self
+            .index
+            .resolve_module_type(self.module_path, &value_type);
 
         match carrier_segment {
             Some(segment) if RequestInjectable::VerifiedJwt.matches(carrier.as_ref(), false) => {
@@ -67,7 +68,7 @@ impl BearerTokenParameter<'_> {
     }
 
     fn claims(&self, claims: &Type) -> Result<CanonicalPath, RequestBindingError> {
-        match PlainTypeResolution::of(self.index, self.item, claims) {
+        match PlainTypeResolution::of(self.index, self.module_path, claims) {
             PlainTypeResolution::NotPlain => {
                 Err(RequestBindingError::UnsupportedBearerTokenClaims {
                     subject: self.subject.to_string(),
@@ -119,7 +120,7 @@ impl BearerTokenParameter<'_> {
     }
 
     fn profile(&self, profile: &Type) -> Result<CanonicalPath, RequestBindingError> {
-        match PlainTypeResolution::of(self.index, self.item, profile) {
+        match PlainTypeResolution::of(self.index, self.module_path, profile) {
             PlainTypeResolution::NotPlain => {
                 Err(RequestBindingError::UnsupportedBearerTokenProfile {
                     subject: self.subject.to_string(),

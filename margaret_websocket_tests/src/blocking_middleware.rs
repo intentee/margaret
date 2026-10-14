@@ -10,12 +10,12 @@ use margaret_http::response_continuation::ResponseContinuation;
 pub struct BlockingMiddleware;
 
 #[async_trait]
-impl HttpMiddleware for BlockingMiddleware {
+impl<TTarget: Send + 'static> HttpMiddleware<TTarget> for BlockingMiddleware {
     async fn process(
         &self,
         _request: &Request,
-        _next: Next,
-    ) -> Result<ResponseContinuation, HandlerError> {
+        _next: Next<TTarget>,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         Ok(ResponseContinuation::Done(Response::forbidden()))
     }
 }

@@ -21,6 +21,14 @@ use crate::rsa_signing_key::RsaSigningKey;
 use crate::signing_curve::SigningCurve;
 use crate::signing_keys_generation::SigningKeysGeneration;
 
+fn encoded_pkcs8(pkcs8: &[u8]) -> Zeroizing<String> {
+    Zeroizing::new(Base64::encode_string(pkcs8))
+}
+
+fn decoded_pkcs8(encoded: &str) -> Result<Zeroizing<Vec<u8>>, base64ct::Error> {
+    Base64::decode_vec(encoded).map(Zeroizing::new)
+}
+
 fn persisted_retired(retired: &[RetiredKey]) -> Vec<PersistedRetiredKey> {
     retired
         .iter()
@@ -43,7 +51,7 @@ fn restored_retired(retired: Vec<PersistedRetiredKey>) -> Result<Vec<RetiredKey>
 struct PersistedEcKey {
     crv: SigningCurve,
     kid: KeyId,
-    pem: Zeroizing<String>,
+    pkcs8: Zeroizing<String>,
 }
 
 impl PersistedEcKey {
@@ -51,14 +59,15 @@ impl PersistedEcKey {
         Self {
             crv: pair.signing_key().curve(),
             kid: pair.kid().clone(),
-            pem: pair.signing_key().pem().clone(),
+            pkcs8: encoded_pkcs8(pair.signing_key().pkcs8()),
         }
     }
 
     fn restore(self) -> Result<JwkPair, JwksKeyError> {
-        let Self { crv, kid, pem } = self;
+        let Self { crv, kid, pkcs8 } = self;
+        let pkcs8 = decoded_pkcs8(&pkcs8).map_err(|source| JwksKeyError::EcKeyBase64 { source })?;
 
-        JwkPair::new(kid, EcSigningKey::from_pkcs8_pem(crv, pem)?)
+        JwkPair::new(kid, EcSigningKey::from_pkcs8(crv, pkcs8)?)
     }
 }
 
@@ -73,15 +82,14 @@ impl PersistedRsaKey {
     fn of(pair: &RsaJwkPair) -> Self {
         Self {
             kid: pair.kid().clone(),
-            pkcs8: Zeroizing::new(Base64::encode_string(pair.signing_key().pkcs8())),
+            pkcs8: encoded_pkcs8(pair.signing_key().pkcs8()),
         }
     }
 
     fn restore(self) -> Result<RsaJwkPair, JwksKeyError> {
         let Self { kid, pkcs8 } = self;
-        let pkcs8 = Base64::decode_vec(&pkcs8)
-            .map(Zeroizing::new)
-            .map_err(|source| JwksKeyError::RsaKeyBase64 { source })?;
+        let pkcs8 =
+            decoded_pkcs8(&pkcs8).map_err(|source| JwksKeyError::RsaKeyBase64 { source })?;
 
         RsaSigningKey::from_pkcs8(pkcs8).and_then(|signing_key| RsaJwkPair::new(kid, signing_key))
     }

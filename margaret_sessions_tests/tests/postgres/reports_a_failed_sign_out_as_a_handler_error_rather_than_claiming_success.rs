@@ -5,7 +5,7 @@ use http::Method;
 
 use margaret_database_tests::started_database::StartedDatabase;
 use margaret_handler_error::handler_error::HandlerError;
-use margaret_http::head_handler::HeadHandler;
+use margaret_http::handles_head::HandlesHead;
 use margaret_jwt_verification_tests::constants::FIXTURE_AUDIENCE;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 use margaret_server_origin::route_url::RouteUrl;

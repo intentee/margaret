@@ -6,17 +6,13 @@ use margaret_route_method::route_method::RouteMethod;
 use crate::content_handler::ContentHandler;
 use crate::head_handler::HeadHandler;
 
-pub(crate) enum MethodHandlerKind {
+pub(crate) enum MethodHandlerKind<TTarget> {
     Content {
-        handler: Arc<dyn ContentHandler>,
+        handler: Arc<dyn ContentHandler<TTarget>>,
         method: ContentMethod,
     },
-    Forwardable {
-        handler: Arc<dyn HeadHandler>,
-        name: &'static str,
-    },
     Head {
-        handler: Arc<dyn HeadHandler>,
+        handler: Arc<dyn HeadHandler<TTarget>>,
         method: RouteMethod,
     },
 }

@@ -15,7 +15,7 @@ use margaret_jwks_roller_tests::converged::converged;
 use margaret_jwks_roller_tests::fixture_synchronizer::fixture_synchronizer;
 use margaret_jwks_roller_tests::locked_signing_keys::locked_signing_keys;
 use margaret_jwks_roller_tests::seeded_signing_keys::seeded_signing_keys;
-use margaret_signing_keys::signing_keys_revision::SigningKeysRevision;
+use margaret_signing_keys_tests::sealed_revision::sealed_revision;
 use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
 use margaret_signing_keys_tests::stored_revision::StoredRevision;
 
@@ -73,8 +73,6 @@ async fn concurrent_due_rolls_replace_the_keys_once() {
     assert_eq!(rolled[0].current().kid(), held.next().kid());
     assert_eq!(
         StoredRevision::loaded(&started.database).await,
-        StoredRevision::of(
-            &SigningKeysRevision::from_secret(&rolled[0]).expect("the keys serialize")
-        )
+        StoredRevision::of(&sealed_revision(&rolled[0]))
     );
 }

@@ -23,5 +23,6 @@ pub enum FrameworkDependency {
     SpiffeHttpClient,
     SpiffeIssuerRequestClient,
     TokenIssuance,
+    UndeclaredSigningKeysEncryption,
     Urls(Vec<UrlSource>),
 }

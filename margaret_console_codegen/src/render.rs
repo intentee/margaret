@@ -21,6 +21,7 @@ use margaret_serve_input_codegen::spiffe_client_requirements::SpiffeClientRequir
 use margaret_service_codegen::serve_invocation_read::ServeInvocationRead;
 
 use crate::console_command::ConsoleCommand;
+use crate::framework_command::FrameworkCommand;
 use crate::invocation_dispatch::InvocationDispatch;
 use crate::serve_dispatch::ServeDispatch;
 
@@ -110,8 +111,10 @@ fn serve_registration(
         }
     });
 
+    let name = FrameworkCommand::Serve.name();
+
     quote! {
-        .subcommand(clap::Command::new("serve")#(#http_server_arguments)*#spiffe_arguments #(#service_arguments)*)
+        .subcommand(clap::Command::new(#name)#(#http_server_arguments)*#spiffe_arguments #(#service_arguments)*)
     }
 }
 
@@ -222,8 +225,10 @@ fn serve_arm(serve: &ServeDispatch, dispatch: InvocationDispatch) -> TokenStream
                 .await
             });
 
+            let name = FrameworkCommand::Serve.name();
+
             quote! {
-                Some(("serve", #binding)) => #chain.map(|serve_invocation| #run),
+                Some((#name, #binding)) => #chain.map(|serve_invocation| #run),
             }
         }
         ServeDispatch::Unserved => TokenStream::new(),
@@ -247,12 +252,14 @@ fn schema_tokens(has_models: bool, dispatch: InvocationDispatch) -> SchemaTokens
         margaret::framework::console::command_outcome::CommandOutcome::Succeeded
     });
 
+    let name = FrameworkCommand::Schema.name();
+
     SchemaTokens {
         arm: quote! {
-            Some(("schema", _matches)) => ::std::result::Result::Ok(#run),
+            Some((#name, _matches)) => ::std::result::Result::Ok(#run),
         },
         registration: quote! {
-            .subcommand(clap::Command::new("schema"))
+            .subcommand(clap::Command::new(#name))
         },
     }
 }

@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use futures_util::SinkExt;
@@ -14,7 +15,7 @@ use margaret_websocket_tests::running_web_socket_server::RunningWebSocketServer;
 
 #[tokio::test]
 async fn blocks_the_handshake_when_a_middleware_short_circuits() {
-    let middleware: Vec<Arc<dyn HttpMiddleware>> = vec![Arc::new(BlockingMiddleware)];
+    let middleware: Vec<Arc<dyn HttpMiddleware<Infallible>>> = vec![Arc::new(BlockingMiddleware)];
     let server = RunningWebSocketServer::start_gated(middleware).await;
 
     let response = raw_http_exchange(
@@ -31,7 +32,7 @@ async fn blocks_the_handshake_when_a_middleware_short_circuits() {
 
 #[tokio::test]
 async fn upgrades_the_connection_when_the_middleware_delegates() {
-    let middleware: Vec<Arc<dyn HttpMiddleware>> = vec![Arc::new(PassingMiddleware)];
+    let middleware: Vec<Arc<dyn HttpMiddleware<Infallible>>> = vec![Arc::new(PassingMiddleware)];
     let server = RunningWebSocketServer::start_gated(middleware).await;
     let url = format!("ws://{}/ws", server.address());
     let tcp = TcpStream::connect(server.address())

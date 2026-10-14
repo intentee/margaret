@@ -6,8 +6,10 @@ publish = false
 autotests = false
 
 [dependencies]
+async-trait = { workspace = true }
 futures-util = { workspace = true }
 margaret_coverage_spiffe_fixture = { path = "../margaret_coverage_spiffe_fixture" }
+margaret_http_tests = { path = "../margaret_http_tests" }
 margaret_local_server_tests = { path = "../margaret_local_server_tests" }
 margaret_spiffe_svid = { workspace = true }
 margaret_spiffe_svid_client = { workspace = true }

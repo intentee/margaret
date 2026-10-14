@@ -5,7 +5,6 @@ use margaret_authorization_server_client_tests::constants::FIXTURE_CLIENT_ID;
 use margaret_authorization_server_client_tests::fixture_client_secret::fixture_client_secret;
 use margaret_authorization_server_client_tests::localhost_trust::localhost_trust;
 use margaret_http::request_authorization::RequestAuthorization;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::token_admission::TokenAdmission;
 use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
@@ -34,6 +33,6 @@ async fn refuses_while_the_authorization_server_is_unavailable() {
             &server,
         )
         .await,
-        TokenAdmission::Refused(ResponseContinuation::Done(response)) if response.status() == 503
+        TokenAdmission::Refused(response) if response.status() == 503
     ));
 }

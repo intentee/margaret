@@ -6,27 +6,26 @@ use tokio_util::sync::CancellationToken;
 use trzcina::Service;
 
 use margaret_http::bound_server::BoundServer;
-use margaret_http::forward_targets::ForwardTargets;
+use margaret_http::forward_scope::ForwardScope;
 use margaret_http::server::Server;
 use margaret_http::server_route_entries::ServerRouteEntries;
-use margaret_http::server_routes::ServerRoutes;
 
 use crate::server_listener::ServerListener;
 
-pub struct ServerService {
+pub struct ServerService<TTarget: ForwardScope> {
     listener: ServerListener,
-    routes: ServerRouteEntries,
+    routes: ServerRouteEntries<TTarget>,
 }
 
-impl ServerService {
+impl<TTarget: ForwardScope> ServerService<TTarget> {
     #[must_use]
-    pub fn new(listener: ServerListener, routes: ServerRouteEntries) -> Self {
+    pub fn new(listener: ServerListener, routes: ServerRouteEntries<TTarget>) -> Self {
         Self { listener, routes }
     }
 }
 
 #[async_trait]
-impl Service for ServerService {
+impl<TTarget: ForwardScope> Service for ServerService<TTarget> {
     async fn run(self: Box<Self>, cancellation_token: CancellationToken) -> Result<()> {
         let Self {
             listener:
@@ -37,13 +36,9 @@ impl Service for ServerService {
                 },
             routes,
         } = *self;
-        let ServerRoutes {
-            named_handlers,
-            router,
-        } = routes.build()?;
         let bound = BoundServer::bind(
-            Arc::new(Server::new(address, transport, uploads, router)),
-            Arc::new(ForwardTargets::new(named_handlers)),
+            Arc::new(Server::new(address, transport, uploads)),
+            routes.build()?,
         )
         .await?;
 

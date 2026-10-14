@@ -27,6 +27,12 @@ mod websocket_sessions;
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::collections::BTreeSet;
+    use std::path::Path;
+    use std::path::PathBuf;
+
+    use syn::Item;
+    use syn::parse_file;
 
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::canonical_path::CanonicalPath;
@@ -39,6 +45,7 @@ mod tests {
     use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
     use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
+    use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
     use margaret_http_codegen::declared_routes::DeclaredRoutes;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
@@ -199,7 +206,7 @@ impl RespondsToWebSocketNotification for Typist {
         collect_registries(index).expect("the binding registries are collected")
     }
 
-    fn generated(source: &str) -> String {
+    fn generated_modules(source: &str) -> Vec<GeneratedModuleTokens> {
         let index = IndexedSource::new(source).index;
         let registries = registries_for(&index);
         let tags = collected_tags(&index);
@@ -209,6 +216,10 @@ impl RespondsToWebSocketNotification for Typist {
         render_websocket(&index, &bindings(&index), &plans, &registries)
             .expect("the websocket module is generated")
             .modules
+    }
+
+    fn generated(source: &str) -> String {
+        generated_modules(source)
             .into_iter()
             .map(|module| {
                 module
@@ -260,6 +271,63 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     const GREETING_RESPONDER: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/greeting/{name}\", server = \"public\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"name\")] name: String) -> anyhow::Result<Response> {}\n}\n";
+
+    #[test]
+    fn places_sessions_and_server_routes_apart_so_a_session_named_after_a_server_never_collides() {
+        let files: BTreeSet<PathBuf> = generated_modules(
+            "mod chat {\n    use margaret::framework::macros::build_for_session;\n    use margaret::framework::macros::websocket_session;\n\n    #[websocket_session(path = \"/live\", server = \"chat\")]\n    pub struct Routes;\n\n    impl Routes {\n        #[build_for_session]\n        fn build() -> anyhow::Result<Self> {}\n    }\n}\n",
+        )
+        .iter()
+        .map(|module| {
+            module
+                .path()
+                .directory_in(Path::new(""))
+                .join(module.path().file_name())
+        })
+        .collect();
+
+        assert_eq!(
+            files,
+            BTreeSet::from([
+                PathBuf::from("websocket.rs"),
+                PathBuf::from("websocket/servers.rs"),
+                PathBuf::from("websocket/servers/chat_routes.rs"),
+                PathBuf::from("websocket/sessions.rs"),
+                PathBuf::from("websocket/sessions/chat_routes.rs"),
+                PathBuf::from("websocket/sessions/chat_routes/upgrade_entry.rs"),
+            ])
+        );
+    }
+
+    #[test]
+    fn defines_the_dispatch_table_before_the_session_factory_so_helper_functions_precede_helper_structs()
+     {
+        let upgrade_entry = generated_modules(FULL_SESSION)
+            .into_iter()
+            .map(|module| {
+                parse_file(module.format().expect("the module formats").source())
+                    .expect("the module parses")
+                    .items
+            })
+            .find(|items| {
+                items.iter().any(|item| {
+                    matches!(item, Item::Fn(function) if function.sig.ident == "dispatch_table")
+                })
+            })
+            .expect("the upgrade entry module is generated");
+        let dispatch_table = upgrade_entry
+            .iter()
+            .position(
+                |item| matches!(item, Item::Fn(function) if function.sig.ident == "dispatch_table"),
+            )
+            .expect("the dispatch table is defined");
+        let first_helper_struct = upgrade_entry
+            .iter()
+            .position(|item| matches!(item, Item::Struct(_)))
+            .expect("the session factory is defined");
+
+        assert!(dispatch_table < first_helper_struct);
+    }
 
     #[test]
     fn rejects_a_session_at_the_path_of_a_responder_since_one_path_has_one_handler() {
@@ -340,7 +408,9 @@ impl RespondsToWebSocketMessage for Chatter {
 
         assert!(source.contains("container.chatter()"));
         assert!(source.contains("dispatch_table(container)"));
-        assert!(source.contains("public_routes(container:&super::super::container::Container,"));
+        assert!(
+            source.contains("public_routes<TTarget:margaret::framework::http::forward_scope::ForwardScope>(container:&super::super::super::container::Container,")
+        );
         assert!(source.contains("upgrade_entry(container"));
         assert!(!source.contains("serve_input_"));
     }
@@ -531,7 +601,7 @@ struct Guard;
 
 impl Guard {
     #[process]
-    fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process<TTarget>(&self, request: &Request, next: Next<TTarget>) -> anyhow::Result<ResponseContinuation<TTarget>> {}
 }
 "#;
 
@@ -559,7 +629,7 @@ struct Tracer;
 
 impl Tracer {
     #[process]
-    fn process(&self, request: &Request, next: Next, routes: &Routes) -> anyhow::Result<ResponseContinuation> {}
+    fn process<TTarget>(&self, request: &Request, next: Next<TTarget>, routes: &Routes) -> anyhow::Result<ResponseContinuation<TTarget>> {}
 }
 "#;
 
@@ -605,18 +675,18 @@ impl Room {
     fn names_the_dispatch_container_unused_when_a_session_has_no_handlers() {
         let source = generated(INJECTED_ONLY_SESSION);
 
-        assert!(
-            source.contains("dispatch_table(_container:&super::super::super::container::Container")
-        );
+        assert!(source.contains(
+            "dispatch_table(_container:&super::super::super::super::container::Container"
+        ));
     }
 
     #[test]
     fn names_the_dispatch_container_when_a_session_has_handlers() {
         let source = generated(FULL_SESSION);
 
-        assert!(
-            source.contains("dispatch_table(container:&super::super::super::container::Container")
-        );
+        assert!(source.contains(
+            "dispatch_table(container:&super::super::super::super::container::Container"
+        ));
     }
 
     #[test]
@@ -625,7 +695,7 @@ impl Room {
 
         assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::web_socket("));
         assert!(source.contains(
-            "=[std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard()"
+            "=[std::sync::Arc::new(super::super::super::middleware::Guard{inner:container.guard()"
         ));
         assert!(source.contains("::std::vec::Vec::from(middleware)"));
         assert!(!source.contains("GatedWebSocketUpgrade"));
@@ -660,7 +730,7 @@ impl Guard {
     fn create(#[console_argument(from = "token")] token: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process<TTarget>(&self, request: &Request, next: Next<TTarget>) -> anyhow::Result<ResponseContinuation<TTarget>> {}
 }
 "#;
 
@@ -668,8 +738,13 @@ impl Guard {
     fn reads_a_session_middleware_from_the_container_since_it_is_built_once_there() {
         let source = generated(SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE);
 
-        assert!(source.contains("public_routes(container:&super::super::container::Container,"));
+        assert!(
+            source.contains("public_routes<TTarget:margaret::framework::http::forward_scope::ForwardScope>(container:&super::super::super::container::Container,")
+        );
         assert!(source.contains("container.guard()"));
+        assert!(source.contains(
+            "wheresuper::super::super::middleware::Guard:margaret::framework::http::http_middleware::HttpMiddleware<TTarget"
+        ));
         assert!(!source.contains("serve_input_"));
     }
 
@@ -688,9 +763,9 @@ impl Guard {
     fn weaves_routes_when_only_a_middleware_injects_them() {
         let source = generated(SESSION_WITH_ROUTES_MIDDLEWARE);
 
-        assert!(source.contains("routes:&::std::sync::Arc<super::super::routes::Routes>"));
+        assert!(source.contains("routes:&::std::sync::Arc<super::super::super::routes::Routes>"));
         assert!(source.contains(
-            "super::super::middleware::Tracer{inner:container.tracer(),routes:routes.clone()"
+            "super::super::super::middleware::Tracer{inner:container.tracer(),routes:routes.clone()"
         ));
         assert!(source.contains("upgrade_entry(container)"));
     }
@@ -770,9 +845,11 @@ impl Guard {
         let source = generated(FULL_SESSION);
 
         assert!(source.contains("pubfnpublic_routes"));
-        assert!(source.contains("->[margaret::framework::http::route_entry::RouteEntry;1]"));
+        assert!(
+            source.contains("->[margaret::framework::http::route_entry::RouteEntry<TTarget>;1]")
+        );
         assert!(source.contains(
-            "route_entry::RouteEntry::web_socket(super::chat_session::upgrade_entry(container)"
+            "route_entry::RouteEntry::web_socket(super::super::sessions::chat_session::upgrade_entry(container)"
         ));
     }
 
@@ -1315,10 +1392,10 @@ impl RespondsToWebSocketMessage for Chatter {
         let source = generated(AUTHENTICATED_HANDSHAKE);
 
         assert!(source.contains(
-            "structFactory{session_user_provider:::std::sync::Arc<super::super::super::authenticated_users::SessionUserProvider,>,}"
+            "structFactory{session_user_provider:::std::sync::Arc<super::super::super::super::authenticated_users::SessionUserProvider,>,}"
         ));
         assert!(source.contains(
-            "Factory{session_user_provider:::std::sync::Arc::new(super::super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(),}),}"
+            "Factory{session_user_provider:::std::sync::Arc::new(super::super::super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(),}),}"
         ));
     }
 
@@ -1460,7 +1537,7 @@ impl RespondsToWebSocketMessage for Chatter {
 
         assert!(source.contains("argument_0:::std::sync::Arc<crate::SystemClock>,"));
         assert!(source.contains(
-            "session:::std::sync::Arc<super::super::super::authenticated_users::Session>,"
+            "session:::std::sync::Arc<super::super::super::super::authenticated_users::Session>,"
         ));
         assert!(source.contains("self.session.as_ref()"));
     }
@@ -1514,17 +1591,13 @@ impl RespondsToWebSocketMessage for Chatter {
     fn threads_the_serve_inputs_of_an_authenticated_user_provider_through_the_handshake() {
         let source = generated(CONSOLE_ARGUMENT_PROVIDER);
 
-        assert!(
-            source.contains(
-                "pubfnupgrade_entry(container:&super::super::super::container::Container,)"
-            )
-        );
+        assert!(source.contains(
+            "pubfnupgrade_entry(container:&super::super::super::super::container::Container,)"
+        ));
         assert!(source.contains("inner:container.session_user_provider(),"));
-        assert!(
-            source.contains(
-                "pubfnpublic_routes(container:&super::super::container::Container,_routes:"
-            )
-        );
+        assert!(source.contains(
+            "pubfnpublic_routes<TTarget:margaret::framework::http::forward_scope::ForwardScope>(container:&super::super::super::container::Container,_routes:"
+        ));
         assert!(source.contains("upgrade_entry(container)"));
     }
 
@@ -1547,7 +1620,7 @@ struct Decorator;
 
 impl Decorator {
     #[process]
-    fn process(&self, views: &crate::margaret::views::Views, next: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process<TTarget>(&self, views: &crate::margaret::views::Views, next: Next<TTarget>) -> anyhow::Result<ResponseContinuation<TTarget>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1750,9 +1823,11 @@ impl RespondsToWebSocketMessage for Poster {
         ));
         assert!(source.contains("::margaret::framework::asset_bag::asset_bag::AssetBag::new()"));
         assert!(source.contains("self.argument_7.as_ref()"));
-        assert!(source.contains("routes:&::std::sync::Arc<super::super::routes::Routes>"));
-        assert!(source.contains("upgrade_entry(container,routes)"));
         assert!(source.contains("routes:&::std::sync::Arc<super::super::super::routes::Routes>"));
+        assert!(source.contains("upgrade_entry(container,routes)"));
+        assert!(
+            source.contains("routes:&::std::sync::Arc<super::super::super::super::routes::Routes>")
+        );
         assert!(!source.contains("views"));
     }
 
@@ -1814,27 +1889,6 @@ impl Bad {
             )
             .to_string()
             .contains("which only an HTTP responder receives")
-        );
-    }
-
-    #[test]
-    fn rejects_a_forwarder_in_a_session_since_a_websocket_cannot_forward_a_request() {
-        assert!(
-            error(
-                r#"use margaret::framework::macros::build_for_session;
-use margaret::framework::macros::websocket_session;
-
-#[websocket_session(path = "/x", server = "public")]
-struct Bad;
-
-impl Bad {
-    #[build_for_session]
-    fn build(forward: crate::margaret::forwarders::public::Forwarder) -> anyhow::Result<Self> {}
-}
-"#
-            )
-            .to_string()
-            .contains("cannot forward a request")
         );
     }
 
@@ -2386,7 +2440,7 @@ struct Verifier;
 
 impl Verifier {
     #[process]
-    fn process(&self, peer: &SpiffeId, next: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process<TTarget>(&self, peer: &SpiffeId, next: Next<TTarget>) -> anyhow::Result<ResponseContinuation<TTarget>> {}
 }
 "#,
         );

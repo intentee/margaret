@@ -19,7 +19,7 @@ impl WebSocketSessionFactory for RejectingSessionFactory {
         _handshake: &Request,
     ) -> Result<WebSocketSessionCreationOutcome<TestSession>, WebSocketSessionCreationError> {
         Ok(WebSocketSessionCreationOutcome::Interrupted(
-            Response::text(403, "the websocket session was rejected").into(),
+            Response::text(403, "the websocket session was rejected"),
         ))
     }
 }

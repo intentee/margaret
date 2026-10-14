@@ -1,6 +1,6 @@
-use crate::response_continuation::ResponseContinuation;
+use crate::response::Response;
 
 pub enum Requirement<Value> {
     Met(Value),
-    Unmet(ResponseContinuation),
+    Unmet(Response),
 }

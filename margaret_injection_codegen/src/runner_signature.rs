@@ -2,7 +2,6 @@ use proc_macro2::Ident;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 
 use crate::is_cancellation_token::is_cancellation_token;
@@ -24,7 +23,7 @@ pub enum RunnerSignature<'runner> {
 
 impl<'runner> RunnerSignature<'runner> {
     #[must_use]
-    pub fn of(index: &AttributeIndex, item: &IndexedItem, runner: &'runner IndexedMethod) -> Self {
+    pub fn of(index: &AttributeIndex, runner: &'runner IndexedMethod) -> Self {
         let mut takes_token = false;
 
         for view in parameters(runner) {
@@ -35,7 +34,7 @@ impl<'runner> RunnerSignature<'runner> {
                 };
             }
 
-            if !is_cancellation_token(index, item, view.declared) {
+            if !is_cancellation_token(index, runner.module_path(), view.declared) {
                 return Self::RejectedArgument {
                     parameter: view.name,
                 };

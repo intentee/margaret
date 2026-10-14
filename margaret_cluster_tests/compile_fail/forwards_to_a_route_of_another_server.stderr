@@ -1,0 +1,24 @@
+error[E0277]: the trait bound `ResponseContinuation<Infallible>: From<margaret::framework::margaret_http::forward::Forward<PublicForwardTarget>>` is not satisfied
+  --> compile_fail/forwards_to_a_route_of_another_server.rs:11:34
+   |
+11 |     drop(responded::<Infallible, _>(Ok(routes
+   |                                  ^ unsatisfied trait bound
+   |
+   = help: the trait `From<margaret::framework::margaret_http::forward::Forward<PublicForwardTarget>>` is not implemented for `ResponseContinuation<Infallible>`
+help: the following other types implement trait `From<T>`
+  --> $WORKSPACE/margaret_http/src/response_continuation.rs
+   |
+   | impl<TTarget> From<Forward<TTarget>> for ResponseContinuation<TTarget> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ResponseContinuation<TTarget>` implements `From<margaret::framework::margaret_http::forward::Forward<TTarget>>`
+...
+   | impl<TTarget> From<Redirect> for ResponseContinuation<TTarget> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ResponseContinuation<TTarget>` implements `From<margaret::framework::margaret_http::redirect::Redirect>`
+...
+   | impl<TTarget> From<Response> for ResponseContinuation<TTarget> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ResponseContinuation<TTarget>` implements `From<margaret::framework::margaret_http::response::Response>`
+   = note: required for `margaret::framework::margaret_http::forward::Forward<PublicForwardTarget>` to implement `Into<ResponseContinuation<Infallible>>`
+note: required by a bound in `responded`
+  --> $WORKSPACE/margaret_http/src/responded.rs
+   |
+   | pub fn responded<TTarget, TResponse: Into<ResponseContinuation<TTarget>>>(
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `responded`

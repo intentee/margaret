@@ -13,6 +13,7 @@ use margaret_container::container_error::ContainerError;
 use margaret_database_codegen::database_codegen_error::DatabaseCodegenError;
 use margaret_generated_module::generated_module_error::GeneratedModuleError;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
+use margaret_jwks_codegen::jwks_codegen_error::JwksCodegenError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_model_codegen::model_codegen_error::ModelCodegenError;
 use margaret_oauth_client_codegen::oauth_client_codegen_error::OAuthClientCodegenError;
@@ -48,6 +49,12 @@ pub enum CodegenError {
     Database {
         #[from]
         source: DatabaseCodegenError,
+    },
+
+    #[error("failed to read the signing keys encryption: {source}")]
+    Jwks {
+        #[from]
+        source: JwksCodegenError,
     },
 
     #[error("failed to read the token issuance: {source}")]

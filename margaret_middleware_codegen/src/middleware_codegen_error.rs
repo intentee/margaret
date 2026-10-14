@@ -43,6 +43,31 @@ pub enum MiddlewareCodegenError {
     )]
     MiddlewareHandlerNotOnStruct { target: String },
 
+    #[error(
+        "#[middleware] applies only to a #[responds_to_http] or #[websocket_session] struct, but it is attached to the method '{method}'"
+    )]
+    MiddlewareOnMethod { method: String },
+
+    #[error(
+        "#[middleware] applies only to a #[responds_to_http] or #[websocket_session] struct, but '{target}' is neither"
+    )]
+    MiddlewareOutsideRoute { target: String },
+
+    #[error(
+        "the #[process] method of middleware '{middleware}' must declare exactly one type parameter, the forward target it passes along, or none"
+    )]
+    MiddlewareProcessGenerics { middleware: String },
+
+    #[error(
+        "the #[process] method of middleware '{middleware}' names no forward target: declare a type parameter for Next<TTarget>, or take Next<ServerForwardTarget> of one server"
+    )]
+    MiddlewareTargetWithoutNext { middleware: String },
+
+    #[error(
+        "the Next parameter of middleware '{middleware}' does not name a forward target type that resolves"
+    )]
+    MiddlewareTargetUnresolved { middleware: String },
+
     #[error("{site} attaches the middleware handled by '{handler}', which has no middleware plan")]
     UnplannedMiddlewareHandler { handler: String, site: String },
 }

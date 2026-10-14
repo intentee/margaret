@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -11,7 +12,6 @@ use margaret_http::body_limit::BodyLimit;
 use margaret_http::body_reading::BodyReading;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::content_handler::ContentHandler;
-use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::head_handler::HeadHandler;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::read_form_fields::read_form_fields;
@@ -28,37 +28,38 @@ use margaret_route_method::content_method::ContentMethod;
 use margaret_route_method::route_method::RouteMethod;
 
 async fn exchange(request: &[u8], close_write: bool) -> String {
-    let router = ServerPaths::build(["/submit", "/tiny", "/search"])
+    let routes = ServerPaths::build(["/submit", "/tiny", "/search"])
         .expect("the route paths do not conflict")
-        .routes([
-            RouteEntry::new(vec![MethodHandler::content(
-                ContentMethod::Post,
-                Arc::new(ReadsForm {
-                    limit: BodyLimit::new(1024),
-                }),
-            )]),
-            RouteEntry::new(vec![MethodHandler::content(
-                ContentMethod::Post,
-                Arc::new(ReadsForm {
-                    limit: BodyLimit::new(4),
-                }),
-            )]),
-            RouteEntry::new(vec![MethodHandler::head(
-                RouteMethod::Query,
-                Arc::new(Accepts),
-            )]),
-        ])
+        .routes::<Infallible>(
+            [
+                RouteEntry::new(vec![MethodHandler::content(
+                    ContentMethod::Post,
+                    Arc::new(ReadsForm {
+                        limit: BodyLimit::new(1024),
+                    }),
+                )]),
+                RouteEntry::new(vec![MethodHandler::content(
+                    ContentMethod::Post,
+                    Arc::new(ReadsForm {
+                        limit: BodyLimit::new(4),
+                    }),
+                )]),
+                RouteEntry::new(vec![MethodHandler::head(
+                    RouteMethod::Query,
+                    Arc::new(Accepts),
+                )]),
+            ],
+            (),
+        )
         .build()
-        .expect("the route entries register cleanly")
-        .router;
+        .expect("the route entries register cleanly");
     let bound = BoundServer::bind(
         Arc::new(Server::new(
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            router,
         )),
-        Arc::new(ForwardTargets::new(Vec::new())),
+        routes,
     )
     .await
     .expect("the server binds");
@@ -97,8 +98,11 @@ async fn exchange(request: &[u8], close_write: bool) -> String {
 struct Accepts;
 
 #[async_trait]
-impl HeadHandler for Accepts {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl HeadHandler<Infallible> for Accepts {
+    async fn handle(
+        &self,
+        _request: &Request,
+    ) -> Result<ResponseContinuation<Infallible>, HandlerError> {
         Ok(ResponseContinuation::Done(Response::text(200, "accepted")))
     }
 }
@@ -108,12 +112,12 @@ struct ReadsForm {
 }
 
 #[async_trait]
-impl ContentHandler for ReadsForm {
+impl ContentHandler<Infallible> for ReadsForm {
     async fn handle(
         &self,
         request: &Request,
         body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<ResponseContinuation<Infallible>, HandlerError> {
         Ok(ResponseContinuation::Done(
             match read_form_fields(request, body, self.limit).await {
                 BodyReading::Read(_) => Response::text(200, "accepted"),

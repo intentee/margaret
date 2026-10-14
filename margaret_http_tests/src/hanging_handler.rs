@@ -14,8 +14,11 @@ pub struct HangingHandler {
 }
 
 #[async_trait]
-impl HeadHandler for HangingHandler {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TTarget> HeadHandler<TTarget> for HangingHandler {
+    async fn handle(
+        &self,
+        _request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         self.request_received.cancel();
         self.release.cancelled().await;
 

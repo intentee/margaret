@@ -3,7 +3,6 @@ use margaret_container::container_bindings::ContainerBindings;
 use crate::http_artifacts::HttpArtifacts;
 use crate::http_plan::HttpPlan;
 use crate::render::render;
-use crate::render_forwarders::render_forwarders;
 use crate::render_routes::render_routes;
 use crate::server_layouts::server_layouts;
 
@@ -21,7 +20,6 @@ pub fn render_http(plan: HttpPlan, bindings: &ContainerBindings) -> HttpArtifact
     modules.extend(render_routes(&plan.table, &layouts, &plan.websocket_paths));
 
     HttpArtifacts {
-        forwarders: render_forwarders(&plan.table, &layouts),
         retained_roots: plan.retained_roots,
         modules,
         servers: plan.servers,

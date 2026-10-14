@@ -1,5 +1,6 @@
 use reqwest::StatusCode;
 
+use margaret_cluster_fixture::margaret::routes::props::GetAssetRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 
@@ -13,7 +14,16 @@ async fn answers_a_missing_asset_as_not_found() {
         cluster
             .client
             .get(
-                addressed_route(cluster.routes().public.get_asset("missing.css".to_string())).url()
+                addressed_route(
+                    cluster
+                        .routes()
+                        .public
+                        .get_asset
+                        .address(GetAssetRouteProps {
+                            asset_path: "missing.css".to_string()
+                        })
+                )
+                .url()
             )
             .send()
             .await

@@ -50,8 +50,14 @@ pub(crate) fn generate_into(
         "cargo:rerun-if-changed={}",
         crate_root.source_directory.display()
     );
-    println!("cargo:rerun-if-changed={}", metafile_path.display());
-    println!("cargo:rerun-if-changed={}", assets_directory.display());
+
+    if metafile_contents.is_some() {
+        println!("cargo:rerun-if-changed={}", metafile_path.display());
+    }
+
+    if assets_directory.is_dir() {
+        println!("cargo:rerun-if-changed={}", assets_directory.display());
+    }
 
     Ok(())
 }

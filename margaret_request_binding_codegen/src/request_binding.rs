@@ -35,7 +35,6 @@ pub enum RequestBinding {
         source: HeadInputSource,
         extraction: FormRequestExtraction,
     },
-    Forwarder,
     Injectable {
         dependency: InjectedDependency,
     },
@@ -78,7 +77,6 @@ impl RequestBinding {
             | Self::AuthenticatedUser { .. }
             | Self::CurrentRequest
             | Self::FormContent { .. }
-            | Self::Forwarder
             | Self::Injectable { .. }
             | Self::JsonContent { .. }
             | Self::Next
@@ -101,7 +99,6 @@ impl RequestBinding {
             | Self::CurrentRequest
             | Self::FormContent { .. }
             | Self::FormRequest { .. }
-            | Self::Forwarder
             | Self::Injectable { .. }
             | Self::IntrospectedBearerToken { .. }
             | Self::JsonContent { .. }

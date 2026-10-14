@@ -36,11 +36,11 @@ impl WebSocketUpgradeTerminal {
 }
 
 #[async_trait]
-impl OneShotHandler for WebSocketUpgradeTerminal {
+impl<TTarget> OneShotHandler<TTarget> for WebSocketUpgradeTerminal {
     async fn handle(
         self: Box<Self>,
         request: &Request,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         let Self {
             cancellation_token,
             driver_sender,
@@ -48,8 +48,10 @@ impl OneShotHandler for WebSocketUpgradeTerminal {
             upgrade,
         } = *self;
 
-        Ok(upgrade
-            .upgrade(request, on_upgrade, cancellation_token, driver_sender)
-            .await)
+        Ok(ResponseContinuation::Done(
+            upgrade
+                .upgrade(request, on_upgrade, cancellation_token, driver_sender)
+                .await,
+        ))
     }
 }

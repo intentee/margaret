@@ -1,11 +1,11 @@
 use margaret_http::cookie_changes::CookieChanges;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::response::Response;
 
 use crate::created_web_socket_session::CreatedWebSocketSession;
 
 pub enum WebSocketSessionCreationOutcome<Session> {
     Created(CreatedWebSocketSession<Session>),
-    Interrupted(ResponseContinuation),
+    Interrupted(Response),
 }
 
 impl<Session> WebSocketSessionCreationOutcome<Session> {
@@ -19,7 +19,7 @@ impl<Session> WebSocketSessionCreationOutcome<Session> {
                 cookie_changes: changes.followed_by(cookie_changes),
                 session,
             }),
-            Self::Interrupted(continuation) => Self::Interrupted(changes.precede(continuation)),
+            Self::Interrupted(response) => Self::Interrupted(changes.precede_response(response)),
         }
     }
 }
@@ -32,7 +32,6 @@ mod tests {
 
     use margaret_http::cookie_changes::CookieChanges;
     use margaret_http::response::Response;
-    use margaret_http::response_continuation::ResponseContinuation;
 
     use super::WebSocketSessionCreationOutcome;
     use crate::created_web_socket_session::CreatedWebSocketSession;
@@ -61,11 +60,9 @@ mod tests {
     #[test]
     fn precedes_the_response_of_an_interruption_so_its_cookie_changes_still_apply() {
         assert!(matches!(
-            WebSocketSessionCreationOutcome::<()>::Interrupted(ResponseContinuation::from(
-                Response::text(401, "")
-            ))
+            WebSocketSessionCreationOutcome::<()>::Interrupted(Response::text(401, ""))
             .preceded_by(&removed_session()),
-            WebSocketSessionCreationOutcome::Interrupted(ResponseContinuation::Done(response))
+            WebSocketSessionCreationOutcome::Interrupted(response)
                 if response.headers().iter().any(|header| header.value == "session=removed")
         ));
     }

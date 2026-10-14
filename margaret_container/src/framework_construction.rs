@@ -1,4 +1,5 @@
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_environment_variable_codegen::environment_variable_name::EnvironmentVariableName;
 
 use crate::constructor_outcome::ConstructorOutcome;
 use crate::framework_dependency::FrameworkDependency;
@@ -14,6 +15,9 @@ pub enum FrameworkConstruction {
         is_async: bool,
         method: String,
         outcome: ConstructorOutcome,
+    },
+    EnvironmentVariable {
+        name: EnvironmentVariableName,
     },
     Prepared {
         method: String,

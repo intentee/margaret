@@ -53,13 +53,6 @@ impl SvidClientBundle {
         self.svid_client_side.client_readiness()
     }
 
-    /// # Errors
-    ///
-    /// Returns `SvidError` propagated from the work it performs.
-    pub fn reqwest_client(&self) -> Result<Client, SvidError> {
-        self.svid_client_side.reqwest_client()
-    }
-
     #[must_use]
     pub fn into_services(self) -> Vec<Box<dyn Service>> {
         let mut services = self.svid_service.into_common_services();
@@ -67,6 +60,13 @@ impl SvidClientBundle {
         services.push(Box::new(self.svid_client_side.into_verifier_service()));
 
         services
+    }
+
+    /// # Errors
+    ///
+    /// Returns `SvidError` propagated from the work it performs.
+    pub fn reqwest_client(&self) -> Result<Client, SvidError> {
+        self.svid_client_side.reqwest_client()
     }
 
     pub fn reqwest_client_builder(&self) -> ClientBuilder {

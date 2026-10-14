@@ -10,7 +10,6 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
-heck = { workspace = true }
 margaret_attribute_arguments = { workspace = true }
 margaret_attributes = { workspace = true }
 margaret_codegen_tokens = { workspace = true }

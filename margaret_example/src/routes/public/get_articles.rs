@@ -12,6 +12,7 @@ use margaret::framework::route_method::route_method::RouteMethod;
 
 use crate::forms::get_articles_form::GetArticlesForm;
 use crate::margaret::routes::Routes;
+use crate::margaret::routes::props::GetArticleRouteProps;
 use crate::repositories::article_repository::ArticleRepository;
 
 #[singleton]
@@ -42,8 +43,10 @@ impl GetArticles {
                 .listed(author)
                 .await?
                 .into_iter()
-                .map(
-                    |article| match routes.public.get_article(article.id.to_string()) {
+                .map(|article| {
+                    match routes.public.get_article.address(GetArticleRouteProps {
+                        article: article.id.to_string(),
+                    }) {
                         RouteAddressing::Addressed(route) => {
                             Ok(format!("{}: {}", article.title, route.url()))
                         }
@@ -58,8 +61,8 @@ impl GetArticles {
                             "the article {} cannot fill the route parameter '{name}'",
                             article.id
                         ))),
-                    },
-                )
+                    }
+                })
                 .collect::<anyhow::Result<Vec<String>>>()?
                 .join("\n");
 

@@ -69,7 +69,6 @@ fn application_responder(
     let handler_method = process_method(item)?;
     let arguments = classify_parameters(
         index,
-        item,
         handler_method,
         &BindingContext::Responder {
             route_path: &route.path,

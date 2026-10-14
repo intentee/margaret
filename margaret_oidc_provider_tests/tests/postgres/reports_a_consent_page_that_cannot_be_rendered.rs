@@ -1,5 +1,5 @@
 use margaret_handler_error::handler_error::HandlerError;
-use margaret_http::head_handler::HeadHandler;
+use margaret_http::handles_head::HandlesHead;
 use margaret_oidc_provider_tests::authorization_page_request::authorization_page_request;
 use margaret_oidc_provider_tests::failing_consent_view::FailingConsentView;
 use margaret_oidc_provider_tests::fixture_authorization_handler::fixture_authorization_handler;

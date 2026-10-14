@@ -13,6 +13,7 @@ margaret_spiffe_svid = { workspace = true }
 margaret_spiffe_svid_client = { workspace = true }
 margaret_spiffe_svid_tests = { path = "../margaret_spiffe_svid_tests" }
 rustls = { workspace = true }
+rustls-webpki = { workspace = true }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
 

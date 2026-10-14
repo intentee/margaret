@@ -11,6 +11,11 @@ slow-timeout = { period = "30s", terminate-after = 2 }
 threads-required = 'num-test-threads'
 
 [[profile.default.overrides]]
+filter = 'binary_id(margaret_cluster_tests::compile_fail)'
+slow-timeout = { period = "30s", terminate-after = 2 }
+threads-required = 'num-test-threads'
+
+[[profile.default.overrides]]
 filter = 'binary_id(margaret_codegen_tests::served_fixtures)'
 threads-required = 'num-test-threads'
 

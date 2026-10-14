@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use margaret::framework::http::response::Response;
-use margaret::framework::http::response_continuation::ResponseContinuation;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::jwt_verification::id_token_profile::IdTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
@@ -40,9 +39,7 @@ impl CiRunnerProvider {
         };
 
         if !self.trusted_workflow.admits(&verified.claims) {
-            return AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(
-                Response::forbidden(),
-            ));
+            return AuthenticatedUserOutcome::Interrupted(Response::forbidden());
         }
 
         let GithubActionsClaims {

@@ -4,7 +4,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use margaret::framework::http::redirect::Redirect;
-use margaret::framework::http::response_continuation::ResponseContinuation;
+use margaret::framework::http::response::Response;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
@@ -33,14 +33,12 @@ impl PostSignIn {
     ///
     /// Returns an error when the session cannot be started.
     #[process]
-    pub async fn respond(&self, routes: &Routes) -> anyhow::Result<ResponseContinuation> {
+    pub async fn respond(&self, routes: &Routes) -> anyhow::Result<Response> {
         Ok(self
             .sessions
             .start(Uuid::new_v4(), Utc::now())
             .await?
             .cookie_changes
-            .precede(ResponseContinuation::from(Redirect::see_other(
-                routes.public.get_profile.url(),
-            ))))
+            .precede_response(Redirect::see_other(routes.public.get_profile.url()).into_response()))
     }
 }

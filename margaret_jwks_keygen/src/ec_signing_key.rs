@@ -7,7 +7,7 @@ use p256::elliptic_curve::rand_core::OsRng;
 use p256::pkcs8;
 use p256::pkcs8::DecodePrivateKey;
 use p256::pkcs8::EncodePrivateKey;
-use p256::pkcs8::LineEnding;
+use p256::pkcs8::SecretDocument;
 use zeroize::Zeroizing;
 
 use margaret_jose_parameters::key_use::KeyUse;
@@ -56,61 +56,65 @@ fn ec_verification_material(
     }
 }
 
-fn with_pem(
+fn with_pkcs8(
     material: SigningMaterial,
-    pem: Result<Zeroizing<String>, pkcs8::Error>,
+    document: Result<SecretDocument, pkcs8::Error>,
 ) -> Result<EcSigningKey, JwksKeyError> {
-    match pem {
-        Ok(pem) => Ok(EcSigningKey { material, pem }),
-        Err(source) => Err(JwksKeyError::PemEncoding { source }),
+    match document {
+        Ok(document) => Ok(EcSigningKey {
+            material,
+            pkcs8: Zeroizing::new(document.as_bytes().to_vec()),
+        }),
+        Err(source) => Err(JwksKeyError::Pkcs8Encoding { source }),
     }
 }
 
 #[derive(Clone, PartialEq)]
 pub struct EcSigningKey {
     material: SigningMaterial,
-    pem: Zeroizing<String>,
+    pkcs8: Zeroizing<Vec<u8>>,
 }
 
 impl EcSigningKey {
     /// # Errors
     ///
-    /// Returns `JwksKeyError::SigningKeyRejected` when the pem is not a pkcs#8 key of the curve.
-    pub fn from_pkcs8_pem(
+    /// Returns `JwksKeyError::SigningKeyRejected` when the document is not a pkcs#8 key of the
+    /// curve.
+    pub fn from_pkcs8(
         curve: SigningCurve,
-        pem: Zeroizing<String>,
+        pkcs8: Zeroizing<Vec<u8>>,
     ) -> Result<Self, JwksKeyError> {
         let material = match curve {
             SigningCurve::P256 => {
-                p256::ecdsa::SigningKey::from_pkcs8_pem(&pem).map(SigningMaterial::P256)
+                p256::ecdsa::SigningKey::from_pkcs8_der(&pkcs8).map(SigningMaterial::P256)
             }
             SigningCurve::P384 => {
-                p384::ecdsa::SigningKey::from_pkcs8_pem(&pem).map(SigningMaterial::P384)
+                p384::ecdsa::SigningKey::from_pkcs8_der(&pkcs8).map(SigningMaterial::P384)
             }
         };
 
         match material {
-            Ok(material) => Ok(Self { material, pem }),
+            Ok(material) => Ok(Self { material, pkcs8 }),
             Err(source) => Err(JwksKeyError::SigningKeyRejected { source }),
         }
     }
 
     /// # Errors
     ///
-    /// Returns `JwksKeyError::PemEncoding` when the generated key cannot be encoded.
+    /// Returns `JwksKeyError::Pkcs8Encoding` when the generated key cannot be encoded.
     pub fn generate(curve: SigningCurve) -> Result<Self, JwksKeyError> {
         match curve {
             SigningCurve::P256 => {
                 let key = p256::ecdsa::SigningKey::random(&mut OsRng);
-                let pem = key.to_pkcs8_pem(LineEnding::LF);
+                let document = key.to_pkcs8_der();
 
-                with_pem(SigningMaterial::P256(key), pem)
+                with_pkcs8(SigningMaterial::P256(key), document)
             }
             SigningCurve::P384 => {
                 let key = p384::ecdsa::SigningKey::random(&mut OsRng);
-                let pem = key.to_pkcs8_pem(LineEnding::LF);
+                let document = key.to_pkcs8_der();
 
-                with_pem(SigningMaterial::P384(key), pem)
+                with_pkcs8(SigningMaterial::P384(key), document)
             }
         }
     }
@@ -124,8 +128,8 @@ impl EcSigningKey {
     }
 
     #[must_use]
-    pub fn pem(&self) -> &Zeroizing<String> {
-        &self.pem
+    pub fn pkcs8(&self) -> &Zeroizing<Vec<u8>> {
+        &self.pkcs8
     }
 
     pub(crate) fn public_jwk(&self, kid: &KeyId) -> Result<Jwk, JwksKeyError> {
@@ -198,7 +202,7 @@ mod tests {
     use super::SigningMaterial;
     use super::ec_jwk;
     use super::ec_verification_material;
-    use super::with_pem;
+    use super::with_pkcs8;
     use crate::jwks_key_error::JwksKeyError;
     use crate::signing_curve::SigningCurve;
 
@@ -217,20 +221,20 @@ mod tests {
     }
 
     #[test]
-    fn reports_a_key_that_cannot_be_encoded_to_pem() {
-        let pem_failure = p256::ecdsa::SigningKey::from_pkcs8_pem("not a pem")
-            .expect_err("the fixture is not a pem");
+    fn reports_a_key_that_cannot_be_encoded_to_pkcs8() {
+        let encoding_failure = p256::ecdsa::SigningKey::from_pkcs8_der(&[])
+            .expect_err("the fixture is not a pkcs#8 document");
         let key = p256::ecdsa::SigningKey::from_slice(&[1; 32]).expect("the scalar is a key");
 
         assert_eq!(
-            with_pem(SigningMaterial::P256(key), Err(pem_failure))
+            with_pkcs8(SigningMaterial::P256(key), Err(encoding_failure))
                 .map(drop)
                 .expect_err("the encoding failure is reported")
                 .to_string(),
             format!(
-                "the generated private key could not be encoded to pkcs#8 pem: {}",
-                p256::ecdsa::SigningKey::from_pkcs8_pem("not a pem")
-                    .expect_err("the fixture is not a pem")
+                "the generated private key could not be encoded to pkcs#8: {}",
+                p256::ecdsa::SigningKey::from_pkcs8_der(&[])
+                    .expect_err("the fixture is not a pkcs#8 document")
             )
         );
     }

@@ -10,6 +10,10 @@ name = "margaret_cluster_instance"
 path = "src/main.rs"
 
 [[test]]
+name = "compile_fail"
+path = "tests/compile_fail/main.rs"
+
+[[test]]
 name = "integration"
 path = "tests/main.rs"
 
@@ -34,6 +38,7 @@ margaret_local_server_tests = { path = "../margaret_local_server_tests" }
 margaret_oidc_provider_tests = { path = "../margaret_oidc_provider_tests" }
 margaret_process_tests = { path = "../margaret_process_tests" }
 margaret_route_method = { workspace = true }
+margaret_signing_keys_tests = { path = "../margaret_signing_keys_tests" }
 margaret_sync_holder = { workspace = true }
 reqwest = { workspace = true, features = ["stream"] }
 rustls = { workspace = true }
@@ -47,7 +52,9 @@ tokio-tungstenite = { workspace = true }
 tokio-util = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
-zeroize = { workspace = true }
+
+[dev-dependencies]
+trybuild = { workspace = true }
 
 [features]
 tests_that_use_cluster = []

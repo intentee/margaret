@@ -119,9 +119,7 @@ pub(crate) fn render_bound_request_extractions(
                         model,
                     ) => model,
                     margaret::framework::route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome::NotFound => {
-                        let response = margaret::framework::http::response_continuation::ResponseContinuation::from(
-                            margaret::framework::http::response::Response::not_found(),
-                        );
+                        let response = margaret::framework::http::response::Response::not_found();
 
                         #continuation_return
                     }

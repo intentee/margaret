@@ -14,14 +14,20 @@ pub enum JwksKeyError {
     #[error("the secret's keys do not form a key set: {duplicate}")]
     DuplicateKeyId { duplicate: DuplicateKeyId },
 
+    #[error("the persisted ec signing key is not base64: {source}")]
+    EcKeyBase64 {
+        #[source]
+        source: base64ct::Error,
+    },
+
     #[error("the signing keys reached their last generation {generation}")]
     GenerationExhausted { generation: SigningKeysGeneration },
 
     #[error("the public key is missing its {coordinate} coordinate")]
     MissingPublicKeyCoordinate { coordinate: &'static str },
 
-    #[error("the generated private key could not be encoded to pkcs#8 pem: {source}")]
-    PemEncoding {
+    #[error("the generated private key could not be encoded to pkcs#8: {source}")]
+    Pkcs8Encoding {
         #[source]
         source: pkcs8::Error,
     },
@@ -62,7 +68,9 @@ pub enum JwksKeyError {
         source: Unspecified,
     },
 
-    #[error("the signing key pem could not be parsed into an ecdsa signing key: {source}")]
+    #[error(
+        "the signing key pkcs#8 document could not be parsed into an ecdsa signing key: {source}"
+    )]
     SigningKeyRejected {
         #[source]
         source: pkcs8::Error,

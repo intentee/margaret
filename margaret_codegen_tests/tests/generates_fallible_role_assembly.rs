@@ -48,7 +48,9 @@ fn http_server_assembly_reads_only_completed_dependencies() {
     assert!(source.contains("container.get_home_get_home()"));
     assert!(source.contains("super::super::websocket::public_routes(container,routes)"));
     assert!(
-        source.contains("->margaret::framework::http::server_route_entries::ServerRouteEntries{")
+        source.contains(
+            "->margaret::framework::http::server_route_entries::ServerRouteEntries<::core::convert::Infallible,>{"
+        )
     );
     assert!(!source.contains("ConstructionError"));
 }
@@ -57,7 +59,7 @@ fn http_server_assembly_reads_only_completed_dependencies() {
 fn websocket_dispatch_reads_only_completed_dependencies_so_none_can_fail_to_build() {
     let source = module(
         &generated(),
-        "websocket/chat_chat_session_chat_session/upgrade_entry",
+        "websocket/sessions/chat_chat_session_chat_session/upgrade_entry",
     );
 
     assert!(source.contains("handler:container.chat_chat_responder_chat_responder()"));

@@ -2,7 +2,6 @@ use margaret_bearer_token_verification::bearer_token_routing::BearerTokenRouting
 use margaret_bearer_token_verification::route_bearer_token::route_bearer_token;
 use margaret_bearer_token_verification_tests::held_trusted_issuer::held_trusted_issuer;
 use margaret_http::request_authorization::RequestAuthorization;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
@@ -26,7 +25,7 @@ fn refuses_a_token_of_an_untrusted_issuer() {
 
     assert!(matches!(
         route_bearer_token(&authorization, &[&trusted_issuer]),
-        BearerTokenRouting::Refused(ResponseContinuation::Done(response))
+        BearerTokenRouting::Refused(response)
             if response.status() == 401
     ));
 }

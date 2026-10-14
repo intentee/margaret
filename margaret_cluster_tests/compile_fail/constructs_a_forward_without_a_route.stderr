@@ -1,0 +1,9 @@
+error[E0451]: fields `cookies` and `target` of struct `margaret::framework::margaret_http::forward::Forward` are private
+ --> compile_fail/constructs_a_forward_without_a_route.rs:7:9
+  |
+6 |     drop(Forward {
+  |          ------- in this type
+7 |         cookies: Vec::new(),
+  |         ^^^^^^^ private field
+8 |         target: PublicForwardTarget::GetNotes(GetNotesRouteProps),
+  |         ^^^^^^ private field

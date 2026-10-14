@@ -58,6 +58,7 @@ margaret_server_origin = { workspace = true, optional = true }
 margaret_service = { workspace = true, optional = true }
 margaret_sessions = { workspace = true, optional = true }
 margaret_signing_keys = { workspace = true, optional = true }
+margaret_signing_keys_encryption = { workspace = true, optional = true }
 margaret_spiffe_svid = { workspace = true, optional = true }
 margaret_spiffe_svid_bundle = { workspace = true, optional = true }
 margaret_spiffe_svid_client = { workspace = true, optional = true }
@@ -127,6 +128,7 @@ runtime = [
     "dep:margaret_service",
     "dep:margaret_sessions",
     "dep:margaret_signing_keys",
+    "dep:margaret_signing_keys_encryption",
     "dep:margaret_spiffe_svid",
     "dep:margaret_spiffe_svid_bundle",
     "dep:margaret_spiffe_svid_client",

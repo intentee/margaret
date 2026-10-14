@@ -1,5 +1,6 @@
 use reqwest::StatusCode;
 
+use margaret_cluster_fixture::margaret::routes::props::GetAssetRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 
@@ -13,12 +14,11 @@ async fn assets_are_identical_on_every_instance_so_any_peer_can_serve_a_hashed_u
         let response = cluster
             .client
             .get(
-                addressed_route(
-                    cluster
-                        .instance_routes(index)
-                        .public
-                        .get_asset("cluster_C1A2B3C4.css".to_string()),
-                )
+                addressed_route(cluster.instance_routes(index).public.get_asset.address(
+                    GetAssetRouteProps {
+                        asset_path: "cluster_C1A2B3C4.css".to_string(),
+                    },
+                ))
                 .url(),
             )
             .send()

@@ -1,0 +1,23 @@
+error[E0277]: the trait bound `IdentityGate: HttpMiddleware<PublicForwardTarget>` is not satisfied
+  --> compile_fail/attaches_a_middleware_typed_for_another_server.rs:31:11
+   |
+31 |     layer(Arc::new(IdentityGate), handler)
+   |     ----- ^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |     |
+   |     required by a bound introduced by this call
+   |
+help: the trait `HttpMiddleware<PublicForwardTarget>` is not implemented for `IdentityGate`
+      but trait `HttpMiddleware<Infallible>` is implemented for it
+  --> compile_fail/attaches_a_middleware_typed_for_another_server.rs:18:1
+   |
+18 | impl HttpMiddleware<Infallible> for IdentityGate {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for that trait implementation, expected `Infallible`, found `PublicForwardTarget`
+note: required by a bound in `layer`
+  --> $WORKSPACE/margaret_http/src/layer.rs
+   |
+   | pub fn layer<TMiddleware, THandler>(
+   |        ----- required by a bound in this function
+...
+   |     TMiddleware: HttpMiddleware<THandler::Target> + Send + Sync + ?Sized + 'static,
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `layer`

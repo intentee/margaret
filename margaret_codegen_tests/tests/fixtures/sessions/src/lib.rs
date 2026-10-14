@@ -4,6 +4,7 @@ pub mod margaret;
 
 pub mod browser_sessions;
 pub mod fixture_database;
+pub mod fixture_signing_keys_encryption;
 pub mod get_partner_callback;
 pub mod get_partner_sign_in;
 pub mod get_profile;

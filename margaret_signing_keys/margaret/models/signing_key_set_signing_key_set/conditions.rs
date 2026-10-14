@@ -7,9 +7,13 @@ pub struct Conditions {
         crate::signing_key_set::SigningKeySet,
         i64,
     >,
-    pub document: margaret::framework::active_record::operand::Operand<
+    pub nonce: margaret::framework::active_record::operand::Operand<
         crate::signing_key_set::SigningKeySet,
-        ::margaret::framework::active_record::secret_text::SecretText,
+        ::std::vec::Vec<u8>,
+    >,
+    pub sealed_document: margaret::framework::active_record::operand::Operand<
+        crate::signing_key_set::SigningKeySet,
+        ::std::vec::Vec<u8>,
     >,
 }
 impl margaret::framework::active_record::field_set::FieldSet for Conditions {
@@ -22,9 +26,13 @@ impl margaret::framework::active_record::field_set::FieldSet for Conditions {
             field: ::std::marker::PhantomData,
             start: 1usize,
         },
-        document: margaret::framework::active_record::operand::Operand {
+        nonce: margaret::framework::active_record::operand::Operand {
             field: ::std::marker::PhantomData,
             start: 2usize,
+        },
+        sealed_document: margaret::framework::active_record::operand::Operand {
+            field: ::std::marker::PhantomData,
+            start: 3usize,
         },
     };
 }

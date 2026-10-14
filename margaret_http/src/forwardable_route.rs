@@ -1,89 +1,178 @@
+use crate::addressable_route::AddressableRoute;
+use crate::forward::Forward;
+use crate::get_route_reference::GetRouteReference;
 use crate::redirect::Redirect;
+use crate::route_addressing::RouteAddressing;
+use crate::route_props::RouteProps;
 
-pub struct ForwardableRoute {
-    url: String,
+pub struct ForwardableRoute<TTarget, TProps, TLocator> {
+    locator: TLocator,
+    target: fn(TProps) -> TTarget,
 }
 
-impl ForwardableRoute {
+impl<TTarget, TProps, TLocator> ForwardableRoute<TTarget, TProps, TLocator> {
     #[must_use]
-    pub fn new(url: String) -> Self {
-        Self { url }
+    pub fn new(locator: TLocator, target: fn(TProps) -> TTarget) -> Self {
+        Self { locator, target }
     }
 
     #[must_use]
+    pub fn forward_to(&self, props: TProps) -> Forward<TTarget> {
+        Forward {
+            cookies: Vec::new(),
+            target: (self.target)(props),
+        }
+    }
+}
+
+impl<TTarget, TProps> ForwardableRoute<TTarget, TProps, GetRouteReference> {
+    #[must_use]
     pub fn permanent_redirect(&self) -> Redirect {
-        Redirect::permanent(self.url.clone())
+        self.locator.permanent_redirect()
     }
 
     #[must_use]
     pub fn see_other(&self) -> Redirect {
-        Redirect::see_other(self.url.clone())
+        self.locator.see_other()
     }
 
     #[must_use]
     pub fn temporary_redirect(&self) -> Redirect {
-        Redirect::temporary(self.url.clone())
+        self.locator.temporary_redirect()
     }
 
     #[must_use]
     pub fn url(&self) -> String {
-        self.url.clone()
+        self.locator.url()
+    }
+}
+
+impl<TTarget, TProps: RouteProps>
+    ForwardableRoute<TTarget, TProps, AddressableRoute<TProps, GetRouteReference>>
+{
+    pub fn address(&self, props: TProps) -> RouteAddressing<GetRouteReference> {
+        self.locator.address(props)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use http::header::LOCATION;
+
     use super::ForwardableRoute;
+    use crate::get_route_reference::GetRouteReference;
+    use crate::redirect::Redirect;
+    use crate::route_addressing::RouteAddressing;
+    use crate::route_position::RoutePosition;
+    use crate::route_props::RouteProps;
+    use crate::server_paths::ServerPaths;
+    use crate::url_parameter::UrlParameter;
+    use crate::url_segment::UrlSegment;
 
-    fn article_route() -> ForwardableRoute {
-        ForwardableRoute::new("http://localhost/articles/rust".to_string())
+    struct NoteProps {
+        note: String,
     }
 
-    #[test]
-    fn sees_other_to_the_route_url_with_303_so_the_client_follows_up_with_a_get() {
-        let response = article_route().see_other().into_response().into_http();
+    impl RouteProps for NoteProps {
+        const NAME: &'static str = "get_note";
 
-        assert_eq!(response.status().as_u16(), 303);
-        assert_eq!(
-            response
-                .headers()
-                .get("location")
-                .expect("the location header is present"),
-            "http://localhost/articles/rust"
-        );
+        type Segments = [UrlSegment; 2];
+
+        fn into_segments(self) -> Self::Segments {
+            [
+                UrlSegment::Literal {
+                    decoded: "/notes/",
+                    encoded: "/notes/",
+                },
+                UrlSegment::Parameter {
+                    parameter: UrlParameter {
+                        name: "note",
+                        value: self.note,
+                    },
+                    prefix: "",
+                },
+            ]
+        }
     }
 
-    #[test]
-    fn temporarily_redirects_to_the_route_url_with_307_keeping_the_request_method() {
-        let response = article_route()
-            .temporary_redirect()
+    enum NotesTarget {
+        Note(NoteProps),
+    }
+
+    fn literal_route() -> ForwardableRoute<NotesTarget, NoteProps, GetRouteReference> {
+        ForwardableRoute::new(
+            GetRouteReference::new("http://localhost/notes/latest".to_string()),
+            NotesTarget::Note,
+        )
+    }
+
+    fn location(redirect: Redirect) -> String {
+        redirect
             .into_response()
-            .into_http();
+            .header_value(&LOCATION)
+            .expect("the redirect names its location")
+            .to_string()
+    }
 
-        assert_eq!(response.status().as_u16(), 307);
+    #[test]
+    fn forwards_to_the_target_its_props_name() {
+        let NotesTarget::Note(NoteProps { note }) = literal_route()
+            .forward_to(NoteProps {
+                note: "rust".to_string(),
+            })
+            .target;
+
+        assert_eq!(note, "rust");
+    }
+
+    #[test]
+    fn answers_the_url_of_a_literal_route() {
+        assert_eq!(literal_route().url(), "http://localhost/notes/latest");
+    }
+
+    #[test]
+    fn sees_other_to_a_literal_route() {
         assert_eq!(
-            response
-                .headers()
-                .get("location")
-                .expect("the location header is present"),
-            "http://localhost/articles/rust"
+            location(literal_route().see_other()),
+            "http://localhost/notes/latest"
         );
     }
 
     #[test]
-    fn permanently_redirects_to_the_route_url_with_308_so_clients_cache_the_move() {
-        let response = article_route()
-            .permanent_redirect()
-            .into_response()
-            .into_http();
-
-        assert_eq!(response.status().as_u16(), 308);
+    fn temporarily_redirects_to_a_literal_route() {
         assert_eq!(
-            response
-                .headers()
-                .get("location")
-                .expect("the location header is present"),
-            "http://localhost/articles/rust"
+            location(literal_route().temporary_redirect()),
+            "http://localhost/notes/latest"
         );
+    }
+
+    #[test]
+    fn permanently_redirects_to_a_literal_route() {
+        assert_eq!(
+            location(literal_route().permanent_redirect()),
+            "http://localhost/notes/latest"
+        );
+    }
+
+    #[test]
+    fn addresses_a_parameterized_route_with_its_props() {
+        let paths = ServerPaths::build(["/notes/{note}"]).expect("the route paths build");
+        let route = ForwardableRoute::new(
+            paths.addressable(
+                &Arc::from("http://localhost"),
+                RoutePosition::new(0),
+                GetRouteReference::new,
+            ),
+            NotesTarget::Note,
+        );
+
+        assert!(matches!(
+            route.address(NoteProps {
+                note: "rust".to_string(),
+            }),
+            RouteAddressing::Addressed(reference) if reference.url() == "http://localhost/notes/rust"
+        ));
     }
 }

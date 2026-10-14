@@ -13,7 +13,9 @@ use crate::web_socket_plan::WebSocketPlan;
 
 #[must_use]
 pub fn render_websocket(plan: WebSocketPlan, bindings: &ContainerBindings) -> WebSocketArtifacts {
-    let module_declarations = plan.sessions.iter().map(|session_plan| {
+    let websocket = ModulePath::root("websocket");
+    let servers = websocket.child("servers");
+    let session_declarations = plan.sessions.iter().map(|session_plan| {
         let module = format_ident!("{}", session_plan.session.module_name);
 
         quote! {
@@ -21,13 +23,15 @@ pub fn render_websocket(plan: WebSocketPlan, bindings: &ContainerBindings) -> We
             pub mod #module;
         }
     });
-    let route_declarations = plan.sessions_by_server.keys().map(|server| {
+    let server_declarations = plan.sessions_by_server.keys().map(|server| {
         let function = format_ident!("{server}_routes");
 
-        quote! {
-            mod #function;
-            pub use #function::#function;
-        }
+        quote! { pub mod #function; }
+    });
+    let route_exports = plan.sessions_by_server.keys().map(|server| {
+        let function = format_ident!("{server}_routes");
+
+        quote! { pub use servers::#function::#function; }
     });
     let server_route_modules = plan.sessions_by_server.iter().map(|(server, positions)| {
         let sessions = positions
@@ -36,21 +40,40 @@ pub fn render_websocket(plan: WebSocketPlan, bindings: &ContainerBindings) -> We
             .collect::<Vec<_>>();
 
         GeneratedModuleTokens::new(
-            ModulePath::root("websocket").child(format!("{server}_routes")),
+            servers.child(format!("{server}_routes")),
             render_server_routes(server, &sessions, bindings),
         )
     });
     let message_implementations = render_messages(&plan.messages);
 
-    let mut modules = vec![GeneratedModuleTokens::new(
-        ModulePath::root("websocket"),
+    let has_sessions = !plan.sessions.is_empty();
+    let session_namespaces = has_sessions.then(|| {
         quote! {
-            #(#module_declarations)*
-            #(#route_declarations)*
+            pub mod sessions;
+            mod servers;
+        }
+    });
+    let mut modules = vec![GeneratedModuleTokens::new(
+        websocket.clone(),
+        quote! {
+            #session_namespaces
+
+            #(#route_exports)*
 
             #message_implementations
         },
     )];
+
+    if has_sessions {
+        modules.push(GeneratedModuleTokens::new(
+            servers.clone(),
+            quote! { #(#server_declarations)* },
+        ));
+        modules.push(GeneratedModuleTokens::new(
+            websocket.child("sessions"),
+            quote! { #(#session_declarations)* },
+        ));
+    }
 
     modules.extend(server_route_modules);
     modules.extend(render_sessions(&plan.sessions, bindings));

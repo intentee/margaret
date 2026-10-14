@@ -13,8 +13,11 @@ pub struct TokenEndpoint {
 }
 
 #[async_trait]
-impl HeadHandler for TokenEndpoint {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TTarget> HeadHandler<TTarget> for TokenEndpoint {
+    async fn handle(
+        &self,
+        request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         self.answer.wait().handle(request).await
     }
 }

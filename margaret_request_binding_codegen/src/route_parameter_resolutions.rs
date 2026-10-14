@@ -18,8 +18,27 @@ use crate::route_parameter_binder::RouteParameterBinder;
 use crate::route_parameter_conversion::RouteParameterConversion;
 use crate::route_parameter_resolution::RouteParameterResolution;
 
+fn binder_trait_path() -> CanonicalPath {
+    CanonicalPath::new(vec![
+        "margaret".to_string(),
+        "framework".to_string(),
+        "route_parameter_binding".to_string(),
+        "http_route_parameter_binder".to_string(),
+        "HttpRouteParameterBinder".to_string(),
+    ])
+}
+
+fn implements_binder(index: &AttributeIndex, trait_impl: &IndexedTraitImpl) -> bool {
+    index.resolve_module_path(trait_impl.module_path(), trait_impl.trait_path())
+        == Some(binder_trait_path())
+}
+
 fn associated_model(index: &AttributeIndex, item: &IndexedItem) -> Option<CanonicalPath> {
     item.trait_impls().iter().find_map(|trait_impl| {
+        if !implements_binder(index, trait_impl) {
+            return None;
+        }
+
         let associated_type = trait_impl.associated_type("Model")?;
         let resolved = index.resolve_module_type(trait_impl.module_path(), associated_type.ty())?;
 
@@ -219,7 +238,7 @@ mod tests {
     use crate::route_parameter_conversion::RouteParameterConversion;
     use crate::route_parameter_resolution::RouteParameterResolution;
 
-    const BINDER: &str = "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n";
+    const BINDER: &str = "use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;\nuse margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n";
 
     #[derive(Debug, Eq, PartialEq)]
     enum ResolvedBy {
@@ -402,6 +421,16 @@ mod tests {
     }
 
     #[test]
+    fn takes_the_binder_model_from_the_binder_impl_so_another_traits_model_is_never_bound() {
+        let lib_source = "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;\nstruct Article;\nstruct CachedArticle;\n\ntrait Cache {\n    type Model;\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl Cache for ArticleStore {\n    type Model = CachedArticle;\n}\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n";
+
+        assert_eq!(
+            resolved_by(lib_source, &["crate", "Article"]),
+            ResolvedBy::Binder("crate::ArticleStore".to_string())
+        );
+    }
+
+    #[test]
     fn rejects_a_value_declaration_on_something_that_is_neither_a_struct_nor_an_enum() {
         assert!(
             rejection_for("use margaret::framework::macros::route_parameter_value;\n#[route_parameter_value]\ntrait ArticleSlug {}\n")
@@ -413,7 +442,7 @@ mod tests {
     fn rejects_a_binder_whose_model_is_already_declared_as_a_value() {
         assert!(
             rejection_for(
-                "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::route_parameter_value;\nuse margaret::framework::macros::singleton;\n#[route_parameter_value]\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
+                "use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;\nuse margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::route_parameter_value;\nuse margaret::framework::macros::singleton;\n#[route_parameter_value]\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
             )
             .contains("is both a #[route_parameter_value] and the model")
         );
@@ -423,7 +452,7 @@ mod tests {
     fn rejects_a_value_declaration_for_a_type_that_a_binder_already_provides() {
         assert!(
             rejection_for(
-                "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::route_parameter_value;\nuse margaret::framework::macros::singleton;\n#[route_parameter_value]\nstruct Zebra;\n\n#[singleton]\n#[provides_route_parameter]\nstruct AardvarkStore;\n\nimpl HttpRouteParameterBinder for AardvarkStore {\n    type Model = Zebra;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Zebra>> {}\n}\n"
+                "use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;\nuse margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::route_parameter_value;\nuse margaret::framework::macros::singleton;\n#[route_parameter_value]\nstruct Zebra;\n\n#[singleton]\n#[provides_route_parameter]\nstruct AardvarkStore;\n\nimpl HttpRouteParameterBinder for AardvarkStore {\n    type Model = Zebra;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Zebra>> {}\n}\n"
             )
             .contains("is both a #[route_parameter_value] and the model")
         );
@@ -433,7 +462,7 @@ mod tests {
     fn rejects_two_binders_for_the_same_model() {
         assert!(
             rejection_for(
-                "use margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct First;\n\nimpl HttpRouteParameterBinder for First {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct Second;\n\nimpl HttpRouteParameterBinder for Second {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
+                "use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;\nuse margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct First;\n\nimpl HttpRouteParameterBinder for First {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct Second;\n\nimpl HttpRouteParameterBinder for Second {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
             )
             .contains("has more than one route parameter binder")
         );
@@ -443,7 +472,7 @@ mod tests {
     fn rejects_a_binder_that_is_not_a_struct() {
         assert!(
             rejection_for(
-                "use margaret::framework::macros::provides_route_parameter;\nstruct Article;\n\n#[provides_route_parameter]\nenum ArticleStore {}\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
+                "use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;\nuse margaret::framework::macros::provides_route_parameter;\nstruct Article;\n\n#[provides_route_parameter]\nenum ArticleStore {}\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
             )
             .contains("is only supported on structs")
         );
@@ -453,9 +482,17 @@ mod tests {
     fn rejects_a_binder_that_is_not_a_singleton() {
         assert!(
             rejection_for(
-                "use margaret::framework::macros::provides_route_parameter;\nstruct Article;\n\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
+                "use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;\nuse margaret::framework::macros::provides_route_parameter;\nstruct Article;\n\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
             )
             .contains("must also be declared as a #[singleton]")
+        );
+    }
+
+    #[test]
+    fn rejects_a_binder_impl_that_declares_no_model_since_nothing_names_what_it_binds() {
+        assert!(
+            rejection_for("use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;\nuse margaret::framework::macros::provides_route_parameter;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n")
+                .contains("has no `type Model = <struct>` associated type")
         );
     }
 

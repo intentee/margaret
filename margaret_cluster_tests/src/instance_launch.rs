@@ -5,9 +5,11 @@ use tokio::process::Command;
 use url::Url;
 
 use margaret_database_tests::constants::RACING_INSTANCES;
+use margaret_signing_keys_tests::constants::FIXTURE_SIGNING_KEYS_ENCRYPTION_KEY;
 
 use crate::constants::CLUSTER_DATABASE_MAX_CONNECTIONS_VARIABLE;
 use crate::constants::CLUSTER_DATABASE_URL_VARIABLE;
+use crate::constants::CLUSTER_SIGNING_KEYS_ENCRYPTION_KEY_VARIABLE;
 use crate::constants::TRUSTED_CERTIFICATES_VARIABLE;
 
 pub struct InstanceLaunch {
@@ -27,6 +29,10 @@ impl InstanceLaunch {
             .env(
                 CLUSTER_DATABASE_MAX_CONNECTIONS_VARIABLE,
                 RACING_INSTANCES.to_string(),
+            )
+            .env(
+                CLUSTER_SIGNING_KEYS_ENCRYPTION_KEY_VARIABLE,
+                FIXTURE_SIGNING_KEYS_ENCRYPTION_KEY,
             )
             .env(TRUSTED_CERTIFICATES_VARIABLE, self.certificate_file.path())
             .kill_on_drop(true);

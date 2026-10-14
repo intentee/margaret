@@ -13,6 +13,7 @@ use margaret_signing_keys::signing_keys_creation::SigningKeysCreation;
 use margaret_signing_keys::signing_keys_replacement::SigningKeysReplacement;
 use margaret_signing_keys::signing_keys_revision::SigningKeysRevision;
 use margaret_signing_keys::stored_signing_keys::StoredSigningKeys;
+use margaret_signing_keys_encryption::signing_keys_encryption_key::SigningKeysEncryptionKey;
 
 use crate::held_secret::HeldSecret;
 use crate::restored_secret::restored_secret;
@@ -41,6 +42,7 @@ fn confirm_progression(held: &JwksSecret, stored: &JwksSecret) -> Result<(), Rol
 pub struct SigningKeysSynchronizer {
     pub curve: SigningCurve,
     pub database: Arc<Database>,
+    pub encryption_key: Arc<SigningKeysEncryptionKey>,
     pub rsa_keys: Arc<dyn ProvidesRsaSigningKeys>,
 }
 
@@ -63,7 +65,7 @@ impl SigningKeysSynchronizer {
                 HeldSecret::Unheld => self.created(now).await,
             },
             StoredSigningKeys::Stored(revision) => {
-                let stored = restored_secret(&revision, self.curve)?;
+                let stored = restored_secret(revision, &self.encryption_key, self.curve)?;
 
                 if let HeldSecret::Held(secret) = held {
                     confirm_progression(secret, &stored)?;
@@ -88,7 +90,8 @@ impl SigningKeysSynchronizer {
         .map_err(RollerError::KeyGeneration)?;
 
         match ready(
-            SigningKeysRevision::from_secret(&fresh).map_err(RollerError::DocumentSerialization),
+            SigningKeysRevision::sealed(&fresh, &self.encryption_key)
+                .map_err(RollerError::DocumentSeal),
         )
         .and_then(|revision| async move {
             SigningKeySet::create(&self.database, &revision)
@@ -101,7 +104,7 @@ impl SigningKeysSynchronizer {
             SigningKeysCreation::AlreadyCreated => match self.loaded().await? {
                 StoredSigningKeys::Absent => Err(RollerError::CreatedKeysNotObserved),
                 StoredSigningKeys::Stored(revision) => {
-                    restored_secret(&revision, self.curve).map(Arc::new)
+                    restored_secret(revision, &self.encryption_key, self.curve).map(Arc::new)
                 }
             },
         }
@@ -123,7 +126,8 @@ impl SigningKeysSynchronizer {
             .map_err(RollerError::KeyRoll)?;
 
         match ready(
-            SigningKeysRevision::from_secret(&rolled).map_err(RollerError::DocumentSerialization),
+            SigningKeysRevision::sealed(&rolled, &self.encryption_key)
+                .map_err(RollerError::DocumentSeal),
         )
         .and_then(|revision| async move {
             SigningKeySet::replace(&self.database, stored.generation(), &revision)
@@ -140,7 +144,7 @@ impl SigningKeysSynchronizer {
                 StoredSigningKeys::Stored(revision)
                     if revision.generation > stored.generation() =>
                 {
-                    restored_secret(&revision, self.curve).map(Arc::new)
+                    restored_secret(revision, &self.encryption_key, self.curve).map(Arc::new)
                 }
                 StoredSigningKeys::Stored(revision) => {
                     Err(RollerError::SupersedingKeysNotObserved {

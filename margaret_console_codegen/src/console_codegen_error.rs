@@ -81,4 +81,9 @@ pub enum ConsoleCodegenError {
         existing_command: String,
         name: String,
     },
+
+    #[error(
+        "command '{command}' registers the console command name '{name}', which the framework already registers for its own command"
+    )]
+    CommandNameTakenByFramework { command: String, name: String },
 }

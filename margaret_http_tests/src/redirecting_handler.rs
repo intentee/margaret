@@ -12,8 +12,11 @@ pub struct RedirectingHandler {
 }
 
 #[async_trait]
-impl HeadHandler for RedirectingHandler {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TTarget> HeadHandler<TTarget> for RedirectingHandler {
+    async fn handle(
+        &self,
+        _request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         Ok(ResponseContinuation::Done(
             Response::text(self.status, "redirected").header("location", self.location.clone()),
         ))

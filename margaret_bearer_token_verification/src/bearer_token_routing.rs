@@ -1,8 +1,8 @@
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::response::Response;
 
 use crate::routed_bearer_token::RoutedBearerToken;
 
 pub enum BearerTokenRouting<'request, 'trusted> {
-    Refused(ResponseContinuation),
+    Refused(Response),
     Routed(RoutedBearerToken<'request, 'trusted>),
 }

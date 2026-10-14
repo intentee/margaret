@@ -271,10 +271,21 @@ fn reject_conflicting_indexes(
     model: &str,
 ) -> Result<(), ModelCodegenError> {
     let mut names: HashSet<&str> = HashSet::new();
+    let mut plain: Vec<&ModelIndex> = Vec::new();
     let keys: Vec<&ModelIndex> = indexes
         .all()
         .filter(|index| index.kind != IndexKind::Plain)
         .collect();
+
+    if let Some(unique) = indexes
+        .of_kind(IndexKind::Unique)
+        .find(|unique| unique.fields == indexes.primary_key.fields)
+    {
+        return Err(ModelCodegenError::RedundantUniqueOnPrimaryKeyColumns {
+            columns: unique.column_names().join(", "),
+            model: model.to_string(),
+        });
+    }
 
     for index in indexes.of_kind(IndexKind::Plain) {
         if !names.insert(index.name.as_str()) {
@@ -283,6 +294,17 @@ fn reject_conflicting_indexes(
                 model: model.to_string(),
             });
         }
+
+        if let Some(first) = plain.iter().find(|seen| seen.fields == index.fields) {
+            return Err(ModelCodegenError::DuplicateIndexColumns {
+                columns: index.column_names().join(", "),
+                first: first.name.clone(),
+                model: model.to_string(),
+                second: index.name.clone(),
+            });
+        }
+
+        plain.push(index);
 
         if leads_a_key_of_kind(&keys, IndexKind::PrimaryKey, index) {
             return Err(ModelCodegenError::RedundantIndexOnPrimaryKeyColumns {

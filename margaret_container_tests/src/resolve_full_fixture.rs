@@ -39,5 +39,5 @@ pub fn resolve_full_fixture(consumer: &str, declared: &str) -> InjectableResolut
         .expect("the consumer item is indexed");
     let declared: Type = parse_str(declared).expect("the declared type parses");
 
-    resolve_injectable(&index, item, &declared, &bindings)
+    resolve_injectable(&index, item.module_path(), &declared, &bindings)
 }

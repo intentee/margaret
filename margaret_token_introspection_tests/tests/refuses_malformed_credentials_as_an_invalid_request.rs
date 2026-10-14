@@ -4,7 +4,6 @@ use margaret_authorization_server_client_tests::fixture_authorization_server::Fi
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request_authorization::RequestAuthorization;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::token_admission::TokenAdmission;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_route_method::route_method::RouteMethod;
@@ -35,6 +34,6 @@ async fn refuses_malformed_credentials_as_an_invalid_request() {
 
     assert!(matches!(
         admission,
-        TokenAdmission::Refused(ResponseContinuation::Done(response)) if response.status() == 400
+        TokenAdmission::Refused(response) if response.status() == 400
     ));
 }

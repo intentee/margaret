@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use serde_json::json;
@@ -10,6 +11,7 @@ use margaret_http::head_handler::HeadHandler;
 use margaret_http::limited_content_handler::limited_content_handler;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::route_entry::RouteEntry;
+use margaret_http::terminal_head_handler::terminal_head_handler;
 use margaret_jwks_roller_server::public_jwks_handler::PublicJwksHandler;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_oidc_discovery::provider_endpoints::ProviderEndpoints;
@@ -31,11 +33,11 @@ use crate::fixed_userinfo_claims::FixedUserinfoClaims;
 
 const FORM_LIMIT: BodyLimit = BodyLimit::new(16_384);
 
-fn content_route(handler: Arc<dyn ContentHandler>) -> RouteEntry {
+fn content_route(handler: Arc<dyn ContentHandler<Infallible>>) -> RouteEntry<Infallible> {
     RouteEntry::new(vec![MethodHandler::content(ContentMethod::Post, handler)])
 }
 
-fn head_route(handler: Arc<dyn HeadHandler>) -> RouteEntry {
+fn head_route(handler: Arc<dyn HeadHandler<Infallible>>) -> RouteEntry<Infallible> {
     RouteEntry::new(vec![MethodHandler::head(RouteMethod::Get, handler)])
 }
 
@@ -62,16 +64,19 @@ impl ProviderParts {
     ///
     /// Panics when the provider metadata cannot be serialized.
     #[must_use]
-    pub fn routes(&self, exchangers: Vec<Arc<SubjectTokenExchanger>>) -> [RouteEntry; 6] {
+    pub fn routes(
+        &self,
+        exchangers: Vec<Arc<SubjectTokenExchanger>>,
+    ) -> [RouteEntry<Infallible>; 6] {
         [
-            head_route(Arc::new(
+            head_route(terminal_head_handler(Arc::new(
                 ProviderMetadataHandler::create(
                     FIXTURE_PROVIDER_SUPPORT,
                     self.endpoints,
                     self.issuance,
                 )
                 .expect("the provider metadata serializes"),
-            )),
+            ))),
             content_route(limited_content_handler(
                 Arc::new(IntrospectionEndpoint::create(
                     Arc::clone(&self.clients),
@@ -79,7 +84,7 @@ impl ProviderParts {
                 )),
                 FORM_LIMIT,
             )),
-            head_route(self.public_jwks_handler.clone()),
+            head_route(terminal_head_handler(Arc::clone(&self.public_jwks_handler))),
             content_route(limited_content_handler(
                 Arc::new(RevocationEndpoint::create(
                     Arc::clone(&self.clients),
@@ -98,13 +103,13 @@ impl ProviderParts {
                 )),
                 FORM_LIMIT,
             )),
-            head_route(Arc::new(UserinfoEndpoint::create(
+            head_route(terminal_head_handler(Arc::new(UserinfoEndpoint::create(
                 Arc::clone(&self.secret_store),
                 self.issuance,
                 Arc::new(FixedUserinfoClaims {
                     claims: json!({"name": "Ada"}),
                 }),
-            ))),
+            )))),
         ]
     }
 }

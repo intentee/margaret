@@ -2,10 +2,10 @@ use margaret::framework::active_record::change::Change;
 use margaret::framework::active_record::insertion::Insertion;
 use margaret::framework::active_record::lookup::Lookup;
 use margaret::framework::active_record::model::Model;
-use margaret::framework::active_record::secret_text::SecretText;
 use margaret::framework::database::database::Database;
 use margaret::framework::macros::model;
 use margaret_jwks_keygen::signing_keys_generation::SigningKeysGeneration;
+use margaret_signing_keys_encryption::sealed_document::SealedDocument;
 
 use crate::constants::SIGNING_KEY_SET_NAME;
 use crate::signing_keys_creation::SigningKeysCreation;
@@ -22,21 +22,30 @@ fn stored_generation(generation: SigningKeysGeneration) -> Result<i64, SigningKe
 fn stored_signing_keys(
     lookup: Lookup<SigningKeySet>,
 ) -> Result<StoredSigningKeys, SigningKeysError> {
-    match lookup {
-        Lookup::Found(SigningKeySet {
-            document,
-            generation,
-            ..
-        }) => u64::try_from(generation)
-            .map(|value| {
-                StoredSigningKeys::Stored(SigningKeysRevision {
-                    document,
-                    generation: SigningKeysGeneration::new(value),
-                })
-            })
-            .map_err(|source| SigningKeysError::StoredGenerationOutOfRange { generation, source }),
-        Lookup::Missing => Ok(StoredSigningKeys::Absent),
-    }
+    let Lookup::Found(SigningKeySet {
+        generation,
+        nonce,
+        sealed_document,
+        ..
+    }) = lookup
+    else {
+        return Ok(StoredSigningKeys::Absent);
+    };
+    let generation = u64::try_from(generation)
+        .map_err(|source| SigningKeysError::StoredGenerationOutOfRange { generation, source })?;
+    let nonce = nonce
+        .try_into()
+        .map_err(|nonce: Vec<u8>| SigningKeysError::StoredNonceLength {
+            length: nonce.len(),
+        })?;
+
+    Ok(StoredSigningKeys::Stored(SigningKeysRevision {
+        generation: SigningKeysGeneration::new(generation),
+        sealed: SealedDocument {
+            ciphertext: sealed_document,
+            nonce,
+        },
+    }))
 }
 
 fn creation(insertion: Insertion) -> SigningKeysCreation {
@@ -59,8 +68,10 @@ pub struct SigningKeySet {
     pub name: String,
     #[column]
     pub generation: i64,
+    #[column(byte_length = 12)]
+    pub nonce: Vec<u8>,
     #[column]
-    pub document: SecretText,
+    pub sealed_document: Vec<u8>,
 }
 
 impl SigningKeySet {
@@ -70,17 +81,15 @@ impl SigningKeySet {
     /// database, and `SigningKeysError::Create` when the signing keys cannot be stored.
     pub async fn create(
         database: &Database,
-        SigningKeysRevision {
-            document,
-            generation,
-        }: &SigningKeysRevision,
+        SigningKeysRevision { generation, sealed }: &SigningKeysRevision,
     ) -> Result<SigningKeysCreation, SigningKeysError> {
         let generation = stored_generation(*generation)?;
 
         Self {
             name: SIGNING_KEY_SET_NAME.to_string(),
             generation,
-            document: document.clone(),
+            nonce: sealed.nonce.to_vec(),
+            sealed_document: sealed.ciphertext.clone(),
         }
         .insert()
         .or_ignore(database)
@@ -110,10 +119,7 @@ impl SigningKeySet {
     pub async fn replace(
         database: &Database,
         expected: SigningKeysGeneration,
-        SigningKeysRevision {
-            document,
-            generation,
-        }: &SigningKeysRevision,
+        SigningKeysRevision { generation, sealed }: &SigningKeysRevision,
     ) -> Result<SigningKeysReplacement, SigningKeysError> {
         let expected = stored_generation(expected)?;
         let generation = stored_generation(*generation)?;
@@ -126,7 +132,8 @@ impl SigningKeySet {
                 columns
                     .generation
                     .to(generation)
-                    .and(columns.document.to(document.clone()))
+                    .and(columns.nonce.to(sealed.nonce.to_vec()))
+                    .and(columns.sealed_document.to(sealed.ciphertext.clone()))
             })
             .await
             .map(|change| replacement(&change))

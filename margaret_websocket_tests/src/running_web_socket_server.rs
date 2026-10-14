@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -5,7 +6,6 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use margaret_http::bound_server::BoundServer;
-use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::server::Server;
@@ -33,22 +33,16 @@ impl RunningWebSocketServer {
 
     async fn start_from(
         upgrade: Arc<dyn WebSocketUpgrade>,
-        middleware: Vec<Arc<dyn HttpMiddleware>>,
+        middleware: Vec<Arc<dyn HttpMiddleware<Infallible>>>,
         transport: TransportConfig,
     ) -> Self {
-        let server = Server::new(
-            "127.0.0.1:0".to_string(),
-            transport,
-            UploadConfig::Disabled,
-            ServerPaths::build(["/ws"])
-                .expect("the route paths do not conflict")
-                .routes([RouteEntry::web_socket(upgrade, middleware)])
-                .build()
-                .expect("the route entries register cleanly")
-                .router,
-        );
-        let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
-        let bound = BoundServer::bind(Arc::new(server), forward_targets)
+        let server = Server::new("127.0.0.1:0".to_string(), transport, UploadConfig::Disabled);
+        let routes = ServerPaths::build(["/ws"])
+            .expect("the route paths do not conflict")
+            .routes::<Infallible>([RouteEntry::web_socket(upgrade, middleware)], ())
+            .build()
+            .expect("the route entries register cleanly");
+        let bound = BoundServer::bind(Arc::new(server), routes)
             .await
             .expect("the websocket server binds");
         let address = bound
@@ -64,7 +58,7 @@ impl RunningWebSocketServer {
         }
     }
 
-    pub async fn start_gated(middleware: Vec<Arc<dyn HttpMiddleware>>) -> Self {
+    pub async fn start_gated(middleware: Vec<Arc<dyn HttpMiddleware<Infallible>>>) -> Self {
         Self::start_from(
             Arc::new(WebSocketUpgradeEntry::new(
                 TestSessionFactory,

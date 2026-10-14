@@ -17,7 +17,7 @@ margaret_issuer_request = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_signing_keys = { workspace = true }
-serde_json = { workspace = true }
+margaret_signing_keys_encryption = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]

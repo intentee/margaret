@@ -254,6 +254,9 @@ pub enum AcceptedClientsCodegenError {
     )]
     UnknownScope { anchor: String, written: String },
 
+    #[error("#[admits_oauth_client] on '{anchor}' lists the scope '{written}' more than once")]
+    RepeatedScope { anchor: String, written: String },
+
     #[error(
         "#[admits_oauth_client] on '{anchor}' pins its assertions to '{written}', which is not a variant of margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm"
     )]

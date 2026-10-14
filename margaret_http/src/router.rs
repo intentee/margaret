@@ -19,10 +19,10 @@ use crate::router_error::RouterError;
 use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
-fn method_handlers(
+fn method_handlers<TTarget>(
     path: &'static str,
-    handlers: Vec<MethodHandler>,
-) -> Result<HashMap<RouteMethod, RouteHandler>, RouterError> {
+    handlers: Vec<MethodHandler<TTarget>>,
+) -> Result<HashMap<RouteMethod, RouteHandler<TTarget>>, RouterError> {
     let mut by_method = HashMap::with_capacity(handlers.len());
 
     for RoutedHandler { handler, method } in handlers.into_iter().map(MethodHandler::into_routed) {
@@ -37,29 +37,29 @@ fn method_handlers(
     Ok(by_method)
 }
 
-enum RouteTarget {
-    Http(HashMap<RouteMethod, RouteHandler>),
+enum RouteTarget<TTarget> {
+    Http(HashMap<RouteMethod, RouteHandler<TTarget>>),
     WebSocket {
-        middleware: Vec<Arc<dyn HttpMiddleware>>,
+        middleware: Vec<Arc<dyn HttpMiddleware<TTarget>>>,
         upgrade: Arc<dyn WebSocketUpgrade>,
     },
 }
 
-struct MatchedTarget<'router, 'path> {
+struct MatchedTarget<'router, 'path, TTarget> {
     params: Params<'router, 'path>,
-    target: &'router RouteTarget,
+    target: &'router RouteTarget<TTarget>,
 }
 
-pub struct Router {
+pub struct Router<TTarget> {
     matcher: Arc<matchit::Router<RoutePosition>>,
-    targets: Vec<RouteTarget>,
+    targets: Vec<RouteTarget<TTarget>>,
 }
 
-impl Router {
+impl<TTarget> Router<TTarget> {
     pub(crate) fn build(
         matcher: Arc<matchit::Router<RoutePosition>>,
         paths: Vec<&'static str>,
-        entries: Vec<RouteEntry>,
+        entries: Vec<RouteEntry<TTarget>>,
     ) -> Result<Self, RouterError> {
         let mut targets = Vec::with_capacity(entries.len());
 
@@ -81,7 +81,7 @@ impl Router {
         Ok(Self { matcher, targets })
     }
 
-    pub(crate) fn resolve(&self, method: &Method, path: &str) -> RouteResolution {
+    pub(crate) fn resolve(&self, method: &Method, path: &str) -> RouteResolution<TTarget> {
         let matched = self.matcher.at(path).ok().and_then(|matched| {
             self.targets
                 .get(matched.value.index())

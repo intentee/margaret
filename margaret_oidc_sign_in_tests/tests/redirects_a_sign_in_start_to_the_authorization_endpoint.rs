@@ -1,6 +1,5 @@
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_http_tests::fixture_request::FixtureRequest;
 use margaret_oidc_sign_in::sign_in_start_handler::SignInStartHandler;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
@@ -15,7 +14,7 @@ async fn redirects_a_sign_in_start_to_the_authorization_endpoint() {
 
     fixture.server.stop().await;
 
-    let Ok(ResponseContinuation::Done(response)) = answered else {
+    let Ok(response) = answered else {
         panic!("the sign-in start is answered");
     };
 

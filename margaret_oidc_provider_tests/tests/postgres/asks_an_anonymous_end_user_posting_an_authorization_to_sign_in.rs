@@ -1,6 +1,5 @@
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::handles_limited_content::HandlesLimitedContent;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_oidc_provider_tests::fixture_authorization_handler::fixture_authorization_handler;
 use margaret_oidc_provider_tests::fixture_consent_view::FixtureConsentView;
 use margaret_oidc_provider_tests::form_encoded::form_encoded;
@@ -24,6 +23,6 @@ async fn asks_an_anonymous_end_user_posting_an_authorization_to_sign_in() {
 
     assert!(matches!(
         answered,
-        Ok(ResponseContinuation::Done(response)) if response.status() == 401
+        Ok(response) if response.status() == 401
     ));
 }

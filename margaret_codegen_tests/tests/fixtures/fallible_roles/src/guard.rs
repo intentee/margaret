@@ -1,5 +1,6 @@
 use failures as errors;
 
+use margaret::framework::http::forward_scope::ForwardScope;
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response_continuation::ResponseContinuation;
@@ -14,11 +15,11 @@ impl Guard {
     ///
     /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn process(
+    pub async fn process<TTarget: ForwardScope>(
         &self,
         request: &Request,
-        next: Next,
-    ) -> errors::Result<ResponseContinuation> {
+        next: Next<TTarget>,
+    ) -> errors::Result<ResponseContinuation<TTarget>> {
         Ok(next.run(request).await?)
     }
 }

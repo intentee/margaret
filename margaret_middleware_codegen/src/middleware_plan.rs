@@ -4,6 +4,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 
 use crate::middleware_injections::MiddlewareInjections;
+use crate::middleware_target::MiddlewareTarget;
 
 pub struct MiddlewarePlan {
     pub concrete: CanonicalPath,
@@ -11,5 +12,6 @@ pub struct MiddlewarePlan {
     pub(crate) injections: MiddlewareInjections,
     pub(crate) is_async: bool,
     pub(crate) parameters: Vec<BoundParameter>,
+    pub(crate) target: MiddlewareTarget,
     pub(crate) wrapper: Ident,
 }

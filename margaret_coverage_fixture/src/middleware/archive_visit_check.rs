@@ -1,3 +1,4 @@
+use margaret::framework::http::forward_scope::ForwardScope;
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response_continuation::ResponseContinuation;
@@ -15,12 +16,12 @@ impl ArchiveVisitCheck {
     ///
     /// Returns an error when the archive itself fails to answer.
     #[process]
-    pub async fn process(
+    pub async fn process<TTarget: ForwardScope>(
         &self,
         request: &Request,
         #[form_request(from = RequestInput::Query)] _visit: ArchiveVisit,
-        next: Next,
-    ) -> anyhow::Result<ResponseContinuation> {
+        next: Next<TTarget>,
+    ) -> anyhow::Result<ResponseContinuation<TTarget>> {
         next.run(request).await.map_err(anyhow::Error::from)
     }
 }

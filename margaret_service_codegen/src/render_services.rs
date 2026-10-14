@@ -16,7 +16,6 @@ use margaret_http_codegen::http_server::HttpServer;
 
 use crate::runner_outcome::RunnerOutcome;
 use crate::serve_invocation_field::ServeInvocationField;
-use crate::serve_invocation_fields::serve_invocation_fields;
 use crate::server_bindings::ServerBindings;
 use crate::service_kind::ServiceKind;
 use crate::service_plan::ServicePlan;
@@ -257,15 +256,14 @@ fn server_registration(servers: &[HttpServer], activation: SpiffeActivation) -> 
     }
 }
 
-#[must_use]
-pub fn render_services(
+pub(crate) fn render_services(
     plan: &ServicePlan,
     servers: &[HttpServer],
     has_views: bool,
     bindings: &ContainerBindings,
+    activation: SpiffeActivation,
+    fields: &[ServeInvocationField],
 ) -> Vec<GeneratedModuleTokens> {
-    let activation = SpiffeActivation::of(plan, servers);
-    let fields = serve_invocation_fields(plan, servers, bindings);
     let declarations = fields.iter().map(ServeInvocationField::declaration);
     let names = fields.iter().map(ServeInvocationField::name);
     let adapters = plan.units.iter().map(adapter);
@@ -304,9 +302,9 @@ pub fn render_services(
             quote! {
                 pub mod serve_invocation;
 
-                #(#adapters)*
-
                 #register_servers
+
+                #(#adapters)*
 
                 #serve_too_many_lines
                 pub async fn serve(

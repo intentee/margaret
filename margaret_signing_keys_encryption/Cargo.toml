@@ -1,0 +1,19 @@
+[package]
+name = "margaret_signing_keys_encryption"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Seals the signing keys a Margaret application stores under its key-encryption key."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+aws-lc-rs = { workspace = true }
+base64ct = { workspace = true, features = ["alloc"] }
+thiserror = { workspace = true }
+zeroize = { workspace = true }
+
+[lints]
+workspace = true

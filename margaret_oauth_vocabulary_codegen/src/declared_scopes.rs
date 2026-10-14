@@ -13,6 +13,7 @@ use margaret_oauth_vocabulary::scope_parsing::ScopeParsing;
 
 use crate::declared_scope_item::DeclaredScopeItem;
 use crate::oauth_vocabulary_codegen_error::OAuthVocabularyCodegenError;
+use crate::scope_list_resolution::ScopeListResolution;
 use crate::scope_resolution::ScopeResolution;
 
 fn openid_scope_path() -> CanonicalPath {
@@ -115,7 +116,28 @@ impl<'index> DeclaredScopes<'index> {
     }
 
     #[must_use]
-    pub fn resolve(
+    pub fn resolve_list<'written>(
+        &self,
+        index: &AttributeIndex,
+        item: &IndexedItem,
+        written: &'written [Path],
+    ) -> ScopeListResolution<'written> {
+        let mut scopes: Vec<Scope> = Vec::with_capacity(written.len());
+
+        for written_scope in written {
+            match self.resolve(index, item, written_scope) {
+                ScopeResolution::Unknown => return ScopeListResolution::Unknown(written_scope),
+                ScopeResolution::Declared(scope) if scopes.contains(&scope) => {
+                    return ScopeListResolution::Repeated(written_scope);
+                }
+                ScopeResolution::Declared(scope) => scopes.push(scope),
+            }
+        }
+
+        ScopeListResolution::Declared(scopes)
+    }
+
+    fn resolve(
         &self,
         index: &AttributeIndex,
         item: &IndexedItem,
@@ -152,6 +174,7 @@ mod tests {
 
     use super::DeclaredScopes;
     use crate::oauth_vocabulary_codegen_error::OAuthVocabularyCodegenError;
+    use crate::scope_list_resolution::ScopeListResolution;
     use crate::scope_resolution::ScopeResolution;
 
     const PROFILE: &str = "use margaret::framework::macros::oauth_scope;\n#[oauth_scope(name = \"profile\")]\npub struct ProfileScope;\n";
@@ -280,6 +303,28 @@ mod tests {
             ),
             ScopeResolution::Unknown
         );
+    }
+
+    #[test]
+    fn rejects_a_scope_listed_twice_through_two_spellings_since_a_client_holds_each_scope_once() {
+        let indexed = IndexedSource::new(&format!("{PROFILE}pub struct Client;\n"));
+        let declared = DeclaredScopes::read(&indexed.index).expect("the scopes are read");
+        let client = indexed
+            .index
+            .item(&CanonicalPath::new(vec![
+                "crate".to_string(),
+                "Client".to_string(),
+            ]))
+            .expect("the client is indexed");
+        let written: Vec<syn::Path> = vec![
+            parse_quote!(ProfileScope),
+            parse_quote!(crate::ProfileScope),
+        ];
+
+        assert!(matches!(
+            declared.resolve_list(&indexed.index, client, &written),
+            ScopeListResolution::Repeated(repeated) if *repeated == written[1]
+        ));
     }
 
     #[test]

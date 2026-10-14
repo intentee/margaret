@@ -15,12 +15,12 @@ pub struct JsonReadingHandler {
 }
 
 #[async_trait]
-impl ContentHandler for JsonReadingHandler {
+impl<TTarget> ContentHandler<TTarget> for JsonReadingHandler {
     async fn handle(
         &self,
         request: &Request,
         body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         Ok(ResponseContinuation::Done(
             match read_json_value(request, body, self.limit).await {
                 BodyReading::Read(_) => Response::text(200, "read"),

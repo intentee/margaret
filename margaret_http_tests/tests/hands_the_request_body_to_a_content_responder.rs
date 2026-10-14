@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use margaret_http::body_limit::BodyLimit;
@@ -27,7 +28,10 @@ struct Echo {
 async fn hands_the_request_body_to_a_content_responder() {
     let handler = content_responder(
         Arc::new(Echo { prefix: "echo-" }),
-        |responder: Arc<Echo>, _request: &Request, body: RequestBody| -> HandlerFuture<'_> {
+        |responder: Arc<Echo>,
+         _request: &Request,
+         body: RequestBody|
+         -> HandlerFuture<'_, Infallible> {
             Box::pin(async move {
                 let BodyReading::Read(mut stream) =
                     RequestBodyStream::open(body, BodyLimit::new(ECHOED_BODY.len()))

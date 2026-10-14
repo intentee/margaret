@@ -2,25 +2,25 @@ use crate::forward::Forward;
 use crate::redirect::Redirect;
 use crate::response::Response;
 
-pub enum ResponseContinuation {
+pub enum ResponseContinuation<TTarget> {
     Done(Response),
-    Forward(Forward),
+    Forward(Forward<TTarget>),
     Redirect(Redirect),
 }
 
-impl From<Forward> for ResponseContinuation {
-    fn from(forward: Forward) -> Self {
+impl<TTarget> From<Forward<TTarget>> for ResponseContinuation<TTarget> {
+    fn from(forward: Forward<TTarget>) -> Self {
         Self::Forward(forward)
     }
 }
 
-impl From<Redirect> for ResponseContinuation {
+impl<TTarget> From<Redirect> for ResponseContinuation<TTarget> {
     fn from(redirect: Redirect) -> Self {
         Self::Redirect(redirect)
     }
 }
 
-impl From<Response> for ResponseContinuation {
+impl<TTarget> From<Response> for ResponseContinuation<TTarget> {
     fn from(response: Response) -> Self {
         Self::Done(response)
     }

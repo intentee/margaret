@@ -10,7 +10,6 @@ use margaret_authorization_server_client::endpoint_outcome::EndpointOutcome;
 use margaret_http::bearer_challenge::BearerChallenge;
 use margaret_http::request_authorization::RequestAuthorization;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::token_admission::TokenAdmission;
 
 use crate::extension_members::ExtensionMembers;
@@ -18,12 +17,8 @@ use crate::introspected_token::IntrospectedToken;
 use crate::introspection_verdict::IntrospectionVerdict;
 use crate::judge_introspection::judge_introspection;
 
-fn refused<TToken>(response: Response) -> TokenAdmission<TToken> {
-    TokenAdmission::Refused(ResponseContinuation::from(response))
-}
-
 fn unavailable<TToken>() -> TokenAdmission<TToken> {
-    refused(Response::text(
+    TokenAdmission::Refused(Response::text(
         503,
         "The authorization server cannot introspect the token",
     ))
@@ -38,7 +33,7 @@ pub async fn introspect_bearer_token<TClaims: DeserializeOwned>(
         ControlFlow::Break(BearerChallenge::MissingCredentials) => {
             return TokenAdmission::Unaddressed;
         }
-        ControlFlow::Break(challenge) => return refused(challenge.response()),
+        ControlFlow::Break(challenge) => return TokenAdmission::Refused(challenge.response()),
     };
 
     match server.introspect::<ExtensionMembers>(token.as_str()).await {
@@ -48,7 +43,7 @@ pub async fn introspect_bearer_token<TClaims: DeserializeOwned>(
                 IntrospectionVerdict::Rejected(rejection) => {
                     warn!("Refusing an introspected bearer token: {rejection}");
 
-                    refused(BearerChallenge::InvalidToken.response())
+                    TokenAdmission::Refused(BearerChallenge::InvalidToken.response())
                 }
             }
         }

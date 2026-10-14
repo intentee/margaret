@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod cluster_database;
+pub mod cluster_signing_keys_encryption;
 pub mod commands;
 pub mod constants;
 pub mod forms;

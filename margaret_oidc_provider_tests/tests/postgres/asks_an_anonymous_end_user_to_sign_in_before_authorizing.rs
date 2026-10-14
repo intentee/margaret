@@ -1,5 +1,4 @@
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_oidc_provider_tests::authorization_page_request::authorization_page_request;
 use margaret_oidc_provider_tests::fixture_authorization_handler::fixture_authorization_handler;
 use margaret_oidc_provider_tests::fixture_consent_view::FixtureConsentView;
@@ -17,6 +16,6 @@ async fn asks_an_anonymous_end_user_to_sign_in_before_authorizing() {
 
     assert!(matches!(
         answered,
-        Ok(ResponseContinuation::Done(response)) if response.status() == 401
+        Ok(response) if response.status() == 401
     ));
 }

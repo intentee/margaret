@@ -8,7 +8,6 @@ use margaret_url_path::path_segments::path_segments;
 
 use crate::route_addressing::RouteAddressing;
 use crate::route_position::RoutePosition;
-use crate::server_paths::ServerPaths;
 use crate::unaddressable_parameter::UnaddressableParameter;
 use crate::url_parameter::UrlParameter;
 use crate::url_segment::UrlSegment;
@@ -74,10 +73,9 @@ enum SegmentAddressing {
     Unaddressable(UnaddressableParameter),
 }
 
-#[must_use]
-pub fn build_url<const COUNT: usize>(
+pub(crate) fn build_url(
     origin: &str,
-    paths: &ServerPaths<COUNT>,
+    matcher: &matchit::Router<RoutePosition>,
     position: RoutePosition,
     segments: &[UrlSegment],
 ) -> RouteAddressing<String> {
@@ -109,7 +107,10 @@ pub fn build_url<const COUNT: usize>(
         }
     }
 
-    if paths.resolves_to(&path, position) {
+    if matcher
+        .at(&path)
+        .is_ok_and(|matched| *matched.value == position)
+    {
         RouteAddressing::Addressed(url)
     } else {
         RouteAddressing::Misrouted { url }
@@ -123,7 +124,6 @@ mod tests {
     use super::build_url;
     use crate::route_addressing::RouteAddressing;
     use crate::route_position::RoutePosition;
-    use crate::server_paths::ServerPaths;
     use crate::unaddressable_parameter::UnaddressableParameter;
     use crate::url_parameter::UrlParameter;
     use crate::url_segment::UrlSegment;
@@ -139,8 +139,10 @@ mod tests {
     const ESCAPED_CALLBACK: RoutePosition = RoutePosition::new(7);
     const ARTICLE: RoutePosition = RoutePosition::new(8);
 
-    fn paths() -> ServerPaths<11> {
-        ServerPaths::build([
+    fn matcher() -> matchit::Router<RoutePosition> {
+        let mut matcher = matchit::Router::new();
+
+        for (index, path) in [
             "/greeting",
             "/articles/{article}/edit",
             "/articles/{article}/comments/{comment}",
@@ -152,8 +154,16 @@ mod tests {
             "/articles/{article}",
             "/articles/new",
             "/files/readme",
-        ])
-        .expect("the fixture paths build")
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            matcher
+                .insert(path, RoutePosition::new(index))
+                .expect("the fixture paths build");
+        }
+
+        matcher
     }
 
     fn literal(text: &'static str) -> UrlSegment {
@@ -184,7 +194,7 @@ mod tests {
     }
 
     fn url(position: RoutePosition, segments: &[UrlSegment]) -> RouteAddressing<String> {
-        build_url(ORIGIN, &paths(), position, segments)
+        build_url(ORIGIN, &matcher(), position, segments)
     }
 
     fn article_edit_url(value: &str) -> RouteAddressing<String> {

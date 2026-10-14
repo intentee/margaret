@@ -16,10 +16,10 @@ pub enum RollerError {
         stored: SigningCurve,
     },
 
-    #[error("the stored signing keys document is malformed: {source}")]
-    DocumentMalformed {
+    #[error("the roller cannot read the sealed signing keys it loaded: {source}")]
+    DocumentOpen {
         #[source]
-        source: serde_json::Error,
+        source: SigningKeysError,
     },
 
     #[error("the stored signing keys cannot be restored: {source}")]
@@ -28,8 +28,8 @@ pub enum RollerError {
         source: JwksKeyError,
     },
 
-    #[error("the signing keys cannot be serialized for storage: {0}")]
-    DocumentSerialization(#[source] serde_json::Error),
+    #[error("the signing keys cannot be sealed for storage: {0}")]
+    DocumentSeal(#[source] SigningKeysError),
 
     #[error(
         "the stored signing keys of generation {generation} differ from the held ones of the same generation"

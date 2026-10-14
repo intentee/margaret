@@ -7,10 +7,10 @@ use crate::request_body::RequestBody;
 use crate::response_continuation::ResponseContinuation;
 
 #[async_trait]
-pub trait ContentHandler: Send + Sync {
+pub trait ContentHandler<TTarget>: Send + Sync {
     async fn handle(
         &self,
         request: &Request,
         body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError>;
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError>;
 }

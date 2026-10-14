@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use url::Url;
@@ -26,7 +27,7 @@ pub struct FixtureAuthorizationServer {
 }
 
 impl FixtureAuthorizationServer {
-    pub async fn start(endpoint_path: &'static str, endpoint: MethodHandler) -> Self {
+    pub async fn start(endpoint_path: &'static str, endpoint: MethodHandler<Infallible>) -> Self {
         let fixture = TlsFixture::generate();
         let server = RunningFixtureServer::start(
             fixture.server_config.clone(),

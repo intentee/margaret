@@ -80,7 +80,6 @@ impl ExclusiveBindings {
             | RequestBinding::CurrentRequest
             | RequestBinding::FormContent { .. }
             | RequestBinding::FormRequest { .. }
-            | RequestBinding::Forwarder
             | RequestBinding::Injectable { .. }
             | RequestBinding::IntrospectedBearerToken { .. }
             | RequestBinding::JsonContent { .. }

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
-use margaret::framework::http::response_continuation::ResponseContinuation;
 use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::macros::constructor;
@@ -47,7 +46,7 @@ impl SessionReaderProvider {
         Ok(if self.realm.admits(&reader) {
             AuthenticatedUserOutcome::Authenticated(Reader { name: reader })
         } else {
-            AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(Response::forbidden()))
+            AuthenticatedUserOutcome::Interrupted(Response::forbidden())
         })
     }
 }

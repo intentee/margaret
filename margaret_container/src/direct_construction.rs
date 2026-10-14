@@ -43,6 +43,14 @@ impl DirectConstruction {
         }
     }
 
+    pub(crate) fn is_async(&self) -> bool {
+        matches!(
+            self,
+            Self::Constructor { is_async: true, .. }
+                | Self::FrameworkConstructor { is_async: true, .. }
+        )
+    }
+
     pub(crate) fn outcome(&self) -> ConstructorOutcome {
         match self {
             Self::Constructor { outcome, .. } | Self::FrameworkConstructor { outcome, .. } => {
@@ -53,13 +61,5 @@ impl DirectConstruction {
             | Self::FrameworkUnit
             | Self::FrameworkAccessor { .. } => ConstructorOutcome::Infallible,
         }
-    }
-
-    pub(crate) fn is_async(&self) -> bool {
-        matches!(
-            self,
-            Self::Constructor { is_async: true, .. }
-                | Self::FrameworkConstructor { is_async: true, .. }
-        )
     }
 }

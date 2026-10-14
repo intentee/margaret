@@ -1,9 +1,9 @@
 use crate::requirement::Requirement;
-use crate::response_continuation::ResponseContinuation;
+use crate::response::Response;
 
 pub enum TokenAdmission<TToken> {
     Admitted(TToken),
-    Refused(ResponseContinuation),
+    Refused(Response),
     Unaddressed,
 }
 
@@ -23,12 +23,11 @@ mod tests {
     use super::TokenAdmission;
     use crate::requirement::Requirement;
     use crate::response::Response;
-    use crate::response_continuation::ResponseContinuation;
 
-    fn met(requirement: Requirement<Option<u8>>) -> Result<Option<u8>, ResponseContinuation> {
+    fn met(requirement: Requirement<Option<u8>>) -> Result<Option<u8>, Response> {
         match requirement {
             Requirement::Met(token) => Ok(token),
-            Requirement::Unmet(continuation) => Err(continuation),
+            Requirement::Unmet(response) => Err(response),
         }
     }
 
@@ -51,11 +50,8 @@ mod tests {
     #[test]
     fn leaves_the_requirement_unmet_for_a_refused_token() {
         assert!(
-            met(TokenAdmission::<u8>::Refused(
-                ResponseContinuation::from(Response::unauthorized())
-            )
-            .into_requirement())
-            .is_err()
+            met(TokenAdmission::<u8>::Refused(Response::unauthorized()).into_requirement())
+                .is_err()
         );
     }
 }

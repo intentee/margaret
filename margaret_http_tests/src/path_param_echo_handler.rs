@@ -11,8 +11,11 @@ pub struct PathParamEchoHandler {
 }
 
 #[async_trait]
-impl HeadHandler for PathParamEchoHandler {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TTarget> HeadHandler<TTarget> for PathParamEchoHandler {
+    async fn handle(
+        &self,
+        request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         Ok(ResponseContinuation::Done(
             match request.path_param(self.name) {
                 Some(value) => Response::text(200, value.to_string()),

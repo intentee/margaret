@@ -24,8 +24,11 @@ struct GatedDownload {
 }
 
 #[async_trait]
-impl HeadHandler for GatedDownload {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl HeadHandler<Infallible> for GatedDownload {
+    async fn handle(
+        &self,
+        _request: &Request,
+    ) -> Result<ResponseContinuation<Infallible>, HandlerError> {
         let gate = self.gate.clone();
         let chunks = stream::iter([Ok::<_, Infallible>(Bytes::from_static(b"first-chunk"))]).chain(
             stream::once(async move {

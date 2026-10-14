@@ -34,6 +34,7 @@ use margaret_http_codegen::http_artifacts::HttpArtifacts;
 use margaret_http_codegen::http_plan::HttpPlan;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::render_http::render_http;
+use margaret_jwks_codegen::declared_signing_keys_encryption::DeclaredSigningKeysEncryption;
 use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers;
 use margaret_model_codegen::model::Model;
@@ -51,8 +52,8 @@ use margaret_schema_codegen::render_table::render_table;
 use margaret_schema_codegen::render_tables::render_tables;
 use margaret_serve_input_codegen::scan::scan;
 use margaret_service_codegen::framework_service::FrameworkService;
-use margaret_service_codegen::read_serve_invocation::read_serve_invocation;
-use margaret_service_codegen::render_services::render_services;
+use margaret_service_codegen::render_serving::render_serving;
+use margaret_service_codegen::rendered_serving::RenderedServing;
 use margaret_service_codegen::service_plan::ServicePlan;
 use margaret_session_endpoints_codegen::declared_session_endpoints::DeclaredSessionEndpoints;
 use margaret_session_endpoints_codegen::session_refresh_route::SessionRefreshRoute;
@@ -115,6 +116,7 @@ use crate::served_modules::ServedModules;
 use crate::served_routes::ServedRoutes;
 use crate::serving_modules::ServingModules;
 use crate::sessions_framework_providers::sessions_framework_providers;
+use crate::signing_keys_encryption_providers::signing_keys_encryption_providers;
 use crate::trusted_issuer_framework_providers::trusted_issuer_framework_providers;
 use crate::umbrella::umbrella;
 use crate::wrapper_modules::WrapperModules;
@@ -133,6 +135,7 @@ fn framework_providers(
     exchanger_bindings: &[SubjectTokenExchangerBinding],
     routes: &DeclaredRoutes,
     database: &DeclaredPostgresDatabase,
+    signing_keys_encryption: &DeclaredSigningKeysEncryption,
     endpoints: &ServedEndpoints,
 ) -> Result<Vec<FrameworkProvider>, CodegenError> {
     let mut framework_providers = vec![FrameworkProvider {
@@ -142,7 +145,11 @@ fn framework_providers(
         provided: asset_responder_canonical_path(),
     }];
     framework_providers.extend(database_providers(database));
-    framework_providers.extend(jwks_framework_providers(&endpoints.routes));
+    framework_providers.extend(signing_keys_encryption_providers(signing_keys_encryption));
+    framework_providers.extend(jwks_framework_providers(
+        &endpoints.routes,
+        signing_keys_encryption,
+    ));
     framework_providers.extend(trusted_issuer_framework_providers(trusts));
     framework_providers.extend(own_trusted_issuer_framework_providers(own_trusts));
     for client in &accepted_clients.clients {
@@ -379,7 +386,6 @@ fn render_serving_modules(
     } else {
         HttpModules {
             artifacts: HttpArtifacts {
-                forwarders: Vec::new(),
                 retained_roots: Vec::new(),
                 modules: Vec::new(),
                 servers: Vec::new(),
@@ -389,7 +395,6 @@ fn render_serving_modules(
     };
 
     Ok(ServingModules {
-        forwarders: http.artifacts.forwarders,
         modules: [
             websockets.modules,
             views.modules,
@@ -427,20 +432,30 @@ fn render_role_modules(
     let service_plan = ServicePlan::build(index, framework_services, bindings, serving_roots)?;
 
     let serve = if features.contains(GeneratedFeature::Serves) {
-        modules.extend(render_services(
+        let RenderedServing {
+            invocation,
+            modules: served,
+        } = render_serving(
             &service_plan,
             servers,
             features.contains(GeneratedFeature::Views),
             bindings,
-        ));
+        );
 
-        ServeDispatch::Served(read_serve_invocation(&service_plan, servers, bindings))
+        modules.extend(served);
+
+        ServeDispatch::Served(invocation)
     } else {
         ServeDispatch::Unserved
     };
 
     let console_roots = if features.contains(GeneratedFeature::Console) {
-        let plan = ConsolePlan::build(index, bindings)?;
+        let plan = ConsolePlan::build(
+            index,
+            bindings,
+            &serve,
+            features.contains(GeneratedFeature::Schema),
+        )?;
         let console = render_console(
             &plan,
             &serve,
@@ -481,7 +496,6 @@ fn served_modules(
         registries,
     } = render_wrapper_modules(index, bindings, features, binding)?;
     let ServingModules {
-        forwarders,
         modules: serving_modules,
         retained_roots: serving_roots,
         servers,
@@ -508,7 +522,6 @@ fn served_modules(
     )?;
 
     Ok(ServedModules {
-        forwarders,
         modules: [wrapper_modules, serving_modules, role_modules]
             .into_iter()
             .flatten()
@@ -582,7 +595,6 @@ fn issuance_modules(
 fn rendered(
     planned_container: PlannedContainer,
     ServedModules {
-        forwarders,
         modules,
         roots: RoleRoots {
             console,
@@ -593,9 +605,7 @@ fn rendered(
     mut module_tokens: Vec<GeneratedModuleTokens>,
     mut features: GeneratedFeatures,
 ) -> Result<GeneratedCode, CodegenError> {
-    features.enable_if(GeneratedFeature::Forwarders, !forwarders.is_empty());
     module_tokens.extend(modules);
-    module_tokens.extend(forwarders);
 
     let served_roots = service
         .into_iter()
@@ -663,6 +673,7 @@ pub fn build(
     let mut features = GeneratedFeatures::from_index(&index);
     let registry = scan(&index)?;
     let database = DeclaredPostgresDatabase::read(&index)?;
+    let signing_keys_encryption = DeclaredSigningKeysEncryption::read(&index)?;
     let identity = IdentityDeclarations::read(&index)?;
     let mut route_paths = RoutePathRegistry::new();
     let declared_routes = DeclaredRoutes::read(&index, &mut route_paths)?;
@@ -702,6 +713,7 @@ pub fn build(
         &exchanger_bindings,
         &declared_routes,
         &database,
+        &signing_keys_encryption,
         &endpoints,
     )?;
     let planned_container = plan_container(
@@ -769,6 +781,7 @@ mod tests {
     use margaret_database_codegen::database_codegen_error::DatabaseCodegenError;
     use margaret_generated_module::generated_module::GeneratedModule;
     use margaret_http_codegen::http_codegen_error::HttpCodegenError;
+    use margaret_jwks_codegen::jwks_codegen_error::JwksCodegenError;
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_sql_identifier::table_namespace::TableNamespace;
     use margaret_tag_codegen::tag_error::TagError;
@@ -1175,7 +1188,7 @@ impl AssetRoute {
         assert!(message.contains("failed to generate the asset bag"));
     }
 
-    const JWKS_ROLLER_CRATE: &str = "use margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\n\
+    const JWKS_ROLLER_CRATE: &str = "use margaret::framework::macros::encrypts_signing_keys;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1185,6 +1198,9 @@ struct GetJwks;
 
 #[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]
 struct ApplicationDatabase;
+
+#[encrypts_signing_keys(key_from = \"SIGNING_KEYS_ENCRYPTION_KEY\")]
+struct SigningKeysEncryption;
 ";
 
     const JWKS_MULTI_CLIENT_CRATE: &str = "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
@@ -1212,7 +1228,7 @@ impl GetVerify {
 }
 ";
 
-    const JWKS_SERVER_STORE_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
+    const JWKS_SERVER_STORE_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::encrypts_signing_keys;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1236,6 +1252,9 @@ impl PostAudit {
 
 #[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]
 struct ApplicationDatabase;
+
+#[encrypts_signing_keys(key_from = \"SIGNING_KEYS_ENCRYPTION_KEY\")]
+struct SigningKeysEncryption;
 ";
 
     const SPIFFE_HTTP_CLIENT_CRATE: &str = "\
@@ -1298,7 +1317,7 @@ impl Worker {
         assert!(!serve.contains("bundle_services"));
         assert!(!serve.contains("spiffe_server_config"));
 
-        let construction: String = module(&code, "container/build/serve_arguments")
+        let construction: String = module(&code, "container/build/arguments/serve_arguments")
             .split_whitespace()
             .collect();
         assert!(construction.contains("pubargument0:margaret::framework::reqwest::Client,"));
@@ -1491,6 +1510,52 @@ impl GetIdentity {
     }
 
     #[test]
+    fn rejects_a_jwks_roller_whose_signing_keys_encryption_is_undeclared() {
+        assert!(matches!(
+            generate("use margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\n#[rustfmt::skip]\npub mod margaret;\n\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/.well-known/jwks.json\", server = \"internal\")]\n#[serves_oidc_endpoint(margaret::framework::oidc_provider::oidc_endpoint::OidcEndpoint::Jwks)]\nstruct GetJwks;\n\n#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]\nstruct ApplicationDatabase;\n"),
+            Err(CodegenError::Container {
+                source: ContainerError::MissingSigningKeysEncryption { provider },
+            }) if provider == "crate::margaret::jwks::JwksRoller"
+        ));
+    }
+
+    #[test]
+    fn reports_a_signing_keys_encryption_without_key_from_as_a_jwks_failure() {
+        assert!(matches!(
+            generate(
+                "use margaret::framework::macros::encrypts_signing_keys;\n#[rustfmt::skip]\npub mod margaret;\n\n#[encrypts_signing_keys]\nstruct SigningKeysEncryption;\n",
+            ),
+            Err(CodegenError::Jwks {
+                source: JwksCodegenError::MissingKeySource { anchor },
+            }) if anchor == "crate::SigningKeysEncryption"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_signing_keys_encryption_nothing_uses_so_no_unused_key_is_read() {
+        assert!(matches!(
+            generate(
+                "use margaret::framework::macros::encrypts_signing_keys;\n#[rustfmt::skip]\npub mod margaret;\n\n#[encrypts_signing_keys(key_from = \"SIGNING_KEYS_ENCRYPTION_KEY\")]\nstruct SigningKeysEncryption;\n",
+            ),
+            Err(CodegenError::Container {
+                source: ContainerError::UnconsumedDeclaration { path },
+            }) if path == "margaret::framework::signing_keys_encryption::signing_keys_encryption_key::SigningKeysEncryptionKey"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_singleton_that_injects_the_signing_keys_encryption_key() {
+        assert_eq!(
+            generate(&format!(
+                "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n{JWKS_ROLLER_CRATE}#[singleton]\n#[console_command(name = \"unseal\")]\nstruct Unseal {{\n    key: std::sync::Arc<margaret::framework::signing_keys_encryption::signing_keys_encryption_key::SigningKeysEncryptionKey>,\n}}\n\nimpl Unseal {{\n    #[constructor]\n    fn create(key: std::sync::Arc<margaret::framework::signing_keys_encryption::signing_keys_encryption_key::SigningKeysEncryptionKey>) -> anyhow::Result<Self> {{}}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {{}}\n}}\n"
+            ))
+            .expect_err("only the framework holds the signing keys encryption key")
+            .to_string(),
+            "failed to generate the dependency container: parameter 'key' of singleton 'crate::Unseal' injects 'margaret::framework::signing_keys_encryption::signing_keys_encryption_key::SigningKeysEncryptionKey', which only the framework may inject"
+        );
+    }
+
+    #[test]
     fn rejects_a_singleton_that_injects_the_signing_keys_of_the_framework() {
         assert_eq!(
             generate(&format!(
@@ -1525,8 +1590,19 @@ impl GetIdentity {
         ));
         assert!(construction.contains(".public_jwks_handler()"));
         assert!(construction.contains(
-            "crate::margaret::jwks::JwksRoller::create(::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone(&framework_database_database_database),"
+            "letframework_signing_keys_encryption_signing_keys_encryption_key_signing_keys_encryption_key=::std::sync::Arc::new(serve_input_2,);"
         ));
+        assert!(construction.contains(
+            "crate::margaret::jwks::JwksRoller::create(::std::sync::Arc::<::margaret::framework::database::database::Database,>::clone(&framework_database_database_database),::std::sync::Arc::<::margaret::framework::jwks_keygen::generated_rsa_signing_keys::GeneratedRsaSigningKeys,>::clone(&framework_jwks_keygen_generated_rsa_signing_keys_generated_rsa_signing_keys,),::std::sync::Arc::<::margaret::framework::signing_keys_encryption::signing_keys_encryption_key::SigningKeysEncryptionKey,>::clone(&framework_signing_keys_encryption_signing_keys_encryption_key_signing_keys_encryption_key,),)"
+        ));
+        assert!(
+            module(&code, "run")
+                .split_whitespace()
+                .collect::<String>()
+                .contains(
+                    "margaret::framework::environment_variable::read_required::read_required::<::margaret::framework::signing_keys_encryption::signing_keys_encryption_key::SigningKeysEncryptionKey,>(\"SIGNING_KEYS_ENCRYPTION_KEY\").map_err(margaret::framework::console::report_failure::report_failure,).map(|serve_input_2|"
+                )
+        );
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains("impltrzcina::ServiceforMargaretJwksJwksRoller"));
@@ -1616,7 +1692,7 @@ impl GetIdentity {
         assert!(construction.contains("crate::margaret::token_issuance::TOKEN_ISSUANCE,"));
     }
 
-    const JWKS_CONSOLE_STORE_CRATE: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\
+    const JWKS_CONSOLE_STORE_CRATE: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::encrypts_signing_keys;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1639,6 +1715,9 @@ impl Audit {
 
 #[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]
 struct ApplicationDatabase;
+
+#[encrypts_signing_keys(key_from = \"SIGNING_KEYS_ENCRYPTION_KEY\")]
+struct SigningKeysEncryption;
 ";
 
     #[test]
@@ -1766,7 +1845,7 @@ impl Page {
 }
 ";
 
-    const SIGN_IN_CRATE: &str = "use margaret::framework::macros::admits_sign_in;\nuse margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::oauth_scope;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_sign_in;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
+    const SIGN_IN_CRATE: &str = "use margaret::framework::macros::admits_sign_in;\nuse margaret::framework::macros::encrypts_signing_keys;\nuse margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::oauth_scope;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_sign_in;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1814,9 +1893,12 @@ impl margaret::framework::oidc_sign_in::admits_sign_in::AdmitsSignIn for Partner
 
 #[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]
 struct ApplicationDatabase;
+
+#[encrypts_signing_keys(key_from = \"SIGNING_KEYS_ENCRYPTION_KEY\")]
+struct SigningKeysEncryption;
 ";
 
-    const OIDC_PROVIDER_CRATE: &str = "use margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::exchanges_tokens_from;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::oauth_scope;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::provides_userinfo_claims;\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
+    const OIDC_PROVIDER_CRATE: &str = "use margaret::framework::macros::admits_oauth_client;\nuse margaret::framework::macros::constructor;\nuse margaret::framework::macros::encrypts_signing_keys;\nuse margaret::framework::macros::exchanges_tokens_from;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::oauth_client;\nuse margaret::framework::macros::oauth_scope;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::provides_userinfo_claims;\nuse margaret::framework::macros::renders_view;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::macros::verifies_tokens_from_issuer;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1932,6 +2014,9 @@ struct PostConsent;
 
 #[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]
 struct ApplicationDatabase;
+
+#[encrypts_signing_keys(key_from = \"SIGNING_KEYS_ENCRYPTION_KEY\")]
+struct SigningKeysEncryption;
 ";
 
     #[test]
@@ -1991,7 +2076,7 @@ struct ApplicationDatabase;
         assert!(construction.contains(
             "letmargaret_oidc_provider_issuer_metadata=::std::sync::Arc::new(serve_input_0);"
         ));
-        assert!(!run.contains("serve_input_8"));
+        assert!(!run.contains("serve_input_9"));
         assert!(
             module(&code, "schema")
                 .split_whitespace()
@@ -2020,16 +2105,16 @@ struct ApplicationDatabase;
             "pub type AuthorizationHandler = margaret::framework::oidc_provider::authorization_handler::AuthorizationHandler<\n    crate::ConsentView,\n    crate::margaret::routes::Routes,\n>;\n"
         );
         assert!(run.contains(
-            "margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/consent\",),).map_err(margaret::framework::console::report_failure::report_failure,).map(|serve_input_6|{letserve_input_7=::std::sync::Arc::clone(&routes);"
+            "margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/consent\",),).map_err(margaret::framework::console::report_failure::report_failure,).map(|serve_input_7|{letserve_input_8=::std::sync::Arc::clone(&routes);"
         ));
         assert!(construction.contains(
-            "crate::margaret::oidc_provider::authorization_handler::AuthorizationHandler::create(::std::sync::Arc::<crate::margaret::oidc_provider::AuthorizationEndpoint,>::clone(&margaret_oidc_provider_authorization_endpoint),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),::std::sync::Arc::<crate::ConsentView>::clone(&consent_view),serve_input_6,serve_input_7,)"
+            "crate::margaret::oidc_provider::authorization_handler::AuthorizationHandler::create(::std::sync::Arc::<crate::margaret::oidc_provider::AuthorizationEndpoint,>::clone(&margaret_oidc_provider_authorization_endpoint),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),::std::sync::Arc::<crate::ConsentView>::clone(&consent_view),serve_input_7,serve_input_8,)"
         ));
         assert!(construction.contains(
             "crate::margaret::oidc_provider::ConsentHandler::create(::std::sync::Arc::<crate::margaret::oidc_provider::ConsentEndpoint,>::clone(&margaret_oidc_provider_consent_endpoint),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),)"
         ));
         assert!(server.contains(
-            "{container.margaret_oidc_provider_authorization_handler_authorization_handler()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>}"
+            "{margaret::framework::http::terminal_head_handler::terminal_head_handler(container.margaret_oidc_provider_authorization_handler_authorization_handler(),)}"
         ));
         assert!(server.contains(
             "margaret::framework::http::limited_content_handler::limited_content_handler(container.margaret_oidc_provider_authorization_handler_authorization_handler(),margaret::framework::http::body_limit::BodyLimit::new(1_024),)"
@@ -2104,10 +2189,10 @@ struct ApplicationDatabase;
             .collect();
 
         assert!(construction.contains(
-            "letmargaret_oidc_provider_provider_metadata_handler=::std::sync::Arc::new(serve_input_5,);"
+            "letmargaret_oidc_provider_provider_metadata_handler=::std::sync::Arc::new(serve_input_6,);"
         ));
         assert!(module(&code, "run").split_whitespace().collect::<String>().contains(
-            "crate::margaret::oidc_provider::ProviderMetadataHandler::create(crate::margaret::accepted_clients::provider_support::PROVIDER_SUPPORT,crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS,crate::margaret::token_issuance::TOKEN_ISSUANCE,).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_5|"
+            "crate::margaret::oidc_provider::ProviderMetadataHandler::create(crate::margaret::accepted_clients::provider_support::PROVIDER_SUPPORT,crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS,crate::margaret::token_issuance::TOKEN_ISSUANCE,).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_6|"
         ));
         assert!(construction.contains(
             "crate::margaret::accepted_clients::accepted_resources::ACCEPTED_RESOURCES,)"
@@ -2183,7 +2268,7 @@ struct ApplicationDatabase;
             "margaret::framework::http::limited_content_handler::limited_content_handler(container.margaret_oidc_provider_token_endpoint(),margaret::framework::http::body_limit::BodyLimit::new(1_024),)"
         ));
         assert!(server.contains(
-            "{container.margaret_oidc_provider_provider_metadata_handler()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>}"
+            "{margaret::framework::http::terminal_head_handler::terminal_head_handler(container.margaret_oidc_provider_provider_metadata_handler(),)}"
         ));
     }
 
@@ -2324,16 +2409,16 @@ struct GetDiscovery;
             .collect();
 
         assert!(run.contains(
-            "margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/sign-in/callback\",),).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_3|{margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/welcome\",),).map_err(margaret::framework::console::report_failure::report_failure,).map(|serve_input_4|"
+            "margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/sign-in/callback\",),).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_4|{margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/welcome\",),).map_err(margaret::framework::console::report_failure::report_failure,).map(|serve_input_5|"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client),::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_3,crate::margaret::oauth_clients::partner_client::sign_in_scopes::SIGN_IN_SCOPES,),);"
+            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client),::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_4,crate::margaret::oauth_clients::partner_client::sign_in_scopes::SIGN_IN_SCOPES,),);"
         ));
         assert!(construction.contains(
             "crate::margaret::oauth_clients::partner_client::SignInStartHandler::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::SignInFlow,>::clone(&margaret_oauth_clients_partner_client_sign_in_flow),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::sign_in_callback_handler::SignInCallbackHandler::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::SignInFlow,>::clone(&margaret_oauth_clients_partner_client_sign_in_flow),::std::sync::Arc::<crate::PartnerReaders>::clone(&partner_readers),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),serve_input_4,)"
+            "crate::margaret::oauth_clients::partner_client::sign_in_callback_handler::SignInCallbackHandler::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::SignInFlow,>::clone(&margaret_oauth_clients_partner_client_sign_in_flow),::std::sync::Arc::<crate::PartnerReaders>::clone(&partner_readers),::std::sync::Arc::<crate::margaret::sessions::IssuedSessions,>::clone(&margaret_sessions_issued_sessions),serve_input_5,)"
         ));
         assert_eq!(
             module(
@@ -2343,10 +2428,10 @@ struct GetDiscovery;
             "pub type SignInCallbackHandler = margaret::framework::oidc_sign_in::sign_in_callback_handler::SignInCallbackHandler<\n    crate::PartnerReaders,\n>;\n"
         );
         assert!(server.contains(
-            "{container.margaret_oauth_clients_partner_client_sign_in_start_handler()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>}"
+            "{margaret::framework::http::terminal_head_handler::terminal_head_handler(container.margaret_oauth_clients_partner_client_sign_in_start_handler(),)}"
         ));
         assert!(server.contains(
-            "{container.margaret_oauth_clients_partner_client_sign_in_callback_handler_sign_in_callback_handler()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>}"
+            "{margaret::framework::http::terminal_head_handler::terminal_head_handler(container.margaret_oauth_clients_partner_client_sign_in_callback_handler_sign_in_callback_handler(),)}"
         ));
     }
 
@@ -2471,10 +2556,10 @@ struct GetDiscovery;
             "pub const RESOURCE_GRANT: margaret::framework::client_credentials::resource_grant::ResourceGrant = margaret::framework::client_credentials::resource_grant::ResourceGrant {\n    audience: crate::margaret::resource_tokens::reports::audience::AUDIENCE,\n    scopes: &[\"reports:read\"],\n};\n"
         );
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::service_client::resources::reports::ResourceCredentials::create(::std::sync::Arc::<crate::margaret::oauth_clients::service_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_service_client_authorization_server_client),serve_input_4,),);"
+            "crate::margaret::oauth_clients::service_client::resources::reports::ResourceCredentials::create(::std::sync::Arc::<crate::margaret::oauth_clients::service_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_service_client_authorization_server_client),serve_input_5,),);"
         ));
         assert!(module(&code, "run").split_whitespace().collect::<String>().contains(
-            "::margaret::framework::client_credentials::resource_grant::ResourceGrant::target(crate::margaret::oauth_clients::service_client::resources::reports::resource_grant::RESOURCE_GRANT,).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_4|"
+            "::margaret::framework::client_credentials::resource_grant::ResourceGrant::target(crate::margaret::oauth_clients::service_client::resources::reports::resource_grant::RESOURCE_GRANT,).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_5|"
         ));
         assert!(!module(&code, "oauth_clients/service_client").contains("ClientCredentials"));
         assert!(construction.contains(
@@ -2507,14 +2592,14 @@ struct GetDiscovery;
 
         let run: String = module(&code, "run").split_whitespace().collect();
         assert!(run.contains(
-            "margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/blog/callback\",),).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_05|"
+            "margaret::framework::server_origin::route_url::RouteUrl::parse(margaret::framework::http::literal_url::literal_url(&origin_public,\"/blog/callback\",),).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|serve_input_06|"
         ));
         assert_eq!(run.matches("\"/blog/callback\"").count(), 1);
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::blog_app::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(serve_input_05.clone())]),"
+            "crate::margaret::accepted_clients::clients::blog_app::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(serve_input_06.clone())]),"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::blog::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::blog::AuthorizationServerClient,>::clone(&margaret_oauth_clients_blog_authorization_server_client),::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_05,"
+            "crate::margaret::oauth_clients::blog::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::blog::AuthorizationServerClient,>::clone(&margaret_oauth_clients_blog_authorization_server_client),::std::sync::Arc::<::margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_06,"
         ));
         assert_eq!(
             module(&code, "oauth_clients/blog/sign_in_scopes"),
@@ -2636,7 +2721,7 @@ impl Consumer {
         assert!(error.contains("which only the framework may inject"));
     }
 
-    const OWN_BEARER_CRATE: &str = "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
+    const OWN_BEARER_CRATE: &str = "use margaret::framework::macros::encrypts_signing_keys;\nuse margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::issues_resource_tokens;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2652,6 +2737,9 @@ struct AttachmentsResource;
 
 #[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]
 struct ApplicationDatabase;
+
+#[encrypts_signing_keys(key_from = \"SIGNING_KEYS_ENCRYPTION_KEY\")]
+struct SigningKeysEncryption;
 
 struct Claims;
 
@@ -2761,7 +2849,7 @@ impl HolderPage {
         ));
     }
 
-    const JWKS_NAME_COLLISION_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\n\
+    const JWKS_NAME_COLLISION_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::encrypts_signing_keys;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2788,6 +2876,9 @@ impl GetRoller {
 
 #[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]
 struct ApplicationDatabase;
+
+#[encrypts_signing_keys(key_from = \"SIGNING_KEYS_ENCRYPTION_KEY\")]
+struct SigningKeysEncryption;
 ";
 
     #[test]
@@ -2805,7 +2896,7 @@ struct ApplicationDatabase;
         ));
     }
 
-    const JWKS_FIELD_COLLISION_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\n\
+    const JWKS_FIELD_COLLISION_CRATE: &str = "use margaret::framework::macros::constructor;\nuse margaret::framework::macros::encrypts_signing_keys;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_oidc_endpoint;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -2836,6 +2927,9 @@ impl GetRoller {
 
 #[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]
 struct ApplicationDatabase;
+
+#[encrypts_signing_keys(key_from = \"SIGNING_KEYS_ENCRYPTION_KEY\")]
+struct SigningKeysEncryption;
 ";
 
     #[test]
@@ -2973,7 +3067,7 @@ impl RequestLog {
     fn create() -> anyhow::Result<Self> {}
 
     #[process]
-    fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process<TTarget>(&self, request: &Request, next: Next<TTarget>) -> anyhow::Result<ResponseContinuation<TTarget>> {}
 }
 ";
 
@@ -3110,7 +3204,7 @@ impl RequestLog {
     fn create() -> anyhow::Result<Self> {}
 
     #[process]
-    fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process<TTarget>(&self, request: &Request, next: Next<TTarget>) -> anyhow::Result<ResponseContinuation<TTarget>> {}
 }
 ";
 
@@ -3437,23 +3531,29 @@ impl Metrics {
 ";
 
     #[test]
-    fn declares_no_forwarders_module_when_no_responder_injects_a_forwarder() {
+    fn declares_no_forward_targets_module_without_a_named_get_route() {
         let code = generate(MULTI_SERVER_CRATE).expect("the build succeeds");
 
-        assert!(!module(&code, "mod").contains("pub mod forwarders;"));
-        assert!(!has_module(&code, "forwarders"));
+        assert!(!module(&code, "routes").contains("pub mod forward_targets;"));
+        assert!(!has_module(&code, "routes/forward_targets"));
     }
 
     #[test]
-    fn declares_the_forwarder_of_the_server_whose_responder_injects_it() {
+    fn declares_the_forward_targets_of_the_server_with_a_named_get_route() {
         let code = generate(&format!(
-            "{MULTI_SERVER_CRATE}use crate::margaret::forwarders::public::Forwarder;\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/forward\", server = \"public\")]\nstruct GetForward;\n\nimpl GetForward {{\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {{}}\n}}\n"
+            "{MULTI_SERVER_CRATE}#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_report\", path = \"/report\", server = \"public\")]\nstruct GetReport;\n\nimpl GetReport {{\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {{}}\n}}\n"
         ))
         .expect("the build succeeds");
 
-        assert!(module(&code, "mod").contains("pub mod forwarders;"));
-        assert!(has_module(&code, "forwarders/public/forwarder"));
-        assert!(!has_module(&code, "forwarders/internal"));
+        assert!(module(&code, "routes").contains("pub mod forward_targets;"));
+        assert!(has_module(
+            &code,
+            "routes/forward_targets/public_forward_target"
+        ));
+        assert!(!has_module(
+            &code,
+            "routes/forward_targets/internal_forward_target"
+        ));
     }
 
     #[test]
@@ -3847,7 +3947,7 @@ impl Page {
         let run: String = module(&code, "run").split_whitespace().collect();
 
         assert!(run.contains(
-            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"greeting").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"greeting").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::arguments::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
         ));
         assert!(serve.contains("letcontainer=matchsuper::container::build::serve(arguments){"));
         assert!(serve.contains("server_public(container,routes"));
@@ -3886,7 +3986,7 @@ impl Page {
         let run: String = module(&code, "run").split_whitespace().collect();
 
         assert!(run.contains(
-            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"title").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"title").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::arguments::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
         ));
         assert!(serve.contains("letcontainer=matchsuper::container::build::serve(arguments){"));
         assert!(serve.contains("super::views::build::build(container)"));
@@ -3931,7 +4031,7 @@ impl RespondsToWebSocketMessage for Chatter {
         let run: String = module(&code, "run").split_whitespace().collect();
 
         assert!(run.contains(
-            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"greeting").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"greeting").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::arguments::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
         ));
         assert!(serve.contains("letcontainer=matchsuper::container::build::serve(arguments){"));
         assert!(serve.contains("server_public(container,routes"));
@@ -3986,14 +4086,14 @@ impl RespondsToWebSocketMessage for Chatter {
         let run: String = module(&code, "run").split_whitespace().collect();
 
         assert!(run.contains(
-            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"timezone").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
+            r#"margaret::framework::console::required_argument::required_argument::<::std::string::String,>(matches,"timezone").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::arguments::serve_arguments::ServeArguments{argument0:serve_input_0,},"#
         ));
         assert!(serve.contains("letcontainer=matchsuper::container::build::serve(arguments){"));
         assert!(serve.contains("server_public(container,routes"));
         assert!(!serve.contains("server_public(container,&serve_input_0"));
     }
 
-    const ISSUED_SESSIONS_CRATE: &str = "use margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_session_endpoint;\nuse margaret::framework::macros::singleton;\n\
+    const ISSUED_SESSIONS_CRATE: &str = "use margaret::framework::macros::encrypts_signing_keys;\nuse margaret::framework::macros::infer_from_request;\nuse margaret::framework::macros::infers_authenticated_user;\nuse margaret::framework::macros::issues_sessions;\nuse margaret::framework::macros::issues_tokens;\nuse margaret::framework::macros::postgres_database;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::serves_session_endpoint;\nuse margaret::framework::macros::singleton;\n\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -4004,6 +4104,9 @@ use margaret::framework::sessions::session_endpoint::SessionEndpoint;
 
 #[postgres_database(url_from = \"APPLICATION_DATABASE_URL\", max_connections_from = \"APPLICATION_DATABASE_MAX_CONNECTIONS\")]
 struct ApplicationDatabase;
+
+#[encrypts_signing_keys(key_from = \"SIGNING_KEYS_ENCRYPTION_KEY\")]
+struct SigningKeysEncryption;
 
 #[issues_tokens(provider, issuer = \"https://issuer.fixture\")]
 struct Issuer;
@@ -4068,7 +4171,7 @@ struct PostSignOut;
             "margaret::framework::http::limited_content_handler::limited_content_handler(container.margaret_sessions_session_refresh_endpoint(),margaret::framework::http::body_limit::BodyLimit::new(4_096),)"
         ));
         assert!(source.contains(
-            "container.margaret_sessions_sign_out_endpoints_post_sign_out_session_sign_out_endpoint_session_sign_out_endpoint()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>"
+            "margaret::framework::http::terminal_head_handler::terminal_head_handler(container.margaret_sessions_sign_out_endpoints_post_sign_out_session_sign_out_endpoint_session_sign_out_endpoint(),)"
         ));
     }
 
@@ -4085,10 +4188,10 @@ struct PostSignOut;
             "pubmodpost_sign_out;pubmodpost_staff_sign_out;"
         );
         assert!(source.contains(
-            "container.margaret_sessions_sign_out_endpoints_post_sign_out_session_sign_out_endpoint_session_sign_out_endpoint()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>"
+            "margaret::framework::http::terminal_head_handler::terminal_head_handler(container.margaret_sessions_sign_out_endpoints_post_sign_out_session_sign_out_endpoint_session_sign_out_endpoint(),)"
         ));
         assert!(source.contains(
-            "container.margaret_sessions_sign_out_endpoints_post_staff_sign_out_session_sign_out_endpoint_session_sign_out_endpoint()as::std::sync::Arc<dynmargaret::framework::http::head_handler::HeadHandler>"
+            "margaret::framework::http::terminal_head_handler::terminal_head_handler(container.margaret_sessions_sign_out_endpoints_post_staff_sign_out_session_sign_out_endpoint_session_sign_out_endpoint(),)"
         ));
         assert!(source.contains(
             "margaret::framework::http::literal_url::literal_url(&origin_public,\"/welcome\",)"

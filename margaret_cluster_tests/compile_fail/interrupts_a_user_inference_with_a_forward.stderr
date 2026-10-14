@@ -1,0 +1,15 @@
+error[E0308]: mismatched types
+  --> compile_fail/interrupts_a_user_inference_with_a_forward.rs:10:9
+   |
+ 9 |     drop(AuthenticatedUserOutcome::<()>::Interrupted(
+   |          ------------------------------------------- arguments to this enum variant are incorrect
+10 |         routes.public.get_notes.forward_to(GetNotesRouteProps),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Response`, found `Forward<PublicForwardTarget>`
+   |
+   = note: expected struct `margaret::framework::margaret_http::response::Response`
+              found struct `margaret::framework::margaret_http::forward::Forward<PublicForwardTarget>`
+note: tuple variant defined here
+  --> $WORKSPACE/margaret_identity/src/authenticated_user_outcome.rs
+   |
+   |     Interrupted(Response),
+   |     ^^^^^^^^^^^

@@ -4,7 +4,6 @@ use chrono::Utc;
 
 use margaret_http::bearer_challenge::BearerChallenge;
 use margaret_http::request_authorization::RequestAuthorization;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_jwt_verification::jwt_presentation::JwtPresentation;
 use margaret_jwt_verification::jwt_routing::JwtRouting;
 use margaret_jwt_verification::presented_jwt::PresentedJwt;
@@ -18,7 +17,7 @@ use crate::routed_bearer_token::RoutedBearerToken;
 fn refused<'request, 'trusted>(
     challenge: BearerChallenge,
 ) -> BearerTokenRouting<'request, 'trusted> {
-    BearerTokenRouting::Refused(ResponseContinuation::from(challenge.response()))
+    BearerTokenRouting::Refused(challenge.response())
 }
 
 fn route_presented_at<'request, 'trusted>(

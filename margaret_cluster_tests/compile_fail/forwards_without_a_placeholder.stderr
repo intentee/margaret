@@ -1,0 +1,5 @@
+error[E0063]: missing field `note` in initializer of `GetNoteRouteProps`
+ --> compile_fail/forwards_without_a_placeholder.rs:8:44
+  |
+8 |     drop(routes.public.get_note.forward_to(GetNoteRouteProps {}));
+  |                                            ^^^^^^^^^^^^^^^^^ missing `note`

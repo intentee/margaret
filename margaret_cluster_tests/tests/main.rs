@@ -61,6 +61,7 @@ mod chat_messages_posted_on_one_instance_are_listed_on_another;
 #[cfg(feature = "tests_that_use_cluster")]
 mod client_credentials_introspect_active_on_another_instance;
 mod cluster_binary;
+mod concludes_a_forward_to_every_named_public_route_with_its_props;
 #[cfg(feature = "tests_that_use_cluster")]
 mod concurrent_code_redemptions_on_several_instances_admit_one;
 #[cfg(feature = "tests_that_use_cluster")]
@@ -95,7 +96,6 @@ mod fails_patching_a_note_the_database_refuses;
 mod fails_reading_a_note_the_database_refuses;
 #[cfg(feature = "tests_that_use_cluster")]
 mod fails_viewing_a_note_the_database_refuses;
-mod forwards_to_every_named_public_route_by_its_name_and_placeholders;
 #[cfg(feature = "tests_that_use_cluster")]
 mod instances_started_on_overdue_keys_roll_once;
 #[cfg(feature = "tests_that_use_cluster")]

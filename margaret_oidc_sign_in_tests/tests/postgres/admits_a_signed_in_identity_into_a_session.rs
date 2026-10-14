@@ -3,8 +3,7 @@ use http::header::SET_COOKIE;
 use uuid::Uuid;
 
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::clears_the_transaction::clears_the_transaction;
@@ -33,7 +32,7 @@ async fn admits_a_signed_in_identity_into_a_session() {
 
     fixture.server.stop().await;
 
-    let Ok(ResponseContinuation::Done(response)) = answered else {
+    let Ok(response) = answered else {
         panic!("the sign-in callback is answered");
     };
 

@@ -30,7 +30,7 @@ async fn answers_a_librarian_at_a_shelf_after_hearing_whispers() {
                 .headers_mut()
                 .insert(LIBRARIAN_BADGE, HeaderValue::from_static(LISTED_LIBRARIAN));
 
-            let (mut talk, _) = open_websocket(*address, request)
+            let mut talk = open_websocket(*address, request)
                 .await
                 .expect("the listed librarian talks at the shelf");
 

@@ -36,6 +36,7 @@ use margaret_route_method::route_method::RouteMethod;
 use crate::application_responder::ApplicationResponder;
 use crate::constants::ROUTE_METHODS;
 use crate::content_method_tokens::content_method_tokens;
+use crate::forward_targets_layout::ForwardTargetsLayout;
 use crate::framework_route::FrameworkRoute;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
@@ -44,6 +45,7 @@ use crate::route_content::RouteContent;
 use crate::route_group::RouteGroup;
 use crate::route_handling::RouteHandling;
 use crate::route_responder::RouteResponder;
+use crate::server_forwarding::ServerForwarding;
 use crate::server_layout::ServerLayout;
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
@@ -138,7 +140,7 @@ fn content_bindings(
                 body_local: body_binding,
                 content_local,
                 continuation_return: &quote! {
-                    return ::std::result::Result::Ok(response)
+                    return margaret::framework::http::refusal::refusal(response)
                 },
                 limit: limit.get(),
                 request_local: request_binding,
@@ -155,7 +157,6 @@ fn content_bindings(
 
 fn responder_body(
     responder: &ApplicationResponder,
-    server: &str,
     HandlerNames {
         body_binding,
         captured,
@@ -167,10 +168,10 @@ fn responder_body(
         views_local,
     }: &HandlerNames,
 ) -> TokenStream {
-    let refused = quote! { ::std::result::Result::Ok };
+    let refused = quote! { margaret::framework::http::refusal::refusal };
     let extraction_context = HeadExtractionContext {
         continuation_return: &quote! {
-            return ::std::result::Result::Ok(response)
+            return margaret::framework::http::refusal::refusal(response)
         },
         error_return: &quote! {
             return ::std::result::Result::Err(
@@ -181,11 +182,10 @@ fn responder_body(
         refused: &refused,
         request_local: request_binding,
     };
-    let server = format_ident!("{server}");
     let argument_values = responder
         .arguments
         .iter()
-        .map(|argument| argument_value(argument, routes_local, views_local, &server));
+        .map(|argument| argument_value(argument, routes_local, views_local));
     let method_name = &responder.method_name;
     let respond_call = if responder.is_async {
         quote! { #responder_binding.#method_name(#(#argument_values),*).await }
@@ -244,14 +244,16 @@ fn framework_handler(
             }
         }
         RouteContent::Unread { .. } => quote! {
-            #handler_access as ::std::sync::Arc<dyn margaret::framework::http::head_handler::HeadHandler>
+            margaret::framework::http::terminal_head_handler::terminal_head_handler(#handler_access)
         },
     }
 }
 
-fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
+fn onion(route: &HttpRoute, target: &TokenStream, bindings: &ContainerBindings) -> TokenStream {
     let handler = match &route.responder {
-        RouteResponder::Application(responder) => application_handler(route, responder, bindings),
+        RouteResponder::Application(responder) => {
+            application_handler(route, responder, target, bindings)
+        }
         RouteResponder::Framework(framework) => framework_handler(framework, bindings),
     };
 
@@ -266,6 +268,7 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
 fn application_handler(
     route: &HttpRoute,
     responder: &ApplicationResponder,
+    target: &TokenStream,
     bindings: &ContainerBindings,
 ) -> TokenStream {
     let responder_type = path_tokens(&route.responder_path);
@@ -284,12 +287,12 @@ fn application_handler(
         ..
     } = &names;
 
-    let body = responder_body(responder, &route.server, &names);
+    let body = responder_body(responder, &names);
 
     let captures_routes = responder_injects_routes(route);
     let captures_views = responder_injects_views(route);
     let outcome_future = quote! {
-        margaret::framework::http::handler_future::HandlerFuture<'_>
+        margaret::framework::http::handler_future::HandlerFuture<'_, #target>
     };
     let responder_function = match &responder.content {
         RouteContent::Read { .. } => {
@@ -362,14 +365,10 @@ fn argument_value(
     argument: &BoundParameter,
     routes_binding: &Ident,
     views_binding: &Ident,
-    server: &Ident,
 ) -> TokenStream {
     match &argument.binding {
         RequestBinding::Routes => quote! { #routes_binding.as_ref() },
         RequestBinding::Views => quote! { #views_binding.as_ref() },
-        RequestBinding::Forwarder => {
-            quote! { super::super::forwarders::#server::Forwarder::default() }
-        }
         _ => {
             let holder = &argument.holder;
 
@@ -407,6 +406,7 @@ fn render_handler(
     route: &HttpRoute,
     position: usize,
     has_views: bool,
+    target: &TokenStream,
     bindings: &ContainerBindings,
 ) -> RenderedHandler {
     let function = format_ident!("route_handler_{position}");
@@ -425,7 +425,7 @@ fn render_handler(
             #views: &::std::sync::Arc<super::super::views::Views>,
         }
     });
-    let handler = onion(route, bindings);
+    let handler = onion(route, target, bindings);
     let handler_kind = match route.handling() {
         RouteHandling::Content(_) => {
             quote! { margaret::framework::http::content_handler::ContentHandler }
@@ -441,7 +441,7 @@ fn render_handler(
             container: &super::super::container::Container,
             #routes: &::std::sync::Arc<super::super::routes::Routes>,
             #views_parameter
-        ) -> ::std::sync::Arc<dyn #handler_kind> {
+        ) -> ::std::sync::Arc<dyn #handler_kind<#target>> {
             #handler
         }
     };
@@ -449,11 +449,107 @@ fn render_handler(
     RenderedHandler { function, tokens }
 }
 
+fn handler_call(route: &HttpRoute, call: TokenStream) -> HandlerCall {
+    match &route.name {
+        Some(name) if matches!(route.handling(), RouteHandling::Head(RouteMethod::Get)) => {
+            HandlerCall::ForwardTarget {
+                call,
+                field: format_ident!("{name}"),
+            }
+        }
+        Some(_) | None => HandlerCall::Direct(call),
+    }
+}
+
+fn method_handler(route: &HttpRoute, handler: &TokenStream) -> TokenStream {
+    match route.handling() {
+        RouteHandling::Content(method) => {
+            let method = content_method_tokens(method);
+
+            quote! {
+                margaret::framework::http::method_handler::MethodHandler::content(
+                    #method,
+                    #handler,
+                )
+            }
+        }
+        RouteHandling::Head(method) => {
+            let method = ROUTE_METHODS.tokens(method);
+
+            quote! {
+                margaret::framework::http::method_handler::MethodHandler::head(
+                    #method,
+                    #handler,
+                )
+            }
+        }
+    }
+}
+
+fn route_entries(
+    table: &HttpRouteTable,
+    server: &HttpServer,
+    handler_calls: &[HandlerCall],
+) -> Vec<TokenStream> {
+    let mut calls = handler_calls.iter();
+
+    table
+        .route_groups(server.name())
+        .map(|group| {
+            let method_handlers = group
+                .method_routes()
+                .zip(calls.by_ref())
+                .map(|(route, handler)| match handler {
+                    HandlerCall::Direct(call) => method_handler(route, call),
+                    HandlerCall::ForwardTarget { field, .. } => method_handler(
+                        route,
+                        &quote! { ::std::sync::Arc::clone(&forward_targets.#field) },
+                    ),
+                })
+                .collect::<Vec<TokenStream>>();
+            let method_handlers = vec_literal_tokens(method_handlers);
+
+            quote! {
+                margaret::framework::http::route_entry::RouteEntry::new(#method_handlers)
+            }
+        })
+        .collect()
+}
+
+fn forward_targets_binding(
+    layout: &ServerLayout<'_>,
+    handler_calls: &[HandlerCall],
+) -> TokenStream {
+    match &layout.forwarding {
+        ServerForwarding::Targets(ForwardTargetsLayout { targets_type, .. }) => {
+            let fields = handler_calls.iter().filter_map(|handler| match handler {
+                HandlerCall::Direct(_) => None,
+                HandlerCall::ForwardTarget { call, field } => Some(quote! { #field: #call, }),
+            });
+
+            quote! {
+                let forward_targets = super::super::routes::forward_targets::#targets_type {
+                    #(#fields)*
+                };
+            }
+        }
+        ServerForwarding::Unforwarded => TokenStream::new(),
+    }
+}
+
+fn forward_targets_argument(layout: &ServerLayout<'_>) -> TokenStream {
+    match &layout.forwarding {
+        ServerForwarding::Targets(_) => quote! { forward_targets },
+        ServerForwarding::Unforwarded => quote! { () },
+    }
+}
+
 fn server_router(
     layout: &ServerLayout<'_>,
     websocket_session_count: usize,
     routes_param: &Ident,
     route_entries: &[TokenStream],
+    targets: &TokenStream,
 ) -> TokenStream {
     let ServerLayout { field, paths, .. } = layout;
     let websocket_entries: Vec<Ident> = (0..websocket_session_count)
@@ -471,71 +567,14 @@ fn server_router(
     quote! {
         #websocket_destructure
 
-        #routes_param.#field.#paths.routes([
-            #(#route_entries,)*
-            #(#websocket_entries,)*
-        ])
+        #routes_param.#field.#paths.routes(
+            [
+                #(#route_entries,)*
+                #(#websocket_entries,)*
+            ],
+            #targets,
+        )
     }
-}
-
-fn route_entries<'handler>(
-    table: &HttpRouteTable,
-    server: &HttpServer,
-    routes_param: &Ident,
-    views_argument: Option<&TokenStream>,
-    rendered_handler_entries: &mut impl Iterator<Item = &'handler RenderedHandler>,
-) -> Vec<TokenStream> {
-    table
-        .route_groups(server.name())
-        .map(|group| {
-            let method_handlers = group
-                .method_routes()
-                .zip(rendered_handler_entries.by_ref())
-                .map(|(route, rendered_handler)| {
-                    let function = &rendered_handler.function;
-                    let handler_call = quote! {
-                        #function(container, #routes_param, #views_argument)
-                    };
-
-                    match route.handling() {
-                        RouteHandling::Content(method) => {
-                            let method = content_method_tokens(method);
-
-                            quote! {
-                                margaret::framework::http::method_handler::MethodHandler::content(
-                                    #method,
-                                    #handler_call,
-                                )
-                            }
-                        }
-                        RouteHandling::Head(method) => match &route.name {
-                            Some(name) if matches!(method, RouteMethod::Get) => quote! {
-                                margaret::framework::http::method_handler::MethodHandler::forwardable(
-                                    #name,
-                                    #handler_call,
-                                )
-                            },
-                            Some(_) | None => {
-                                let method = ROUTE_METHODS.tokens(method);
-
-                                quote! {
-                                    margaret::framework::http::method_handler::MethodHandler::head(
-                                        #method,
-                                        #handler_call,
-                                    )
-                                }
-                            }
-                        },
-                    }
-                })
-                .collect::<Vec<TokenStream>>();
-            let method_handlers = vec_literal_tokens(method_handlers);
-
-            quote! {
-                margaret::framework::http::route_entry::RouteEntry::new(#method_handlers)
-            }
-        })
-        .collect()
 }
 
 fn server_module(
@@ -551,6 +590,9 @@ fn server_module(
         .route_groups(server.name())
         .flat_map(RouteGroup::method_routes)
         .collect();
+    let target = layout
+        .forwarding
+        .target_type(&quote! { super::super::routes });
     let routes_param = format_ident!("routes");
     let views_param = if has_views && !server_routes.is_empty() {
         format_ident!("views")
@@ -565,32 +607,32 @@ fn server_module(
     let rendered_handlers = server_routes
         .iter()
         .enumerate()
-        .map(|(position, route)| render_handler(route, position, has_views, bindings))
+        .map(|(position, route)| render_handler(route, position, has_views, &target, bindings))
         .collect::<Vec<_>>();
-    let handler_helpers = rendered_handlers
-        .iter()
-        .map(|handler| &handler.tokens)
-        .collect::<Vec<_>>();
-    let mut rendered_handler_entries = rendered_handlers.iter();
+    let handler_helpers = rendered_handlers.iter().map(|handler| &handler.tokens);
     let views_argument = has_views.then(|| quote! { #views_param, });
-    let route_entries = route_entries(
-        table,
-        server,
-        &routes_param,
-        views_argument.as_ref(),
-        &mut rendered_handler_entries,
-    );
+    let handler_calls: Vec<HandlerCall> = server_routes
+        .iter()
+        .zip(&rendered_handlers)
+        .map(|(route, RenderedHandler { function, .. })| {
+            handler_call(
+                route,
+                quote! { #function(container, #routes_param, #views_argument) },
+            )
+        })
+        .collect();
+    let targets_binding = forward_targets_binding(layout, &handler_calls);
+    let route_entries = route_entries(table, server, &handler_calls);
+    let targets = forward_targets_argument(layout);
     let router = server_router(
         layout,
         websocket_session_count,
         &routes_param,
         &route_entries,
+        &targets,
     );
-
-    let inner_return =
-        quote! { margaret::framework::http::server_route_entries::ServerRouteEntries };
-    let body = quote! { #router };
     let too_many_lines = too_many_lines_allow();
+
     quote! {
         #(#handler_helpers)*
 
@@ -599,8 +641,10 @@ fn server_module(
             container: &super::super::container::Container,
             #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
             #views_parameter
-        ) -> #inner_return {
-            #body
+        ) -> margaret::framework::http::server_route_entries::ServerRouteEntries<#target> {
+            #targets_binding
+
+            #router
         }
     }
 }
@@ -619,6 +663,11 @@ struct HandlerNames {
 struct RenderedHandler {
     function: Ident,
     tokens: TokenStream,
+}
+
+enum HandlerCall {
+    Direct(TokenStream),
+    ForwardTarget { call: TokenStream, field: Ident },
 }
 
 pub(crate) fn render(

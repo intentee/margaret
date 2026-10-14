@@ -22,7 +22,6 @@ use margaret_http::no_store::no_store;
 use margaret_http::request::Request;
 use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http_validation::responded_to_form::responded_to_form;
 use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
@@ -165,7 +164,7 @@ impl HandlesLimitedContent for IntrospectionEndpoint {
         request: &Request,
         body: RequestBody,
         limit: BodyLimit,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<Response, HandlerError> {
         responded_to_form(request, body, limit, |submission| {
             self.respond(request, submission)
         })

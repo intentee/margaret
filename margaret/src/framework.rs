@@ -1,6 +1,11 @@
 #[cfg(feature = "runtime")]
 pub use anyhow;
 #[cfg(feature = "runtime")]
+pub use oauth2;
+#[cfg(feature = "runtime")]
+pub use reqwest;
+
+#[cfg(feature = "runtime")]
 pub use margaret_accepted_clients as accepted_clients;
 #[cfg(feature = "runtime")]
 pub use margaret_active_record as active_record;
@@ -93,6 +98,8 @@ pub use margaret_sessions as sessions;
 #[cfg(feature = "runtime")]
 pub use margaret_signing_keys as signing_keys;
 #[cfg(feature = "runtime")]
+pub use margaret_signing_keys_encryption as signing_keys_encryption;
+#[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid as spiffe_svid;
 #[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid_bundle as spiffe_svid_bundle;
@@ -126,10 +133,6 @@ pub use margaret_views as views;
 pub use margaret_websocket as websocket;
 #[cfg(feature = "runtime")]
 pub use margaret_websocket_session as websocket_session;
-#[cfg(feature = "runtime")]
-pub use oauth2;
-#[cfg(feature = "runtime")]
-pub use reqwest;
 
 #[cfg(all(test, feature = "runtime"))]
 mod tests {

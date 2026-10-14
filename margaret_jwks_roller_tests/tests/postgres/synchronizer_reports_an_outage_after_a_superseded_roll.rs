@@ -14,7 +14,7 @@ use margaret_jwks_roller_tests::locked_signing_keys::locked_signing_keys;
 use margaret_jwks_roller_tests::seeded_signing_keys::seeded_signing_keys;
 use margaret_signing_keys::constants::SIGNING_KEY_SET_NAME;
 use margaret_signing_keys::signing_key_set::SigningKeySet;
-use margaret_signing_keys::signing_keys_revision::SigningKeysRevision;
+use margaret_signing_keys_tests::sealed_revision::sealed_revision;
 use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
 
 #[tokio::test]
@@ -46,8 +46,7 @@ async fn synchronizer_reports_an_outage_after_a_superseded_roll() {
 
     started.administration.await_lock_waiters(1).await;
 
-    let peer_roll = SigningKeysRevision::from_secret(&rolled_secret(&stored))
-        .expect("the peer roll serializes");
+    let peer_roll = sealed_revision(&rolled_secret(&stored));
 
     assert!(matches!(
         SigningKeySet::query()
@@ -57,7 +56,8 @@ async fn synchronizer_reports_an_outage_after_a_superseded_roll() {
                 columns
                     .generation
                     .to(2)
-                    .and(columns.document.to(peer_roll.document))
+                    .and(columns.nonce.to(peer_roll.sealed.nonce.to_vec()))
+                    .and(columns.sealed_document.to(peer_roll.sealed.ciphertext))
             })
             .await
             .expect("the peer rolls the keys"),

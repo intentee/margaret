@@ -56,8 +56,7 @@ impl Request {
         &self.server
     }
 
-    #[must_use]
-    pub fn with_path_params(self, path_params: HashMap<String, String>) -> Self {
+    pub(crate) fn with_path_params(self, path_params: HashMap<String, String>) -> Self {
         Self {
             inputs: self.inputs,
             path_params,

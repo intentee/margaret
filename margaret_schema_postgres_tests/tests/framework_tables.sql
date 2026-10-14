@@ -53,6 +53,7 @@ CREATE INDEX "client_assertions_expires_at_index" ON "margaret"."client_assertio
 CREATE TABLE "margaret"."signing_key_sets" (
     "name" TEXT NOT NULL,
     "generation" BIGINT NOT NULL,
-    "document" TEXT NOT NULL,
+    "nonce" BYTEA NOT NULL CONSTRAINT "signing_key_sets_nonce_byte_length" CHECK (length("nonce") = 12),
+    "sealed_document" BYTEA NOT NULL,
     PRIMARY KEY ("name")
 );

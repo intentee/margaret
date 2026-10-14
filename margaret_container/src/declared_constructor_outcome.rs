@@ -12,11 +12,12 @@ use crate::constructor_outcome::ConstructorOutcome;
 fn returns_the_constructed_struct(
     index: &AttributeIndex,
     item: &IndexedItem,
+    constructor: &IndexedMethod,
     returned: &Type,
 ) -> bool {
     syn::parse2::<Token![Self]>(returned.to_token_stream()).is_ok()
         || index
-            .resolve_item_type(item, returned)
+            .resolve_module_type(constructor.module_path(), returned)
             .is_some_and(|resolved| resolved == *item.canonical_path())
 }
 
@@ -26,7 +27,9 @@ pub(crate) fn declared_constructor_outcome(
     constructor: &IndexedMethod,
 ) -> ConstructorOutcome {
     match &constructor.signature().output {
-        ReturnType::Type(_, returned) if returns_the_constructed_struct(index, item, returned) => {
+        ReturnType::Type(_, returned)
+            if returns_the_constructed_struct(index, item, constructor, returned) =>
+        {
             ConstructorOutcome::Infallible
         }
         ReturnType::Default | ReturnType::Type(..) => ConstructorOutcome::Fallible,

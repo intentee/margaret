@@ -58,6 +58,8 @@ mod server_secret_store_canonical_path;
 mod serving_modules;
 mod sessions_framework_providers;
 mod sessions_tables_canonical_path;
+mod signing_keys_encryption_key_canonical_path;
+mod signing_keys_encryption_providers;
 mod signing_keys_tables_canonical_path;
 mod token_target_canonical_path;
 mod trusted_issuer_framework_providers;

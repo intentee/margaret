@@ -8,8 +8,11 @@ use margaret_http::response_continuation::ResponseContinuation;
 pub struct FailingHandler;
 
 #[async_trait]
-impl HeadHandler for FailingHandler {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TTarget> HeadHandler<TTarget> for FailingHandler {
+    async fn handle(
+        &self,
+        _request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         Err(HandlerError::consumer(anyhow::anyhow!(
             "secret database endpoint"
         )))

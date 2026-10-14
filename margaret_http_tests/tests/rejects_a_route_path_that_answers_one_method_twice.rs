@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use margaret_http::method_handler::MethodHandler;
@@ -20,10 +21,13 @@ fn rejects_a_route_path_that_answers_one_method_twice() {
     assert!(matches!(
         ServerPaths::build(["/items"])
             .expect("the route paths do not conflict")
-            .routes([RouteEntry::new(vec![
-                MethodHandler::head(RouteMethod::Get, not_found()),
-                MethodHandler::head(RouteMethod::Get, not_found()),
-            ])])
+            .routes::<Infallible>(
+                [RouteEntry::new(vec![
+                    MethodHandler::head(RouteMethod::Get, not_found()),
+                    MethodHandler::head(RouteMethod::Get, not_found()),
+                ])],
+                (),
+            )
             .build(),
         Err(RouterError::DuplicateMethod {
             method: RouteMethod::Get,

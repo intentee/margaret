@@ -8,7 +8,6 @@ use margaret_http::handles_limited_content::HandlesLimitedContent;
 use margaret_http::request::Request;
 use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http_validation::responded_to_form::responded_to_form;
 use margaret_sessions::issued_sessions::IssuedSessions;
 use margaret_sessions::resolved_session::ResolvedSession;
@@ -61,7 +60,7 @@ impl ConsentHandler {
         &self,
         request: &Request,
         submission: ValidationResult<ConsentSubmission>,
-    ) -> anyhow::Result<ResponseContinuation> {
+    ) -> anyhow::Result<Response> {
         let ResolvedSession {
             cookie_changes,
             session,
@@ -71,7 +70,7 @@ impl ConsentHandler {
             None => Response::unauthorized(),
         };
 
-        Ok(cookie_changes.precede(ResponseContinuation::from(frame_denied(response))))
+        Ok(cookie_changes.precede_response(frame_denied(response)))
     }
 }
 
@@ -82,7 +81,7 @@ impl HandlesLimitedContent for ConsentHandler {
         request: &Request,
         body: RequestBody,
         limit: BodyLimit,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<Response, HandlerError> {
         responded_to_form(request, body, limit, |submission| {
             self.respond(request, submission)
         })

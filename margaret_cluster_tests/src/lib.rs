@@ -69,6 +69,7 @@ pub mod signing_key_sets;
 pub mod started_alice_session;
 pub mod stored_message;
 pub mod stored_note;
+pub mod stored_signing_keys_revision;
 pub mod tls_relay;
 pub mod token_exchange;
 pub mod unreachable_database_command;

@@ -4,38 +4,37 @@ use syn::TypeParamBound;
 use syn::TypeTraitObject;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::standard_library_item::StandardLibraryItem;
 use margaret_syn_type_peeling::peel_standard_wrapper::peel_standard_wrapper;
 
-fn is_marker_trait(index: &AttributeIndex, item: &IndexedItem, path: &Path) -> bool {
+fn is_marker_trait(index: &AttributeIndex, module_path: &[String], path: &Path) -> bool {
     matches!(
         index
-            .resolve_item_path(item, path)
+            .resolve_module_path(module_path, path)
             .as_ref()
             .and_then(StandardLibraryItem::from_canonical),
         Some(StandardLibraryItem::Send | StandardLibraryItem::Sync)
     )
 }
 
-fn peel_pointee(index: &AttributeIndex, item: &IndexedItem, pointee: &Type) -> Option<Path> {
+fn peel_pointee(index: &AttributeIndex, module_path: &[String], pointee: &Type) -> Option<Path> {
     match pointee {
         Type::Path(type_path) => Some(type_path.path.clone()),
-        Type::TraitObject(trait_object) => single_trait_bound(index, item, trait_object),
+        Type::TraitObject(trait_object) => single_trait_bound(index, module_path, trait_object),
         _ => None,
     }
 }
 
 fn single_trait_bound(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     trait_object: &TypeTraitObject,
 ) -> Option<Path> {
     let mut resolved: Option<Path> = None;
 
     for bound in &trait_object.bounds {
         if let TypeParamBound::Trait(trait_bound) = bound {
-            if is_marker_trait(index, item, &trait_bound.path) {
+            if is_marker_trait(index, module_path, &trait_bound.path) {
                 continue;
             }
             if resolved.is_some() {
@@ -50,16 +49,16 @@ fn single_trait_bound(
 
 pub(crate) fn peel_target(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     parameter_type: &Type,
 ) -> Option<Path> {
     peel_standard_wrapper(
         index,
-        item,
+        module_path,
         parameter_type,
         &[StandardLibraryItem::Arc, StandardLibraryItem::Rc],
     )
-    .and_then(|pointee| peel_pointee(index, item, pointee))
+    .and_then(|pointee| peel_pointee(index, module_path, pointee))
 }
 
 #[cfg(test)]
@@ -75,7 +74,7 @@ mod tests {
             IndexedSource::new("use std::rc::Rc;\nuse std::sync::Arc;\n\nstruct Probe;\n");
         let parsed: Type = syn::parse_str(parameter_type).expect("a type fixture parses");
 
-        match peel_target(&indexed.index, indexed.item("Probe"), &parsed) {
+        match peel_target(&indexed.index, indexed.item("Probe").module_path(), &parsed) {
             Some(_) => "single",
             None => "none",
         }

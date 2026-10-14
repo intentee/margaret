@@ -3,6 +3,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use margaret::framework::sql_identifier::table_namespace::TableNamespace;
+use margaret_cluster_fixture::margaret::routes::props::PatchNoteRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_database_tests::table_privilege::TablePrivilege;
@@ -26,7 +27,10 @@ async fn fails_patching_a_note_the_database_refuses() {
                     cluster
                         .routes()
                         .public
-                        .patch_note(Uuid::new_v4().to_string())
+                        .patch_note
+                        .address(PatchNoteRouteProps {
+                            note: Uuid::new_v4().to_string()
+                        })
                 )
                 .url()
             )

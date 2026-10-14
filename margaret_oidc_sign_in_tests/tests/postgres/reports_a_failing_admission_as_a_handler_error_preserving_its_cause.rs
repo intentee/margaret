@@ -1,6 +1,6 @@
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_handler_error::handler_error::HandlerError;
-use margaret_http::head_handler::HeadHandler;
+use margaret_http::handles_head::HandlesHead;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::fixture_admission::FixtureAdmission;

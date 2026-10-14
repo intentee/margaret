@@ -17,6 +17,7 @@ use margaret_attributes::matched_attribute::MatchedAttribute;
 use margaret_database_codegen::database_canonical_path::database_canonical_path;
 use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
 use margaret_environment_variable_codegen::environment_variable::EnvironmentVariable;
+use margaret_environment_variable_codegen::environment_variable_name::EnvironmentVariableName;
 use margaret_input_weaving::input_value::InputValue;
 use margaret_input_weaving::weaving_kind::WeavingKind;
 use margaret_serve_input_codegen::declared_serve_inputs::DeclaredServeInputs;
@@ -155,7 +156,7 @@ fn build_provider_draft<'index>(
 
     let field_name = identifier.field().to_string();
     let construction = resolve_construction(index, item, shape)?;
-    let parameters = read_draft_parameters(index, item, &construction);
+    let parameters = read_draft_parameters(index, &construction);
 
     Ok(Draft {
         concrete_path: concrete_path.clone(),
@@ -205,7 +206,7 @@ fn build_construction_draft<'index>(
 
     let concrete_path = item.canonical_path().clone();
     let construction = resolve_construction(index, item, shape)?;
-    let parameters = read_draft_parameters(index, item, &construction);
+    let parameters = read_draft_parameters(index, &construction);
 
     Ok(Draft {
         concrete_path: concrete_path.clone(),
@@ -218,7 +219,6 @@ fn build_construction_draft<'index>(
 
 fn read_draft_parameters<'index>(
     index: &AttributeIndex,
-    item: &IndexedItem,
     construction: &ConstructionSource<'index>,
 ) -> Vec<DraftParameter<'index>> {
     let ConstructionSource::Constructor {
@@ -232,7 +232,7 @@ fn read_draft_parameters<'index>(
     constructor
         .parameters()
         .iter()
-        .map(|parameter| DraftParameter::read(index, item, parameter))
+        .map(|parameter| DraftParameter::read(index, constructor.module_path(), parameter))
         .collect()
 }
 
@@ -381,6 +381,23 @@ fn declared_framework_providers(
     Ok(declared)
 }
 
+fn environment_variable_input(
+    index: &AttributeIndex,
+    name: &EnvironmentVariableName,
+    value_type: &CanonicalPath,
+) -> DependencyKind {
+    DependencyKind::ServeInput {
+        input: Box::new(ServeInput::EnvironmentVariable(EnvironmentVariable {
+            name: name.clone(),
+            value: InputValue {
+                required: true,
+                value_type: value_type.clone(),
+                weaving: WeavingKind::from_canonical(index, value_type, true),
+            },
+        })),
+    }
+}
+
 fn framework_dependency_kind(
     index: &AttributeIndex,
     dependency: &FrameworkDependency,
@@ -391,16 +408,7 @@ fn framework_dependency_kind(
     match dependency {
         FrameworkDependency::Constant(path) => Ok(DependencyKind::Constant { path: path.clone() }),
         FrameworkDependency::EnvironmentVariable { name, value_type } => {
-            Ok(DependencyKind::ServeInput {
-                input: Box::new(ServeInput::EnvironmentVariable(EnvironmentVariable {
-                    name: name.clone(),
-                    value: InputValue {
-                        required: true,
-                        value_type: value_type.clone(),
-                        weaving: WeavingKind::from_canonical(index, value_type, true),
-                    },
-                })),
-            })
+            Ok(environment_variable_input(index, name, value_type))
         }
         FrameworkDependency::Database { .. } => match database {
             DeclaredPostgresDatabase::Absent => Err(ContainerError::MissingPostgresDatabase {
@@ -445,6 +453,11 @@ fn framework_dependency_kind(
         FrameworkDependency::Urls(sources) => Ok(DependencyKind::Urls {
             sources: sources.clone(),
         }),
+        FrameworkDependency::UndeclaredSigningKeysEncryption => {
+            Err(ContainerError::MissingSigningKeysEncryption {
+                provider: provided.to_string(),
+            })
+        }
         FrameworkDependency::TokenIssuance => match token_issuance {
             DeclaredTokenIssuance::Absent => Err(ContainerError::MissingTokenIssuance {
                 provider: provided.to_string(),
@@ -507,6 +520,11 @@ fn resolve_framework_construction(
             method: method.clone(),
             outcome: *outcome,
         },
+        FrameworkConstruction::EnvironmentVariable { name } => {
+            DirectConstruction::FrameworkPrepared {
+                dependency: environment_variable_input(index, name, provided),
+            }
+        }
         FrameworkConstruction::Prepared { method, sources } => {
             DirectConstruction::FrameworkPrepared {
                 dependency: DependencyKind::ServeInput {
@@ -542,10 +560,13 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
                 | FrameworkDependency::SpiffeHttpClient
                 | FrameworkDependency::SpiffeIssuerRequestClient
                 | FrameworkDependency::TokenIssuance
+                | FrameworkDependency::UndeclaredSigningKeysEncryption
                 | FrameworkDependency::Urls(_) => &[],
             })
             .collect(),
-        FrameworkConstruction::Prepared { .. } | FrameworkConstruction::Unit => Vec::new(),
+        FrameworkConstruction::EnvironmentVariable { .. }
+        | FrameworkConstruction::Prepared { .. }
+        | FrameworkConstruction::Unit => Vec::new(),
     }
 }
 

@@ -1,5 +1,6 @@
 use spiffe::spiffe_id::SpiffeId;
 
+use margaret::framework::http::forward_scope::ForwardScope;
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
@@ -15,12 +16,12 @@ impl MeshPeerGate {
     ///
     /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn process(
+    pub async fn process<TTarget: ForwardScope>(
         &self,
         request: &Request,
         peer: &SpiffeId,
-        next: Next,
-    ) -> anyhow::Result<ResponseContinuation> {
+        next: Next<TTarget>,
+    ) -> anyhow::Result<ResponseContinuation<TTarget>> {
         if peer.path().is_empty() {
             return Ok(ResponseContinuation::from(Response::forbidden()));
         }

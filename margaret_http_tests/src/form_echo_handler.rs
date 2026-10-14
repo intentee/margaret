@@ -37,12 +37,12 @@ pub struct FormEchoHandler {
 }
 
 #[async_trait]
-impl ContentHandler for FormEchoHandler {
+impl<TTarget> ContentHandler<TTarget> for FormEchoHandler {
     async fn handle(
         &self,
         request: &Request,
         body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         Ok(ResponseContinuation::Done(
             match read_form_fields(request, body, self.limit).await {
                 BodyReading::Read(fields) => Response::json(

@@ -209,7 +209,12 @@ pub(crate) fn classify_field_type(
     model: &str,
     field: &str,
 ) -> Result<ClassifiedFieldType, ModelCodegenError> {
-    let wrapped = peel_standard_wrapper(index, item, declared, &[StandardLibraryItem::Option]);
+    let wrapped = peel_standard_wrapper(
+        index,
+        item.module_path(),
+        declared,
+        &[StandardLibraryItem::Option],
+    );
 
     Ok(ClassifiedFieldType {
         nullable: wrapped.is_some(),

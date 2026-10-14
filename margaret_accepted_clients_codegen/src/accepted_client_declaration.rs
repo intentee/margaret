@@ -27,7 +27,7 @@ use margaret_oauth_vocabulary::resource_scope_parsing::ResourceScopeParsing;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_oauth_vocabulary_codegen::constants::CLIENT_AUTHENTICATION_METHODS;
 use margaret_oauth_vocabulary_codegen::declared_scopes::DeclaredScopes;
-use margaret_oauth_vocabulary_codegen::scope_resolution::ScopeResolution;
+use margaret_oauth_vocabulary_codegen::scope_list_resolution::ScopeListResolution;
 use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
 use margaret_token_issuance_codegen::token_issuance_declaration::TokenIssuanceDeclaration;
 
@@ -59,23 +59,24 @@ fn scope_list(
     reader
         .take_path_array("scopes")?
         .map(|written_scopes| {
-            written_scopes
-                .iter()
-                .map(|written_scope| {
-                    match context
-                        .scopes
-                        .resolve(context.index, context.item, written_scope)
-                    {
-                        ScopeResolution::Declared(scope) => Ok(scope),
-                        ScopeResolution::Unknown => {
-                            Err(AcceptedClientsCodegenError::UnknownScope {
-                                anchor: context.item.canonical_path().to_string(),
-                                written: written(written_scope),
-                            })
-                        }
-                    }
-                })
-                .collect()
+            match context
+                .scopes
+                .resolve_list(context.index, context.item, &written_scopes)
+            {
+                ScopeListResolution::Declared(scopes) => Ok(scopes),
+                ScopeListResolution::Repeated(written_scope) => {
+                    Err(AcceptedClientsCodegenError::RepeatedScope {
+                        anchor: context.item.canonical_path().to_string(),
+                        written: written(written_scope),
+                    })
+                }
+                ScopeListResolution::Unknown(written_scope) => {
+                    Err(AcceptedClientsCodegenError::UnknownScope {
+                        anchor: context.item.canonical_path().to_string(),
+                        written: written(written_scope),
+                    })
+                }
+            }
         })
         .transpose()
 }
@@ -943,6 +944,17 @@ mod tests {
             ),
             AcceptedClientsCodegenError::MissingTokenExchangeScopes { anchor }
                 if anchor == ANCHOR
+        ));
+    }
+
+    #[test]
+    fn rejects_a_token_exchange_scope_listed_twice_since_a_client_holds_each_scope_once() {
+        assert!(matches!(
+            rejection(
+                "authentication = ClientAuthenticationMethod::None, client_id = \"ci\", resources = [artifacts], token_exchange(scopes = [DeployScope, crate::DeployScope])"
+            ),
+            AcceptedClientsCodegenError::RepeatedScope { anchor, written }
+                if anchor == ANCHOR && written == "crate :: DeployScope"
         ));
     }
 

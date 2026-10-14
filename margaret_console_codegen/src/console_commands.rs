@@ -12,10 +12,12 @@ use margaret_serve_input_codegen::spiffe_client_requirements::SpiffeClientRequir
 use crate::console_codegen_error::ConsoleCodegenError;
 use crate::console_command::ConsoleCommand;
 use crate::console_command_arguments::ConsoleCommandArguments;
+use crate::framework_command::FrameworkCommand;
 
 pub(crate) fn console_commands(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
+    framework_commands: &[FrameworkCommand],
 ) -> Result<Vec<ConsoleCommand>, ConsoleCodegenError> {
     let mut commands: BTreeMap<String, ConsoleCommand> = BTreeMap::new();
 
@@ -31,10 +33,17 @@ pub(crate) fn console_commands(
         let command = item.canonical_path().to_string();
         let ConsoleCommandArguments { name, description } =
             ConsoleCommandArguments::parse(matched.args()?, &command)?;
+
+        if framework_commands
+            .iter()
+            .any(|framework_command| framework_command.name() == name)
+        {
+            return Err(ConsoleCodegenError::CommandNameTakenByFramework { command, name });
+        }
         let accessor = format_ident!("{}", identifier.field());
         let runner = process_method(item)?;
 
-        let takes_token = match RunnerSignature::of(index, item, runner) {
+        let takes_token = match RunnerSignature::of(index, runner) {
             RunnerSignature::Accepted { takes_token } => takes_token,
             RunnerSignature::RejectedArgument { parameter } => {
                 return Err(ConsoleCodegenError::ConsoleCommandRunnerArgument {

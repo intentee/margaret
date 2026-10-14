@@ -11,7 +11,6 @@ use margaret_http::request::Request;
 use margaret_http::request_outcome::RequestOutcome;
 use margaret_http::request_rejection::RequestRejection;
 use margaret_http::server::Server;
-use margaret_http::server_paths::ServerPaths;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 use margaret_peer_identity::peer_identity::PeerIdentity;
@@ -71,12 +70,6 @@ impl FixtureRequest {
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             self.upload_config,
-            ServerPaths::build([])
-                .expect("an empty path set builds")
-                .routes([])
-                .build()
-                .expect("an empty router builds")
-                .router,
         ));
 
         match Request::from_head(

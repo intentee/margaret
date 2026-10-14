@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use anyhow::anyhow;
 use async_trait::async_trait;
-use log::error;
 use log::info;
 use log::warn;
 use spiffe::X509Context;
@@ -56,9 +55,7 @@ impl Service for SvidConverterService {
                         Ok(x509_context) => {
                             info!("Received x509 SVID context");
 
-                            if let Err(err) = self.convert_x509_context(&x509_context) {
-                                error!("Unable to process SVID context: {err:#?}");
-                            }
+                            self.convert_x509_context(&x509_context)?;
                         }
                         Err(RecvError::Lagged(skipped)) => {
                             warn!("Lagged while receiving SVID context, skipped {skipped} messages");

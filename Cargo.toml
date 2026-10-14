@@ -140,6 +140,7 @@ members = [
     "margaret_sessions_tests",
     "margaret_sign_in_endpoints_codegen",
     "margaret_signing_keys",
+    "margaret_signing_keys_encryption",
     "margaret_signing_keys_tests",
     "margaret_spiffe_svid",
     "margaret_spiffe_svid_bundle",
@@ -335,6 +336,7 @@ margaret_sessions = { path = "margaret_sessions", version = "0.5.0" }
 margaret_sessions_codegen = { path = "margaret_sessions_codegen", version = "0.5.0" }
 margaret_sign_in_endpoints_codegen = { path = "margaret_sign_in_endpoints_codegen", version = "0.5.0" }
 margaret_signing_keys = { path = "margaret_signing_keys", version = "0.5.0" }
+margaret_signing_keys_encryption = { path = "margaret_signing_keys_encryption", version = "0.5.0" }
 margaret_spiffe_svid = { path = "margaret_spiffe_svid", version = "0.5.0" }
 margaret_spiffe_svid_bundle = { path = "margaret_spiffe_svid_bundle", version = "0.5.0" }
 margaret_spiffe_svid_client = { path = "margaret_spiffe_svid_client", version = "0.5.0" }

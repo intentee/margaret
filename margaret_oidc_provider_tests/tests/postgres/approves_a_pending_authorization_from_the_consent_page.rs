@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::handles_limited_content::HandlesLimitedContent;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http_tests::redirection::Redirection;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::consent_handler::ConsentHandler;
@@ -32,7 +31,7 @@ async fn approves_a_pending_authorization_from_the_consent_page() {
 
     fixture.stop().await;
 
-    let Ok(ResponseContinuation::Done(response)) = answered else {
+    let Ok(response) = answered else {
         panic!("the consent is answered");
     };
 

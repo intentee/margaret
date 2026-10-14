@@ -1877,6 +1877,36 @@ struct FragmentMetadata {
     }
 
     #[test]
+    fn rejects_a_unique_column_that_is_also_the_primary_key_since_the_key_is_already_unique() {
+        assert!(matches!(
+                rejection(
+                    "use margaret::framework::macros::model;\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key, unique)]\n    id: uuid::Uuid,\n}\n"
+                ),
+                ModelCodegenError::RedundantUniqueOnPrimaryKeyColumns { ref columns, .. } if columns == "id"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_model_unique_constraint_that_duplicates_the_primary_key() {
+        assert!(matches!(
+                rejection(
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\n#[unique(fields = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
+                ),
+                ModelCodegenError::RedundantUniqueOnPrimaryKeyColumns { ref columns, .. } if columns == "repository, branch"
+        ));
+    }
+
+    #[test]
+    fn rejects_two_indexes_over_the_same_fields_since_one_would_duplicate_the_other() {
+        assert!(matches!(
+                rejection(
+                    "use margaret::framework::macros::model;\n#[model(table = \"posts\")]\n#[index(name = \"posts_by_author\", fields = [author, published_at])]\n#[index(name = \"posts_by_author_again\", fields = [author, published_at])]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    author: String,\n    #[column]\n    published_at: String,\n}\n"
+                ),
+                ModelCodegenError::DuplicateIndexColumns { ref first, ref second, .. } if first == "posts_by_author" && second == "posts_by_author_again"
+        ));
+    }
+
+    #[test]
     fn rejects_an_index_on_a_unique_field() {
         assert!(matches!(
                 rejection(

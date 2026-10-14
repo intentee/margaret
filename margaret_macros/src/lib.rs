@@ -348,6 +348,11 @@ pub fn issues_tokens(_attributes: TokenStream, item: TokenStream) -> TokenStream
 }
 
 #[proc_macro_attribute]
+pub fn encrypts_signing_keys(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
 pub fn oauth_scope(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }

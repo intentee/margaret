@@ -9,33 +9,33 @@ use crate::request::Request;
 use crate::request_body::RequestBody;
 use crate::response_continuation::ResponseContinuation;
 
-enum NextHandler {
+enum NextHandler<TTarget> {
     Content {
         body: RequestBody,
-        handler: Arc<dyn ContentHandler>,
+        handler: Arc<dyn ContentHandler<TTarget>>,
     },
-    Head(Arc<dyn HeadHandler>),
-    OneShot(Box<dyn OneShotHandler>),
+    Head(Arc<dyn HeadHandler<TTarget>>),
+    OneShot(Box<dyn OneShotHandler<TTarget>>),
 }
 
-pub struct Next {
-    handler: NextHandler,
+pub struct Next<TTarget> {
+    handler: NextHandler<TTarget>,
 }
 
-impl Next {
-    pub(crate) fn content(handler: Arc<dyn ContentHandler>, body: RequestBody) -> Self {
+impl<TTarget> Next<TTarget> {
+    pub(crate) fn content(handler: Arc<dyn ContentHandler<TTarget>>, body: RequestBody) -> Self {
         Self {
             handler: NextHandler::Content { body, handler },
         }
     }
 
-    pub(crate) fn head(handler: Arc<dyn HeadHandler>) -> Self {
+    pub(crate) fn head(handler: Arc<dyn HeadHandler<TTarget>>) -> Self {
         Self {
             handler: NextHandler::Head(handler),
         }
     }
 
-    pub(crate) fn one_shot(inner: Box<dyn OneShotHandler>) -> Self {
+    pub(crate) fn one_shot(inner: Box<dyn OneShotHandler<TTarget>>) -> Self {
         Self {
             handler: NextHandler::OneShot(inner),
         }
@@ -44,7 +44,10 @@ impl Next {
     /// # Errors
     ///
     /// Returns `HandlerError` propagated from the work it performs.
-    pub async fn run(self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+    pub async fn run(
+        self,
+        request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         match self.handler {
             NextHandler::Content { body, handler } => handler.handle(request, body).await,
             NextHandler::Head(handler) => handler.handle(request).await,

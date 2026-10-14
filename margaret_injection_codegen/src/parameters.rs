@@ -27,7 +27,12 @@ mod tests {
     #[test]
     fn skips_the_receiver_and_names_parameters_from_identifier_patterns() {
         let signature = parse_quote!(fn run(&self, request: &Request, count: usize));
-        let method = IndexedMethod::new("run".to_string(), Vec::new(), signature);
+        let method = IndexedMethod::new(
+            "run".to_string(),
+            Vec::new(),
+            vec!["crate".to_string()],
+            signature,
+        );
 
         let views = parameters(&method);
 
@@ -41,7 +46,12 @@ mod tests {
     #[test]
     fn synthesizes_a_name_for_a_destructured_pattern() {
         let signature = parse_quote!(fn run(&self, Point { x, y }: Point));
-        let method = IndexedMethod::new("run".to_string(), Vec::new(), signature);
+        let method = IndexedMethod::new(
+            "run".to_string(),
+            Vec::new(),
+            vec!["crate".to_string()],
+            signature,
+        );
 
         let views = parameters(&method);
 

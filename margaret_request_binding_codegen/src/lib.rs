@@ -475,7 +475,6 @@ impl SessionUserProvider {
 
         classify_parameters(
             index,
-            item,
             method,
             &BindingContext::Responder {
                 route_path: &route_path,
@@ -529,7 +528,6 @@ impl SessionUserProvider {
 
         classify_parameters(
             index,
-            item,
             process_method(item).expect("the responder has a #[process] method"),
             &BindingContext::Responder {
                 route_path: &route_path,
@@ -1322,7 +1320,6 @@ struct SecondClient;
         let route_path = admitted_path("/");
         let parameters = classify_parameters(
             &indexed.index,
-            item,
             process_method(item).expect("the responder has a #[process] method"),
             &BindingContext::Responder {
                 route_path: &route_path,
@@ -1365,7 +1362,6 @@ struct SecondClient;
         let route_path = admitted_path("/");
         let holders: Vec<String> = classify_parameters(
             &indexed.index,
-            item,
             process_method(item).expect("the responder has a #[process] method"),
             &BindingContext::Responder {
                 route_path: &route_path,
@@ -1392,7 +1388,6 @@ struct SecondClient;
         let bindings = trusted_issuer_bindings();
         let rejection = classify_parameters(
             &indexed.index,
-            item,
             process_method(item).expect("the builder has a #[process] method"),
             &BindingContext::Handshake {
                 container_bindings: &bindings,
@@ -1526,7 +1521,6 @@ struct PartnerSessions;
 
         classify_parameters(
             &indexed.index,
-            item,
             process_method(item).expect("the responder has a #[process] method"),
             &BindingContext::Responder {
                 route_path: &route_path,
@@ -1846,7 +1840,7 @@ struct PartnerSessions;
         )));
 
         assert!(source.contains(
-            "margaret::framework::sessions::session_resolution::SessionResolution::Unavailable(unavailability)=>{return::std::result::Result::Ok(margaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:margaret::framework::http::cookie_changes::CookieChanges{cookies:::std::vec::Vec::new(),},outcome:margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(margaret::framework::http::response_continuation::ResponseContinuation::from(unavailability),),});}"
+            "margaret::framework::sessions::session_resolution::SessionResolution::Unavailable(unavailability)=>{return::std::result::Result::Ok(margaret::framework::identity::session_user_inference::SessionUserInference{cookie_changes:margaret::framework::http::cookie_changes::CookieChanges{cookies:::std::vec::Vec::new(),},outcome:margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(margaret::framework::http::reported_unavailability::reported_unavailability(&unavailability),),});}"
         ));
     }
 
@@ -1876,7 +1870,6 @@ struct PartnerSessions;
         let route_path = admitted_path("/");
         let parameters = classify_parameters(
             &indexed.index,
-            item,
             process_method(item).expect("the responder has a #[process] method"),
             &BindingContext::Responder {
                 route_path: &route_path,
@@ -2051,7 +2044,6 @@ struct PartnerSessions;
         assert!(
             classify_parameters(
                 &index,
-                item,
                 process_method(item).expect("the responder has a #[process] method"),
                 &BindingContext::Responder {
                     route_path: &route_path,

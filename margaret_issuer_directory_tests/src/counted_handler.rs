@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -11,12 +12,15 @@ use margaret_http::response_continuation::ResponseContinuation;
 
 pub struct CountedHandler {
     pub handled: Arc<AtomicUsize>,
-    pub inner: Arc<dyn HeadHandler>,
+    pub inner: Arc<dyn HeadHandler<Infallible>>,
 }
 
 #[async_trait]
-impl HeadHandler for CountedHandler {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl HeadHandler<Infallible> for CountedHandler {
+    async fn handle(
+        &self,
+        request: &Request,
+    ) -> Result<ResponseContinuation<Infallible>, HandlerError> {
         self.handled.fetch_add(1, Ordering::SeqCst);
         self.inner.handle(request).await
     }

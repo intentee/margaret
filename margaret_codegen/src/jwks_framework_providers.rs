@@ -4,6 +4,7 @@ use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
+use margaret_jwks_codegen::declared_signing_keys_encryption::DeclaredSigningKeysEncryption;
 use margaret_jwks_codegen::public_jwks_handler_canonical_path::public_jwks_handler_canonical_path;
 use margaret_oidc_provider_codegen::declared_endpoint_routes::DeclaredEndpointRoutes;
 use margaret_oidc_provider_codegen::provider_endpoint::ProviderEndpoint;
@@ -12,10 +13,23 @@ use crate::jwks_roller_canonical_path::jwks_roller_canonical_path;
 use crate::jwks_secret_holder_canonical_path::jwks_secret_holder_canonical_path;
 use crate::rsa_signing_keys_canonical_path::rsa_signing_keys_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
+use crate::signing_keys_encryption_key_canonical_path::signing_keys_encryption_key_canonical_path;
 use crate::signing_keys_tables_canonical_path::signing_keys_tables_canonical_path;
+
+fn signing_keys_encryption_key(encryption: &DeclaredSigningKeysEncryption) -> FrameworkDependency {
+    match encryption {
+        DeclaredSigningKeysEncryption::Absent => {
+            FrameworkDependency::UndeclaredSigningKeysEncryption
+        }
+        DeclaredSigningKeysEncryption::Declared(_) => {
+            FrameworkDependency::Provider(signing_keys_encryption_key_canonical_path())
+        }
+    }
+}
 
 pub(crate) fn jwks_framework_providers(
     endpoint_routes: &DeclaredEndpointRoutes,
+    encryption: &DeclaredSigningKeysEncryption,
 ) -> Vec<FrameworkProvider> {
     let roller = jwks_roller_canonical_path();
     let jwks_secret_holder = jwks_secret_holder_canonical_path();
@@ -35,6 +49,7 @@ pub(crate) fn jwks_framework_providers(
                         framework_tables: vec![signing_keys_tables_canonical_path()],
                     },
                     FrameworkDependency::Provider(rsa_signing_keys),
+                    signing_keys_encryption_key(encryption),
                 ],
                 is_async: true,
                 method: "create".to_string(),

@@ -1,0 +1,5 @@
+error[E0599]: no method named `forward_to` found for struct `RouteReference` in the current scope
+ --> compile_fail/forwards_to_a_post_route.rs:7:34
+  |
+7 |     drop(routes.public.post_note.forward_to(()));
+  |                                  ^^^^^^^^^^ method not found in `RouteReference`

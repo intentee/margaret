@@ -6,11 +6,10 @@ use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::request::Request;
 use crate::response::Response;
-use crate::response_continuation::ResponseContinuation;
 
 pub async fn with_verified_peer<'request, TOutput, TContinuation, TFuture>(
     request: &'request Request,
-    refused: fn(ResponseContinuation) -> TOutput,
+    refused: fn(Response) -> TOutput,
     continuation: TContinuation,
 ) -> TOutput
 where
@@ -19,8 +18,6 @@ where
 {
     match request.peer_identity() {
         PeerIdentity::Verified { spiffe_id } => continuation(spiffe_id).await,
-        PeerIdentity::Anonymous | PeerIdentity::Unidentified => {
-            refused(ResponseContinuation::from(Response::forbidden()))
-        }
+        PeerIdentity::Anonymous | PeerIdentity::Unidentified => refused(Response::forbidden()),
     }
 }

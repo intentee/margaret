@@ -22,8 +22,11 @@ impl PublishedDocuments {
 }
 
 #[async_trait]
-impl HeadHandler for PublishedDocuments {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TTarget> HeadHandler<TTarget> for PublishedDocuments {
+    async fn handle(
+        &self,
+        request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         let path = format!(
             "/{}",
             request

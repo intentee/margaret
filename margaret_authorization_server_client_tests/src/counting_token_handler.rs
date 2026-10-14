@@ -16,8 +16,11 @@ pub struct CountingTokenHandler {
 }
 
 #[async_trait]
-impl HeadHandler for CountingTokenHandler {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TTarget> HeadHandler<TTarget> for CountingTokenHandler {
+    async fn handle(
+        &self,
+        _request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         let issued = self.issued.fetch_add(1, Ordering::SeqCst) + 1;
 
         Ok(ResponseContinuation::Done(Response::json(

@@ -1,11 +1,11 @@
 use std::future::Future;
 
 use crate::requirement::Requirement;
-use crate::response_continuation::ResponseContinuation;
+use crate::response::Response;
 
 pub async fn with_requirement<TValue, TOutput, TContinuation, TFuture>(
     requirement: Requirement<TValue>,
-    refused: fn(ResponseContinuation) -> TOutput,
+    refused: fn(Response) -> TOutput,
     continuation: TContinuation,
 ) -> TOutput
 where
@@ -23,9 +23,8 @@ mod tests {
     use super::with_requirement;
     use crate::requirement::Requirement;
     use crate::response::Response;
-    use crate::response_continuation::ResponseContinuation;
 
-    async fn named(name: String) -> Result<String, ResponseContinuation> {
+    async fn named(name: String) -> Result<String, Response> {
         Ok(name)
     }
 
@@ -41,12 +40,12 @@ mod tests {
     async fn answers_an_unmet_requirement_with_its_refusal_without_continuing() {
         assert!(matches!(
             with_requirement(
-                Requirement::<String>::Unmet(ResponseContinuation::from(Response::unauthorized())),
+                Requirement::<String>::Unmet(Response::unauthorized()),
                 Err,
                 named,
             )
             .await,
-            Err(ResponseContinuation::Done(response)) if response.status() == 401
+            Err(response) if response.status() == 401
         ));
     }
 }

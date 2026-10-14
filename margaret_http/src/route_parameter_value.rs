@@ -1,6 +1,5 @@
 use crate::requirement::Requirement;
 use crate::response::Response;
-use crate::response_continuation::ResponseContinuation;
 
 #[must_use]
 pub fn route_parameter_value<TValue>(value: String) -> Requirement<TValue>
@@ -9,7 +8,7 @@ where
 {
     match TValue::try_from(value) {
         Ok(converted) => Requirement::Met(converted),
-        Err(_rejected) => Requirement::Unmet(ResponseContinuation::from(Response::not_found())),
+        Err(_rejected) => Requirement::Unmet(Response::not_found()),
     }
 }
 
@@ -17,7 +16,6 @@ where
 mod tests {
     use super::route_parameter_value;
     use crate::requirement::Requirement;
-    use crate::response_continuation::ResponseContinuation;
 
     struct PublishedYear(u16);
 
@@ -41,7 +39,7 @@ mod tests {
     fn answers_a_route_parameter_its_value_type_rejects_with_not_found() {
         assert!(matches!(
             route_parameter_value::<PublishedYear>("draft".to_string()),
-            Requirement::Unmet(ResponseContinuation::Done(response)) if response.status() == 404
+            Requirement::Unmet(response) if response.status() == 404
         ));
     }
 }

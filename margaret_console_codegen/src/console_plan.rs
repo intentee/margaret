@@ -5,6 +5,8 @@ use margaret_container::container_bindings::ContainerBindings;
 use crate::console_codegen_error::ConsoleCodegenError;
 use crate::console_command::ConsoleCommand;
 use crate::console_commands::console_commands;
+use crate::framework_command::FrameworkCommand;
+use crate::serve_dispatch::ServeDispatch;
 
 pub struct ConsolePlan {
     pub(crate) commands: Vec<ConsoleCommand>,
@@ -18,8 +20,14 @@ impl ConsolePlan {
     pub fn build(
         index: &AttributeIndex,
         bindings: &ContainerBindings,
+        serve: &ServeDispatch,
+        has_models: bool,
     ) -> Result<Self, ConsoleCodegenError> {
-        let commands = console_commands(index, bindings)?;
+        let commands = console_commands(
+            index,
+            bindings,
+            &FrameworkCommand::generated(serve, has_models),
+        )?;
         let construction_roots = commands
             .iter()
             .map(|command| command.construction_root.clone())

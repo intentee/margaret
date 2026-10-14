@@ -7,9 +7,9 @@ use uuid::Uuid;
 
 use margaret_handler_error::handler_error::HandlerError;
 use margaret_http::bearer_challenge::BearerChallenge;
-use margaret_http::head_handler::HeadHandler;
+use margaret_http::handles_head::HandlesHead;
 use margaret_http::request::Request;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::response::Response;
 use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
@@ -78,16 +78,15 @@ impl UserinfoEndpoint {
 }
 
 #[async_trait]
-impl HeadHandler for UserinfoEndpoint {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl HandlesHead for UserinfoEndpoint {
+    async fn handle(&self, request: &Request) -> Result<Response, HandlerError> {
         match self.authenticate(request) {
             UserinfoAuthentication::Authenticated(grant) => self
                 .answer
                 .answered(&grant)
                 .await
-                .map(ResponseContinuation::from)
                 .map_err(|error| HandlerError::consumer(anyhow::Error::from(error))),
-            UserinfoAuthentication::Refused(refusal) => Ok(ResponseContinuation::from(refusal)),
+            UserinfoAuthentication::Refused(refusal) => Ok(refusal),
         }
     }
 }

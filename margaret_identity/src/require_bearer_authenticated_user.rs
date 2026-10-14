@@ -1,6 +1,5 @@
 use margaret_http::bearer_challenge::BearerChallenge;
 use margaret_http::requirement::Requirement;
-use margaret_http::response_continuation::ResponseContinuation;
 
 use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
 use crate::require_authenticated_user::require_authenticated_user;
@@ -10,9 +9,9 @@ pub fn require_bearer_authenticated_user<User>(
     outcome: AuthenticatedUserOutcome<User>,
 ) -> Requirement<User> {
     match outcome {
-        AuthenticatedUserOutcome::Anonymous => Requirement::Unmet(ResponseContinuation::from(
-            BearerChallenge::MissingCredentials.response(),
-        )),
+        AuthenticatedUserOutcome::Anonymous => {
+            Requirement::Unmet(BearerChallenge::MissingCredentials.response())
+        }
         AuthenticatedUserOutcome::Authenticated(_) | AuthenticatedUserOutcome::Interrupted(_) => {
             require_authenticated_user(outcome)
         }

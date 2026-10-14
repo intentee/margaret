@@ -1,6 +1,5 @@
 use serde_json::json;
 
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::token_admission::TokenAdmission;
 use margaret_token_introspection_tests::introspected_with::introspected_with;
 use margaret_token_introspection_tests::repository_claims::RepositoryClaims;
@@ -19,7 +18,7 @@ async fn refuses_a_token_naming_a_malformed_client_identifier() {
             }),
         )
         .await,
-        TokenAdmission::Refused(ResponseContinuation::Done(response))
+        TokenAdmission::Refused(response)
             if response.status() == 401
     ));
 }

@@ -25,12 +25,12 @@ use crate::redirection::Redirection;
 
 fn registered_redirect_uri(redirect_uris: &[String], requested: Option<&str>) -> Option<Url> {
     requested
-        .and_then(|redirect_uri| Url::parse(redirect_uri).ok())
         .filter(|redirect_uri| {
             redirect_uris
                 .iter()
-                .any(|registered| registered == redirect_uri.as_str())
+                .any(|registered| registered == redirect_uri)
         })
+        .and_then(|redirect_uri| Url::parse(redirect_uri).ok())
 }
 
 fn rejected(reason: &str) -> AuthorizationOutcome {

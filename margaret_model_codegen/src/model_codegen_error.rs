@@ -87,6 +87,16 @@ pub enum ModelCodegenError {
         second_table: String,
     },
 
+    #[error(
+        "model '{model}' declares the index '{second}' over '{columns}', which the index '{first}' already covers"
+    )]
+    DuplicateIndexColumns {
+        columns: String,
+        first: String,
+        model: String,
+        second: String,
+    },
+
     #[error("model '{model}' declares more than one index named '{index}'")]
     DuplicateIndexDeclaration { index: String, model: String },
 
@@ -458,6 +468,11 @@ pub enum ModelCodegenError {
         "model '{model}' declares an index over '{columns}', which leads a unique constraint and duplicates its index"
     )]
     RedundantIndexOnUniqueColumns { columns: String, model: String },
+
+    #[error(
+        "model '{model}' declares a unique constraint over '{columns}', which is already its primary key"
+    )]
+    RedundantUniqueOnPrimaryKeyColumns { columns: String, model: String },
 
     #[error(
         "relation '{relation}' of model '{model}' names '{related}', which is not a #[model] of this crate"

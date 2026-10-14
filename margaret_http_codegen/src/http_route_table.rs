@@ -4,7 +4,6 @@ use margaret_route_parameter_codegen::route_path::RoutePath;
 
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
-use crate::named_route::NamedRoute;
 use crate::route_group::RouteGroup;
 use crate::server_route_group::ServerRouteGroup;
 
@@ -31,27 +30,6 @@ impl HttpRouteTable {
             .entry(server.clone())
             .or_insert_with(ServerRouteGroup::new)
             .insert(&server, path, method, route)
-    }
-
-    pub(crate) fn named_routes(&self, server: &str) -> Vec<NamedRoute<'_>> {
-        let mut named: Vec<NamedRoute<'_>> = self
-            .route_groups(server)
-            .enumerate()
-            .flat_map(|(position, group)| {
-                group.method_routes().filter_map(move |route| {
-                    route.name.as_deref().map(|name| NamedRoute {
-                        name,
-                        path: group.path(),
-                        position,
-                        route,
-                    })
-                })
-            })
-            .collect();
-
-        named.sort_by(|first, second| first.name.cmp(second.name));
-
-        named
     }
 
     pub(crate) fn route_groups(&self, server: &str) -> impl Iterator<Item = &RouteGroup> {

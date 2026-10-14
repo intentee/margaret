@@ -1,7 +1,7 @@
 use cookie::Cookie;
 use http::Method;
 
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::reported_unavailability::reported_unavailability;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 use margaret_sessions::session_resolution::SessionResolution;
@@ -42,7 +42,7 @@ async fn reports_an_issuer_answering_the_refresh_with_an_unexpected_status() {
         "the session issuer answered the refresh with status 500 Internal Server Error"
     );
     assert!(matches!(
-        ResponseContinuation::from(unavailability),
-        ResponseContinuation::Done(response) if response.status() == 503
+        reported_unavailability(&unavailability),
+        response if response.status() == 503
     ));
 }

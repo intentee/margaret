@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use zeroize::Zeroizing;
+use base64ct::Base64;
+use base64ct::Encoding;
 
-use margaret::framework::active_record::secret_text::SecretText;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_keygen_tests::persisted_document::persisted_document;
@@ -18,12 +18,8 @@ async fn synchronizer_rejects_a_document_whose_keys_cannot_be_restored() {
     let started = started_with_signing_keys().await;
     let mut document = persisted_document(&fresh_secret(SigningCurve::P256));
 
-    document["ec"]["current"]["pem"] = "not a pem document".into();
-    stored_document(
-        &started.database,
-        SecretText::new(Zeroizing::new(document.to_string())),
-    )
-    .await;
+    document["ec"]["current"]["pkcs8"] = Base64::encode_string(b"not a pkcs8 document").into();
+    stored_document(&started.database, document.to_string().as_bytes()).await;
 
     assert!(matches!(
         fixture_synchronizer(Arc::clone(&started.database))

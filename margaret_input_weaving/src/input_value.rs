@@ -5,7 +5,6 @@ use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_injection_codegen::optional_parameter::OptionalParameter;
 
@@ -42,14 +41,14 @@ impl InputValue {
     /// `InputWeavingError::UnresolvableValueType`.
     pub fn from_declared(
         index: &AttributeIndex,
-        item: &IndexedItem,
+        module_path: &[String],
         declared: &Type,
         site: &ConstructorParameter,
     ) -> Result<Self, InputWeavingError> {
         let OptionalParameter {
             required,
             value_type,
-        } = OptionalParameter::from_type(index, item, declared);
+        } = OptionalParameter::from_type(index, module_path, declared);
 
         if has_generic_arguments(&value_type) {
             return Err(InputWeavingError::GenericValueType {
@@ -58,12 +57,12 @@ impl InputValue {
             });
         }
 
-        let canonical = index.resolve_item_type(item, &value_type).ok_or_else(|| {
-            InputWeavingError::UnresolvableValueType {
+        let canonical = index
+            .resolve_module_type(module_path, &value_type)
+            .ok_or_else(|| InputWeavingError::UnresolvableValueType {
                 site: site.clone(),
                 value_type: quote! { #value_type }.to_string(),
-            }
-        })?;
+            })?;
         let weaving = WeavingKind::from_canonical(index, &canonical, required);
 
         Ok(Self {
@@ -121,7 +120,12 @@ mod tests {
             "use margaret::framework::macros::singleton;\n#[singleton]\nstruct Config;\n",
         );
 
-        InputValue::from_declared(&indexed.index, indexed.item("Config"), declared, &site())
+        InputValue::from_declared(
+            &indexed.index,
+            indexed.item("Config").module_path(),
+            declared,
+            &site(),
+        )
     }
 
     fn collapsed(tokens: &TokenStream) -> String {

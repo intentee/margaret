@@ -1,0 +1,7 @@
+error[E0609]: no field `get_unnamed` on type `Public`
+ --> compile_fail/forwards_to_an_unnamed_route.rs:7:24
+  |
+7 |     drop(routes.public.get_unnamed.forward_to(()));
+  |                        ^^^^^^^^^^^ unknown field
+  |
+  = note: available fields are: `delete_note`, `get_asset`, `get_external`, `get_forwarded_note`, `get_health` ... and 14 others

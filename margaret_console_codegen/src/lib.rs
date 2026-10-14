@@ -4,6 +4,7 @@ mod console_command;
 mod console_command_arguments;
 mod console_commands;
 pub mod console_plan;
+pub mod framework_command;
 mod invocation_dispatch;
 mod render;
 pub mod render_console;
@@ -30,7 +31,7 @@ mod tests {
     use margaret_http_codegen::server_uploads::ServerUploads;
     use margaret_serve_input_codegen::route_url_input::RouteUrlInput;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_service_codegen::read_serve_invocation::read_serve_invocation;
+    use margaret_service_codegen::render_serving::render_serving;
     use margaret_service_codegen::service_plan::ServicePlan;
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
@@ -108,7 +109,7 @@ impl Farewell {
     ) -> ServeDispatch {
         let plan = ServicePlan::build(index, &[], bindings, &[]).expect("the services are planned");
 
-        ServeDispatch::Served(read_serve_invocation(&plan, http_servers, bindings))
+        ServeDispatch::Served(render_serving(&plan, http_servers, false, bindings).invocation)
     }
 
     fn collapsed(artifacts: ConsoleArtifacts) -> String {
@@ -135,7 +136,7 @@ impl Farewell {
         serve_inputs: &[SlottedServeInput],
         bindings: &ContainerBindings,
     ) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
-        let plan = ConsolePlan::build(index, bindings)?;
+        let plan = ConsolePlan::build(index, bindings, serve, has_models)?;
 
         Ok(render_console(
             &plan,
@@ -604,7 +605,7 @@ impl Farewell {
         .bindings;
 
         assert_eq!(
-            ConsolePlan::build(&index, &bindings)
+            ConsolePlan::build(&index, &bindings, &ServeDispatch::Unserved, false)
                 .err()
                 .expect("the command is rejected")
                 .to_string(),
@@ -650,10 +651,32 @@ impl Farewell {
         .bindings;
 
         assert!(matches!(
-            ConsolePlan::build(&index, &bindings),
+            ConsolePlan::build(&index, &bindings, &ServeDispatch::Unserved, false),
             Err(ConsoleCodegenError::ConsoleCommandDependsOnSpiffeIssuerRequestClient { command })
                 if command == "crate::Refresh"
         ));
+    }
+
+    const SERVE_NAMED_COMMAND: &str = "use margaret::framework::macros::console_command;\nuse margaret::framework::macros::process;\nuse margaret::framework::macros::singleton;\n#[singleton]\n#[console_command(name = \"serve\")]\nstruct Serve;\n\nimpl Serve {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n";
+
+    #[test]
+    fn rejects_a_command_named_after_the_serve_command_of_a_serving_application() {
+        let index = IndexedSource::new(SERVE_NAMED_COMMAND).index;
+        let bindings = bindings(&index);
+
+        assert!(matches!(
+            ConsolePlan::build(&index, &bindings, &served(&index, &bindings, &public()), false),
+            Err(ConsoleCodegenError::CommandNameTakenByFramework { command, name })
+                if command == "crate::Serve" && name == "serve"
+        ));
+    }
+
+    #[test]
+    fn accepts_a_command_named_serve_when_the_application_serves_nothing_since_no_name_is_taken() {
+        let index = IndexedSource::new(SERVE_NAMED_COMMAND).index;
+        let bindings = bindings(&index);
+
+        assert!(ConsolePlan::build(&index, &bindings, &ServeDispatch::Unserved, false).is_ok());
     }
 
     #[test]

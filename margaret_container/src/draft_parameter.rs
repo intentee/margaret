@@ -1,5 +1,4 @@
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_parameter::IndexedParameter;
 
 use crate::parameter_target::ParameterTarget;
@@ -12,12 +11,12 @@ pub(crate) struct DraftParameter<'index> {
 impl<'index> DraftParameter<'index> {
     pub(crate) fn read(
         index: &AttributeIndex,
-        item: &IndexedItem,
+        module_path: &[String],
         indexed: &'index IndexedParameter,
     ) -> Self {
         Self {
             indexed,
-            target: ParameterTarget::peel(index, item, indexed.declared()),
+            target: ParameterTarget::peel(index, module_path, indexed.declared()),
         }
     }
 }

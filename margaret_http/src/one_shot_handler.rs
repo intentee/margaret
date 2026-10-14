@@ -6,9 +6,9 @@ use crate::request::Request;
 use crate::response_continuation::ResponseContinuation;
 
 #[async_trait]
-pub(crate) trait OneShotHandler: Send {
+pub(crate) trait OneShotHandler<TTarget>: Send {
     async fn handle(
         self: Box<Self>,
         request: &Request,
-    ) -> Result<ResponseContinuation, HandlerError>;
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError>;
 }

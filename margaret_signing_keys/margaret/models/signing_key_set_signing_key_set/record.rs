@@ -19,10 +19,16 @@ for crate::signing_key_set::SigningKeySet {
                 margaret::framework::active_record::field::Field::read(cursor)
                     .and_then(|value_1| {
                         margaret::framework::active_record::field::Field::read(cursor)
-                            .map(|value_2| Self {
-                                name: value_0,
-                                generation: value_1,
-                                document: value_2,
+                            .and_then(|value_2| {
+                                margaret::framework::active_record::field::Field::read(
+                                        cursor,
+                                    )
+                                    .map(|value_3| Self {
+                                        name: value_0,
+                                        generation: value_1,
+                                        nonce: value_2,
+                                        sealed_document: value_3,
+                                    })
                             })
                     })
             })
@@ -44,7 +50,11 @@ for crate::signing_key_set::SigningKeySet {
                 parameters,
             ))
             .and_then(|()| margaret::framework::active_record::field::Field::write(
-                &self.document,
+                &self.nonce,
+                parameters,
+            ))
+            .and_then(|()| margaret::framework::active_record::field::Field::write(
+                &self.sealed_document,
                 parameters,
             ))
     }

@@ -36,7 +36,6 @@ use margaret_http::handles_limited_content::HandlesLimitedContent;
 use margaret_http::request::Request;
 use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http_validation::responded_to_form::responded_to_form;
 use margaret_identity_session::id_token_claims::IdTokenClaims;
 use margaret_identity_session::issued_access_token_claims::IssuedAccessTokenClaims;
@@ -718,7 +717,7 @@ impl HandlesLimitedContent for TokenEndpoint {
         request: &Request,
         body: RequestBody,
         limit: BodyLimit,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<Response, HandlerError> {
         responded_to_form(request, body, limit, |token_request| {
             self.respond(request, token_request)
         })

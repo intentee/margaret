@@ -2,7 +2,6 @@ use syn::Type;
 
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_input_weaving::constructor_parameter::ConstructorParameter;
 use margaret_input_weaving::input_value::InputValue;
 
@@ -15,14 +14,14 @@ use crate::environment_variable_codegen_error::EnvironmentVariableCodegenError;
 /// Returns `EnvironmentVariableCodegenError` propagated from the work it performs.
 pub fn read_environment_variable(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     arguments: &AttributeArgs,
     declared: &Type,
     site: &ConstructorParameter,
 ) -> Result<EnvironmentVariable, EnvironmentVariableCodegenError> {
     Ok(EnvironmentVariable {
         name: environment_variable_arguments(arguments, site)?,
-        value: InputValue::from_declared(index, item, declared, site)?,
+        value: InputValue::from_declared(index, module_path, declared, site)?,
     })
 }
 
@@ -72,7 +71,7 @@ mod tests {
 
         read_environment_variable(
             &indexed.index,
-            indexed.item("Config"),
+            indexed.item("Config").module_path(),
             &AttributeArgs::from_attribute(attribute).expect("the arguments parse"),
             declared,
             &ConstructorParameter {

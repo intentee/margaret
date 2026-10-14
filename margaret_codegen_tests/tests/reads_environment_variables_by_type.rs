@@ -13,7 +13,7 @@ fn fixture() -> ModuleSources {
         generate_fixture("type_aware_environment_variables").expect("the fixture generates");
     ModuleSources {
         construction: without_formatting(
-            generated_module_source(&generated, "container/build/serve_arguments")
+            generated_module_source(&generated, "container/build/arguments/serve_arguments")
                 .expect("the bootstrap arguments module is generated"),
         ),
         run: without_formatting(

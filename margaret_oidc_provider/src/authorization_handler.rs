@@ -4,12 +4,11 @@ use async_trait::async_trait;
 
 use margaret_handler_error::handler_error::HandlerError;
 use margaret_http::body_limit::BodyLimit;
+use margaret_http::handles_head::HandlesHead;
 use margaret_http::handles_limited_content::HandlesLimitedContent;
-use margaret_http::head_handler::HeadHandler;
 use margaret_http::request::Request;
 use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http_validation::responded_to_form::responded_to_form;
 use margaret_server_origin::route_url::RouteUrl;
 use margaret_sessions::issued_sessions::IssuedSessions;
@@ -61,7 +60,7 @@ where
         &self,
         request: &Request,
         authorization_request: ValidationResult<AuthorizationRequest>,
-    ) -> anyhow::Result<ResponseContinuation> {
+    ) -> anyhow::Result<Response> {
         let ResolvedSession {
             cookie_changes,
             session,
@@ -93,18 +92,18 @@ where
             | AuthorizationOutcome::Rejected(response) => response,
         };
 
-        Ok(cookie_changes.precede(ResponseContinuation::from(frame_denied(response))))
+        Ok(cookie_changes.precede_response(frame_denied(response)))
     }
 }
 
 #[async_trait]
-impl<TConsentView, TRoutes> HeadHandler for AuthorizationHandler<TConsentView, TRoutes>
+impl<TConsentView, TRoutes> HandlesHead for AuthorizationHandler<TConsentView, TRoutes>
 where
     TConsentView:
         for<'page> RendersView<Props<'page> = ConsentPageProps<'page, TRoutes>> + Send + Sync,
     TRoutes: Send + Sync,
 {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+    async fn handle(&self, request: &Request) -> Result<Response, HandlerError> {
         self.respond(request, validate(&request.inputs.query))
             .await
             .map_err(HandlerError::consumer)
@@ -123,7 +122,7 @@ where
         request: &Request,
         body: RequestBody,
         limit: BodyLimit,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<Response, HandlerError> {
         responded_to_form(request, body, limit, |authorization_request| {
             self.respond(request, authorization_request)
         })

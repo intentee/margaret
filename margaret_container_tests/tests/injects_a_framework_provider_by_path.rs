@@ -114,7 +114,7 @@ fn refuses_to_inject_a_token_issuer_client_into_a_request_site() {
     let declared: syn::Type = syn::parse_str("Arc<crate::IssuerClient>").expect("the type parses");
 
     assert!(matches!(
-        resolve_injectable(&index, consumer, &declared, &bindings),
+        resolve_injectable(&index, consumer.module_path(), &declared, &bindings),
         InjectableResolution::FrameworkOnly
     ));
 }

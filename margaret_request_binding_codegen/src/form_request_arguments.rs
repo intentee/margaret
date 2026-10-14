@@ -2,7 +2,6 @@ use quote::ToTokens;
 
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
 use crate::constants::REQUEST_INPUTS;
@@ -17,7 +16,7 @@ impl FormRequestArguments {
     pub(crate) fn parse(
         arguments: &AttributeArgs,
         index: &AttributeIndex,
-        item: &IndexedItem,
+        module_path: &[String],
         subject: &str,
         position: usize,
     ) -> Result<Self, RequestBindingError> {
@@ -29,7 +28,7 @@ impl FormRequestArguments {
                     parameter: position.to_string(),
                 })?;
             let source = index
-                .resolve_item_path(item, &from)
+                .resolve_module_path(module_path, &from)
                 .as_ref()
                 .and_then(|resolved| REQUEST_INPUTS.variant(resolved))
                 .ok_or_else(|| RequestBindingError::UnknownRequestInput {

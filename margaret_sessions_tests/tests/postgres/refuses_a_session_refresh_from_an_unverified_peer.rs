@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::handles_limited_content::HandlesLimitedContent;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http_tests::fixture_body::fixture_body;
 use margaret_jwt_verification_tests::constants::FIXTURE_AUDIENCE;
 use margaret_peer_identity::peer_identity::PeerIdentity;
@@ -28,6 +27,6 @@ async fn refuses_a_session_refresh_from_an_unverified_peer() {
             BodyLimit::new(1024),
         )
         .await,
-        Ok(ResponseContinuation::Done(response)) if response.status() == 403
+        Ok(response) if response.status() == 403
     ));
 }

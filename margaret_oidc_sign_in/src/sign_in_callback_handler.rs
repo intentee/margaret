@@ -7,11 +7,11 @@ use uuid::Uuid;
 
 use margaret_handler_error::handler_error::HandlerError;
 use margaret_http::cookie_changes::CookieChanges;
-use margaret_http::head_handler::HeadHandler;
+use margaret_http::handles_head::HandlesHead;
 use margaret_http::redirect::Redirect;
+use margaret_http::reported_unavailability::reported_unavailability;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_server_origin::route_url::RouteUrl;
 use margaret_sessions::issued_sessions::IssuedSessions;
 use margaret_sessions::started_session::StartedSession;
@@ -44,7 +44,7 @@ impl<TAdmission: AdmitsSignIn> SignInCallbackHandler<TAdmission> {
         }
     }
 
-    async fn answered(&self, request: &Request) -> anyhow::Result<ResponseContinuation> {
+    async fn answered(&self, request: &Request) -> anyhow::Result<Response> {
         let transaction_removal = self.flow.transaction_removal();
         let refused = match self.flow.complete::<TAdmission::IdClaims>(request).await {
             SignInCompletion::SignedIn(signed_in) => {
@@ -63,20 +63,18 @@ impl<TAdmission: AdmitsSignIn> SignInCallbackHandler<TAdmission> {
                 "The signing keys of the identity server are not available yet",
             ),
             SignInCompletion::Unavailable(unavailability) => {
-                Response::text(503, unavailability.to_string())
+                reported_unavailability(&unavailability)
             }
         };
 
-        Ok(ResponseContinuation::from(
-            refused.set_cookie(&transaction_removal),
-        ))
+        Ok(refused.set_cookie(&transaction_removal))
     }
 
     async fn started(
         &self,
         subject: Uuid,
         transaction_removal: Cookie<'static>,
-    ) -> anyhow::Result<ResponseContinuation> {
+    ) -> anyhow::Result<Response> {
         let StartedSession {
             cookie_changes: CookieChanges { mut cookies },
             ..
@@ -84,17 +82,14 @@ impl<TAdmission: AdmitsSignIn> SignInCallbackHandler<TAdmission> {
 
         cookies.push(transaction_removal);
 
-        Ok(
-            CookieChanges { cookies }.precede(ResponseContinuation::from(Redirect::see_other(
-                self.landing.clone(),
-            ))),
-        )
+        Ok(CookieChanges { cookies }
+            .precede_response(Redirect::see_other(self.landing.clone()).into_response()))
     }
 }
 
 #[async_trait]
-impl<TAdmission: AdmitsSignIn> HeadHandler for SignInCallbackHandler<TAdmission> {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TAdmission: AdmitsSignIn> HandlesHead for SignInCallbackHandler<TAdmission> {
+    async fn handle(&self, request: &Request) -> Result<Response, HandlerError> {
         self.answered(request).await.map_err(HandlerError::consumer)
     }
 }

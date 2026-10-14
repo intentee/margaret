@@ -1,8 +1,7 @@
 use http::header::CONTENT_SECURITY_POLICY;
 use serde_json::json;
 
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_oidc_provider_tests::authorization_page_request::authorization_page_request;
 use margaret_oidc_provider_tests::fixture_authorization_handler::fixture_authorization_handler;
 use margaret_oidc_provider_tests::fixture_consent_view::FixtureConsentView;
@@ -22,7 +21,7 @@ async fn rejects_a_malformed_authorization_page_request_in_a_page_no_site_can_fr
 
     assert!(matches!(
         answered,
-        Ok(ResponseContinuation::Done(response))
+        Ok(response)
             if response.status() == 400
                 && response.header_value(&CONTENT_SECURITY_POLICY) == Some("frame-ancestors 'none'")
     ));

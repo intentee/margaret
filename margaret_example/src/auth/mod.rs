@@ -7,6 +7,7 @@ pub mod resource_token_issuers;
 pub mod scopes;
 pub mod session_issuers;
 pub mod sign_in_admitters;
+pub mod signing_keys_encryption;
 pub mod subject_token_exchangers;
 pub mod token_issuers;
 pub mod trusted_issuers;

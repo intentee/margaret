@@ -2,7 +2,6 @@ use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::indexed_item::IndexedItem;
 
 use crate::container_bindings::ContainerBindings;
 use crate::framework_injection_role::FrameworkInjectionRole;
@@ -39,11 +38,11 @@ fn resolved_single(
 #[must_use]
 pub fn resolve_injectable(
     index: &AttributeIndex,
-    item: &IndexedItem,
+    module_path: &[String],
     declared: &Type,
     bindings: &ContainerBindings,
 ) -> InjectableResolution {
-    match ParameterTarget::peel(index, item, declared) {
+    match ParameterTarget::peel(index, module_path, declared) {
         ParameterTarget::Resolved { resolved, .. } => resolved_single(resolved, bindings),
         ParameterTarget::Unresolved { .. } => InjectableResolution::MissingProvider,
         ParameterTarget::UnsupportedShape => InjectableResolution::UnsupportedShape,

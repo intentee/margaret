@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_oidc_sign_in_tests::callback_request::callback_request;
 use margaret_oidc_sign_in_tests::clears_the_transaction::clears_the_transaction;
 use margaret_oidc_sign_in_tests::fixture_admission::FixtureAdmission;
@@ -29,7 +28,7 @@ async fn refuses_a_callback_without_its_transaction_so_unsolicited_codes_sign_no
 
     assert!(matches!(
         answered,
-        Ok(ResponseContinuation::Done(response))
+        Ok(response)
             if response.status() == 403 && clears_the_transaction(&response)
     ));
 }

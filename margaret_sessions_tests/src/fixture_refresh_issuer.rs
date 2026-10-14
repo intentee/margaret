@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use margaret_http::head_handler::HeadHandler;
@@ -11,7 +12,7 @@ use margaret_route_method::route_method::RouteMethod;
 
 const TEMPORARY_REDIRECT: u16 = 307;
 
-async fn serving(refresh: Arc<dyn HeadHandler>) -> FixtureRefreshIssuer {
+async fn serving(refresh: Arc<dyn HeadHandler<Infallible>>) -> FixtureRefreshIssuer {
     let tls = TlsFixture::generate();
     let server = RunningFixtureServer::start(
         tls.server_config.clone(),

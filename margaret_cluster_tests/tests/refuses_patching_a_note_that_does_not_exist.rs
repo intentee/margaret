@@ -2,6 +2,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 use uuid::Uuid;
 
+use margaret_cluster_fixture::margaret::routes::props::PatchNoteRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 
@@ -19,7 +20,10 @@ async fn refuses_patching_a_note_that_does_not_exist() {
                     cluster
                         .routes()
                         .public
-                        .patch_note(Uuid::new_v4().to_string())
+                        .patch_note
+                        .address(PatchNoteRouteProps {
+                            note: Uuid::new_v4().to_string()
+                        })
                 )
                 .url()
             )

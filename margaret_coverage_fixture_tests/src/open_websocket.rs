@@ -5,7 +5,6 @@ use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::client_async;
 use tokio_tungstenite::tungstenite::Error;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-use tokio_tungstenite::tungstenite::handshake::client::Response;
 
 /// # Errors
 ///
@@ -17,7 +16,7 @@ use tokio_tungstenite::tungstenite::handshake::client::Response;
 pub async fn open_websocket(
     address: SocketAddr,
     request: impl IntoClientRequest + Unpin,
-) -> Result<(WebSocketStream<TcpStream>, Response), Error> {
+) -> Result<WebSocketStream<TcpStream>, Error> {
     client_async(
         request,
         TcpStream::connect(address)
@@ -25,4 +24,5 @@ pub async fn open_websocket(
             .expect("the library accepts the connection"),
     )
     .await
+    .map(|(stream, _handshake)| stream)
 }

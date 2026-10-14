@@ -9,12 +9,12 @@ use margaret_http::response_continuation::ResponseContinuation;
 pub struct DelegatingMiddleware;
 
 #[async_trait]
-impl HttpMiddleware for DelegatingMiddleware {
+impl<TTarget: Send + 'static> HttpMiddleware<TTarget> for DelegatingMiddleware {
     async fn process(
         &self,
         request: &Request,
-        next: Next,
-    ) -> Result<ResponseContinuation, HandlerError> {
+        next: Next<TTarget>,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         next.run(request).await
     }
 }

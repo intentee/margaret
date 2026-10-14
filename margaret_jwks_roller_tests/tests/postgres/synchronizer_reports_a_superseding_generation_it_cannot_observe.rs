@@ -13,7 +13,7 @@ use margaret_jwks_roller_tests::locked_signing_keys::locked_signing_keys;
 use margaret_jwks_roller_tests::seeded_signing_keys::seeded_signing_keys;
 use margaret_signing_keys::constants::SIGNING_KEY_SET_NAME;
 use margaret_signing_keys::signing_key_set::SigningKeySet;
-use margaret_signing_keys::signing_keys_revision::SigningKeysRevision;
+use margaret_signing_keys_tests::sealed_revision::sealed_revision;
 use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
 
 #[tokio::test]
@@ -46,7 +46,7 @@ async fn synchronizer_reports_a_superseding_generation_it_cannot_observe() {
 
     started.administration.await_lock_waiters(1).await;
 
-    let backup_revision = SigningKeysRevision::from_secret(&backup).expect("the backup serializes");
+    let backup_revision = sealed_revision(&backup);
 
     assert!(matches!(
         SigningKeySet::query()
@@ -56,7 +56,12 @@ async fn synchronizer_reports_a_superseding_generation_it_cannot_observe() {
                 columns
                     .generation
                     .to(1)
-                    .and(columns.document.to(backup_revision.document))
+                    .and(columns.nonce.to(backup_revision.sealed.nonce.to_vec()))
+                    .and(
+                        columns
+                            .sealed_document
+                            .to(backup_revision.sealed.ciphertext),
+                    )
             })
             .await
             .expect("the backup is restored"),

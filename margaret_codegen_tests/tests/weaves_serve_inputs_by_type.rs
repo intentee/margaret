@@ -6,7 +6,7 @@ fn weaves_each_serve_input_category_with_its_type_appropriate_operation() {
     let generated =
         generate_fixture("type_aware_console_arguments").expect("the fixture generates");
     let construction: String =
-        generated_module_source(&generated, "container/build/serve_arguments")
+        generated_module_source(&generated, "container/build/arguments/serve_arguments")
             .expect("the bootstrap arguments module is generated")
             .split_whitespace()
             .collect();

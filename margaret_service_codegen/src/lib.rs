@@ -1,11 +1,13 @@
 pub mod framework_service;
-pub mod read_serve_invocation;
-pub mod render_services;
+pub mod render_serving;
+pub mod rendered_serving;
 pub mod runner_outcome;
 pub mod serve_invocation_read;
 pub mod service_codegen_error;
 pub mod service_plan;
 
+mod read_serve_invocation;
+mod render_services;
 mod serve_inputs;
 mod serve_invocation_field;
 mod serve_invocation_fields;
@@ -21,6 +23,8 @@ mod tick_timer_arguments;
 #[cfg(test)]
 mod tests {
     use quote::quote;
+    use syn::Item;
+    use syn::parse_file;
 
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
@@ -45,8 +49,8 @@ mod tests {
     use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use crate::framework_service::FrameworkService;
-    use crate::read_serve_invocation::read_serve_invocation;
-    use crate::render_services::render_services;
+    use crate::render_serving::render_serving;
+    use crate::rendered_serving::RenderedServing;
     use crate::runner_outcome::RunnerOutcome;
     use crate::serve_invocation_read::ServeInvocationRead;
     use crate::service_codegen_error::ServiceCodegenError;
@@ -103,8 +107,10 @@ mod tests {
         has_views: bool,
         bindings: &ContainerBindings,
     ) -> String {
-        let ServeInvocationRead { binding, chain } = read_serve_invocation(plan, servers, bindings);
-        let mut modules = render_services(plan, servers, has_views, bindings);
+        let RenderedServing {
+            invocation: ServeInvocationRead { binding, chain },
+            mut modules,
+        } = render_serving(plan, servers, has_views, bindings);
 
         modules.push(GeneratedModuleTokens::new(
             ModulePath::root("serve_invocation_read"),
@@ -463,6 +469,37 @@ impl Flusher {
     }
 
     #[test]
+    fn defines_the_server_registration_before_the_unit_adapters_so_helper_functions_precede_helper_structs()
+     {
+        let index = IndexedSource::new(SERVICE).index;
+        let bindings = bindings(&index);
+        let plan = ServicePlan::build(&index, &[], &bindings, &serve_roots(&index))
+            .expect("the service construction is planned");
+        let serve = render_serving(&plan, &public(), false, &bindings)
+            .modules
+            .into_iter()
+            .next()
+            .expect("the serve module is rendered")
+            .format()
+            .expect("the serve module formats");
+        let items = parse_file(serve.source())
+            .expect("the serve module parses")
+            .items;
+        let registration = items
+            .iter()
+            .position(|item| {
+                matches!(item, Item::Fn(function) if function.sig.ident == "register_servers")
+            })
+            .expect("the server registration is defined");
+        let first_adapter = items
+            .iter()
+            .position(|item| matches!(item, Item::Struct(_)))
+            .expect("the unit adapter is defined");
+
+        assert!(registration < first_adapter);
+    }
+
+    #[test]
     fn builds_one_mutable_manager_for_a_units_only_application() {
         let source = rendered(SERVICE, &[]);
 
@@ -537,7 +574,7 @@ impl Flusher {
         let source = rendered(SPIFFE_CLIENT, &[]);
 
         assert!(source.contains(
-            "margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{spiffe_trust_domain,spire_agent_addr,}).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|spiffe_bundle|{spiffe_bundle.reqwest_client().map_err(margaret::framework::console::report_failure::report_failure,).map(|spiffe_http_client|{letserve_input_0=spiffe_http_client.clone();super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0,},spiffe_bundle,}})"
+            "margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{spiffe_trust_domain,spire_agent_addr,}).map_err(margaret::framework::console::report_failure::report_failure,).and_then(|spiffe_bundle|{spiffe_bundle.reqwest_client().map_err(margaret::framework::console::report_failure::report_failure,).map(|spiffe_http_client|{letserve_input_0=spiffe_http_client.clone();super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::arguments::serve_arguments::ServeArguments{argument0:serve_input_0,},spiffe_bundle,}})"
         ));
         assert!(source.contains("letspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(source.contains(
@@ -844,7 +881,7 @@ impl Roller {
         assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains("manager.register_service(Roller{inner:container.roller(),});"));
         assert!(source.contains(
-            r#"margaret::framework::console::required_argument::required_argument::<::std::path::PathBuf,>(matches,"secret-path").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0,},})"#
+            r#"margaret::framework::console::required_argument::required_argument::<::std::path::PathBuf,>(matches,"secret-path").map(|serve_input_0|super::serve::serve_invocation::ServeInvocation{arguments:super::container::build::arguments::serve_arguments::ServeArguments{argument0:serve_input_0,},})"#
         ));
     }
 

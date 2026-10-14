@@ -1,4 +1,3 @@
-use heck::ToSnakeCase;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -211,7 +210,7 @@ fn session_resolution(
                             cookies: ::std::vec::Vec::new(),
                         },
                         outcome: margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
-                            margaret::framework::http::response_continuation::ResponseContinuation::from(unavailability),
+                            margaret::framework::http::reported_unavailability::reported_unavailability(&unavailability),
                         ),
                     }
                 },
@@ -512,13 +511,12 @@ struct InferenceSteps<'steps> {
 pub fn render_authenticated_user_wrappers(
     providers: &[&AuthenticatedUserProvider],
 ) -> Vec<GeneratedModuleTokens> {
-    let modules = providers.iter().map(|provider| {
-        let wrapper = &provider.application.wrapper;
-        format_ident!("{}", wrapper.to_string().to_snake_case())
-    });
+    let modules = providers
+        .iter()
+        .map(|provider| format_ident!("{}", provider.application.field));
     let exports = providers.iter().map(|provider| {
+        let module = format_ident!("{}", provider.application.field);
         let wrapper = &provider.application.wrapper;
-        let module = format_ident!("{}", wrapper.to_string().to_snake_case());
 
         quote! { pub use #module::#wrapper; }
     });
@@ -532,11 +530,8 @@ pub fn render_authenticated_user_wrappers(
     )];
 
     generated.extend(providers.iter().map(|provider| {
-        let wrapper = &provider.application.wrapper;
-        let module = wrapper.to_string().to_snake_case();
-
         GeneratedModuleTokens::new(
-            authenticated_users.child(module),
+            authenticated_users.child(provider.application.field.as_str()),
             provider_wrapper(provider),
         )
     }));

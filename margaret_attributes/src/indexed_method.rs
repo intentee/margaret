@@ -8,6 +8,7 @@ use crate::indexed_parameter::IndexedParameter;
 pub struct IndexedMethod {
     attributes: Vec<IndexedAttribute>,
     identifier: String,
+    module_path: Vec<String>,
     parameters: Vec<IndexedParameter>,
     signature: Box<Signature>,
 }
@@ -16,12 +17,14 @@ impl IndexedMethod {
     pub(crate) fn from_parts(
         attributes: Vec<IndexedAttribute>,
         identifier: String,
+        module_path: Vec<String>,
         parameters: Vec<IndexedParameter>,
         signature: Box<Signature>,
     ) -> Self {
         Self {
             attributes,
             identifier,
+            module_path,
             parameters,
             signature,
         }
@@ -31,6 +34,7 @@ impl IndexedMethod {
     pub fn new(
         identifier: String,
         attributes: Vec<IndexedAttribute>,
+        module_path: Vec<String>,
         signature: Signature,
     ) -> Self {
         let parameters = signature
@@ -51,6 +55,7 @@ impl IndexedMethod {
         Self {
             attributes,
             identifier,
+            module_path,
             parameters,
             signature: Box::new(signature),
         }
@@ -79,6 +84,11 @@ impl IndexedMethod {
     }
 
     #[must_use]
+    pub fn module_path(&self) -> &[String] {
+        &self.module_path
+    }
+
+    #[must_use]
     pub fn parameters(&self) -> &[IndexedParameter] {
         &self.parameters
     }
@@ -104,6 +114,7 @@ mod tests {
             vec![IndexedAttribute::resolving_to_margaret_macro(
                 &parse_quote!(#[process]),
             )],
+            vec!["crate".to_string()],
             parse_quote!(fn run(&self, #[route_parameter(from = "id")] id: String)),
         );
 

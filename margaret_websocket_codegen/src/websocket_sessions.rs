@@ -49,7 +49,6 @@ pub(crate) fn websocket_sessions(
         let subject = format!("session '{session}'");
         let parameters = classify_parameters(
             index,
-            item,
             method,
             &BindingContext::Handshake {
                 container_bindings: bindings,

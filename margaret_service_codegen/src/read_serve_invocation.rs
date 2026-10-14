@@ -6,7 +6,6 @@ use margaret_codegen_tokens::routes_ident::routes_ident;
 use margaret_codegen_tokens::server_origin_ident::server_origin_ident;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
 use margaret_codegen_tokens::spiffe_issuer_request_client_ident::spiffe_issuer_request_client_ident;
-use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_origin_source::ServerOriginSource;
 use margaret_http_codegen::server_uploads::ServerUploads;
@@ -16,7 +15,6 @@ use margaret_serve_input_codegen::read_expression::ReadExpression;
 use margaret_serve_input_codegen::spiffe_client_requirements::SpiffeClientRequirements;
 
 use crate::serve_invocation_field::ServeInvocationField;
-use crate::serve_invocation_fields::serve_invocation_fields;
 use crate::serve_invocation_read::ServeInvocationRead;
 use crate::server_bindings::ServerBindings;
 use crate::service_plan::ServicePlan;
@@ -225,19 +223,18 @@ fn server_reads(servers: &[HttpServer], activation: SpiffeActivation) -> Vec<Cha
         .collect()
 }
 
-#[must_use]
-pub fn read_serve_invocation(
+pub(crate) fn read_serve_invocation(
     plan: &ServicePlan,
     servers: &[HttpServer],
-    bindings: &ContainerBindings,
+    activation: SpiffeActivation,
+    fields: &[ServeInvocationField],
 ) -> ServeInvocationRead {
-    let activation = SpiffeActivation::of(plan, servers);
     let reads: Vec<ChainedRead> = spiffe_reads(activation, plan.spiffe_clients)
         .into_iter()
         .chain(server_reads(servers, activation))
         .chain(plan.reads.iter().cloned())
         .collect();
-    let initializations = serve_invocation_fields(plan, servers, bindings)
+    let initializations = fields
         .iter()
         .map(ServeInvocationField::initialization)
         .collect::<Vec<TokenStream>>();

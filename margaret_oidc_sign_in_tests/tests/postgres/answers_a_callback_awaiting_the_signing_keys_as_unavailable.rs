@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
@@ -61,7 +60,7 @@ async fn answers_a_callback_awaiting_the_signing_keys_as_unavailable() {
 
     assert!(matches!(
         answered,
-        Ok(ResponseContinuation::Done(response))
+        Ok(response)
             if response.status() == 503 && clears_the_transaction(&response)
     ));
 }

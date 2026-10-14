@@ -3,6 +3,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 
 use margaret_cluster_fixture::constants::NOTE_SWEEP_INTERVAL;
+use margaret_cluster_fixture::margaret::routes::props::GetNoteRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::stored_note::StoredNote;
@@ -32,7 +33,14 @@ async fn any_instance_sweeps_notes_another_wrote_so_a_crashed_writer_leaves_no_g
     let read_on_survivor = async || {
         cluster
             .client
-            .get(addressed_route(cluster.instance_routes(1).public.get_note(id.to_string())).url())
+            .get(
+                addressed_route(cluster.instance_routes(1).public.get_note.address(
+                    GetNoteRouteProps {
+                        note: id.to_string(),
+                    },
+                ))
+                .url(),
+            )
             .send()
             .await
             .expect("the note is read")

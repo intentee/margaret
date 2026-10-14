@@ -154,6 +154,7 @@ pub(crate) struct ModuleWalker {
     items: Vec<ScannedItem>,
     pending_members: Vec<PendingMember>,
     seen_paths: HashSet<CanonicalPath>,
+    value_definitions: Vec<CanonicalPath>,
 }
 
 impl ModuleWalker {
@@ -168,6 +169,7 @@ impl ModuleWalker {
             items: Vec::new(),
             pending_members: Vec::new(),
             seen_paths: HashSet::new(),
+            value_definitions: Vec::new(),
         };
         let root_file = source_directory.join("lib.rs");
         let module_path = vec![crate_name.to_string()];
@@ -177,6 +179,16 @@ impl ModuleWalker {
         walker.into_output()
     }
 
+    fn define_value(&mut self, module_path: &[String], identifier: &Ident) {
+        self.value_definitions.push(CanonicalPath::new(
+            module_path
+                .iter()
+                .cloned()
+                .chain([identifier.to_string()])
+                .collect(),
+        ));
+    }
+
     fn into_output(self) -> Result<WalkOutput, AttributeError> {
         let Self {
             excluded_root_modules: _,
@@ -184,11 +196,13 @@ impl ModuleWalker {
             mut items,
             pending_members,
             seen_paths: _,
+            value_definitions,
         } = self;
 
         let definitions: ItemPaths = items
             .iter()
             .map(|item| item.canonical_path().clone())
+            .chain(value_definitions)
             .collect();
         let resolver = PathResolver::new(definitions, imports);
 
@@ -413,6 +427,16 @@ impl ModuleWalker {
             }
             Item::Impl(item_impl) => {
                 self.walk_impl(item_impl, module_path);
+
+                None
+            }
+            Item::Const(item_const) => {
+                self.define_value(module_path, &item_const.ident);
+
+                None
+            }
+            Item::Static(item_static) => {
+                self.define_value(module_path, &item_static.ident);
 
                 None
             }

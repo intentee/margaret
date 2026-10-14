@@ -10,6 +10,7 @@ use margaret_jwks_roller_tests::fixture_synchronizer::fixture_synchronizer;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_signing_keys::signing_key_set::SigningKeySet;
 use margaret_signing_keys::signing_keys_revision::SigningKeysRevision;
+use margaret_signing_keys_tests::sealed_revision::sealed_revision;
 use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
 
 const PEER_GENERATION: u64 = 7;
@@ -22,8 +23,7 @@ async fn synchronizer_reports_created_keys_it_cannot_observe() {
         &started.database,
         &SigningKeysRevision {
             generation: SigningKeysGeneration::new(PEER_GENERATION),
-            ..SigningKeysRevision::from_secret(&fresh_secret(SigningCurve::P256))
-                .expect("the peer keys serialize")
+            ..sealed_revision(&fresh_secret(SigningCurve::P256))
         },
     )
     .await

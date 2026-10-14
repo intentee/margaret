@@ -1,5 +1,6 @@
 use reqwest::StatusCode;
 
+use margaret_cluster_fixture::margaret::routes::props::PatchNoteRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::note_written::note_written;
@@ -14,7 +15,18 @@ async fn refuses_a_note_patch_that_is_not_json() {
     assert_eq!(
         cluster
             .client
-            .patch(addressed_route(cluster.routes().public.patch_note(id.to_string())).url())
+            .patch(
+                addressed_route(
+                    cluster
+                        .routes()
+                        .public
+                        .patch_note
+                        .address(PatchNoteRouteProps {
+                            note: id.to_string()
+                        })
+                )
+                .url()
+            )
             .body("second draft")
             .send()
             .await

@@ -10,26 +10,26 @@ use crate::one_shot_handler::OneShotHandler;
 use crate::request::Request;
 use crate::response_continuation::ResponseContinuation;
 
-struct OneShotLayer {
-    inner: Box<dyn OneShotHandler>,
-    middleware: Arc<dyn HttpMiddleware>,
+struct OneShotLayer<TTarget> {
+    inner: Box<dyn OneShotHandler<TTarget>>,
+    middleware: Arc<dyn HttpMiddleware<TTarget>>,
 }
 
 #[async_trait]
-impl OneShotHandler for OneShotLayer {
+impl<TTarget: Send + 'static> OneShotHandler<TTarget> for OneShotLayer<TTarget> {
     async fn handle(
         self: Box<Self>,
         request: &Request,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         let Self { inner, middleware } = *self;
 
         middleware.process(request, Next::one_shot(inner)).await
     }
 }
 
-pub(crate) fn one_shot_layer(
-    middleware: Arc<dyn HttpMiddleware>,
-    inner: Box<dyn OneShotHandler>,
-) -> Box<dyn OneShotHandler> {
+pub(crate) fn one_shot_layer<TTarget: Send + 'static>(
+    middleware: Arc<dyn HttpMiddleware<TTarget>>,
+    inner: Box<dyn OneShotHandler<TTarget>>,
+) -> Box<dyn OneShotHandler<TTarget>> {
     Box::new(OneShotLayer { inner, middleware })
 }

@@ -3,7 +3,6 @@ use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::indexed_item::IndexedItem;
 
 use crate::peel_target::peel_target;
 
@@ -19,12 +18,12 @@ pub(crate) enum ParameterTarget {
 }
 
 impl ParameterTarget {
-    pub(crate) fn peel(index: &AttributeIndex, item: &IndexedItem, declared: &Type) -> Self {
-        let Some(written) = peel_target(index, item, declared) else {
+    pub(crate) fn peel(index: &AttributeIndex, module_path: &[String], declared: &Type) -> Self {
+        let Some(written) = peel_target(index, module_path, declared) else {
             return Self::UnsupportedShape;
         };
 
-        match index.resolve_item_path(item, &written) {
+        match index.resolve_module_path(module_path, &written) {
             Some(resolved) => Self::Resolved { resolved, written },
             None => Self::Unresolved { written },
         }

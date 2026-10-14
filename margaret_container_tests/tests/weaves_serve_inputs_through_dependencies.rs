@@ -13,17 +13,17 @@ fn weaves_console_arguments_through_dependencies_so_roots_receive_every_input_be
         .collect();
 
     assert!(
-        source.contains("pubfnconstruct_config(super::construct_config_arguments::ConstructConfigArguments{argument1:serve_input_1,}:super::construct_config_arguments::ConstructConfigArguments,)")
+        source.contains("pubfnconstruct_config(super::arguments::construct_config_arguments::ConstructConfigArguments{argument1:serve_input_1,}:super::arguments::construct_config_arguments::ConstructConfigArguments,)")
     );
     assert!(source.contains("crate::Config::create(serve_input_1)"));
     assert!(
         source.contains(
-            "pubfnconstruct_alpha_plugin(super::construct_alpha_plugin_arguments::ConstructAlphaPluginArguments{argument0:serve_input_0,}:super::construct_alpha_plugin_arguments::ConstructAlphaPluginArguments,)"
+            "pubfnconstruct_alpha_plugin(super::arguments::construct_alpha_plugin_arguments::ConstructAlphaPluginArguments{argument0:serve_input_0,}:super::arguments::construct_alpha_plugin_arguments::ConstructAlphaPluginArguments,)"
         )
     );
     assert!(
         source.contains(
-            "pubfnconstruct_service(super::construct_service_arguments::ConstructServiceArguments{argument1:serve_input_1,argument0:serve_input_0,}:super::construct_service_arguments::ConstructServiceArguments,)"
+            "pubfnconstruct_service(super::arguments::construct_service_arguments::ConstructServiceArguments{argument1:serve_input_1,argument0:serve_input_0,}:super::arguments::construct_service_arguments::ConstructServiceArguments,)"
         )
     );
     assert!(source.contains(

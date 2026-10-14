@@ -15,8 +15,11 @@ use margaret_route_method::route_method::RouteMethod;
 struct EchoBearer;
 
 #[async_trait]
-impl HeadHandler for EchoBearer {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TTarget> HeadHandler<TTarget> for EchoBearer {
+    async fn handle(
+        &self,
+        request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         Ok(ResponseContinuation::Done(
             match request.inputs.server.authorization().bearer() {
                 ControlFlow::Continue(token) => Response::text(200, token.as_str()),
@@ -27,7 +30,7 @@ impl HeadHandler for EchoBearer {
 }
 
 #[must_use]
-pub fn echo_bearer_route() -> RouteEntry {
+pub fn echo_bearer_route<TTarget: Send + 'static>() -> RouteEntry<TTarget> {
     RouteEntry::new(vec![MethodHandler::head(
         RouteMethod::Get,
         Arc::new(EchoBearer),

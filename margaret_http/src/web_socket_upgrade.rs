@@ -5,7 +5,7 @@ use hyper::upgrade::OnUpgrade;
 use tokio_util::sync::CancellationToken;
 
 use crate::request::Request;
-use crate::response_continuation::ResponseContinuation;
+use crate::response::Response;
 use crate::web_socket_driver_sender::WebSocketDriverSender;
 
 #[async_trait]
@@ -16,5 +16,5 @@ pub trait WebSocketUpgrade: Send + Sync {
         on_upgrade: OnUpgrade,
         cancellation_token: CancellationToken,
         driver_sender: WebSocketDriverSender,
-    ) -> ResponseContinuation;
+    ) -> Response;
 }

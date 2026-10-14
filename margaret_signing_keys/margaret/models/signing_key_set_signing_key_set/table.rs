@@ -15,10 +15,24 @@ pub const TABLE: margaret::framework::model::table::Table = margaret::framework:
             nullable: false,
         },
         margaret::framework::model::column::Column {
-            checks: &[],
-            column_type: margaret::framework::model::column_type::ColumnType::Text,
+            checks: &[
+                margaret::framework::model::column_check::ColumnCheck {
+                    name: "signing_key_sets_nonce_byte_length",
+                    predicate: margaret::framework::model::check_predicate::CheckPredicate::ByteLength {
+                        length: 12u32,
+                    },
+                },
+            ],
+            column_type: margaret::framework::model::column_type::ColumnType::Bytea,
             default: margaret::framework::model::column_default::ColumnDefault::NotSet,
-            name: "document",
+            name: "nonce",
+            nullable: false,
+        },
+        margaret::framework::model::column::Column {
+            checks: &[],
+            column_type: margaret::framework::model::column_type::ColumnType::Bytea,
+            default: margaret::framework::model::column_default::ColumnDefault::NotSet,
+            name: "sealed_document",
             nullable: false,
         },
     ],

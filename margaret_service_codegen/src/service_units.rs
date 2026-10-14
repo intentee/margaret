@@ -52,7 +52,7 @@ fn build_unit(
 
     let runner = process_method(item)?;
 
-    let takes_token = match RunnerSignature::of(index, item, runner) {
+    let takes_token = match RunnerSignature::of(index, runner) {
         RunnerSignature::Accepted { takes_token } => takes_token,
         RunnerSignature::RejectedArgument { parameter } => {
             return Err(ServiceCodegenError::RunnerArgument {

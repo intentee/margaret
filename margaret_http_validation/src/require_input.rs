@@ -1,18 +1,17 @@
 use margaret_http::requirement::Requirement;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_validation::validation_result::ValidationResult;
 
 #[must_use]
 pub fn require_input<Model>(validation: ValidationResult<Model>) -> Requirement<Model> {
     match validation {
         ValidationResult::Valid(model) => Requirement::Met(model),
-        ValidationResult::Invalid(errors) => Requirement::Unmet(ResponseContinuation::from(
-            Response::text(422, errors.to_string()),
-        )),
-        ValidationResult::Malformed(malformation) => Requirement::Unmet(
-            ResponseContinuation::from(Response::text(400, malformation.to_string())),
-        ),
+        ValidationResult::Invalid(errors) => {
+            Requirement::Unmet(Response::text(422, errors.to_string()))
+        }
+        ValidationResult::Malformed(malformation) => {
+            Requirement::Unmet(Response::text(400, malformation.to_string()))
+        }
     }
 }
 
@@ -24,7 +23,6 @@ mod tests {
     use validator::Validate;
 
     use margaret_http::requirement::Requirement;
-    use margaret_http::response_continuation::ResponseContinuation;
     use margaret_validation::validate::validate;
 
     use super::require_input;
@@ -47,7 +45,7 @@ mod tests {
     fn is_unmet_with_status(requirement: Requirement<Sample>, status: u16) -> bool {
         matches!(
             requirement,
-            Requirement::Unmet(ResponseContinuation::Done(response)) if response.status() == status
+            Requirement::Unmet(response) if response.status() == status
         )
     }
 

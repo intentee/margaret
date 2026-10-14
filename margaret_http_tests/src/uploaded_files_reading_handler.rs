@@ -15,12 +15,12 @@ pub struct UploadedFilesReadingHandler {
 }
 
 #[async_trait]
-impl ContentHandler for UploadedFilesReadingHandler {
+impl<TTarget> ContentHandler<TTarget> for UploadedFilesReadingHandler {
     async fn handle(
         &self,
         request: &Request,
         body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         Ok(ResponseContinuation::Done(
             match read_uploaded_files(request, body, self.limit).await? {
                 BodyReading::Read(_) => Response::text(200, "stored"),

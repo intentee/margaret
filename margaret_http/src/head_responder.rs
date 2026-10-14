@@ -15,26 +15,31 @@ struct HeadResponder<TResponder, TExtract> {
 }
 
 #[async_trait]
-impl<TResponder, TExtract> HeadHandler for HeadResponder<TResponder, TExtract>
+impl<TTarget, TResponder, TExtract> HeadHandler<TTarget> for HeadResponder<TResponder, TExtract>
 where
+    TTarget: 'static,
     TResponder: Send + Sync + 'static,
-    TExtract: for<'request> Fn(Arc<TResponder>, &'request Request) -> HandlerFuture<'request>
+    TExtract: for<'request> Fn(Arc<TResponder>, &'request Request) -> HandlerFuture<'request, TTarget>
         + Send
         + Sync
         + 'static,
 {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+    async fn handle(
+        &self,
+        request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         (self.extract)(Arc::clone(&self.responder), request).await
     }
 }
 
-pub fn head_responder<TResponder, TExtract>(
+pub fn head_responder<TTarget, TResponder, TExtract>(
     responder: Arc<TResponder>,
     extract: TExtract,
-) -> Arc<dyn HeadHandler>
+) -> Arc<dyn HeadHandler<TTarget>>
 where
+    TTarget: 'static,
     TResponder: Send + Sync + 'static,
-    TExtract: for<'request> Fn(Arc<TResponder>, &'request Request) -> HandlerFuture<'request>
+    TExtract: for<'request> Fn(Arc<TResponder>, &'request Request) -> HandlerFuture<'request, TTarget>
         + Send
         + Sync
         + 'static,

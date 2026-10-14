@@ -5,7 +5,7 @@ use margaret_handler_error::handler_error::HandlerError;
 use crate::body_limit::BodyLimit;
 use crate::request::Request;
 use crate::request_body::RequestBody;
-use crate::response_continuation::ResponseContinuation;
+use crate::response::Response;
 
 #[async_trait]
 pub trait HandlesLimitedContent: Send + Sync {
@@ -14,5 +14,5 @@ pub trait HandlesLimitedContent: Send + Sync {
         request: &Request,
         body: RequestBody,
         limit: BodyLimit,
-    ) -> Result<ResponseContinuation, HandlerError>;
+    ) -> Result<Response, HandlerError>;
 }

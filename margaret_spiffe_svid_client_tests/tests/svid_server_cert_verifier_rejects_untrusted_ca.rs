@@ -1,5 +1,3 @@
-use rustls::CertificateError;
-use rustls::Error;
 use rustls::client::danger::ServerCertVerifier as _;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::ServerName;
@@ -7,6 +5,7 @@ use rustls::pki_types::UnixTime;
 
 use margaret_spiffe_svid::svid_crypto_provider::svid_crypto_provider;
 use margaret_spiffe_svid_client::svid_server_cert_verifier::SvidServerCertVerifier;
+use margaret_spiffe_svid_client_tests::rejected_by_webpki::rejected_by_webpki;
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 use margaret_spiffe_svid_tests::constants::LEAF_SPIFFE_EXAMPLE_ORG_UNTRUSTED_DER;
 
@@ -27,8 +26,8 @@ fn rejects_a_server_svid_signed_by_an_untrusted_ca_even_within_the_trust_domain(
         UnixTime::now(),
     );
 
-    assert_eq!(
-        result.unwrap_err(),
-        Error::InvalidCertificate(CertificateError::BadSignature),
-    );
+    assert!(rejected_by_webpki(
+        &result.unwrap_err(),
+        &webpki::Error::UnknownIssuer
+    ));
 }

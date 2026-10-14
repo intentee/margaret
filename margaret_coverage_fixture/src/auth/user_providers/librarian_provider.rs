@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
-use margaret::framework::http::response_continuation::ResponseContinuation;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::infer_from_request;
@@ -43,7 +42,7 @@ impl LibrarianProvider {
                 badge: badge.to_string(),
             })
         } else {
-            AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(Response::forbidden()))
+            AuthenticatedUserOutcome::Interrupted(Response::forbidden())
         })
     }
 }

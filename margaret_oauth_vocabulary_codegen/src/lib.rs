@@ -3,4 +3,5 @@ pub mod declared_scope_item;
 pub mod declared_scopes;
 pub mod oauth_vocabulary_codegen_error;
 pub mod render_scopes;
-pub mod scope_resolution;
+pub mod scope_list_resolution;
+mod scope_resolution;

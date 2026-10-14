@@ -1,3 +1,6 @@
+use base64ct::Base64;
+use base64ct::Encoding;
+
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fresh_secret::fresh_secret;
 use margaret_jwks_keygen_tests::persisted_document::persisted_document;
@@ -13,8 +16,8 @@ fn persisted_jwks_secret_serializes_the_signing_material() {
         secret.current().kid().as_str()
     );
     assert_eq!(
-        serialized["ec"]["current"]["pem"],
-        secret.current().signing_key().pem().as_str()
+        serialized["ec"]["current"]["pkcs8"],
+        Base64::encode_string(secret.current().signing_key().pkcs8())
     );
     assert_eq!(serialized["ec"]["current"]["crv"], "P-256");
     assert_eq!(

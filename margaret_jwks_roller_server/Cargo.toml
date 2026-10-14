@@ -21,6 +21,7 @@ margaret_http = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwks_roller = { workspace = true }
 margaret_registered_claims = { workspace = true }
+margaret_signing_keys_encryption = { workspace = true }
 margaret_sync_holder = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

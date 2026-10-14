@@ -16,10 +16,16 @@ struct ContentResponder<TResponder, TExtract> {
 }
 
 #[async_trait]
-impl<TResponder, TExtract> ContentHandler for ContentResponder<TResponder, TExtract>
+impl<TTarget, TResponder, TExtract> ContentHandler<TTarget>
+    for ContentResponder<TResponder, TExtract>
 where
+    TTarget: 'static,
     TResponder: Send + Sync + 'static,
-    TExtract: for<'request> Fn(Arc<TResponder>, &'request Request, RequestBody) -> HandlerFuture<'request>
+    TExtract: for<'request> Fn(
+            Arc<TResponder>,
+            &'request Request,
+            RequestBody,
+        ) -> HandlerFuture<'request, TTarget>
         + Send
         + Sync
         + 'static,
@@ -28,18 +34,23 @@ where
         &self,
         request: &Request,
         body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         (self.extract)(Arc::clone(&self.responder), request, body).await
     }
 }
 
-pub fn content_responder<TResponder, TExtract>(
+pub fn content_responder<TTarget, TResponder, TExtract>(
     responder: Arc<TResponder>,
     extract: TExtract,
-) -> Arc<dyn ContentHandler>
+) -> Arc<dyn ContentHandler<TTarget>>
 where
+    TTarget: 'static,
     TResponder: Send + Sync + 'static,
-    TExtract: for<'request> Fn(Arc<TResponder>, &'request Request, RequestBody) -> HandlerFuture<'request>
+    TExtract: for<'request> Fn(
+            Arc<TResponder>,
+            &'request Request,
+            RequestBody,
+        ) -> HandlerFuture<'request, TTarget>
         + Send
         + Sync
         + 'static,

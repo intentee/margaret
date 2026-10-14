@@ -255,7 +255,7 @@ fn arguments_declaration(
     });
 
     quote! {
-        super::#module::#arguments_type { #(#bindings)* }: super::#module::#arguments_type
+        super::arguments::#module::#arguments_type { #(#bindings)* }: super::arguments::#module::#arguments_type
     }
 }
 
@@ -276,7 +276,9 @@ fn arguments_module(
     });
 
     Some(GeneratedModuleTokens::new(
-        build_module().child(bootstrap_arguments_module(function).to_string()),
+        build_module()
+            .child("arguments")
+            .child(bootstrap_arguments_module(function).to_string()),
         quote! {
             pub struct #arguments_type {
                 #(#fields)*
@@ -495,16 +497,20 @@ pub(crate) fn render_build(
         .collect::<Vec<RootBuilder>>();
     let module_declarations = builders.iter().map(|builder| {
         let function = &builder.function;
-        let arguments_module = builder
-            .arguments
-            .as_ref()
-            .map(|_| bootstrap_arguments_module(function))
-            .map(|module| quote! { pub mod #module; });
 
-        quote! {
-            #arguments_module
-            mod #function;
-        }
+        quote! { mod #function; }
+    });
+    let argument_declarations: Vec<TokenStream> = builders
+        .iter()
+        .filter(|builder| builder.arguments.is_some())
+        .map(|builder| {
+            let module = bootstrap_arguments_module(&builder.function);
+
+            quote! { pub mod #module; }
+        })
+        .collect();
+    let arguments_namespace = (!argument_declarations.is_empty()).then(|| {
+        quote! { pub mod arguments; }
     });
     let module_exports = builders.iter().map(|builder| {
         let function = &builder.function;
@@ -515,11 +521,19 @@ pub(crate) fn render_build(
     let mut modules = vec![GeneratedModuleTokens::new(
         build.clone(),
         quote! {
+            #arguments_namespace
             #(#module_declarations)*
 
             #(#module_exports)*
         },
     )];
+
+    if !argument_declarations.is_empty() {
+        modules.push(GeneratedModuleTokens::new(
+            build.child("arguments"),
+            quote! { #(#argument_declarations)* },
+        ));
+    }
 
     for builder in builders {
         modules.extend(builder.arguments);

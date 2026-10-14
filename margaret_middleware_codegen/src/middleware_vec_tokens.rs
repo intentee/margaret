@@ -10,6 +10,7 @@ use crate::middleware_instance_tokens::middleware_instance_tokens;
 pub fn middleware_vec_tokens(
     layers: &[LayerApplication],
     module_path: &TokenStream,
+    target: &TokenStream,
     bindings: &ContainerBindings,
 ) -> TokenStream {
     let elements = layers
@@ -19,7 +20,7 @@ pub fn middleware_vec_tokens(
     quote! {
         {
             let middleware: [
-                ::std::sync::Arc<dyn margaret::framework::http::http_middleware::HttpMiddleware>;
+                ::std::sync::Arc<dyn margaret::framework::http::http_middleware::HttpMiddleware<#target>>;
                 _
             ] = [#(#elements),*];
 

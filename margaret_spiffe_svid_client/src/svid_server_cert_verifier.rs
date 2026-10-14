@@ -4,6 +4,7 @@ use log::warn;
 use rustls::CertificateError;
 use rustls::DigitallySignedStruct;
 use rustls::Error;
+use rustls::OtherError;
 use rustls::RootCertStore;
 use rustls::SignatureScheme;
 use rustls::client::WebPkiServerVerifier;
@@ -95,10 +96,8 @@ impl ServerCertVerifier for SvidServerCertVerifier {
                 None,
                 None,
             )
-            .map_err(|err| {
-                warn!("Certificate not good for usage: {err:#?}");
-
-                Error::InvalidCertificate(CertificateError::BadSignature)
+            .map_err(|source| {
+                Error::InvalidCertificate(CertificateError::Other(OtherError(Arc::new(source))))
             })?;
 
         Ok(ServerCertVerified::assertion())

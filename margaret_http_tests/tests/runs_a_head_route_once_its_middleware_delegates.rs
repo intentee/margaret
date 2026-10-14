@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use margaret_http::head_handler::HeadHandler;
@@ -13,7 +14,7 @@ use margaret_route_method::route_method::RouteMethod;
 
 #[tokio::test]
 async fn runs_a_head_route_once_its_middleware_delegates() {
-    let page: Arc<dyn HeadHandler> = Arc::new(StaticHandler {
+    let page: Arc<dyn HeadHandler<Infallible>> = Arc::new(StaticHandler {
         body: b"page".to_vec(),
         content_type: "text/plain",
         status: 200,

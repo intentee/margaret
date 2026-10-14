@@ -11,8 +11,11 @@ use margaret_http::response_continuation::ResponseContinuation;
 pub struct UserinfoEchoHandler;
 
 #[async_trait]
-impl HeadHandler for UserinfoEchoHandler {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl<TTarget> HeadHandler<TTarget> for UserinfoEchoHandler {
+    async fn handle(
+        &self,
+        request: &Request,
+    ) -> Result<ResponseContinuation<TTarget>, HandlerError> {
         Ok(ResponseContinuation::Done(Response::json(
             200,
             &json!({

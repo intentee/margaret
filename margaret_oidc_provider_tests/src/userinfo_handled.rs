@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use margaret_handler_error::handler_error::HandlerError;
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
+use margaret_http::response::Response;
 use margaret_oidc_provider::provides_userinfo_claims::ProvidesUserinfoClaims;
 use margaret_oidc_provider::userinfo_endpoint::UserinfoEndpoint;
 
@@ -16,7 +16,7 @@ use crate::userinfo_access_token::userinfo_access_token;
 pub async fn userinfo_handled<TProvider: ProvidesUserinfoClaims>(
     subject: &str,
     claims: TProvider,
-) -> Result<ResponseContinuation, HandlerError> {
+) -> Result<Response, HandlerError> {
     let provider = UnservedProvider::create();
     let access_token = userinfo_access_token(&provider, subject);
 

@@ -1,6 +1,5 @@
 use serde_json::json;
 
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::token_admission::TokenAdmission;
 use margaret_token_introspection_tests::introspected_with::introspected_with;
 use margaret_token_introspection_tests::repository_claims::RepositoryClaims;
@@ -9,7 +8,7 @@ use margaret_token_introspection_tests::repository_claims::RepositoryClaims;
 async fn refuses_claims_of_another_shape_so_responders_never_get_incomplete_claims() {
     assert!(matches!(
         introspected_with::<RepositoryClaims>(200, &json!({ "active": true, "aud": "margaret" })).await,
-        TokenAdmission::Refused(ResponseContinuation::Done(response))
+        TokenAdmission::Refused(response)
             if response.status() == 401
     ));
 }

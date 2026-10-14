@@ -1,7 +1,6 @@
 use http::header::CONTENT_SECURITY_POLICY;
 
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_oidc_provider_tests::authorization_page_request::authorization_page_request;
 use margaret_oidc_provider_tests::fixture_authorization_handler::fixture_authorization_handler;
 use margaret_oidc_provider_tests::fixture_consent_view::FixtureConsentView;
@@ -21,7 +20,7 @@ async fn denies_framing_of_the_consent_page_so_no_site_can_clickjack_an_approval
 
     assert!(matches!(
         answered,
-        Ok(ResponseContinuation::Done(response))
+        Ok(response)
             if response.status() == 200
                 && response.header_value(&CONTENT_SECURITY_POLICY) == Some("frame-ancestors 'none'")
     ));

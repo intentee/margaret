@@ -38,7 +38,9 @@ async fn drain_outbound<Io>(
     Io: AsyncRead + AsyncWrite + Unpin,
 {
     while let Some(message) = outbound.recv().await {
-        if sink.send(message).await.is_err() {
+        if let Err(error) = sink.send(message).await {
+            eprintln!("margaret_websocket: unable to send a websocket frame: {error}");
+
             return;
         }
     }
@@ -138,7 +140,12 @@ async fn run_source<Io, Session>(
                     }
                     Err(_) => break,
                 },
-                Some(Ok(Message::Close(_)) | Err(_)) | None => break,
+                Some(Err(error)) => {
+                    eprintln!("margaret_websocket: unable to read a websocket frame: {error}");
+
+                    break;
+                }
+                Some(Ok(Message::Close(_))) | None => break,
                 Some(Ok(_)) => {}
             },
         }

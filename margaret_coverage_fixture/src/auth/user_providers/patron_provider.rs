@@ -1,6 +1,5 @@
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
-use margaret::framework::http::response_continuation::ResponseContinuation;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::macros::infer_from_request;
 use margaret::framework::macros::infers_authenticated_user;
@@ -23,12 +22,10 @@ impl PatronProvider {
 
         match card.parse() {
             Ok(card) => AuthenticatedUserOutcome::Authenticated(Patron { card }),
-            Err(error) => {
-                AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(Response::text(
-                    400,
-                    format!("the patron card is not a card number: {error}"),
-                )))
-            }
+            Err(error) => AuthenticatedUserOutcome::Interrupted(Response::text(
+                400,
+                format!("the patron card is not a card number: {error}"),
+            )),
         }
     }
 }

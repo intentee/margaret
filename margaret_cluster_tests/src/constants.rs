@@ -5,6 +5,9 @@ pub const CLUSTER_DATABASE_MAX_CONNECTIONS_VARIABLE: &str =
 
 pub const CLUSTER_DATABASE_URL_VARIABLE: &str = "MARGARET_CLUSTER_DATABASE_URL";
 
+pub const CLUSTER_SIGNING_KEYS_ENCRYPTION_KEY_VARIABLE: &str =
+    "MARGARET_CLUSTER_SIGNING_KEYS_ENCRYPTION_KEY";
+
 pub const PARTNER_REDIRECT_URI: &str = "https://localhost:20444/partner/callback";
 
 pub const SESSION_ACCESS_COOKIE: &str = "__Host-margaret-session-access";

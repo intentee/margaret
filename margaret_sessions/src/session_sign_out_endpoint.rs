@@ -3,10 +3,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use margaret_handler_error::handler_error::HandlerError;
-use margaret_http::head_handler::HeadHandler;
+use margaret_http::handles_head::HandlesHead;
 use margaret_http::redirect::Redirect;
 use margaret_http::request::Request;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::response::Response;
 use margaret_server_origin::route_url::RouteUrl;
 
 use crate::issued_sessions::IssuedSessions;
@@ -27,15 +27,13 @@ impl SessionSignOutEndpoint {
 }
 
 #[async_trait]
-impl HeadHandler for SessionSignOutEndpoint {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+impl HandlesHead for SessionSignOutEndpoint {
+    async fn handle(&self, request: &Request) -> Result<Response, HandlerError> {
         self.sessions
             .sign_out(request)
             .await
             .map(|removal| {
-                removal.precede(ResponseContinuation::from(Redirect::see_other(
-                    self.landing.clone(),
-                )))
+                removal.precede_response(Redirect::see_other(self.landing.clone()).into_response())
             })
             .map_err(|error| HandlerError::consumer(anyhow::Error::from(error)))
     }

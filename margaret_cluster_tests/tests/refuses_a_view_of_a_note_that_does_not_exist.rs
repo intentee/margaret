@@ -1,6 +1,7 @@
 use reqwest::StatusCode;
 use uuid::Uuid;
 
+use margaret_cluster_fixture::margaret::routes::props::GetNoteViewRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 
@@ -14,12 +15,11 @@ async fn refuses_a_view_of_a_note_that_does_not_exist() {
         cluster
             .client
             .get(
-                addressed_route(
-                    cluster
-                        .routes()
-                        .public
-                        .get_note_view(Uuid::new_v4().to_string())
-                )
+                addressed_route(cluster.routes().public.get_note_view.address(
+                    GetNoteViewRouteProps {
+                        note: Uuid::new_v4().to_string()
+                    }
+                ))
                 .url()
             )
             .send()

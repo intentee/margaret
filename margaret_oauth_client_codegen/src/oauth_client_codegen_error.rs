@@ -72,4 +72,7 @@ pub enum OAuthClientCodegenError {
         "#[oauth_client] on '{anchor}' signs in with the scope '{written}', which no #[oauth_scope] declares and which is not margaret::framework::oauth_vocabulary::openid_scope::OpenidScope"
     )]
     UnknownSignInScope { anchor: String, written: String },
+
+    #[error("#[oauth_client] on '{anchor}' signs in with the scope '{written}' more than once")]
+    RepeatedSignInScope { anchor: String, written: String },
 }

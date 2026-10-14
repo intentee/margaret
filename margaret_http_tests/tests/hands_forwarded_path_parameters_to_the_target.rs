@@ -1,32 +1,47 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
+use margaret_http::forwardable_route::ForwardableRoute;
+use margaret_http::get_route_reference::GetRouteReference;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::route_entry::RouteEntry;
+use margaret_http_tests::article_route_props::ArticleRouteProps;
+use margaret_http_tests::fixture_forward_target::FixtureForwardTarget;
+use margaret_http_tests::fixture_forward_targets::FixtureForwardTargets;
 use margaret_http_tests::forwarding_handler::ForwardingHandler;
 use margaret_http_tests::path_param_echo_handler::PathParamEchoHandler;
 use margaret_http_tests::raw_exchange::raw_exchange;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
-use margaret_http_uploaded_file::upload_config::UploadConfig;
+use margaret_http_tests::static_handler::StaticHandler;
+use margaret_route_method::route_method::RouteMethod;
 
 #[tokio::test]
 async fn hands_forwarded_path_parameters_to_the_target() {
-    let server = RunningFixtureServer::start_plain(
-        UploadConfig::Disabled,
+    let article = Arc::new(PathParamEchoHandler { name: "article" });
+    let server = RunningFixtureServer::start_plain_forwarding(
         ["/origin", "/articles/{article}"],
         [
-            RouteEntry::new(vec![MethodHandler::forwardable(
-                "origin",
+            RouteEntry::new(vec![MethodHandler::head(
+                RouteMethod::Get,
                 Arc::new(ForwardingHandler {
-                    path_params: HashMap::from([("article".to_string(), "7".to_string())]),
-                    target: "article",
+                    props: || ArticleRouteProps {
+                        article: "7".to_string(),
+                    },
+                    route: ForwardableRoute::new(
+                        GetRouteReference::new("http://fixture.test/articles/7".to_string()),
+                        FixtureForwardTarget::Article,
+                    ),
                 }),
             )]),
-            RouteEntry::new(vec![MethodHandler::forwardable(
-                "article",
-                Arc::new(PathParamEchoHandler { name: "article" }),
-            )]),
+            RouteEntry::new(vec![MethodHandler::head(RouteMethod::Get, article.clone())]),
         ],
+        FixtureForwardTargets {
+            article,
+            target: Arc::new(StaticHandler {
+                body: Vec::new(),
+                content_type: "text/plain",
+                status: 204,
+            }),
+        },
     )
     .await;
 

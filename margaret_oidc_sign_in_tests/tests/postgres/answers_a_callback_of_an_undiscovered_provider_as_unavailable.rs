@@ -6,8 +6,7 @@ use margaret_authorization_server_client_tests::constants::FIXTURE_CLIENT_ID;
 use margaret_authorization_server_client_tests::fixture_client_secret::fixture_client_secret;
 use margaret_authorization_server_client_tests::localhost_trust::localhost_trust;
 use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
-use margaret_http::head_handler::HeadHandler;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::handles_head::HandlesHead;
 use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
@@ -60,7 +59,7 @@ async fn answers_a_callback_of_an_undiscovered_provider_as_unavailable() {
 
     assert!(matches!(
         answered,
-        Ok(ResponseContinuation::Done(response))
+        Ok(response)
             if response.status() == 503 && clears_the_transaction(&response)
     ));
 }

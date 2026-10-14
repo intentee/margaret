@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::handles_limited_content::HandlesLimitedContent;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_oidc_provider::consent_handler::ConsentHandler;
 use margaret_oidc_provider_tests::form_post_request::form_post_request;
 use margaret_oidc_provider_tests::owned_body::owned_body;
@@ -26,6 +25,6 @@ async fn finds_no_unknown_pending_authorization_to_consent_to() {
 
     assert!(matches!(
         answered,
-        Ok(ResponseContinuation::Done(response)) if response.status() == 404
+        Ok(response) if response.status() == 404
     ));
 }

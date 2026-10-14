@@ -58,6 +58,11 @@ pub enum ContainerError {
     MissingTokenIssuance { provider: String },
 
     #[error(
+        "the framework provider '{provider}' seals the signing keys it stores, but no struct declares #[encrypts_signing_keys]"
+    )]
+    MissingSigningKeysEncryption { provider: String },
+
+    #[error(
         "the framework provider '{provider}' keeps its state in the application database, but no struct declares #[postgres_database]"
     )]
     MissingPostgresDatabase { provider: String },
