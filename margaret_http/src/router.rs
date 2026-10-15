@@ -14,7 +14,6 @@ use crate::route_entry::RouteEntry;
 use crate::route_handler::RouteHandler;
 use crate::route_position::RoutePosition;
 use crate::route_resolution::RouteResolution;
-use crate::routed_handler::RoutedHandler;
 use crate::router_error::RouterError;
 use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_upgrade::WebSocketUpgrade;
@@ -25,7 +24,7 @@ fn method_handlers(
 ) -> Result<HashMap<RouteMethod, RouteHandler>, RouterError> {
     let mut by_method = HashMap::with_capacity(handlers.len());
 
-    for RoutedHandler { handler, method } in handlers.into_iter().map(MethodHandler::into_routed) {
+    for MethodHandler { handler, method } in handlers {
         match by_method.entry(method) {
             Entry::Occupied(_) => return Err(RouterError::DuplicateMethod { method, path }),
             Entry::Vacant(slot) => {

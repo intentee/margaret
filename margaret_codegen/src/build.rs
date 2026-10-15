@@ -2183,7 +2183,7 @@ struct ApplicationDatabase;
     #[test]
     fn rejects_a_route_that_injects_a_served_provider_endpoint() {
         let error = generate(&format!(
-            "{OIDC_PROVIDER_CRATE}#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/forward\", server = \"public\")]\nstruct Forward;\n\nimpl Forward {{\n    #[constructor]\n    fn create(token: std::sync::Arc<crate::margaret::oidc_provider::TokenEndpoint>) -> anyhow::Result<Self> {{}}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {{}}\n}}\n"
+            "{OIDC_PROVIDER_CRATE}#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/token-relay\", server = \"public\")]\nstruct GetTokenRelay;\n\nimpl GetTokenRelay {{\n    #[constructor]\n    fn create(token: std::sync::Arc<crate::margaret::oidc_provider::TokenEndpoint>) -> anyhow::Result<Self> {{}}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {{}}\n}}\n"
         ))
         .expect_err("a served provider endpoint is not injectable");
 
@@ -2191,7 +2191,7 @@ struct ApplicationDatabase;
             error,
             CodegenError::Container {
                 source: ContainerError::FrameworkOnlyProvider { provider, singleton, .. }
-            } if provider == "crate::margaret::oidc_provider::TokenEndpoint" && singleton == "crate::Forward"
+            } if provider == "crate::margaret::oidc_provider::TokenEndpoint" && singleton == "crate::GetTokenRelay"
         ));
     }
 

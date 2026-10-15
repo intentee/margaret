@@ -66,11 +66,13 @@ fn segment_tokens(segment: &UrlSegment, values: &mut ParameterValues) -> TokenSt
 }
 
 fn route_type_tokens(named: &NamedRoute<'_>) -> TokenStream {
-    if named.route.method() == RouteMethod::Get {
-        quote! { margaret::framework::http::get_route_reference::GetRouteReference }
+    let target = if named.route.method() == RouteMethod::Get {
+        quote! { margaret::framework::http::get_target::GetTarget }
     } else {
-        quote! { margaret::framework::http::route_reference::RouteReference }
-    }
+        quote! { margaret::framework::http::other_target::OtherTarget }
+    };
+
+    quote! { margaret::framework::http::route_reference::RouteReference<#target> }
 }
 
 fn literal_route_field(named: &NamedRoute<'_>) -> TokenStream {
@@ -82,10 +84,11 @@ fn literal_route_field(named: &NamedRoute<'_>) -> TokenStream {
 
 fn literal_route_init(named: &NamedRoute<'_>, path: &str, origin: &Ident) -> TokenStream {
     let field = route_field_ident(named);
-    let route_type = route_type_tokens(named);
 
     quote! {
-        #field: #route_type::new(margaret::framework::http::literal_url::literal_url(#origin, #path)),
+        #field: margaret::framework::http::route_reference::RouteReference::new(
+            margaret::framework::http::literal_url::literal_url(#origin, #path),
+        ),
     }
 }
 
@@ -123,7 +126,7 @@ fn route_method(
                 margaret::framework::http::route_position::RoutePosition::new(#position),
                 &[#(#segments),*],
             )
-            .map(#route_type::new)
+            .map(margaret::framework::http::route_reference::RouteReference::new)
         }
     }
 }

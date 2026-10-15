@@ -17,14 +17,11 @@ impl CookieChanges {
 
     #[must_use]
     pub fn precede(&self, continuation: ResponseContinuation) -> ResponseContinuation {
-        match continuation {
-            ResponseContinuation::Done(response) => {
-                ResponseContinuation::Done(response.preceded_by_cookies(&self.cookies))
-            }
-            ResponseContinuation::Redirect(redirect) => ResponseContinuation::Done(
-                redirect.into_response().preceded_by_cookies(&self.cookies),
-            ),
-        }
+        ResponseContinuation::Done(
+            continuation
+                .into_response()
+                .preceded_by_cookies(&self.cookies),
+        )
     }
 }
 

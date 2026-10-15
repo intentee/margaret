@@ -1281,10 +1281,10 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "pubget_greeting:margaret::framework::http::get_route_reference::GetRouteReference,"
+            "pubget_greeting:margaret::framework::http::route_reference::RouteReference<margaret::framework::http::get_target::GetTarget,>,"
         ));
         assert!(source.contains(
-            "get_greeting:margaret::framework::http::get_route_reference::GetRouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/greeting\",),),"
+            "get_greeting:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/greeting\",),),"
         ));
     }
 
@@ -1362,10 +1362,10 @@ impl GetKind { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "pubfnget_article(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::get_route_reference::GetRouteReference,>"
+            "pubfnget_article(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference<margaret::framework::http::get_target::GetTarget,>,>"
         ));
         assert!(source.contains(
-            "margaret::framework::http::build_url::build_url(&self.origin,&self.paths,margaret::framework::http::route_position::RoutePosition::new(0),&[margaret::framework::http::url_segment::UrlSegment::Literal{decoded:\"/articles/\",encoded:\"/articles/\",},margaret::framework::http::url_segment::UrlSegment::Parameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:parameter_0,},prefix:\"\",},],).map(margaret::framework::http::get_route_reference::GetRouteReference::new)"
+            "margaret::framework::http::build_url::build_url(&self.origin,&self.paths,margaret::framework::http::route_position::RoutePosition::new(0),&[margaret::framework::http::url_segment::UrlSegment::Literal{decoded:\"/articles/\",encoded:\"/articles/\",},margaret::framework::http::url_segment::UrlSegment::Parameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:parameter_0,},prefix:\"\",},],).map(margaret::framework::http::route_reference::RouteReference::new)"
         ));
         assert!(!source.contains("Params"));
     }
@@ -1394,7 +1394,7 @@ impl GetCallback { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         );
 
         assert!(source.contains(
-            "get_callback:margaret::framework::http::get_route_reference::GetRouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/oauth/%7Bcallback%7D\",),),"
+            "get_callback:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/oauth/%7Bcallback%7D\",),),"
         ));
     }
 
@@ -1404,11 +1404,11 @@ impl GetCallback { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 
         assert!(
             source.contains(
-                "pubpost_ping:margaret::framework::http::route_reference::RouteReference,"
+                "pubpost_ping:margaret::framework::http::route_reference::RouteReference<margaret::framework::http::other_target::OtherTarget,>,"
             )
         );
         assert!(source.contains(
-            "pubfnpatch_article(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference,>"
+            "pubfnpatch_article(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference<margaret::framework::http::other_target::OtherTarget,>,>"
         ));
     }
 
@@ -1454,7 +1454,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             .collect();
 
         assert!(source.contains(&format!(
-            "implIdentity{{{allow}pub(crate)fnnew(origin:&str,)->::std::result::Result<Self,margaret::framework::http::router_error::RouterError,>{{margaret::framework::http::server_paths::ServerPaths::build([\"/consent\",\"/login\",]).map(|paths|Self{{paths,get_login:margaret::framework::http::get_route_reference::GetRouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/login\"),),post_consent:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/consent\",),),}})}}}}"
+            "implIdentity{{{allow}pub(crate)fnnew(origin:&str,)->::std::result::Result<Self,margaret::framework::http::router_error::RouterError,>{{margaret::framework::http::server_paths::ServerPaths::build([\"/consent\",\"/login\",]).map(|paths|Self{{paths,get_login:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/login\"),),post_consent:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/consent\",),),}})}}}}"
         )));
     }
 
@@ -2221,7 +2221,7 @@ impl GetGreeting {
             "margaret::framework::http::server_paths::ServerPaths::build([\"/greeting\"])"
         ));
         assert!(routes.contains(
-            "pubget_greeting:margaret::framework::http::get_route_reference::GetRouteReference,"
+            "pubget_greeting:margaret::framework::http::route_reference::RouteReference<margaret::framework::http::get_target::GetTarget,>,"
         ));
     }
 
@@ -2288,7 +2288,7 @@ impl GetGreeting {
 
         assert!(source.contains("origin_2:::std::sync::Arc<str>,"));
         assert!(source.contains(
-            "puborigin:margaret::framework::http::get_route_reference::GetRouteReference,"
+            "puborigin:margaret::framework::http::route_reference::RouteReference<margaret::framework::http::get_target::GetTarget,>,"
         ));
         assert!(source.contains("build_url(&self.origin_2,"));
     }
@@ -2302,7 +2302,7 @@ impl GetGreeting {
 
         assert!(source.contains("pub(crate)fnnew_2(origin:&str,)"));
         assert!(source.contains(
-            "pubfnnew(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::get_route_reference::GetRouteReference,>"
+            "pubfnnew(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference<margaret::framework::http::get_target::GetTarget,>,>"
         ));
         assert!(
             source.contains(

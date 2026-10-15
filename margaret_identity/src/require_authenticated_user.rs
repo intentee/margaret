@@ -19,10 +19,11 @@ pub fn require_authenticated_user<User>(
 
 #[cfg(test)]
 mod tests {
-    use margaret_http::get_route_reference::GetRouteReference;
+    use margaret_http::get_target::GetTarget;
     use margaret_http::requirement::Requirement;
     use margaret_http::response::Response;
     use margaret_http::response_continuation::ResponseContinuation;
+    use margaret_http::route_reference::RouteReference;
 
     use super::require_authenticated_user;
     use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
@@ -36,7 +37,7 @@ mod tests {
 
     fn sign_in_redirect() -> ResponseContinuation {
         ResponseContinuation::from(
-            GetRouteReference::new("http://localhost/sign-in".to_string()).see_other(),
+            RouteReference::<GetTarget>::new("http://localhost/sign-in".to_string()).see_other(),
         )
     }
 

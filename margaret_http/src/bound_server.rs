@@ -28,15 +28,16 @@ use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::constants::CLIENT_HEAD_TIMEOUT;
 use crate::drive_connection::drive_connection;
+use crate::http_middleware::HttpMiddleware;
 use crate::one_shot_handler::OneShotHandler;
 use crate::one_shot_layer::one_shot_layer;
 use crate::request::Request;
 use crate::request_body::RequestBody;
+use crate::request_inputs::RequestInputs;
 use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
 use crate::request_route::RequestRoute;
-use crate::respond_once::respond_once;
-use crate::respond_with_route_handler::respond_with_route_handler;
+use crate::respond_to_outcome::respond_to_outcome;
 use crate::response::Response;
 use crate::route_resolution::RouteResolution;
 use crate::send_stall_limited_stream::SendStallLimitedStream;
@@ -45,6 +46,7 @@ use crate::transport_config::TransportConfig;
 use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_driver_channel::WebSocketDriverChannel;
 use crate::web_socket_driver_sender::WebSocketDriverSender;
+use crate::web_socket_upgrade::WebSocketUpgrade;
 use crate::web_socket_upgrade_terminal::WebSocketUpgradeTerminal;
 
 fn accepted_connection(
@@ -123,32 +125,12 @@ async fn serve_connection<TIo>(
     report_connection_outcome(outcome);
 }
 
-async fn complete_request(
-    route: RequestRoute,
-    request: Request,
-    body: RequestBody,
-) -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
-    match route {
-        RequestRoute::Handler {
-            handler,
-            path_params,
-        } => respond_with_route_handler(&request.with_path_params(path_params), body, handler)
-            .await
-            .into_http(),
-        RequestRoute::MethodNotAllowed => Response::text(405, "Method Not Allowed").into_http(),
-        RequestRoute::NotFound => Response::not_found().into_http(),
-    }
-}
-
 async fn dispatch_web_socket(
     handshake: Request,
     on_upgrade: OnUpgrade,
     cancellation_token: CancellationToken,
-    UpgradeRoute {
-        middleware,
-        path_params,
-        upgrade,
-    }: UpgradeRoute,
+    middleware: Vec<Arc<dyn HttpMiddleware>>,
+    upgrade: Arc<dyn WebSocketUpgrade>,
     driver_sender: WebSocketDriverSender,
 ) -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
     let mut onion: Box<dyn OneShotHandler> = Box::new(WebSocketUpgradeTerminal::new(
@@ -158,13 +140,11 @@ async fn dispatch_web_socket(
         driver_sender,
     ));
 
-    for middleware_layer in middleware.iter().rev() {
-        onion = one_shot_layer(middleware_layer.clone(), onion);
+    for middleware_layer in middleware.into_iter().rev() {
+        onion = one_shot_layer(middleware_layer, onion);
     }
 
-    respond_once(&handshake.with_path_params(path_params), onion)
-        .await
-        .into_http()
+    respond_to_outcome(onion.handle(&handshake).await).into_http()
 }
 
 async fn dispatch(
@@ -179,28 +159,46 @@ async fn dispatch(
 ) -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
     let on_upgrade = upgrade::on(&mut request);
     let (parts, incoming) = request.into_parts();
-    let request = match Request::from_head(server.clone(), parts, remote_addr, peer_identity) {
-        RequestOutcome::Parsed(request) => request,
+    let inputs = match RequestInputs::from_head(parts, remote_addr) {
+        RequestOutcome::Parsed(inputs) => inputs,
         RequestOutcome::Rejected(rejection) => return rejection_response(&rejection).into_http(),
     };
     let resolution = server
         .router()
-        .resolve(request.inputs.server.method(), request.inputs.server.path());
+        .resolve(inputs.server.method(), inputs.server.path());
 
     match resolution {
-        RouteResolution::Upgrade(upgrade_route) => {
+        RouteResolution::Upgrade(UpgradeRoute {
+            middleware,
+            path_params,
+            upgrade,
+        }) => {
             dispatch_web_socket(
-                request,
+                Request::new(server, inputs, path_params, peer_identity),
                 on_upgrade,
                 cancellation_token.child_token(),
-                upgrade_route,
+                middleware,
+                upgrade,
                 driver_sender,
             )
             .await
         }
-        RouteResolution::Request(route) => {
-            complete_request(route, request, RequestBody::new(incoming)).await
+        RouteResolution::Request(RequestRoute::Handler {
+            handler,
+            path_params,
+        }) => respond_to_outcome(
+            handler
+                .handle(
+                    &Request::new(server, inputs, path_params, peer_identity),
+                    RequestBody::new(incoming),
+                )
+                .await,
+        )
+        .into_http(),
+        RouteResolution::Request(RequestRoute::MethodNotAllowed) => {
+            Response::text(405, "Method Not Allowed").into_http()
         }
+        RouteResolution::Request(RequestRoute::NotFound) => Response::not_found().into_http(),
     }
 }
 
