@@ -7,8 +7,6 @@ mod a_crashed_instance_restarted_admits_earlier_tokens;
 #[cfg(feature = "tests_that_use_cluster")]
 mod a_decided_consent_is_unknown_on_another_instance;
 #[cfg(feature = "tests_that_use_cluster")]
-mod a_forward_renders_a_note_written_on_another_instance;
-#[cfg(feature = "tests_that_use_cluster")]
 mod a_replayed_client_assertion_is_refused_on_another_instance;
 #[cfg(feature = "tests_that_use_cluster")]
 mod a_replayed_code_revokes_its_family_on_every_instance;
@@ -95,7 +93,6 @@ mod fails_patching_a_note_the_database_refuses;
 mod fails_reading_a_note_the_database_refuses;
 #[cfg(feature = "tests_that_use_cluster")]
 mod fails_viewing_a_note_the_database_refuses;
-mod forwards_to_every_named_public_route_by_its_name_and_placeholders;
 #[cfg(feature = "tests_that_use_cluster")]
 mod instances_started_on_overdue_keys_roll_once;
 #[cfg(feature = "tests_that_use_cluster")]

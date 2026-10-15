@@ -379,7 +379,6 @@ fn render_serving_modules(
     } else {
         HttpModules {
             artifacts: HttpArtifacts {
-                forwarders: Vec::new(),
                 retained_roots: Vec::new(),
                 modules: Vec::new(),
                 servers: Vec::new(),
@@ -389,7 +388,6 @@ fn render_serving_modules(
     };
 
     Ok(ServingModules {
-        forwarders: http.artifacts.forwarders,
         modules: [
             websockets.modules,
             views.modules,
@@ -481,7 +479,6 @@ fn served_modules(
         registries,
     } = render_wrapper_modules(index, bindings, features, binding)?;
     let ServingModules {
-        forwarders,
         modules: serving_modules,
         retained_roots: serving_roots,
         servers,
@@ -508,7 +505,6 @@ fn served_modules(
     )?;
 
     Ok(ServedModules {
-        forwarders,
         modules: [wrapper_modules, serving_modules, role_modules]
             .into_iter()
             .flatten()
@@ -582,7 +578,6 @@ fn issuance_modules(
 fn rendered(
     planned_container: PlannedContainer,
     ServedModules {
-        forwarders,
         modules,
         roots: RoleRoots {
             console,
@@ -593,9 +588,7 @@ fn rendered(
     mut module_tokens: Vec<GeneratedModuleTokens>,
     mut features: GeneratedFeatures,
 ) -> Result<GeneratedCode, CodegenError> {
-    features.enable_if(GeneratedFeature::Forwarders, !forwarders.is_empty());
     module_tokens.extend(modules);
-    module_tokens.extend(forwarders);
 
     let served_roots = service
         .into_iter()
@@ -3435,26 +3428,6 @@ impl Metrics {
     fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
-
-    #[test]
-    fn declares_no_forwarders_module_when_no_responder_injects_a_forwarder() {
-        let code = generate(MULTI_SERVER_CRATE).expect("the build succeeds");
-
-        assert!(!module(&code, "mod").contains("pub mod forwarders;"));
-        assert!(!has_module(&code, "forwarders"));
-    }
-
-    #[test]
-    fn declares_the_forwarder_of_the_server_whose_responder_injects_it() {
-        let code = generate(&format!(
-            "{MULTI_SERVER_CRATE}use crate::margaret::forwarders::public::Forwarder;\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/forward\", server = \"public\")]\nstruct GetForward;\n\nimpl GetForward {{\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {{}}\n}}\n"
-        ))
-        .expect("the build succeeds");
-
-        assert!(module(&code, "mod").contains("pub mod forwarders;"));
-        assert!(has_module(&code, "forwarders/public/forwarder"));
-        assert!(!has_module(&code, "forwarders/internal"));
-    }
 
     #[test]
     fn generates_a_server_function_and_address_argument_per_active_server() {

@@ -31,7 +31,6 @@ use margaret_request_binding_codegen::render_route_inputs::render_route_inputs;
 use margaret_request_binding_codegen::render_session_user_inference::render_session_user_inference;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 use margaret_request_binding_codegen::session_user_parameter::session_user_parameter;
-use margaret_route_method::route_method::RouteMethod;
 
 use crate::application_responder::ApplicationResponder;
 use crate::constants::ROUTE_METHODS;
@@ -155,7 +154,6 @@ fn content_bindings(
 
 fn responder_body(
     responder: &ApplicationResponder,
-    server: &str,
     HandlerNames {
         body_binding,
         captured,
@@ -181,11 +179,10 @@ fn responder_body(
         refused: &refused,
         request_local: request_binding,
     };
-    let server = format_ident!("{server}");
     let argument_values = responder
         .arguments
         .iter()
-        .map(|argument| argument_value(argument, routes_local, views_local, &server));
+        .map(|argument| argument_value(argument, routes_local, views_local));
     let method_name = &responder.method_name;
     let respond_call = if responder.is_async {
         quote! { #responder_binding.#method_name(#(#argument_values),*).await }
@@ -284,7 +281,7 @@ fn application_handler(
         ..
     } = &names;
 
-    let body = responder_body(responder, &route.server, &names);
+    let body = responder_body(responder, &names);
 
     let captures_routes = responder_injects_routes(route);
     let captures_views = responder_injects_views(route);
@@ -362,14 +359,10 @@ fn argument_value(
     argument: &BoundParameter,
     routes_binding: &Ident,
     views_binding: &Ident,
-    server: &Ident,
 ) -> TokenStream {
     match &argument.binding {
         RequestBinding::Routes => quote! { #routes_binding.as_ref() },
         RequestBinding::Views => quote! { #views_binding.as_ref() },
-        RequestBinding::Forwarder => {
-            quote! { super::super::forwarders::#server::Forwarder::default() }
-        }
         _ => {
             let holder = &argument.holder;
 
@@ -508,24 +501,16 @@ fn route_entries<'handler>(
                                 )
                             }
                         }
-                        RouteHandling::Head(method) => match &route.name {
-                            Some(name) if matches!(method, RouteMethod::Get) => quote! {
-                                margaret::framework::http::method_handler::MethodHandler::forwardable(
-                                    #name,
+                        RouteHandling::Head(method) => {
+                            let method = ROUTE_METHODS.tokens(method);
+
+                            quote! {
+                                margaret::framework::http::method_handler::MethodHandler::head(
+                                    #method,
                                     #handler_call,
                                 )
-                            },
-                            Some(_) | None => {
-                                let method = ROUTE_METHODS.tokens(method);
-
-                                quote! {
-                                    margaret::framework::http::method_handler::MethodHandler::head(
-                                        #method,
-                                        #handler_call,
-                                    )
-                                }
                             }
-                        },
+                        }
                     }
                 })
                 .collect::<Vec<TokenStream>>();

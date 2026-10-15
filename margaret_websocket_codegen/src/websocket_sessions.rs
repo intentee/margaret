@@ -54,7 +54,6 @@ pub(crate) fn websocket_sessions(
             &BindingContext::Handshake {
                 container_bindings: bindings,
                 route_path: &route_path,
-                server: &server,
                 subject: &subject,
             },
             registries,

@@ -2,7 +2,6 @@ pub mod asset_path;
 pub mod delete_note;
 pub mod get_asset;
 pub mod get_external;
-pub mod get_forwarded_note;
 pub mod get_health;
 pub mod get_messages;
 pub mod get_note;

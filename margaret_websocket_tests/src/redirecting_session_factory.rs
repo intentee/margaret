@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use margaret_http::forwardable_route::ForwardableRoute;
+use margaret_http::get_route_reference::GetRouteReference;
 use margaret_http::request::Request;
 use margaret_websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError;
 use margaret_websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome;
@@ -19,7 +19,7 @@ impl WebSocketSessionFactory for RedirectingSessionFactory {
         _handshake: &Request,
     ) -> Result<WebSocketSessionCreationOutcome<TestSession>, WebSocketSessionCreationError> {
         Ok(WebSocketSessionCreationOutcome::Interrupted(
-            ForwardableRoute::new("http://localhost/sign-in".to_string())
+            GetRouteReference::new("http://localhost/sign-in".to_string())
                 .see_other()
                 .into(),
         ))

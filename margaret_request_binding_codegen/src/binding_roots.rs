@@ -26,7 +26,6 @@ pub fn binding_roots(binding: &RequestBinding) -> Vec<&CanonicalPath> {
         | RequestBinding::CurrentRequest
         | RequestBinding::FormContent { .. }
         | RequestBinding::FormRequest { .. }
-        | RequestBinding::Forwarder
         | RequestBinding::JsonContent { .. }
         | RequestBinding::Next
         | RequestBinding::BearerToken { .. }

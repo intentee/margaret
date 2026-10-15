@@ -13,6 +13,7 @@ margaret_sessions_tests = { path = "../margaret_sessions_tests" }
 
 [dev-dependencies]
 chrono = { workspace = true }
+http = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 uuid = { workspace = true }
 

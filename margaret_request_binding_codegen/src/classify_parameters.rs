@@ -46,20 +46,6 @@ use crate::route_parameter_resolution::RouteParameterResolution;
 use crate::session_marker::SessionMarker;
 use crate::views_availability::ViewsAvailability;
 
-fn forwarder_path(server: &str) -> CanonicalPath {
-    CanonicalPath::new(vec![
-        "crate".to_string(),
-        "margaret".to_string(),
-        "forwarders".to_string(),
-        server.to_string(),
-        "Forwarder".to_string(),
-    ])
-}
-
-fn is_forwarder(resolved: Option<&CanonicalPath>, is_reference: bool, server: &str) -> bool {
-    resolved == Some(&forwarder_path(server)) && !is_reference
-}
-
 fn classify_authenticated_user(
     index: &AttributeIndex,
     item: &IndexedItem,
@@ -154,8 +140,6 @@ fn classify_context_specific(
     index: &AttributeIndex,
     item: &IndexedItem,
     declared: &Type,
-    resolved: Option<&CanonicalPath>,
-    is_reference: bool,
     context: &BindingContext,
     position: usize,
 ) -> Result<RequestBinding, RequestBindingError> {
@@ -168,52 +152,33 @@ fn classify_context_specific(
                 parameter: position.to_string(),
             })
         }
-        BindingContext::Responder { server, .. } => {
-            if is_forwarder(resolved, is_reference, server) {
-                Ok(RequestBinding::Forwarder)
-            } else {
-                Err(RequestBindingError::UnmarkedParameter {
+        BindingContext::Responder { .. } => Err(RequestBindingError::UnmarkedParameter {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        }),
+        BindingContext::Handshake {
+            container_bindings, ..
+        } => match resolve_injectable(index, item, declared, container_bindings) {
+            InjectableResolution::Resolved(dependency) => {
+                Ok(RequestBinding::Injectable { dependency })
+            }
+            InjectableResolution::UnsupportedShape => {
+                Err(RequestBindingError::UnsupportedParameterShape {
                     subject: subject.to_string(),
                     parameter: position.to_string(),
                 })
             }
-        }
-        BindingContext::Handshake {
-            container_bindings,
-            server,
-            ..
-        } => {
-            if is_forwarder(resolved, is_reference, server) {
-                return Err(RequestBindingError::ForwarderUnavailable {
+            InjectableResolution::MissingProvider => Err(RequestBindingError::MissingProvider {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+            }),
+            InjectableResolution::FrameworkOnly => {
+                Err(RequestBindingError::FrameworkOnlyProviderInjected {
                     subject: subject.to_string(),
                     parameter: position.to_string(),
-                });
+                })
             }
-
-            match resolve_injectable(index, item, declared, container_bindings) {
-                InjectableResolution::Resolved(dependency) => {
-                    Ok(RequestBinding::Injectable { dependency })
-                }
-                InjectableResolution::UnsupportedShape => {
-                    Err(RequestBindingError::UnsupportedParameterShape {
-                        subject: subject.to_string(),
-                        parameter: position.to_string(),
-                    })
-                }
-                InjectableResolution::MissingProvider => {
-                    Err(RequestBindingError::MissingProvider {
-                        subject: subject.to_string(),
-                        parameter: position.to_string(),
-                    })
-                }
-                InjectableResolution::FrameworkOnly => {
-                    Err(RequestBindingError::FrameworkOnlyProviderInjected {
-                        subject: subject.to_string(),
-                        parameter: position.to_string(),
-                    })
-                }
-            }
-        }
+        },
         BindingContext::Middleware { .. } => {
             Err(RequestBindingError::UnmarkedMiddlewareParameter {
                 subject: subject.to_string(),
@@ -708,15 +673,7 @@ fn classify_parameter(
                     | RequestInjectable::ValidationResult
                     | RequestInjectable::VerifiedJwt,
                 )
-                | None => classify_context_specific(
-                    index,
-                    item,
-                    declared,
-                    resolved.as_ref(),
-                    is_reference,
-                    context,
-                    position,
-                )?,
+                | None => classify_context_specific(index, item, declared, context, position)?,
             },
         },
     )

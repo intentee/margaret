@@ -67,7 +67,7 @@ fn segment_tokens(segment: &UrlSegment, values: &mut ParameterValues) -> TokenSt
 
 fn route_type_tokens(named: &NamedRoute<'_>) -> TokenStream {
     if named.route.method() == RouteMethod::Get {
-        quote! { margaret::framework::http::forwardable_route::ForwardableRoute }
+        quote! { margaret::framework::http::get_route_reference::GetRouteReference }
     } else {
         quote! { margaret::framework::http::route_reference::RouteReference }
     }

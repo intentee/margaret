@@ -75,8 +75,7 @@ impl FixtureRequest {
                 .expect("an empty path set builds")
                 .routes([])
                 .build()
-                .expect("an empty router builds")
-                .router,
+                .expect("an empty router builds"),
         ));
 
         match Request::from_head(

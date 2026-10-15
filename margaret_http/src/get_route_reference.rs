@@ -1,10 +1,10 @@
 use crate::redirect::Redirect;
 
-pub struct ForwardableRoute {
+pub struct GetRouteReference {
     url: String,
 }
 
-impl ForwardableRoute {
+impl GetRouteReference {
     #[must_use]
     pub fn new(url: String) -> Self {
         Self { url }
@@ -33,10 +33,10 @@ impl ForwardableRoute {
 
 #[cfg(test)]
 mod tests {
-    use super::ForwardableRoute;
+    use super::GetRouteReference;
 
-    fn article_route() -> ForwardableRoute {
-        ForwardableRoute::new("http://localhost/articles/rust".to_string())
+    fn article_route() -> GetRouteReference {
+        GetRouteReference::new("http://localhost/articles/rust".to_string())
     }
 
     #[test]

@@ -57,7 +57,6 @@ pub fn render_request_extraction(
         | RequestBinding::IntrospectedBearerToken { .. }
         | RequestBinding::BoundRouteParameter { .. }
         | RequestBinding::FormContent { .. }
-        | RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }
         | RequestBinding::JsonContent { .. }
         | RequestBinding::Next

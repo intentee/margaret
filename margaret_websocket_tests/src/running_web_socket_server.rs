@@ -5,7 +5,6 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use margaret_http::bound_server::BoundServer;
-use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::server::Server;
@@ -44,11 +43,9 @@ impl RunningWebSocketServer {
                 .expect("the route paths do not conflict")
                 .routes([RouteEntry::web_socket(upgrade, middleware)])
                 .build()
-                .expect("the route entries register cleanly")
-                .router,
+                .expect("the route entries register cleanly"),
         );
-        let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
-        let bound = BoundServer::bind(Arc::new(server), forward_targets)
+        let bound = BoundServer::bind(Arc::new(server))
             .await
             .expect("the websocket server binds");
         let address = bound

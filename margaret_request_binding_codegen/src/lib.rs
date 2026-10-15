@@ -479,7 +479,6 @@ impl SessionUserProvider {
             method,
             &BindingContext::Responder {
                 route_path: &route_path,
-                server: "public",
                 subject: "responder 'Page'",
             },
             &registries,
@@ -533,7 +532,6 @@ impl SessionUserProvider {
             process_method(item).expect("the responder has a #[process] method"),
             &BindingContext::Responder {
                 route_path: &route_path,
-                server: "public",
                 subject: "responder 'Page'",
             },
             &registries,
@@ -1326,7 +1324,6 @@ struct SecondClient;
             process_method(item).expect("the responder has a #[process] method"),
             &BindingContext::Responder {
                 route_path: &route_path,
-                server: "public",
                 subject: "responder 'Page'",
             },
             &registries,
@@ -1369,7 +1366,6 @@ struct SecondClient;
             process_method(item).expect("the responder has a #[process] method"),
             &BindingContext::Responder {
                 route_path: &route_path,
-                server: "public",
                 subject: "responder 'Page'",
             },
             &registries,
@@ -1397,7 +1393,6 @@ struct SecondClient;
             &BindingContext::Handshake {
                 container_bindings: &bindings,
                 route_path: &route_path,
-                server: "public",
                 subject: "session 'Room'",
             },
             &collect_registries(&indexed.index, ViewsAvailability::Available)
@@ -1530,7 +1525,6 @@ struct PartnerSessions;
             process_method(item).expect("the responder has a #[process] method"),
             &BindingContext::Responder {
                 route_path: &route_path,
-                server: "public",
                 subject: "responder 'Page'",
             },
             &registries,
@@ -1880,7 +1874,6 @@ struct PartnerSessions;
             process_method(item).expect("the responder has a #[process] method"),
             &BindingContext::Responder {
                 route_path: &route_path,
-                server: "public",
                 subject: "responder 'Page'",
             },
             &registries,
@@ -2055,7 +2048,6 @@ struct PartnerSessions;
                 process_method(item).expect("the responder has a #[process] method"),
                 &BindingContext::Responder {
                     route_path: &route_path,
-                    server: "public",
                     subject: "responder 'Page'",
                 },
                 &registries,

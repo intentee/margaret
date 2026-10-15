@@ -8,11 +8,9 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use margaret_http::bound_server::BoundServer;
-use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::server::Server;
 use margaret_http::server_paths::ServerPaths;
-use margaret_http::server_routes::ServerRoutes;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 
@@ -30,17 +28,13 @@ impl RunningFixtureServer {
         paths: [&'static str; COUNT],
         route_entries: [RouteEntry; COUNT],
     ) -> Self {
-        let ServerRoutes {
-            named_handlers,
-            router,
-        } = ServerPaths::build(paths)
+        let router = ServerPaths::build(paths)
             .expect("the route paths do not conflict")
             .routes(route_entries)
             .build()
             .expect("the route entries register cleanly");
         let server = Server::new(address.to_string(), transport, upload_config, router);
-        let forward_targets = Arc::new(ForwardTargets::new(named_handlers));
-        let bound = BoundServer::bind(Arc::new(server), forward_targets)
+        let bound = BoundServer::bind(Arc::new(server))
             .await
             .expect("the fixture server binds");
         let address = bound

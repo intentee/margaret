@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::route_entry::RouteEntry;
 use crate::route_position::RoutePosition;
+use crate::router::Router;
 use crate::router_error::RouterError;
-use crate::server_routes::ServerRoutes;
 
 pub struct ServerRouteEntries {
     entries: Vec<RouteEntry>,
@@ -27,7 +27,7 @@ impl ServerRouteEntries {
     /// # Errors
     ///
     /// Returns `RouterError::DuplicateMethod` when the entry of a path answers one method twice.
-    pub fn build(self) -> Result<ServerRoutes, RouterError> {
-        ServerRoutes::build(self.matcher, self.paths, self.entries)
+    pub fn build(self) -> Result<Router, RouterError> {
+        Router::build(self.matcher, self.paths, self.entries)
     }
 }

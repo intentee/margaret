@@ -2,7 +2,6 @@ pub mod get_archive;
 pub mod get_audits;
 pub mod get_book;
 pub mod get_deliveries;
-pub mod get_featured;
 pub mod get_guestbook;
 pub mod get_loading_dock;
 pub mod get_loans;

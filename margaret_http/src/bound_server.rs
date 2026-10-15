@@ -28,7 +28,6 @@ use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::constants::CLIENT_HEAD_TIMEOUT;
 use crate::drive_connection::drive_connection;
-use crate::forward_targets::ForwardTargets;
 use crate::one_shot_handler::OneShotHandler;
 use crate::one_shot_layer::one_shot_layer;
 use crate::request::Request;
@@ -37,7 +36,7 @@ use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
 use crate::request_route::RequestRoute;
 use crate::respond_once::respond_once;
-use crate::respond_recursively::respond_recursively;
+use crate::respond_with_route_handler::respond_with_route_handler;
 use crate::response::Response;
 use crate::route_resolution::RouteResolution;
 use crate::send_stall_limited_stream::SendStallLimitedStream;
@@ -128,20 +127,14 @@ async fn complete_request(
     route: RequestRoute,
     request: Request,
     body: RequestBody,
-    forward_targets: &Arc<ForwardTargets>,
 ) -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
     match route {
         RequestRoute::Handler {
             handler,
             path_params,
-        } => respond_recursively(
-            forward_targets,
-            request.with_path_params(path_params),
-            body,
-            handler,
-        )
-        .await
-        .into_http(),
+        } => respond_with_route_handler(&request.with_path_params(path_params), body, handler)
+            .await
+            .into_http(),
         RequestRoute::MethodNotAllowed => Response::text(405, "Method Not Allowed").into_http(),
         RequestRoute::NotFound => Response::not_found().into_http(),
     }
@@ -156,7 +149,6 @@ async fn dispatch_web_socket(
         path_params,
         upgrade,
     }: UpgradeRoute,
-    forward_targets: &Arc<ForwardTargets>,
     driver_sender: WebSocketDriverSender,
 ) -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
     let mut onion: Box<dyn OneShotHandler> = Box::new(WebSocketUpgradeTerminal::new(
@@ -170,19 +162,14 @@ async fn dispatch_web_socket(
         onion = one_shot_layer(middleware_layer.clone(), onion);
     }
 
-    respond_once(
-        forward_targets,
-        handshake.with_path_params(path_params),
-        onion,
-    )
-    .await
-    .into_http()
+    respond_once(&handshake.with_path_params(path_params), onion)
+        .await
+        .into_http()
 }
 
 async fn dispatch(
     ConnectionContext {
         cancellation_token,
-        forward_targets,
         peer_identity,
         remote_addr,
         server,
@@ -207,13 +194,12 @@ async fn dispatch(
                 on_upgrade,
                 cancellation_token.child_token(),
                 upgrade_route,
-                &forward_targets,
                 driver_sender,
             )
             .await
         }
         RouteResolution::Request(route) => {
-            complete_request(route, request, RequestBody::new(incoming), &forward_targets).await
+            complete_request(route, request, RequestBody::new(incoming)).await
         }
     }
 }
@@ -227,7 +213,6 @@ enum BoundTransport {
 #[derive(Clone)]
 struct ConnectionContext {
     cancellation_token: CancellationToken,
-    forward_targets: Arc<ForwardTargets>,
     peer_identity: Arc<PeerIdentity>,
     remote_addr: SocketAddr,
     server: Arc<Server>,
@@ -239,7 +224,6 @@ struct AcceptedConnection {
 }
 
 pub struct BoundServer {
-    forward_targets: Arc<ForwardTargets>,
     listener: TcpListener,
     server: Arc<Server>,
     transport: BoundTransport,
@@ -249,10 +233,7 @@ impl BoundServer {
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
-    pub async fn bind(
-        server: Arc<Server>,
-        forward_targets: Arc<ForwardTargets>,
-    ) -> Result<Self, io::Error> {
+    pub async fn bind(server: Arc<Server>) -> Result<Self, io::Error> {
         let transport = match server.transport() {
             TransportConfig::Plain => BoundTransport::Plain,
             TransportConfig::MutualTls { server_config } => BoundTransport::MutualTls {
@@ -262,7 +243,6 @@ impl BoundServer {
         let listener = TcpListener::bind(server.address()).await?;
 
         Ok(Self {
-            forward_targets,
             listener,
             server,
             transport,
@@ -325,7 +305,6 @@ impl BoundServer {
         let stream = SendStallLimitedStream::new(stream);
         let transport = self.transport.clone();
         let server = self.server.clone();
-        let forward_targets = self.forward_targets.clone();
         let cancellation_token = cancellation_token.clone();
 
         drop(connections.spawn(async move {
@@ -336,7 +315,6 @@ impl BoundServer {
                         TokioIo::new(stream),
                         ConnectionContext {
                             cancellation_token,
-                            forward_targets,
                             peer_identity: Arc::new(PeerIdentity::from_peer_certificate(None)),
                             remote_addr,
                             server,
@@ -367,7 +345,6 @@ impl BoundServer {
                         TokioIo::new(tls_stream),
                         ConnectionContext {
                             cancellation_token,
-                            forward_targets,
                             peer_identity,
                             remote_addr,
                             server,
@@ -382,7 +359,6 @@ impl BoundServer {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use std::io::Error;
     use std::io::ErrorKind;
     use std::net::SocketAddr;
@@ -407,12 +383,9 @@ mod tests {
     use super::accepted_connection;
     use super::report_connection_task_outcome;
     use crate::constants::CLIENT_HEAD_TIMEOUT;
-    use crate::forward::Forward;
-    use crate::forward_targets::ForwardTargets;
     use crate::head_handler::HeadHandler;
     use crate::http_middleware::HttpMiddleware;
     use crate::method_handler::MethodHandler;
-    use crate::named_handler::NamedHandler;
     use crate::next::Next;
     use crate::redirect::Redirect;
     use crate::request::Request;
@@ -456,7 +429,6 @@ mod tests {
             .routes(entries)
             .build()
             .expect("the route entries register cleanly")
-            .router
     }
 
     fn server_with_a_name_parameter() -> Arc<Server> {
@@ -502,10 +474,6 @@ mod tests {
                 )])],
             ),
         ))
-    }
-
-    fn empty_forward_targets() -> Arc<ForwardTargets> {
-        Arc::new(ForwardTargets::new(Vec::new()))
     }
 
     #[tokio::test]
@@ -596,11 +564,7 @@ mod tests {
             router([], []),
         ));
 
-        assert!(
-            BoundServer::bind(server, empty_forward_targets())
-                .await
-                .is_err()
-        );
+        assert!(BoundServer::bind(server).await.is_err());
     }
 
     async fn exchange(address: SocketAddr, request: &[u8], close_write: bool) -> String {
@@ -632,7 +596,7 @@ mod tests {
         Exchange: FnOnce(SocketAddr) -> Assertions,
         Assertions: Future<Output = ()>,
     {
-        let bound = BoundServer::bind(server, empty_forward_targets())
+        let bound = BoundServer::bind(server)
             .await
             .expect("the server binds to an ephemeral port");
         let address = bound
@@ -762,7 +726,7 @@ mod tests {
 
     #[tokio::test]
     async fn answers_concurrent_connections_by_route_until_cancellation_ends_the_serve_task() {
-        let bound = BoundServer::bind(server_with_one(), empty_forward_targets())
+        let bound = BoundServer::bind(server_with_one())
             .await
             .expect("the server binds to an ephemeral port");
         let address = bound
@@ -808,7 +772,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_a_route_parameter_that_is_not_valid_percent_encoded_utf8() {
-        let bound = BoundServer::bind(server_with_a_route_parameter(), empty_forward_targets())
+        let bound = BoundServer::bind(server_with_a_route_parameter())
             .await
             .expect("the server binds to an ephemeral port");
         let address = bound
@@ -924,22 +888,6 @@ mod tests {
         }
     }
 
-    struct ForwardsToTarget;
-
-    #[async_trait]
-    impl HttpMiddleware for ForwardsToTarget {
-        async fn process(
-            &self,
-            _request: &Request,
-            _next: Next,
-        ) -> Result<ResponseContinuation, HandlerError> {
-            Ok(ResponseContinuation::from(Forward::new(
-                "target",
-                HashMap::new(),
-            )))
-        }
-    }
-
     fn server_with_web_socket_middleware(middleware: Vec<Arc<dyn HttpMiddleware>>) -> Arc<Server> {
         Arc::new(Server::new(
             "127.0.0.1:0".to_string(),
@@ -957,7 +905,7 @@ mod tests {
     }
 
     async fn web_socket_handshake_response(server: Arc<Server>, request: &[u8]) -> String {
-        let bound = BoundServer::bind(server, empty_forward_targets())
+        let bound = BoundServer::bind(server)
             .await
             .expect("the server binds to an ephemeral port");
         let address = bound
@@ -983,7 +931,7 @@ mod tests {
 
     #[tokio::test]
     async fn upgrades_only_well_formed_get_handshakes_on_a_websocket_route_with_its_parameters() {
-        let bound = BoundServer::bind(server_with_web_socket(), empty_forward_targets())
+        let bound = BoundServer::bind(server_with_web_socket())
             .await
             .expect("the server binds to an ephemeral port");
         let address = bound
@@ -1082,37 +1030,5 @@ mod tests {
         .await;
 
         assert!(response.contains(" 401 "));
-    }
-
-    #[tokio::test]
-    async fn resolves_a_forward_from_a_web_socket_middleware() {
-        let bound = BoundServer::bind(
-            server_with_web_socket_middleware(vec![Arc::new(ForwardsToTarget)]),
-            Arc::new(ForwardTargets::new(vec![NamedHandler::new(
-                "target",
-                Arc::new(PlainOk),
-            )])),
-        )
-        .await
-        .expect("the server binds to an ephemeral port");
-        let address = bound
-            .local_addr()
-            .expect("the bound listener reports its address");
-        let cancellation_token = CancellationToken::new();
-        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
-
-        let response = exchange(
-            address,
-            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-            false,
-        )
-        .await;
-
-        assert!(response.contains(" 200 "));
-        assert_eq!(response_body(&response), "ok");
-
-        cancellation_token.cancel();
-
-        serving.await.expect("the server task finishes cleanly");
     }
 }

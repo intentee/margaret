@@ -11,10 +11,6 @@ pub(crate) enum MethodHandlerKind {
         handler: Arc<dyn ContentHandler>,
         method: ContentMethod,
     },
-    Forwardable {
-        handler: Arc<dyn HeadHandler>,
-        name: &'static str,
-    },
     Head {
         handler: Arc<dyn HeadHandler>,
         method: RouteMethod,

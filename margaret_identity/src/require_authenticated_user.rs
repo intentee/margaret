@@ -19,7 +19,7 @@ pub fn require_authenticated_user<User>(
 
 #[cfg(test)]
 mod tests {
-    use margaret_http::forwardable_route::ForwardableRoute;
+    use margaret_http::get_route_reference::GetRouteReference;
     use margaret_http::requirement::Requirement;
     use margaret_http::response::Response;
     use margaret_http::response_continuation::ResponseContinuation;
@@ -30,16 +30,13 @@ mod tests {
     fn rejection_status(outcome: AuthenticatedUserOutcome<&str>) -> Option<u16> {
         match require_authenticated_user(outcome) {
             Requirement::Unmet(ResponseContinuation::Done(response)) => Some(response.status()),
-            Requirement::Met(_)
-            | Requirement::Unmet(
-                ResponseContinuation::Forward(_) | ResponseContinuation::Redirect(_),
-            ) => None,
+            Requirement::Met(_) | Requirement::Unmet(ResponseContinuation::Redirect(_)) => None,
         }
     }
 
     fn sign_in_redirect() -> ResponseContinuation {
         ResponseContinuation::from(
-            ForwardableRoute::new("http://localhost/sign-in".to_string()).see_other(),
+            GetRouteReference::new("http://localhost/sign-in".to_string()).see_other(),
         )
     }
 

@@ -14,12 +14,6 @@ pub enum HandlerError {
     #[error(transparent)]
     RequestBinding(#[from] RouteParameterBindingError),
 
-    #[error("the responder forward cycle re-entered '{responder}'")]
-    ForwardCycle { responder: &'static str },
-
-    #[error("no forward target is registered for '{responder}' on this server")]
-    UnknownForwardTarget { responder: &'static str },
-
     #[error(transparent)]
     UploadedFile(#[from] UploadedFileError),
 }

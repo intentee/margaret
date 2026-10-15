@@ -73,7 +73,6 @@ fn application_responder(
         handler_method,
         &BindingContext::Responder {
             route_path: &route.path,
-            server: &route.server,
             subject,
         },
         registries,
