@@ -32,7 +32,7 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "parameter '{parameter}' of {subject} must be a route parameter, a form request, the current request, the peer SPIFFE id, the forwarder, or the routes"
+        "parameter '{parameter}' of {subject} must be a route parameter, a form request, the current request, the peer SPIFFE id, or the routes"
     )]
     UnmarkedParameter { subject: String, parameter: String },
 
@@ -176,11 +176,6 @@ pub enum RequestBindingError {
         "{subject} declares more than one peer SPIFFE id parameter; a request has exactly one peer identity"
     )]
     MultiplePeerSpiffeIdParameters { subject: String },
-
-    #[error(
-        "argument #{parameter} of {subject} requests the forwarder, but a WebSocket session builder cannot forward a request"
-    )]
-    ForwarderUnavailable { subject: String, parameter: String },
 
     #[error(
         "#[provides_route_parameter] '{binder}' has no `type Model = <struct>` associated type that resolves to a known model"

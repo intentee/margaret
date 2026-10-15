@@ -1818,27 +1818,6 @@ impl Bad {
     }
 
     #[test]
-    fn rejects_a_forwarder_in_a_session_since_a_websocket_cannot_forward_a_request() {
-        assert!(
-            error(
-                r#"use margaret::framework::macros::build_for_session;
-use margaret::framework::macros::websocket_session;
-
-#[websocket_session(path = "/x", server = "public")]
-struct Bad;
-
-impl Bad {
-    #[build_for_session]
-    fn build(forward: crate::margaret::forwarders::public::Forwarder) -> anyhow::Result<Self> {}
-}
-"#
-            )
-            .to_string()
-            .contains("cannot forward a request")
-        );
-    }
-
-    #[test]
     fn extracts_a_route_parameter_value_type_during_the_handshake() {
         let source = generated(
             r#"use margaret::framework::macros::build_for_session;

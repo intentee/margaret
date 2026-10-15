@@ -19,7 +19,6 @@ mod http_routes;
 pub mod http_server;
 mod named_route;
 mod render;
-mod render_forwarders;
 pub mod render_http;
 mod render_routes;
 mod route_content;
@@ -206,26 +205,9 @@ mod tests {
         )
     }
 
-    fn forwarders_source(lib_source: &str) -> String {
-        rendered_http(lib_source, false)
-            .expect("the http source is generated")
-            .forwarders
-            .into_iter()
-            .map(|module| {
-                module
-                    .format()
-                    .expect("the module formats")
-                    .source()
-                    .to_string()
-            })
-            .collect::<String>()
-            .split_whitespace()
-            .collect()
-    }
-
     fn http_source(lib_source: &str, has_views: bool) -> Result<String, HttpCodegenError> {
         Ok(rendered_http(lib_source, has_views)?
-            .into_modules()
+            .modules
             .into_iter()
             .filter(|module| {
                 module.path().to_string() == "http"
@@ -316,7 +298,7 @@ impl Tracer {
                 .expect("the endpoints are planned"),
             &bindings_for(index),
         )
-        .into_modules()
+        .modules
         .into_iter()
         .filter(|module| {
             module.path().to_string() == "http" || module.path().to_string().starts_with("http/")
@@ -459,7 +441,7 @@ impl PostNote {
             &registries,
         )
         .expect("the routes render")
-        .into_modules()
+        .modules
         .into_iter()
         .filter(|module| module.path().to_string().starts_with("http/"))
         .map(|module| module.to_source())
@@ -1066,7 +1048,7 @@ impl Health {
             &registries,
         )
         .expect("the http source is generated")
-        .into_modules()
+        .modules
         .into_iter()
         .filter(|module| module.path().to_string().starts_with("http/"))
         .map(|module| {
@@ -1240,7 +1222,7 @@ impl GetWorkload {
             &registries,
         )
         .expect("the http source is generated")
-        .into_modules()
+        .modules
         .into_iter()
         .filter(|module| {
             module.path().to_string() == "routes"
@@ -1295,14 +1277,14 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 "#;
 
     #[test]
-    fn generates_a_forwardable_route_field_for_a_named_paramless_get() {
+    fn generates_a_get_route_reference_field_for_a_named_paramless_get() {
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "pubget_greeting:margaret::framework::http::forwardable_route::ForwardableRoute,"
+            "pubget_greeting:margaret::framework::http::route_reference::RouteReference<margaret::framework::http::get_target::GetTarget,>,"
         ));
         assert!(source.contains(
-            "get_greeting:margaret::framework::http::forwardable_route::ForwardableRoute::new(margaret::framework::http::literal_url::literal_url(origin,\"/greeting\",),),"
+            "get_greeting:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/greeting\",),),"
         ));
     }
 
@@ -1369,21 +1351,21 @@ impl GetKind { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             .find("margaret::framework::route_method::route_method::RouteMethod::Query")
             .expect("the archive entry is rendered");
         let note_entry = server
-            .find("margaret::framework::http::method_handler::MethodHandler::forwardable(\"get_note\"")
+            .find("margaret::framework::http::method_handler::MethodHandler::head(margaret::framework::route_method::route_method::RouteMethod::Get,")
             .expect("the note entry is rendered");
 
         assert!(archive_entry < note_entry);
     }
 
     #[test]
-    fn generates_a_positional_forwardable_method_for_a_parameterized_get() {
+    fn generates_a_positional_get_route_reference_method_for_a_parameterized_get() {
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "pubfnget_article(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::forwardable_route::ForwardableRoute,>"
+            "pubfnget_article(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference<margaret::framework::http::get_target::GetTarget,>,>"
         ));
         assert!(source.contains(
-            "margaret::framework::http::build_url::build_url(&self.origin,&self.paths,margaret::framework::http::route_position::RoutePosition::new(0),&[margaret::framework::http::url_segment::UrlSegment::Literal{decoded:\"/articles/\",encoded:\"/articles/\",},margaret::framework::http::url_segment::UrlSegment::Parameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:parameter_0,},prefix:\"\",},],).map(margaret::framework::http::forwardable_route::ForwardableRoute::new)"
+            "margaret::framework::http::build_url::build_url(&self.origin,&self.paths,margaret::framework::http::route_position::RoutePosition::new(0),&[margaret::framework::http::url_segment::UrlSegment::Literal{decoded:\"/articles/\",encoded:\"/articles/\",},margaret::framework::http::url_segment::UrlSegment::Parameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:parameter_0,},prefix:\"\",},],).map(margaret::framework::http::route_reference::RouteReference::new)"
         ));
         assert!(!source.contains("Params"));
     }
@@ -1412,7 +1394,7 @@ impl GetCallback { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         );
 
         assert!(source.contains(
-            "get_callback:margaret::framework::http::forwardable_route::ForwardableRoute::new(margaret::framework::http::literal_url::literal_url(origin,\"/oauth/%7Bcallback%7D\",),),"
+            "get_callback:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/oauth/%7Bcallback%7D\",),),"
         ));
     }
 
@@ -1422,13 +1404,12 @@ impl GetCallback { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 
         assert!(
             source.contains(
-                "pubpost_ping:margaret::framework::http::route_reference::RouteReference,"
+                "pubpost_ping:margaret::framework::http::route_reference::RouteReference<margaret::framework::http::other_target::OtherTarget,>,"
             )
         );
         assert!(source.contains(
-            "pubfnpatch_article(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference,>"
+            "pubfnpatch_article(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference<margaret::framework::http::other_target::OtherTarget,>,>"
         ));
-        assert!(!source.contains("forward_to"));
     }
 
     #[test]
@@ -1473,7 +1454,7 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             .collect();
 
         assert!(source.contains(&format!(
-            "implIdentity{{{allow}pub(crate)fnnew(origin:&str,)->::std::result::Result<Self,margaret::framework::http::router_error::RouterError,>{{margaret::framework::http::server_paths::ServerPaths::build([\"/consent\",\"/login\",]).map(|paths|Self{{paths,get_login:margaret::framework::http::forwardable_route::ForwardableRoute::new(margaret::framework::http::literal_url::literal_url(origin,\"/login\"),),post_consent:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/consent\",),),}})}}}}"
+            "implIdentity{{{allow}pub(crate)fnnew(origin:&str,)->::std::result::Result<Self,margaret::framework::http::router_error::RouterError,>{{margaret::framework::http::server_paths::ServerPaths::build([\"/consent\",\"/login\",]).map(|paths|Self{{paths,get_login:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/login\"),),post_consent:margaret::framework::http::route_reference::RouteReference::new(margaret::framework::http::literal_url::literal_url(origin,\"/consent\",),),}})}}}}"
         )));
     }
 
@@ -1530,59 +1511,10 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     }
 
     #[test]
-    fn injects_the_scoped_forwarder_into_a_responder_by_type() {
-        let source = source_for(
-            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse crate::margaret::forwarders::public::Forwarder;\n\n#[singleton]
-#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {}\n}\n",
-        );
-
-        assert!(
-            source.contains(
-                "responder.respond(super::super::forwarders::public::Forwarder::default())"
-            )
-        );
-    }
-
-    #[test]
     fn rejects_a_user_type_named_routes_that_shadows_the_injectable() {
         let message = error_for(
             "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nmod app {\n    pub struct Routes;\n}\n\nuse crate::app::Routes;\n\n#[singleton]
 #[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, routes: &Routes) -> anyhow::Result<Response> {}\n}\n",
-        );
-
-        assert!(message.contains("must be a route parameter"));
-    }
-
-    #[test]
-    fn emits_no_forwarder_for_a_server_whose_responders_inject_none() {
-        assert!(forwarders_source(ROUTES_FIXTURE).is_empty());
-    }
-
-    #[test]
-    fn emits_a_constructible_forwarder_to_every_get_route_of_the_server_injecting_it() {
-        let source = forwarders_source(
-            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse crate::margaret::forwarders::public::Forwarder;\n\n#[singleton]
-#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {}\n}\n\n#[singleton]
-#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_article\", path = \"/articles/{article}\", server = \"public\")]\nstruct GetArticle;\nimpl GetArticle {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
-#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_health\", path = \"/health\", server = \"public\")]\nstruct GetHealth;\nimpl GetHealth {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = \"get_report\", path = \"/report\", server = \"internal\")]\nstruct GetReport;\nimpl GetReport {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
-        );
-
-        assert_eq!(source.matches("structForwarder").count(), 1);
-        assert!(source.contains("#[derive(Default)]pubstructForwarder(());"));
-        assert!(source.contains(
-            "#[must_use]pubfnget_article(self,parameter_0:::std::string::String,)->margaret::framework::http::forward::Forward{margaret::framework::http::forward::Forward::new(\"get_article\",::std::collections::HashMap::from([(\"article\".to_string(),parameter_0)]),)}"
-        ));
-        assert!(source.contains(
-            "#[must_use]pubfnget_health(self)->margaret::framework::http::forward::Forward{margaret::framework::http::forward::Forward::new(\"get_health\",::std::collections::HashMap::new(),)}"
-        ));
-        assert!(!source.contains("get_report(self"));
-    }
-
-    #[test]
-    fn rejects_a_forwarder_imported_from_a_foreign_server() {
-        let message = error_for(
-            "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse crate::margaret::forwarders::public::Forwarder;\n\n#[singleton]
-#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(message.contains("must be a route parameter"));
@@ -2281,9 +2213,15 @@ impl GetGreeting {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("routes.public.paths.routes([margaret::framework::http::route_entry::RouteEntry::new(::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::forwardable(\"get_greeting\","));
-        assert!(routes_source_for(NAMED_ROUTE).contains(
+        assert!(source.contains("routes.public.paths.routes([margaret::framework::http::route_entry::RouteEntry::new(::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::head(margaret::framework::route_method::route_method::RouteMethod::Get,"));
+
+        let routes = routes_source_for(NAMED_ROUTE);
+
+        assert!(routes.contains(
             "margaret::framework::http::server_paths::ServerPaths::build([\"/greeting\"])"
+        ));
+        assert!(routes.contains(
+            "pubget_greeting:margaret::framework::http::route_reference::RouteReference<margaret::framework::http::get_target::GetTarget,>,"
         ));
     }
 
@@ -2349,11 +2287,9 @@ impl GetGreeting {
         );
 
         assert!(source.contains("origin_2:::std::sync::Arc<str>,"));
-        assert!(
-            source.contains(
-                "puborigin:margaret::framework::http::forwardable_route::ForwardableRoute,"
-            )
-        );
+        assert!(source.contains(
+            "puborigin:margaret::framework::http::route_reference::RouteReference<margaret::framework::http::get_target::GetTarget,>,"
+        ));
         assert!(source.contains("build_url(&self.origin_2,"));
     }
 
@@ -2366,7 +2302,7 @@ impl GetGreeting {
 
         assert!(source.contains("pub(crate)fnnew_2(origin:&str,)"));
         assert!(source.contains(
-            "pubfnnew(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::forwardable_route::ForwardableRoute,>"
+            "pubfnnew(&self,parameter_0:::std::string::String,)->margaret::framework::http::route_addressing::RouteAddressing<margaret::framework::http::route_reference::RouteReference<margaret::framework::http::get_target::GetTarget,>,>"
         ));
         assert!(
             source.contains(
@@ -3010,7 +2946,7 @@ impl Configured {
     }
 
     #[test]
-    fn registers_a_named_post_route_as_not_forwardable() {
+    fn registers_a_named_post_route_as_a_content_handler() {
         let source = source_for(
             "use margaret::framework::macros::process;\nuse margaret::framework::macros::responds_to_http;\nuse margaret::framework::macros::singleton;\nuse margaret::framework::http_validation::request_input::RequestInput;\n#[singleton]
 #[responds_to_http(max_body_bytes = 64, method = margaret::framework::route_method::route_method::RouteMethod::Post, name = \"post_note\", path = \"/notes\", server = \"public\")]\nstruct PostNote;\nimpl PostNote {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] note: Data) -> anyhow::Result<Response> {}\n}\n",
@@ -3019,7 +2955,6 @@ impl Configured {
         assert!(source.contains(
             "margaret::framework::http::method_handler::MethodHandler::content(margaret::framework::route_method::content_method::ContentMethod::Post,"
         ));
-        assert!(!source.contains("forwardable"));
     }
 
     #[test]

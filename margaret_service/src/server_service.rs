@@ -6,10 +6,8 @@ use tokio_util::sync::CancellationToken;
 use trzcina::Service;
 
 use margaret_http::bound_server::BoundServer;
-use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::server::Server;
 use margaret_http::server_route_entries::ServerRouteEntries;
-use margaret_http::server_routes::ServerRoutes;
 
 use crate::server_listener::ServerListener;
 
@@ -37,14 +35,12 @@ impl Service for ServerService {
                 },
             routes,
         } = *self;
-        let ServerRoutes {
-            named_handlers,
-            router,
-        } = routes.build()?;
-        let bound = BoundServer::bind(
-            Arc::new(Server::new(address, transport, uploads, router)),
-            Arc::new(ForwardTargets::new(named_handlers)),
-        )
+        let bound = BoundServer::bind(Arc::new(Server::new(
+            address,
+            transport,
+            uploads,
+            routes.build()?,
+        )))
         .await?;
 
         bound.serve(cancellation_token).await;

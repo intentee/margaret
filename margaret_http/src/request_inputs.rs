@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::net::SocketAddr;
 
 use cookie::Cookie;
 use http::header::COOKIE;
+use http::request::Parts;
 
 use crate::form_fields::form_fields;
 use crate::named_value::NamedValue;
@@ -52,7 +54,12 @@ pub struct RequestInputs {
 }
 
 impl RequestInputs {
-    pub(crate) fn parse(server: ServerParams) -> RequestOutcome<Self> {
+    #[must_use]
+    pub fn from_head(parts: Parts, remote_addr: SocketAddr) -> RequestOutcome<Self> {
+        let server = match ServerParams::from_parts(parts, remote_addr) {
+            RequestOutcome::Parsed(server) => server,
+            RequestOutcome::Rejected(rejection) => return RequestOutcome::Rejected(rejection),
+        };
         let cookies = match parse_cookies(&server) {
             RequestOutcome::Parsed(cookies) => cookies,
             RequestOutcome::Rejected(rejection) => return RequestOutcome::Rejected(rejection),

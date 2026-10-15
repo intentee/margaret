@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -8,6 +9,7 @@ use http::Method;
 use http::header::COOKIE;
 
 use margaret_http::request::Request;
+use margaret_http::request_inputs::RequestInputs;
 use margaret_http::request_outcome::RequestOutcome;
 use margaret_http::request_rejection::RequestRejection;
 use margaret_http::server::Server;
@@ -19,6 +21,7 @@ use margaret_peer_identity::peer_identity::PeerIdentity;
 pub struct FixtureRequest {
     pub headers: HeaderMap,
     pub method: Method,
+    pub path_params: HashMap<String, String>,
     pub peer_identity: PeerIdentity,
     pub target: String,
     pub upload_config: UploadConfig,
@@ -30,6 +33,7 @@ impl FixtureRequest {
         Self {
             headers: HeaderMap::new(),
             method,
+            path_params: HashMap::new(),
             peer_identity: PeerIdentity::Anonymous,
             target: target.to_string(),
             upload_config: UploadConfig::Disabled,
@@ -75,17 +79,16 @@ impl FixtureRequest {
                 .expect("an empty path set builds")
                 .routes([])
                 .build()
-                .expect("an empty router builds")
-                .router,
+                .expect("an empty router builds"),
         ));
 
-        match Request::from_head(
-            server,
-            parts,
-            SocketAddr::from(([192, 0, 2, 1], 4000)),
-            Arc::new(self.peer_identity),
-        ) {
-            RequestOutcome::Parsed(request) => Ok(request),
+        match RequestInputs::from_head(parts, SocketAddr::from(([192, 0, 2, 1], 4000))) {
+            RequestOutcome::Parsed(inputs) => Ok(Request::new(
+                server,
+                inputs,
+                self.path_params,
+                Arc::new(self.peer_identity),
+            )),
             RequestOutcome::Rejected(rejection) => Err(rejection),
         }
     }

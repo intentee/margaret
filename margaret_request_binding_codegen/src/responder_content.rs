@@ -20,7 +20,6 @@ fn demanded_content(BoundParameter { binding, holder }: &BoundParameter) -> Opti
         | RequestBinding::BoundRouteParameter { .. }
         | RequestBinding::CurrentRequest
         | RequestBinding::FormRequest { .. }
-        | RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }
         | RequestBinding::Next
         | RequestBinding::PeerSpiffeId

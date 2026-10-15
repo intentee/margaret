@@ -15,10 +15,11 @@ pub fn optional_authenticated_user<User>(
 
 #[cfg(test)]
 mod tests {
-    use margaret_http::forwardable_route::ForwardableRoute;
+    use margaret_http::get_target::GetTarget;
     use margaret_http::requirement::Requirement;
     use margaret_http::response::Response;
     use margaret_http::response_continuation::ResponseContinuation;
+    use margaret_http::route_reference::RouteReference;
 
     use super::optional_authenticated_user;
     use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
@@ -28,10 +29,7 @@ mod tests {
             continuation,
         )) {
             Requirement::Unmet(ResponseContinuation::Done(response)) => Some(response.status()),
-            Requirement::Met(_)
-            | Requirement::Unmet(
-                ResponseContinuation::Forward(_) | ResponseContinuation::Redirect(_),
-            ) => None,
+            Requirement::Met(_) | Requirement::Unmet(ResponseContinuation::Redirect(_)) => None,
         }
     }
 
@@ -66,7 +64,8 @@ mod tests {
     fn keeps_a_sign_in_redirect_intact_instead_of_admitting_an_anonymous_visitor() {
         assert_eq!(
             interruption_status(ResponseContinuation::from(
-                ForwardableRoute::new("http://localhost/sign-in".to_string()).see_other(),
+                RouteReference::<GetTarget>::new("http://localhost/sign-in".to_string())
+                    .see_other(),
             )),
             None
         );

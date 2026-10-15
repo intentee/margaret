@@ -23,7 +23,6 @@ mod fails_the_notice_board_without_a_roster;
 mod fails_the_staff_room_without_a_roster;
 mod fails_to_count_books_without_an_inventory;
 mod forbids_an_unlisted_librarian_badge_at_the_notice_board;
-mod forwards_the_featured_book_to_its_route;
 mod greets_a_reader_by_name;
 mod greets_a_reader_loudly_with_a_salutation;
 mod holds_the_library_open_until_it_is_stopped;

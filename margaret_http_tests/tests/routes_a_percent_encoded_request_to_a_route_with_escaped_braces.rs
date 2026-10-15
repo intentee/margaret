@@ -6,14 +6,15 @@ use margaret_http_tests::raw_exchange::raw_exchange;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
+use margaret_route_method::route_method::RouteMethod;
 
 #[tokio::test]
 async fn routes_a_percent_encoded_request_to_a_route_with_escaped_braces() {
     let server = RunningFixtureServer::start_plain(
         UploadConfig::Disabled,
         ["/oauth/{{token}}"],
-        [RouteEntry::new(vec![MethodHandler::forwardable(
-            "escaped",
+        [RouteEntry::new(vec![MethodHandler::head(
+            RouteMethod::Get,
             Arc::new(StaticHandler {
                 body: b"escaped".to_vec(),
                 content_type: "text/plain",

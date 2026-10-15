@@ -11,7 +11,6 @@ use margaret_http::body_limit::BodyLimit;
 use margaret_http::body_reading::BodyReading;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::content_handler::ContentHandler;
-use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::head_handler::HeadHandler;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::read_form_fields::read_form_fields;
@@ -49,17 +48,13 @@ async fn exchange(request: &[u8], close_write: bool) -> String {
             )]),
         ])
         .build()
-        .expect("the route entries register cleanly")
-        .router;
-    let bound = BoundServer::bind(
-        Arc::new(Server::new(
-            "127.0.0.1:0".to_string(),
-            TransportConfig::Plain,
-            UploadConfig::Disabled,
-            router,
-        )),
-        Arc::new(ForwardTargets::new(Vec::new())),
-    )
+        .expect("the route entries register cleanly");
+    let bound = BoundServer::bind(Arc::new(Server::new(
+        "127.0.0.1:0".to_string(),
+        TransportConfig::Plain,
+        UploadConfig::Disabled,
+        router,
+    )))
     .await
     .expect("the server binds");
     let address = bound

@@ -36,8 +36,6 @@ Specific attribute rules:
 # `margaret_http` data flow
 
 - each http request needs to through its entire middleware stack (first attribute in order becomes the first middleware to apply)
-- http responder can forward requests to a different http responder; in that case the next responder's entire middleware stack must be reapplied
-- during the http request handling there must be no cycles (entering the same responder twice must result in a cycle error; same middleware can be entered multiple times)
 
 # `margaret_http` request object
 
@@ -57,49 +55,7 @@ Routes object must be generated so linking between routes must be validated duri
 
 It must be usable with this API: `router.<server_name>.<route_name>.<action>()`. Notice that only `action` is a method, prior chain members are regular properties.
 
-- supported `<action>`:
-    - `forward_to(<route_name>)`, for example `router.public.get_article.forward_to(GetArticleRouteProps{ ... })` (`GetArticleRouteProps` also must be generated at compile time)
-    - `forward_to` should only work for GET routes (because it doesn't carry over any data for different kinds of routes)
 - routes object is generated out of all the named routes at compile time
 - cross-server redirects and references must be supported
 - routes object must be constructed exactly once during the entire application lifecycle
 - routes, and servers within routes object must be accessible with O(1) complexity
-
-
-# `margaret_http` lifecycle algorithm
-
-Middleware -> responder -> middleware -> .. loop must follow this algorithm. You need to assume that all the responders are stateless, so you need to add a safeguard against cycles to be safe.
-
-```
-INPUT:  request, response, currentNode
-OUTPUT: a finalResponse
-
-currentNode is always one of three categories:
-    - Responder        (runs middleware, then emits a successor node)
-    - FinalResponse    (terminal; nothing left to resolve)
-
-PROCEDURE Resolve(request, response, currentNode):
-
-    WHILE currentNode is not a FinalResponse:
-
-        IF currentNode is a Responder:
-            // Invariant: a Responder NEVER emits a successor
-            // before its middleware has had a chance to redirect.
-            redirect ← RunMiddleware(request, response, currentNode)
-            IF redirect ≠ currentNode:
-                currentNode ← redirect
-            ELSE:
-                currentNode ← currentNode.produceSuccessor(request, response)
-            CONTINUE                          // re-categorize from the top
-
-    RETURN currentNode
-
-
-PROCEDURE RunMiddleware(request, response, responderNode):
-    middlewareList ← middleware registered for responderNode
-    FOR EACH middleware IN middlewareList (in order):
-        redirect ← middleware.preprocess(request, response, responderNode)
-        IF redirect ≠ responderNode:
-            RETURN redirect                   // first redirect wins
-    RETURN responderNode                      // unchanged
-```

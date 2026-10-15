@@ -11,7 +11,6 @@ pub enum BindingContext<'context> {
     Handshake {
         container_bindings: &'context ContainerBindings,
         route_path: &'context RoutePath,
-        server: &'context str,
         subject: &'context str,
     },
     Middleware {
@@ -19,7 +18,6 @@ pub enum BindingContext<'context> {
     },
     Responder {
         route_path: &'context RoutePath,
-        server: &'context str,
         subject: &'context str,
     },
 }

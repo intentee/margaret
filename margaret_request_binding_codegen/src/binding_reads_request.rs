@@ -5,7 +5,6 @@ pub fn binding_reads_request(binding: &RequestBinding) -> bool {
     !matches!(
         binding,
         RequestBinding::AssetBag
-            | RequestBinding::Forwarder
             | RequestBinding::Injectable { .. }
             | RequestBinding::Next
             | RequestBinding::RequestBodyStream

@@ -17,30 +17,21 @@ impl CookieChanges {
 
     #[must_use]
     pub fn precede(&self, continuation: ResponseContinuation) -> ResponseContinuation {
-        match continuation {
-            ResponseContinuation::Done(response) => {
-                ResponseContinuation::Done(response.preceded_by_cookies(&self.cookies))
-            }
-            ResponseContinuation::Forward(forward) => {
-                ResponseContinuation::Forward(forward.preceded_by(&self.cookies))
-            }
-            ResponseContinuation::Redirect(redirect) => ResponseContinuation::Done(
-                redirect.into_response().preceded_by_cookies(&self.cookies),
-            ),
-        }
+        ResponseContinuation::Done(
+            continuation
+                .into_response()
+                .preceded_by_cookies(&self.cookies),
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use cookie::Cookie;
     use http::header::LOCATION;
     use http::header::SET_COOKIE;
 
     use super::CookieChanges;
-    use crate::forward::Forward;
     use crate::redirect::Redirect;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
@@ -93,30 +84,6 @@ mod tests {
             )),
             ResponseContinuation::Done(response)
                 if set_cookies(&response) == ["session=removed", "session=started"]
-        ));
-    }
-
-    #[test]
-    fn precedes_the_cookies_a_forward_already_carries() {
-        let carrying_the_start = CookieChanges {
-            cookies: vec![Cookie::new("session", "started")],
-        }
-        .precede(ResponseContinuation::from(Forward::new(
-            "target",
-            HashMap::new(),
-        )));
-
-        assert!(matches!(
-            CookieChanges {
-                cookies: vec![Cookie::new("session", "removed")],
-            }
-            .precede(carrying_the_start),
-            ResponseContinuation::Forward(forward)
-                if forward
-                    .carried_cookies()
-                    .iter()
-                    .map(Cookie::value)
-                    .eq(["removed", "started"])
         ));
     }
 

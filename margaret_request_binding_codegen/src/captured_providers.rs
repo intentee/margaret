@@ -29,7 +29,6 @@ fn provider_kind(binding: &RequestBinding) -> Option<CapturedProviderKind> {
         | RequestBinding::CurrentRequest
         | RequestBinding::FormContent { .. }
         | RequestBinding::FormRequest { .. }
-        | RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }
         | RequestBinding::JsonContent { .. }
         | RequestBinding::Next
