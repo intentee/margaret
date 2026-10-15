@@ -3,6 +3,7 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
+use margaret::framework::url_path::path_parameter_value::PathParameterValue;
 
 use crate::constants::FEATURED_ARTICLE_ID;
 use crate::margaret::routes::Routes;
@@ -19,8 +20,13 @@ impl GetFeatured {
     /// Returns an error propagated from the work it performs.
     #[process]
     pub fn respond(&self, routes: &Routes) -> anyhow::Result<Forward<PublicForwardTarget>> {
-        Ok(routes.public.get_article.forward_to(GetArticleRouteProps {
-            article: FEATURED_ARTICLE_ID.to_string(),
-        }))
+        PathParameterValue::new(FEATURED_ARTICLE_ID.to_string())
+            .map(|article| {
+                routes
+                    .public
+                    .get_article
+                    .forward_to(GetArticleRouteProps { article })
+            })
+            .map_err(anyhow::Error::from)
     }
 }

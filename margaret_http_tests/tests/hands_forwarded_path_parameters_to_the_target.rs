@@ -13,6 +13,7 @@ use margaret_http_tests::raw_exchange::raw_exchange;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_route_method::route_method::RouteMethod;
+use margaret_url_path::path_parameter_value::PathParameterValue;
 
 #[tokio::test]
 async fn hands_forwarded_path_parameters_to_the_target() {
@@ -24,7 +25,8 @@ async fn hands_forwarded_path_parameters_to_the_target() {
                 RouteMethod::Get,
                 Arc::new(ForwardingHandler {
                     props: || ArticleRouteProps {
-                        article: "7".to_string(),
+                        article: PathParameterValue::new("7".to_string())
+                            .expect("the article fills a segment"),
                     },
                     route: ForwardableRoute::new(
                         GetRouteReference::new("http://fixture.test/articles/7".to_string()),

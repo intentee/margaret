@@ -1,76 +1,26 @@
-use margaret_url_path::admit_path_segment::admit_path_segment;
 use margaret_url_path::constants::PATH_SEPARATOR;
 use margaret_url_path::encode_url_path_segment::encode_url_path_segment;
 use margaret_url_path::path_segment::PathSegment;
-use margaret_url_path::path_segment_admission::PathSegmentAdmission;
-use margaret_url_path::path_segment_rejection::PathSegmentRejection;
 use margaret_url_path::path_segments::path_segments;
 
 use crate::route_addressing::RouteAddressing;
 use crate::route_position::RoutePosition;
-use crate::unaddressable_parameter::UnaddressableParameter;
-use crate::url_parameter::UrlParameter;
 use crate::url_segment::UrlSegment;
 
-fn unaddressable(name: &'static str, rejection: PathSegmentRejection) -> SegmentAddressing {
-    SegmentAddressing::Unaddressable(UnaddressableParameter { name, rejection })
-}
-
-fn addressed_catch_all(
-    prefix: &str,
-    UrlParameter { name, value }: &UrlParameter,
-) -> SegmentAddressing {
-    if value.is_empty() {
-        return unaddressable(name, PathSegmentRejection::Empty);
-    }
-
-    let decoded = [prefix, value].concat();
+fn encoded_tail(decoded: &str) -> String {
     let mut encoded = String::with_capacity(decoded.len());
 
-    for (position, segment) in path_segments(&decoded).enumerate() {
+    for (position, segment) in path_segments(decoded).enumerate() {
         if position > 0 {
             encoded.push(PATH_SEPARATOR);
         }
 
         if let PathSegment::Text(component) = segment {
-            if let PathSegmentAdmission::Rejected(rejection) = admit_path_segment(component) {
-                return unaddressable(name, rejection);
-            }
-
             encoded.push_str(&encode_url_path_segment(component));
         }
     }
 
-    SegmentAddressing::Addressed(AddressedSegment { decoded, encoded })
-}
-
-fn addressed_parameter(
-    prefix: &str,
-    UrlParameter { name, value }: &UrlParameter,
-) -> SegmentAddressing {
-    if value.is_empty() {
-        return unaddressable(name, PathSegmentRejection::Empty);
-    }
-
-    let decoded = [prefix, value].concat();
-
-    match admit_path_segment(&decoded) {
-        PathSegmentAdmission::Admitted => SegmentAddressing::Addressed(AddressedSegment {
-            encoded: encode_url_path_segment(&decoded),
-            decoded,
-        }),
-        PathSegmentAdmission::Rejected(rejection) => unaddressable(name, rejection),
-    }
-}
-
-struct AddressedSegment {
-    decoded: String,
-    encoded: String,
-}
-
-enum SegmentAddressing {
-    Addressed(AddressedSegment),
-    Unaddressable(UnaddressableParameter),
+    encoded
 }
 
 pub(crate) fn build_url(
@@ -83,26 +33,22 @@ pub(crate) fn build_url(
     let mut path = String::new();
 
     for segment in segments {
-        let addressing = match segment {
-            UrlSegment::CatchAllParameter { parameter, prefix } => {
-                addressed_catch_all(prefix, parameter)
+        match segment {
+            UrlSegment::CatchAllParameter { prefix, value, .. } => {
+                let decoded = [prefix, value.as_str()].concat();
+
+                url.push_str(&encoded_tail(&decoded));
+                path.push_str(&decoded);
             }
             UrlSegment::Literal { decoded, encoded } => {
                 path.push_str(decoded);
                 url.push_str(encoded);
-
-                continue;
             }
-            UrlSegment::Parameter { parameter, prefix } => addressed_parameter(prefix, parameter),
-        };
+            UrlSegment::Parameter { prefix, value, .. } => {
+                let decoded = [prefix, value.as_str()].concat();
 
-        match addressing {
-            SegmentAddressing::Addressed(AddressedSegment { decoded, encoded }) => {
+                url.push_str(&encode_url_path_segment(&decoded));
                 path.push_str(&decoded);
-                url.push_str(&encoded);
-            }
-            SegmentAddressing::Unaddressable(parameter) => {
-                return RouteAddressing::Unaddressable(parameter);
             }
         }
     }
@@ -119,25 +65,37 @@ pub(crate) fn build_url(
 
 #[cfg(test)]
 mod tests {
-    use margaret_url_path::path_segment_rejection::PathSegmentRejection;
+    use margaret_url_path::path_parameter_value::PathParameterValue;
+    use margaret_url_path::path_tail_value::PathTailValue;
+    use margaret_url_path::segment_prefix::SegmentPrefix;
+    use margaret_url_path::unprefixed_segment::UnprefixedSegment;
 
     use super::build_url;
     use crate::route_addressing::RouteAddressing;
     use crate::route_position::RoutePosition;
-    use crate::unaddressable_parameter::UnaddressableParameter;
-    use crate::url_parameter::UrlParameter;
     use crate::url_segment::UrlSegment;
 
     const ORIGIN: &str = "http://localhost";
     const GREETING: RoutePosition = RoutePosition::new(0);
     const ARTICLE_EDIT: RoutePosition = RoutePosition::new(1);
     const ARTICLE_COMMENT: RoutePosition = RoutePosition::new(2);
-    const DOTTED_NAME: RoutePosition = RoutePosition::new(3);
     const IMAGE: RoutePosition = RoutePosition::new(4);
     const FILE: RoutePosition = RoutePosition::new(5);
     const PREFIXED_FILE: RoutePosition = RoutePosition::new(6);
     const ESCAPED_CALLBACK: RoutePosition = RoutePosition::new(7);
     const ARTICLE: RoutePosition = RoutePosition::new(8);
+
+    struct ImagePrefix;
+
+    impl SegmentPrefix for ImagePrefix {
+        const TEXT: &'static str = "img.";
+    }
+
+    struct LetterPrefix;
+
+    impl SegmentPrefix for LetterPrefix {
+        const TEXT: &'static str = "x";
+    }
 
     fn matcher() -> matchit::Router<RoutePosition> {
         let mut matcher = matchit::Router::new();
@@ -173,24 +131,20 @@ mod tests {
         }
     }
 
-    fn parameter(name: &'static str, prefix: &'static str, value: &str) -> UrlSegment {
-        UrlSegment::Parameter {
-            parameter: UrlParameter {
-                name,
-                value: value.to_string(),
-            },
-            prefix,
-        }
+    fn parameter<TPrefix: SegmentPrefix>(name: &'static str, value: &str) -> UrlSegment {
+        UrlSegment::parameter(
+            name,
+            PathParameterValue::<TPrefix>::new(value.to_string())
+                .expect("the fixture value fills its segment"),
+        )
     }
 
-    fn catch_all(prefix: &'static str, value: &str) -> UrlSegment {
-        UrlSegment::CatchAllParameter {
-            parameter: UrlParameter {
-                name: "rest",
-                value: value.to_string(),
-            },
-            prefix,
-        }
+    fn catch_all<TPrefix: SegmentPrefix>(value: &str) -> UrlSegment {
+        UrlSegment::catch_all(
+            "rest",
+            PathTailValue::<TPrefix>::new(value.to_string())
+                .expect("the fixture tail fills its segments"),
+        )
     }
 
     fn url(position: RoutePosition, segments: &[UrlSegment]) -> RouteAddressing<String> {
@@ -202,14 +156,17 @@ mod tests {
             ARTICLE_EDIT,
             &[
                 literal("/articles/"),
-                parameter("article", "", value),
+                parameter::<UnprefixedSegment>("article", value),
                 literal("/edit"),
             ],
         )
     }
 
     fn file_url(value: &str) -> RouteAddressing<String> {
-        url(FILE, &[literal("/files/"), catch_all("", value)])
+        url(
+            FILE,
+            &[literal("/files/"), catch_all::<UnprefixedSegment>(value)],
+        )
     }
 
     fn addressed(url: &str) -> RouteAddressing<String> {
@@ -220,13 +177,6 @@ mod tests {
         RouteAddressing::Misrouted {
             url: url.to_string(),
         }
-    }
-
-    fn unaddressable(
-        name: &'static str,
-        rejection: PathSegmentRejection,
-    ) -> RouteAddressing<String> {
-        RouteAddressing::Unaddressable(UnaddressableParameter { name, rejection })
     }
 
     #[test]
@@ -252,9 +202,9 @@ mod tests {
                 ARTICLE_COMMENT,
                 &[
                     literal("/articles/"),
-                    parameter("article", "", "rust"),
+                    parameter::<UnprefixedSegment>("article", "rust"),
                     literal("/comments/"),
-                    parameter("comment", "", "42"),
+                    parameter::<UnprefixedSegment>("comment", "42"),
                 ],
             ),
             addressed("http://localhost/articles/rust/comments/42")
@@ -270,59 +220,14 @@ mod tests {
     }
 
     #[test]
-    fn refuses_a_parent_directory_value_since_clients_would_collapse_the_segment() {
-        assert_eq!(
-            article_edit_url(".."),
-            unaddressable("article", PathSegmentRejection::DotSegment)
-        );
-    }
-
-    #[test]
-    fn refuses_a_current_directory_value_since_clients_would_drop_the_segment() {
-        assert_eq!(
-            article_edit_url("."),
-            unaddressable("article", PathSegmentRejection::DotSegment)
-        );
-    }
-
-    #[test]
-    fn refuses_an_empty_parameter_value_since_an_empty_segment_cannot_address_the_route() {
-        assert_eq!(
-            article_edit_url(""),
-            unaddressable("article", PathSegmentRejection::Empty)
-        );
-    }
-
-    #[test]
-    fn refuses_a_value_that_contains_a_path_separator() {
-        assert_eq!(
-            article_edit_url("rust/lang"),
-            unaddressable("article", PathSegmentRejection::Separator)
-        );
-    }
-
-    #[test]
-    fn refuses_a_value_that_contains_a_line_break() {
-        assert_eq!(
-            article_edit_url("a\r\nX-Injected: 1"),
-            unaddressable("article", PathSegmentRejection::ControlCharacter)
-        );
-    }
-
-    #[test]
-    fn refuses_a_value_that_completes_a_dot_segment_with_its_literal_prefix() {
-        assert_eq!(
-            url(DOTTED_NAME, &[literal("/"), parameter("name", ".", ".")]),
-            unaddressable("name", PathSegmentRejection::DotSegment)
-        );
-    }
-
-    #[test]
     fn encodes_a_value_together_with_the_literal_text_of_its_segment() {
         assert_eq!(
             url(
                 IMAGE,
-                &[literal("/images/"), parameter("id", "img.", " big.png")]
+                &[
+                    literal("/images/"),
+                    parameter::<ImagePrefix>("id", " big.png")
+                ]
             ),
             addressed("http://localhost/images/img.%20big.png")
         );
@@ -347,32 +252,11 @@ mod tests {
     #[test]
     fn joins_the_literal_text_preceding_a_catch_all_with_its_value() {
         assert_eq!(
-            url(PREFIXED_FILE, &[literal("/"), catch_all("x", "/a b")]),
+            url(
+                PREFIXED_FILE,
+                &[literal("/"), catch_all::<LetterPrefix>("/a b")]
+            ),
             addressed("http://localhost/x/a%20b")
-        );
-    }
-
-    #[test]
-    fn refuses_an_empty_catch_all_value_since_an_empty_tail_cannot_address_the_route() {
-        assert_eq!(
-            file_url(""),
-            unaddressable("rest", PathSegmentRejection::Empty)
-        );
-    }
-
-    #[test]
-    fn refuses_a_catch_all_value_with_an_empty_component() {
-        assert_eq!(
-            file_url("a//b"),
-            unaddressable("rest", PathSegmentRejection::Empty)
-        );
-    }
-
-    #[test]
-    fn refuses_a_catch_all_value_with_a_dot_component() {
-        assert_eq!(
-            file_url("nested/../secret"),
-            unaddressable("rest", PathSegmentRejection::DotSegment)
         );
     }
 
@@ -386,7 +270,7 @@ mod tests {
                         decoded: "/oauth/{callback}/",
                         encoded: "/oauth/%7Bcallback%7D/",
                     },
-                    parameter("id", "", "7"),
+                    parameter::<UnprefixedSegment>("id", "7"),
                 ],
             ),
             addressed("http://localhost/oauth/%7Bcallback%7D/7")
@@ -398,7 +282,10 @@ mod tests {
         assert_eq!(
             url(
                 ARTICLE,
-                &[literal("/articles/"), parameter("article", "", "new")]
+                &[
+                    literal("/articles/"),
+                    parameter::<UnprefixedSegment>("article", "new")
+                ]
             ),
             misrouted("http://localhost/articles/new")
         );

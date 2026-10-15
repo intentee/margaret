@@ -61,6 +61,9 @@ mod tests {
 
     use http::header::LOCATION;
 
+    use margaret_url_path::path_parameter_value::PathParameterValue;
+    use margaret_url_path::unprefixed_segment::UnprefixedSegment;
+
     use super::ForwardableRoute;
     use crate::get_route_reference::GetRouteReference;
     use crate::redirect::Redirect;
@@ -68,11 +71,16 @@ mod tests {
     use crate::route_position::RoutePosition;
     use crate::route_props::RouteProps;
     use crate::server_paths::ServerPaths;
-    use crate::url_parameter::UrlParameter;
     use crate::url_segment::UrlSegment;
 
     struct NoteProps {
-        note: String,
+        note: PathParameterValue<UnprefixedSegment>,
+    }
+
+    fn rust_note() -> NoteProps {
+        NoteProps {
+            note: PathParameterValue::new("rust".to_string()).expect("the note fills a segment"),
+        }
     }
 
     impl RouteProps for NoteProps {
@@ -86,13 +94,7 @@ mod tests {
                     decoded: "/notes/",
                     encoded: "/notes/",
                 },
-                UrlSegment::Parameter {
-                    parameter: UrlParameter {
-                        name: "note",
-                        value: self.note,
-                    },
-                    prefix: "",
-                },
+                UrlSegment::parameter("note", self.note),
             ]
         }
     }
@@ -118,13 +120,9 @@ mod tests {
 
     #[test]
     fn forwards_to_the_target_its_props_name() {
-        let NotesTarget::Note(NoteProps { note }) = literal_route()
-            .forward_to(NoteProps {
-                note: "rust".to_string(),
-            })
-            .target;
+        let NotesTarget::Note(NoteProps { note }) = literal_route().forward_to(rust_note()).target;
 
-        assert_eq!(note, "rust");
+        assert_eq!(note.into_string(), "rust");
     }
 
     #[test]
@@ -169,9 +167,7 @@ mod tests {
         );
 
         assert!(matches!(
-            route.address(NoteProps {
-                note: "rust".to_string(),
-            }),
+            route.address(rust_note()),
             RouteAddressing::Addressed(reference) if reference.url() == "http://localhost/notes/rust"
         ));
     }

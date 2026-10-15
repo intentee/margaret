@@ -4,6 +4,7 @@ use margaret_cluster_fixture::margaret::routes::props::PatchNoteRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::note_written::note_written;
+use margaret_cluster_tests::path_parameter::path_parameter;
 
 use crate::cluster_binary::cluster_binary;
 
@@ -22,7 +23,7 @@ async fn refuses_a_note_patch_that_is_not_json() {
                         .public
                         .patch_note
                         .address(PatchNoteRouteProps {
-                            note: id.to_string()
+                            note: path_parameter(id.to_string())
                         })
                 )
                 .url()

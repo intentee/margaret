@@ -20,6 +20,7 @@ mod http_routes;
 pub mod http_server;
 mod named_route;
 mod named_route_shape;
+mod props_prefix;
 mod props_segment;
 mod render;
 mod render_forward_targets;
@@ -1323,13 +1324,13 @@ impl GetKind { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         );
 
         assert!(source.contains(
-            "pubstructGetKindRouteProps{pubtype_2:::std::string::String,pubslug:::std::string::String,pubslag:::std::string::String,}"
+            "pubstructGetKindRouteProps{pubtype_2:margaret::framework::url_path::path_parameter_value::PathParameterValue<margaret::framework::url_path::unprefixed_segment::UnprefixedSegment,>,pubslug:margaret::framework::url_path::path_parameter_value::PathParameterValue<margaret::framework::url_path::unprefixed_segment::UnprefixedSegment,>,pubslag:margaret::framework::url_path::path_parameter_value::PathParameterValue<margaret::framework::url_path::unprefixed_segment::UnprefixedSegment,>,}"
         ));
         assert!(source.contains(
-            "margaret::framework::http::url_parameter::UrlParameter{name:\"type\",value:self.type_2,}"
+            "margaret::framework::http::url_segment::UrlSegment::parameter(\"type\",self.type_2,)"
         ));
         assert!(source.contains(
-            "margaret::framework::http::url_parameter::UrlParameter{name:\"slag\",value:self.slag,}"
+            "margaret::framework::http::url_segment::UrlSegment::parameter(\"slag\",self.slag,)"
         ));
     }
 
@@ -1381,7 +1382,7 @@ impl GetKind { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             "get_article:margaret::framework::http::forwardable_route::ForwardableRoute::new(paths.addressable(&shared_origin,margaret::framework::http::route_position::RoutePosition::new(0,),margaret::framework::http::get_route_reference::GetRouteReference::new,),super::super::forward_targets::PublicForwardTarget::GetArticle,),"
         ));
         assert!(source.contains(
-            "fninto_segments(self)->Self::Segments{[margaret::framework::http::url_segment::UrlSegment::Literal{decoded:\"/articles/\",encoded:\"/articles/\",},margaret::framework::http::url_segment::UrlSegment::Parameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:self.article,},prefix:\"\",},]}"
+            "fninto_segments(self)->Self::Segments{[margaret::framework::http::url_segment::UrlSegment::Literal{decoded:\"/articles/\",encoded:\"/articles/\",},margaret::framework::http::url_segment::UrlSegment::parameter(\"article\",self.article,),]}"
         ));
         assert!(!source.contains("Params"));
     }
@@ -1407,9 +1408,31 @@ impl GetKind { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(
-            source.contains("pubstructPatchArticleRouteProps{pubarticle:::std::string::String,}")
+            source.contains("pubstructPatchArticleRouteProps{pubarticle:margaret::framework::url_path::path_parameter_value::PathParameterValue<margaret::framework::url_path::unprefixed_segment::UnprefixedSegment,>,}")
         );
         assert!(!source.contains("PostPingRouteProps"));
+    }
+
+    #[test]
+    fn types_a_placeholder_after_literal_text_by_a_prefix_marker_of_that_text() {
+        let source = routes_source_for(
+            r#"use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+
+#[singleton]
+#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, name = "get_image", path = "/images/img.{id}", server = "public")]
+struct GetImage;
+impl GetImage { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
+"#,
+        );
+
+        assert!(source.contains(
+            "pubid:margaret::framework::url_path::path_parameter_value::PathParameterValue<super::GetImageIdPrefix,>,"
+        ));
+        assert!(source.contains(
+            "pubstructGetImageIdPrefix;implmargaret::framework::url_path::segment_prefix::SegmentPrefixforGetImageIdPrefix{constTEXT:&'staticstr=\"img.\";}"
+        ));
     }
 
     #[test]
@@ -1417,7 +1440,7 @@ impl GetKind { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "margaret::framework::http::url_segment::UrlSegment::CatchAllParameter{parameter:margaret::framework::http::url_parameter::UrlParameter{name:\"rest\",value:self.rest,},prefix:\"\",}"
+            "margaret::framework::http::url_segment::UrlSegment::catch_all(\"rest\",self.rest,)"
         ));
     }
 

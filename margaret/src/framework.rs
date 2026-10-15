@@ -126,6 +126,8 @@ pub use margaret_token_trust as token_trust;
 #[cfg(feature = "runtime")]
 pub use margaret_trusted_issuer as trusted_issuer;
 #[cfg(feature = "runtime")]
+pub use margaret_url_path as url_path;
+#[cfg(feature = "runtime")]
 pub use margaret_validation as validation;
 #[cfg(feature = "runtime")]
 pub use margaret_views as views;

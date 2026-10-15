@@ -1,3 +1,4 @@
+use proc_macro2::Ident;
 use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -7,24 +8,24 @@ use margaret_generated_module::module_path::ModulePath;
 
 use crate::named_route::NamedRoute;
 use crate::named_route_shape::NamedRouteShape;
+use crate::props_prefix::PropsPrefix;
 use crate::props_segment::PropsSegment;
 use crate::route_props_layout::RoutePropsLayout;
 use crate::server_layout::ServerLayout;
 
+fn prefix_type(prefix: &PropsPrefix) -> TokenStream {
+    match prefix {
+        PropsPrefix::Prefixed { type_ident, .. } => quote! { super::#type_ident },
+        PropsPrefix::Unprefixed => {
+            quote! { margaret::framework::url_path::unprefixed_segment::UnprefixedSegment }
+        }
+    }
+}
+
 fn segment_tokens(segment: &PropsSegment) -> TokenStream {
     match segment {
-        PropsSegment::CatchAllParameter {
-            field,
-            name,
-            prefix,
-        } => quote! {
-            margaret::framework::http::url_segment::UrlSegment::CatchAllParameter {
-                parameter: margaret::framework::http::url_parameter::UrlParameter {
-                    name: #name,
-                    value: self.#field,
-                },
-                prefix: #prefix,
-            }
+        PropsSegment::CatchAllParameter { field, name, .. } => quote! {
+            margaret::framework::http::url_segment::UrlSegment::catch_all(#name, self.#field)
         },
         PropsSegment::Literal { decoded, encoded } => quote! {
             margaret::framework::http::url_segment::UrlSegment::Literal {
@@ -32,20 +33,34 @@ fn segment_tokens(segment: &PropsSegment) -> TokenStream {
                 encoded: #encoded,
             }
         },
-        PropsSegment::Parameter {
-            field,
-            name,
-            prefix,
-        } => quote! {
-            margaret::framework::http::url_segment::UrlSegment::Parameter {
-                parameter: margaret::framework::http::url_parameter::UrlParameter {
-                    name: #name,
-                    value: self.#field,
-                },
-                prefix: #prefix,
-            }
+        PropsSegment::Parameter { field, name, .. } => quote! {
+            margaret::framework::http::url_segment::UrlSegment::parameter(#name, self.#field)
         },
     }
+}
+
+fn prefix_module(prefix: &PropsPrefix) -> Option<PrefixModule<'_>> {
+    match prefix {
+        PropsPrefix::Prefixed {
+            module,
+            text,
+            type_ident,
+        } => Some(PrefixModule {
+            module,
+            text,
+            type_ident,
+        }),
+        PropsPrefix::Unprefixed => None,
+    }
+}
+
+fn prefix_modules(props: &RoutePropsLayout) -> impl Iterator<Item = PrefixModule<'_>> {
+    props.segments.iter().filter_map(|segment| match segment {
+        PropsSegment::CatchAllParameter { prefix, .. } | PropsSegment::Parameter { prefix, .. } => {
+            prefix_module(prefix)
+        }
+        PropsSegment::Literal { .. } => None,
+    })
 }
 
 fn props_struct(name: &str, props: &RoutePropsLayout) -> TokenStream {
@@ -57,11 +72,21 @@ fn props_struct(name: &str, props: &RoutePropsLayout) -> TokenStream {
     let fields: Vec<TokenStream> = segments
         .iter()
         .filter_map(|segment| match segment {
-            PropsSegment::CatchAllParameter { field, .. }
-            | PropsSegment::Parameter { field, .. } => {
-                Some(quote! { pub #field: ::std::string::String, })
+            PropsSegment::CatchAllParameter { field, prefix, .. } => {
+                let prefix = prefix_type(prefix);
+
+                Some(quote! {
+                    pub #field: margaret::framework::url_path::path_tail_value::PathTailValue<#prefix>,
+                })
             }
             PropsSegment::Literal { .. } => None,
+            PropsSegment::Parameter { field, prefix, .. } => {
+                let prefix = prefix_type(prefix);
+
+                Some(quote! {
+                    pub #field: margaret::framework::url_path::path_parameter_value::PathParameterValue<#prefix>,
+                })
+            }
         })
         .collect();
     let declaration = if fields.is_empty() {
@@ -105,6 +130,12 @@ struct NamedRouteProps<'layout> {
     props: &'layout RoutePropsLayout,
 }
 
+struct PrefixModule<'layout> {
+    module: &'layout Ident,
+    text: &'layout str,
+    type_ident: &'layout Ident,
+}
+
 pub(crate) fn render_route_props(
     routes: &ModulePath,
     layouts: &[ServerLayout<'_>],
@@ -124,17 +155,30 @@ pub(crate) fn render_route_props(
         return Vec::new();
     }
 
+    let prefixes: Vec<PrefixModule<'_>> = props
+        .iter()
+        .flat_map(|NamedRouteProps { props, .. }| prefix_modules(props))
+        .collect();
     let modules = props
         .iter()
-        .map(|NamedRouteProps { props, .. }| &props.module);
-    let exports = props.iter().map(
-        |NamedRouteProps {
-             props: RoutePropsLayout {
+        .map(|NamedRouteProps { props, .. }| &props.module)
+        .chain(prefixes.iter().map(|prefix| prefix.module));
+    let exports = props
+        .iter()
+        .map(
+            |NamedRouteProps {
+                 props:
+                     RoutePropsLayout {
+                         module, type_ident, ..
+                     },
+                 ..
+             }| quote! { pub use #module::#type_ident; },
+        )
+        .chain(prefixes.iter().map(
+            |PrefixModule {
                  module, type_ident, ..
-             },
-             ..
-         }| quote! { pub use #module::#type_ident; },
-    );
+             }| quote! { pub use #module::#type_ident; },
+        ));
     let props_module = routes.child("props");
     let mut generated = vec![GeneratedModuleTokens::new(
         props_module.clone(),
@@ -150,6 +194,24 @@ pub(crate) fn render_route_props(
             props_struct(name, props),
         )
     }));
+    generated.extend(prefixes.iter().map(
+        |PrefixModule {
+             module,
+             text,
+             type_ident,
+         }| {
+            GeneratedModuleTokens::new(
+                props_module.child(module.to_string()),
+                quote! {
+                    pub struct #type_ident;
+
+                    impl margaret::framework::url_path::segment_prefix::SegmentPrefix for #type_ident {
+                        const TEXT: &'static str = #text;
+                    }
+                },
+            )
+        },
+    ));
 
     generated
 }

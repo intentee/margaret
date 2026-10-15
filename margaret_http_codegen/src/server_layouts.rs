@@ -14,6 +14,7 @@ use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::named_route::NamedRoute;
 use crate::named_route_shape::NamedRouteShape;
+use crate::props_prefix::PropsPrefix;
 use crate::props_segment::PropsSegment;
 use crate::route_props_layout::RoutePropsLayout;
 use crate::server_forwarding::ServerForwarding;
@@ -42,7 +43,30 @@ fn field_of(name: &str, allocator: &mut NameAllocator) -> Ident {
     }
 }
 
-fn props_segments(path: &RoutePath) -> Vec<PropsSegment> {
+fn props_prefix(
+    route: &str,
+    placeholder: &str,
+    prefix: &str,
+    props_allocator: &mut NameAllocator,
+) -> PropsPrefix {
+    if prefix.is_empty() {
+        return PropsPrefix::Unprefixed;
+    }
+
+    let identifier = props_allocator.allocate(&format!("{route}_{placeholder}_prefix"));
+
+    PropsPrefix::Prefixed {
+        module: format_ident!("{}", identifier.field()),
+        text: prefix.to_string(),
+        type_ident: format_ident!("{}", identifier.type_name()),
+    }
+}
+
+fn props_segments(
+    route: &str,
+    path: &RoutePath,
+    props_allocator: &mut NameAllocator,
+) -> Vec<PropsSegment> {
     let RouteUrlTemplate::Parameterized(segments) = path.template() else {
         return Vec::new();
     };
@@ -54,7 +78,7 @@ fn props_segments(path: &RoutePath) -> Vec<PropsSegment> {
             UrlSegment::CatchAllParameter { name, prefix } => PropsSegment::CatchAllParameter {
                 field: field_of(name, &mut allocator),
                 name: name.clone(),
-                prefix: prefix.clone(),
+                prefix: props_prefix(route, name, prefix, props_allocator),
             },
             UrlSegment::Literal { decoded, encoded } => PropsSegment::Literal {
                 decoded: decoded.clone(),
@@ -63,7 +87,7 @@ fn props_segments(path: &RoutePath) -> Vec<PropsSegment> {
             UrlSegment::Parameter { name, prefix } => PropsSegment::Parameter {
                 field: field_of(name, &mut allocator),
                 name: name.clone(),
-                prefix: prefix.clone(),
+                prefix: props_prefix(route, name, prefix, props_allocator),
             },
         })
         .collect()
@@ -78,7 +102,7 @@ fn route_props(
 
     RoutePropsLayout {
         module: format_ident!("{}", identifier.field()),
-        segments: props_segments(path),
+        segments: props_segments(name, path, props_allocator),
         type_ident: format_ident!("{}", identifier.type_name()),
     }
 }

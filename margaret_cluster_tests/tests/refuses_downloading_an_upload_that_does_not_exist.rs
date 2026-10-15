@@ -4,6 +4,7 @@ use uuid::Uuid;
 use margaret_cluster_fixture::margaret::routes::props::GetUploadRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
+use margaret_cluster_tests::path_parameter::path_parameter;
 
 use crate::cluster_binary::cluster_binary;
 
@@ -21,7 +22,7 @@ async fn refuses_downloading_an_upload_that_does_not_exist() {
                         .public
                         .get_upload
                         .address(GetUploadRouteProps {
-                            upload: Uuid::new_v4().to_string()
+                            upload: path_parameter(Uuid::new_v4().to_string())
                         })
                 )
                 .url()

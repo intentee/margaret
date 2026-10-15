@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::head_handler::HeadHandler;
 use crate::route_props::RouteProps;
-use crate::url_parameter::UrlParameter;
 use crate::url_segment::UrlSegment;
 
 pub struct ForwardedRoute<TTarget> {
@@ -22,14 +21,8 @@ impl<TTarget> ForwardedRoute<TTarget> {
                 .into_segments()
                 .into_iter()
                 .filter_map(|segment| match segment {
-                    UrlSegment::CatchAllParameter {
-                        parameter: UrlParameter { name, value },
-                        ..
-                    }
-                    | UrlSegment::Parameter {
-                        parameter: UrlParameter { name, value },
-                        ..
-                    } => Some((name.to_string(), value)),
+                    UrlSegment::CatchAllParameter { name, value, .. }
+                    | UrlSegment::Parameter { name, value, .. } => Some((name.to_string(), value)),
                     UrlSegment::Literal { .. } => None,
                 })
                 .collect(),

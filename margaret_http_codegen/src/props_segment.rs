@@ -1,10 +1,12 @@
 use proc_macro2::Ident;
 
+use crate::props_prefix::PropsPrefix;
+
 pub(crate) enum PropsSegment {
     CatchAllParameter {
         field: Ident,
         name: String,
-        prefix: String,
+        prefix: PropsPrefix,
     },
     Literal {
         decoded: String,
@@ -13,6 +15,6 @@ pub(crate) enum PropsSegment {
     Parameter {
         field: Ident,
         name: String,
-        prefix: String,
+        prefix: PropsPrefix,
     },
 }

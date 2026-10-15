@@ -6,6 +6,7 @@ use margaret::framework::sql_identifier::table_namespace::TableNamespace;
 use margaret_cluster_fixture::margaret::routes::props::PatchNoteRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
+use margaret_cluster_tests::path_parameter::path_parameter;
 use margaret_database_tests::table_privilege::TablePrivilege;
 
 use crate::cluster_binary::cluster_binary;
@@ -29,7 +30,7 @@ async fn fails_patching_a_note_the_database_refuses() {
                         .public
                         .patch_note
                         .address(PatchNoteRouteProps {
-                            note: Uuid::new_v4().to_string()
+                            note: path_parameter(Uuid::new_v4().to_string())
                         })
                 )
                 .url()

@@ -6,6 +6,7 @@ use margaret_cluster_fixture::constants::NOTE_SWEEP_INTERVAL;
 use margaret_cluster_fixture::margaret::routes::props::GetNoteRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
+use margaret_cluster_tests::path_parameter::path_parameter;
 use margaret_cluster_tests::stored_note::StoredNote;
 use margaret_local_server_tests::poll_until::poll_until;
 
@@ -36,7 +37,7 @@ async fn any_instance_sweeps_notes_another_wrote_so_a_crashed_writer_leaves_no_g
             .get(
                 addressed_route(cluster.instance_routes(1).public.get_note.address(
                     GetNoteRouteProps {
-                        note: id.to_string(),
+                        note: path_parameter(id.to_string()),
                     },
                 ))
                 .url(),

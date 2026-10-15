@@ -52,6 +52,8 @@ pub mod partner_submission;
 pub mod partner_token;
 pub mod partner_token_asserted;
 pub mod partner_tokens;
+pub mod path_parameter;
+pub mod path_tail;
 pub mod posted_chat_message;
 pub mod profile_status;
 pub mod provider_metadata_url;

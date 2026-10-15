@@ -1,12 +1,12 @@
 error[E0308]: mismatched types
-  --> compile_fail/forwards_with_the_props_of_another_route.rs:8:44
+  --> compile_fail/forwards_with_the_props_of_another_route.rs:9:44
    |
- 8 |       drop(routes.public.get_note.forward_to(GetNoteViewRouteProps {
+ 9 |       drop(routes.public.get_note.forward_to(GetNoteViewRouteProps {
    |  _________________________________----------_^
    | |                                 |
    | |                                 arguments to this method are incorrect
- 9 | |         note: "viewed".to_string(),
-10 | |     }));
+10 | |         note: PathParameterValue::new("viewed".to_string()).expect("the note fills a segment"),
+11 | |     }));
    | |_____^ expected `GetNoteRouteProps`, found `GetNoteViewRouteProps`
    |
 note: method defined here

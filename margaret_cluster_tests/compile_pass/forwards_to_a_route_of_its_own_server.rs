@@ -3,10 +3,11 @@ use margaret::framework::http::responded::responded;
 use margaret_cluster_fixture::margaret::routes::Routes;
 use margaret_cluster_fixture::margaret::routes::forward_targets::PublicForwardTarget;
 use margaret_cluster_fixture::margaret::routes::props::GetNoteRouteProps;
+use margaret_cluster_fixture::margaret::framework::url_path::path_parameter_value::PathParameterValue;
 
 fn forwarded(routes: &Routes) -> Forward<PublicForwardTarget> {
     routes.public.get_note.forward_to(GetNoteRouteProps {
-        note: "note".to_string(),
+        note: PathParameterValue::new("note".to_string()).expect("the note fills a segment"),
     })
 }
 

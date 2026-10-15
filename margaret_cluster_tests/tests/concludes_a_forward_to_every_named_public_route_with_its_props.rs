@@ -28,6 +28,8 @@ use margaret_cluster_fixture::margaret::routes::props::GetProfileRouteProps;
 use margaret_cluster_fixture::margaret::routes::props::GetSignInCallbackRouteProps;
 use margaret_cluster_fixture::margaret::routes::props::GetSignInRouteProps;
 use margaret_cluster_fixture::margaret::routes::props::GetUploadRouteProps;
+use margaret_cluster_tests::path_parameter::path_parameter;
+use margaret_cluster_tests::path_tail::path_tail;
 use margaret_http_tests::fixture_request::FixtureRequest;
 
 const ROUTE: HeaderName = HeaderName::from_static("x-route");
@@ -128,21 +130,21 @@ async fn concludes_a_forward_to_every_named_public_route_with_its_props() {
 
     for forward in [
         public.get_asset.forward_to(GetAssetRouteProps {
-            asset_path: "cluster.css".to_string(),
+            asset_path: path_tail("cluster.css".to_string()),
         }),
         public.get_external.forward_to(GetExternalRouteProps),
         public
             .get_forwarded_note
             .forward_to(GetForwardedNoteRouteProps {
-                note_id: "forwarded".to_string(),
+                note_id: path_parameter("forwarded".to_string()),
             }),
         public.get_health.forward_to(GetHealthRouteProps),
         public.get_messages.forward_to(GetMessagesRouteProps),
         public.get_note.forward_to(GetNoteRouteProps {
-            note: "note".to_string(),
+            note: path_parameter("note".to_string()),
         }),
         public.get_note_view.forward_to(GetNoteViewRouteProps {
-            note: "viewed".to_string(),
+            note: path_parameter("viewed".to_string()),
         }),
         public.get_notes.forward_to(GetNotesRouteProps),
         public.get_notes_caller.forward_to(GetNotesCallerRouteProps),
@@ -152,7 +154,7 @@ async fn concludes_a_forward_to_every_named_public_route_with_its_props() {
             .get_sign_in_callback
             .forward_to(GetSignInCallbackRouteProps),
         public.get_upload.forward_to(GetUploadRouteProps {
-            upload: "upload".to_string(),
+            upload: path_parameter("upload".to_string()),
         }),
     ] {
         concluded_forwards.push(concluded(&targets, forward).await);

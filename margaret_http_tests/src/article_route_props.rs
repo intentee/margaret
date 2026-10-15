@@ -1,9 +1,10 @@
 use margaret_http::route_props::RouteProps;
-use margaret_http::url_parameter::UrlParameter;
 use margaret_http::url_segment::UrlSegment;
+use margaret_url_path::path_parameter_value::PathParameterValue;
+use margaret_url_path::unprefixed_segment::UnprefixedSegment;
 
 pub struct ArticleRouteProps {
-    pub article: String,
+    pub article: PathParameterValue<UnprefixedSegment>,
 }
 
 impl RouteProps for ArticleRouteProps {
@@ -17,13 +18,7 @@ impl RouteProps for ArticleRouteProps {
                 decoded: "/articles/",
                 encoded: "/articles/",
             },
-            UrlSegment::Parameter {
-                parameter: UrlParameter {
-                    name: "article",
-                    value: self.article,
-                },
-                prefix: "",
-            },
+            UrlSegment::parameter("article", self.article),
         ]
     }
 }

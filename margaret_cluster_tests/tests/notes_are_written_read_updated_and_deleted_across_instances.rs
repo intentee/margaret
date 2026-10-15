@@ -7,6 +7,7 @@ use margaret_cluster_fixture::margaret::routes::props::PatchNoteRouteProps;
 use margaret_cluster_tests::addressed_route::addressed_route;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::note_written::note_written;
+use margaret_cluster_tests::path_parameter::path_parameter;
 use margaret_cluster_tests::stored_note::StoredNote;
 
 use crate::cluster_binary::cluster_binary;
@@ -21,7 +22,7 @@ async fn notes_are_written_read_updated_and_deleted_across_instances() {
             .client
             .get(
                 addressed_route(routes(index).public.get_note.address(GetNoteRouteProps {
-                    note: id.to_string(),
+                    note: path_parameter(id.to_string()),
                 }))
                 .url(),
             )
@@ -45,7 +46,7 @@ async fn notes_are_written_read_updated_and_deleted_across_instances() {
             .client
             .patch(
                 addressed_route(routes(2).public.patch_note.address(PatchNoteRouteProps {
-                    note: id.to_string()
+                    note: path_parameter(id.to_string())
                 }))
                 .url()
             )
@@ -71,7 +72,7 @@ async fn notes_are_written_read_updated_and_deleted_across_instances() {
             .client
             .delete(
                 addressed_route(routes(1).public.delete_note.address(DeleteNoteRouteProps {
-                    note: id.to_string()
+                    note: path_parameter(id.to_string())
                 }))
                 .url()
             )

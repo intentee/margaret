@@ -1,14 +1,16 @@
 use std::sync::Arc;
 
+use anyhow::Context as _;
+
 use margaret::framework::http::response::Response;
 use margaret::framework::http::route_addressing::RouteAddressing;
-use margaret::framework::http::unaddressable_parameter::UnaddressableParameter;
 use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_method::route_method::RouteMethod;
+use margaret::framework::url_path::path_parameter_value::PathParameterValue;
 
 use crate::forms::get_articles_form::GetArticlesForm;
 use crate::margaret::routes::Routes;
@@ -44,8 +46,16 @@ impl GetArticles {
                 .await?
                 .into_iter()
                 .map(|article| {
+                    let article_parameter = PathParameterValue::new(article.id.to_string())
+                        .with_context(|| {
+                            format!(
+                                "the article {} cannot fill the route parameter 'article'",
+                                article.id
+                            )
+                        })?;
+
                     match routes.public.get_article.address(GetArticleRouteProps {
-                        article: article.id.to_string(),
+                        article: article_parameter,
                     }) {
                         RouteAddressing::Addressed(route) => {
                             Ok(format!("{}: {}", article.title, route.url()))
@@ -54,13 +64,6 @@ impl GetArticles {
                             "the link of the article {} at '{url}' reaches another route",
                             article.id
                         )),
-                        RouteAddressing::Unaddressable(UnaddressableParameter {
-                            name,
-                            rejection,
-                        }) => Err(anyhow::Error::from(rejection).context(format!(
-                            "the article {} cannot fill the route parameter '{name}'",
-                            article.id
-                        ))),
                     }
                 })
                 .collect::<anyhow::Result<Vec<String>>>()?
