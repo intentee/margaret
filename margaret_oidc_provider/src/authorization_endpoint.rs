@@ -23,14 +23,25 @@ use crate::prompt::Prompt;
 use crate::provider_error::ProviderError;
 use crate::redirection::Redirection;
 
-fn registered_redirect_uri(redirect_uris: &[String], requested: Option<&str>) -> Option<Url> {
+fn registered_redirect_uri(
+    client_id: &'static str,
+    redirect_uris: &[String],
+    requested: Option<&str>,
+) -> Result<Option<Url>, ProviderError> {
     requested
-        .filter(|redirect_uri| {
+        .and_then(|requested| {
             redirect_uris
                 .iter()
-                .any(|registered| registered == redirect_uri)
+                .find(|registered| registered.as_str() == requested)
         })
-        .and_then(|redirect_uri| Url::parse(redirect_uri).ok())
+        .map(|registered| {
+            Url::parse(registered).map_err(|source| ProviderError::RegisteredRedirectUri {
+                client_id,
+                redirect_uri: registered.clone(),
+                source,
+            })
+        })
+        .transpose()
 }
 
 fn rejected(reason: &str) -> AuthorizationOutcome {
@@ -59,8 +70,10 @@ impl AuthorizationEndpoint {
 
     /// # Errors
     ///
-    /// Returns `ProviderError::IssueCode` or `ProviderError::HoldPendingAuthorization` when the
-    /// application cannot store the code or the pending consent.
+    /// Returns `ProviderError::AuthorizationGrants` when the application cannot store the code or
+    /// the pending consent, and
+    /// `ProviderError::RegisteredRedirectUri` when the redirect uri the client registers is not a
+    /// url.
     pub async fn authorize(
         &self,
         request: ValidationResult<AuthorizationRequest>,
@@ -90,8 +103,11 @@ impl AuthorizationEndpoint {
             return Ok(rejected("The client may not request authorization codes"));
         };
         let now = Utc::now();
-        let Some(redirect_uri) =
-            registered_redirect_uri(redirect_uris, request.redirect_uri.as_deref())
+        let Some(redirect_uri) = registered_redirect_uri(
+            client.client_id,
+            redirect_uris,
+            request.redirect_uri.as_deref(),
+        )?
         else {
             return Ok(rejected(
                 "The redirect uri is not registered for the client",

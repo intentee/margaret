@@ -1,6 +1,5 @@
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
-use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
@@ -15,9 +14,18 @@ use crate::server_layout::ServerLayout;
 
 fn forward_target_of<'layout>(named: &'layout NamedRoute<'_>) -> Option<TargetedRoute<'layout>> {
     match &named.shape {
-        NamedRouteShape::ForwardableLiteral { props, variant, .. }
-        | NamedRouteShape::ForwardableParameterized { props, variant } => Some(TargetedRoute {
-            field: format_ident!("{}", named.name),
+        NamedRouteShape::ForwardableLiteral {
+            field,
+            props,
+            variant,
+            ..
+        }
+        | NamedRouteShape::ForwardableParameterized {
+            field,
+            props,
+            variant,
+        } => Some(TargetedRoute {
+            field,
             props,
             variant,
         }),
@@ -95,7 +103,7 @@ fn targets_struct(
 }
 
 struct TargetedRoute<'layout> {
-    field: Ident,
+    field: &'layout Ident,
     props: &'layout RoutePropsLayout,
     variant: &'layout Ident,
 }

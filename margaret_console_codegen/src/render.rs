@@ -235,8 +235,8 @@ fn serve_arm(serve: &ServeDispatch, dispatch: InvocationDispatch) -> TokenStream
     }
 }
 
-fn schema_tokens(has_models: bool, dispatch: InvocationDispatch) -> SchemaTokens {
-    if !has_models {
+fn schema_tokens(has_schema: bool, dispatch: InvocationDispatch) -> SchemaTokens {
+    if !has_schema {
         return SchemaTokens {
             arm: TokenStream::new(),
             registration: TokenStream::new(),
@@ -271,13 +271,13 @@ struct SchemaTokens {
 
 pub(crate) fn render(
     commands: &[ConsoleCommand],
+    framework_commands: &[FrameworkCommand],
     serve: &ServeDispatch,
-    has_models: bool,
     http_servers: &[HttpServer],
     serve_inputs: &[SlottedServeInput],
     bindings: &ContainerBindings,
 ) -> Vec<GeneratedModuleTokens> {
-    let serves = matches!(serve, ServeDispatch::Served(_));
+    let serves = framework_commands.contains(&FrameworkCommand::Serve);
     let dispatch = if serves
         || commands.iter().any(|command| {
             command.takes_token
@@ -297,7 +297,10 @@ pub(crate) fn render(
     let SchemaTokens {
         arm: schema_arm,
         registration: schema_registration,
-    } = schema_tokens(has_models, dispatch);
+    } = schema_tokens(
+        framework_commands.contains(&FrameworkCommand::Schema),
+        dispatch,
+    );
     let serve_registration = if serves {
         serve_registration(http_servers, serve_inputs)
     } else {

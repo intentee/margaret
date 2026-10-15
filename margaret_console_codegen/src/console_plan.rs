@@ -11,6 +11,7 @@ use crate::serve_dispatch::ServeDispatch;
 pub struct ConsolePlan {
     pub(crate) commands: Vec<ConsoleCommand>,
     construction_roots: Vec<CanonicalPath>,
+    pub(crate) framework_commands: Vec<FrameworkCommand>,
 }
 
 impl ConsolePlan {
@@ -23,11 +24,8 @@ impl ConsolePlan {
         serve: &ServeDispatch,
         has_models: bool,
     ) -> Result<Self, ConsoleCodegenError> {
-        let commands = console_commands(
-            index,
-            bindings,
-            &FrameworkCommand::generated(serve, has_models),
-        )?;
+        let framework_commands = FrameworkCommand::generated(serve, has_models);
+        let commands = console_commands(index, bindings, &framework_commands)?;
         let construction_roots = commands
             .iter()
             .map(|command| command.construction_root.clone())
@@ -36,6 +34,7 @@ impl ConsolePlan {
         Ok(Self {
             commands,
             construction_roots,
+            framework_commands,
         })
     }
 

@@ -7,9 +7,9 @@ use aws_lc_rs::aead::AES_256_GCM;
 use aws_lc_rs::aead::Aad;
 use aws_lc_rs::aead::Nonce;
 use aws_lc_rs::aead::RandomizedNonceKey;
-use base64ct::Base64;
-use base64ct::Encoding;
 use zeroize::Zeroizing;
+
+use margaret_zeroizing_base64::zeroizing_base64_decoded::zeroizing_base64_decoded;
 
 use crate::sealed_document::SealedDocument;
 use crate::signing_keys_encryption_error::SigningKeysEncryptionError;
@@ -79,8 +79,7 @@ impl FromStr for SigningKeysEncryptionKey {
     type Err = SigningKeysEncryptionError;
 
     fn from_str(encoded: &str) -> Result<Self, Self::Err> {
-        let material = Base64::decode_vec(encoded)
-            .map(Zeroizing::new)
+        let material = zeroizing_base64_decoded(encoded)
             .map_err(|source| SigningKeysEncryptionError::KeyNotBase64 { source })?;
 
         if material.len() != AES_256_GCM.key_len() {

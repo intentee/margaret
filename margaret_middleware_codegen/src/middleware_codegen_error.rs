@@ -64,9 +64,14 @@ pub enum MiddlewareCodegenError {
     MiddlewareTargetWithoutNext { middleware: String },
 
     #[error(
-        "the Next parameter of middleware '{middleware}' does not name a forward target type that resolves"
+        "the Next parameter of middleware '{middleware}' takes no single type argument naming its forward target"
     )]
-    MiddlewareTargetUnresolved { middleware: String },
+    MiddlewareNextWithoutTypeArgument { middleware: String },
+
+    #[error(
+        "the Next parameter of middleware '{middleware}' names the forward target '{target}', which does not resolve to a type"
+    )]
+    MiddlewareTargetUnresolved { middleware: String, target: String },
 
     #[error("{site} attaches the middleware handled by '{handler}', which has no middleware plan")]
     UnplannedMiddlewareHandler { handler: String, site: String },

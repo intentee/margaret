@@ -16,7 +16,7 @@ make example.database example.migrate example.seed
 
 ## Signing keys
 
-An application that holds signing keys (to issue tokens or sessions, or to publish its JWKS) stores them sealed with AES-256-GCM under a key it reads from the environment variable named by `#[encrypts_signing_keys(key_from = "...")]`, holding 32 bytes in standard padded base64 (for example from `openssl rand -base64 32`). Such an application does not compile without that declaration, and one that declares it without signing anything does not compile either.
+An application that holds signing keys (to issue tokens or sessions, or to publish its JWKS) stores them sealed with AES-256-GCM under a key it reads from the environment variable named by `#[encrypts_signing_keys(key_from = "...")]`, holding 32 bytes in standard padded base64 (for example from `openssl rand -base64 32`). Such an application does not compile without that declaration, and one that declares it without signing anything does not compile either. Give every deployment its own key, since a sealed key set opens wherever the same key is configured.
 
 ## Tests
 

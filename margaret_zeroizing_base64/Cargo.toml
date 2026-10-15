@@ -1,0 +1,17 @@
+[package]
+name = "margaret_zeroizing_base64"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Decodes base64 secrets of a Margaret application into buffers that are wiped when dropped."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+base64ct = { workspace = true }
+zeroize = { workspace = true }
+
+[lints]
+workspace = true

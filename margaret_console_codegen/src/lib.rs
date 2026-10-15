@@ -141,7 +141,6 @@ impl Farewell {
         Ok(render_console(
             &plan,
             serve,
-            has_models,
             http_servers,
             serve_inputs,
             bindings,

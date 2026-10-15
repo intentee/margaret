@@ -1897,6 +1897,16 @@ struct FragmentMetadata {
     }
 
     #[test]
+    fn rejects_a_model_unique_constraint_over_the_primary_key_columns_in_another_order() {
+        assert!(matches!(
+                rejection(
+                    "use margaret::framework::macros::model;\n#[model(table = \"locks\")]\n#[primary_key(fields = [repository, branch])]\n#[unique(fields = [branch, repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n"
+                ),
+                ModelCodegenError::RedundantUniqueOnPrimaryKeyColumns { ref columns, .. } if columns == "branch, repository"
+        ));
+    }
+
+    #[test]
     fn rejects_two_indexes_over_the_same_fields_since_one_would_duplicate_the_other() {
         assert!(matches!(
                 rejection(

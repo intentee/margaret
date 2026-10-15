@@ -93,6 +93,7 @@ fn named_route_shape(
     match path.template() {
         RouteUrlTemplate::Literal(literal) if route.method() == RouteMethod::Get => {
             NamedRouteShape::ForwardableLiteral {
+                field: format_ident!("{name}"),
                 literal: literal.clone(),
                 props: route_props(name, path, props_allocator),
                 variant: format_ident!("{}", variant_allocator.allocate(name).type_name()),
@@ -103,6 +104,7 @@ fn named_route_shape(
         },
         RouteUrlTemplate::Parameterized(_) if route.method() == RouteMethod::Get => {
             NamedRouteShape::ForwardableParameterized {
+                field: format_ident!("{name}"),
                 props: route_props(name, path, props_allocator),
                 variant: format_ident!("{}", variant_allocator.allocate(name).type_name()),
             }
@@ -141,6 +143,7 @@ fn named_routes<'plan>(
         .map(|declared| NamedRoute {
             name: declared.name,
             position: declared.position,
+            route: declared.route,
             shape: named_route_shape(&declared, props_allocator, &mut variant_allocator),
         })
         .collect()

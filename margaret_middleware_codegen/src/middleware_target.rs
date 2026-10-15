@@ -48,11 +48,18 @@ impl MiddlewareTarget {
             });
         };
 
-        single_type_argument(next.declared())
-            .and_then(|target| index.resolve_module_type(method.module_path(), target))
+        let target = single_type_argument(next.declared()).ok_or_else(|| {
+            MiddlewareCodegenError::MiddlewareNextWithoutTypeArgument {
+                middleware: middleware.to_string(),
+            }
+        })?;
+
+        index
+            .resolve_module_type(method.module_path(), target)
             .map(Self::Concrete)
             .ok_or_else(|| MiddlewareCodegenError::MiddlewareTargetUnresolved {
                 middleware: middleware.to_string(),
+                target: quote!(#target).to_string(),
             })
     }
 

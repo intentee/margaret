@@ -459,7 +459,6 @@ fn render_role_modules(
         let console = render_console(
             &plan,
             &serve,
-            features.contains(GeneratedFeature::Schema),
             servers,
             service_plan.serve_inputs(),
             bindings,

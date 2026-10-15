@@ -151,7 +151,8 @@ COVERAGE_REPORTED_PACKAGES := \
 	-p margaret_websocket \
 	-p margaret_websocket_codegen \
 	-p margaret_websocket_session \
-	-p margaret_websocket_tests
+	-p margaret_websocket_tests \
+	-p margaret_zeroizing_base64
 COVERAGE_PACKAGES := $(COVERAGE_REPORTED_PACKAGES) -p margaret_active_record_tests
 GENERATED_CODE_PACKAGES := \
 	-p margaret_active_record_tests \
@@ -290,7 +291,8 @@ RUNTIME_PACKAGES := \
 	-p margaret_views_codegen \
 	-p margaret_websocket \
 	-p margaret_websocket_codegen \
-	-p margaret_websocket_session
+	-p margaret_websocket_session \
+	-p margaret_zeroizing_base64
 RUNTIME_LINTS := \
 	-D unsafe-code \
 	-D clippy::exit \
@@ -547,7 +549,8 @@ coverage: node_modules openid-conformance-images
 		--gated margaret_websocket=100 \
 		--gated margaret_websocket_codegen=100 \
 		--gated margaret_websocket_session=100 \
-		--gated margaret_websocket_tests=100
+		--gated margaret_websocket_tests=100 \
+		--gated margaret_zeroizing_base64=100
 
 .PHONY: example.database
 example.database:

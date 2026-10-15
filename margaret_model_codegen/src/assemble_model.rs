@@ -277,10 +277,17 @@ fn reject_conflicting_indexes(
         .filter(|index| index.kind != IndexKind::Plain)
         .collect();
 
-    if let Some(unique) = indexes
-        .of_kind(IndexKind::Unique)
-        .find(|unique| unique.fields == indexes.primary_key.fields)
-    {
+    if let Some(unique) = indexes.of_kind(IndexKind::Unique).find(|unique| {
+        unique
+            .fields
+            .iter()
+            .all(|field| indexes.primary_key.fields.contains(field))
+            && indexes
+                .primary_key
+                .fields
+                .iter()
+                .all(|field| unique.fields.contains(field))
+    }) {
         return Err(ModelCodegenError::RedundantUniqueOnPrimaryKeyColumns {
             columns: unique.column_names().join(", "),
             model: model.to_string(),

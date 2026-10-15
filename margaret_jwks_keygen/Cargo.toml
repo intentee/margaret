@@ -16,6 +16,7 @@ margaret_jose_parameters = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_sync_holder = { workspace = true }
+margaret_zeroizing_base64 = { workspace = true }
 p256 = { workspace = true }
 p384 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

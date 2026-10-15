@@ -179,6 +179,7 @@ members = [
     "margaret_websocket_codegen",
     "margaret_websocket_session",
     "margaret_websocket_tests",
+    "margaret_zeroizing_base64",
 ]
 
 [workspace.package]
@@ -364,6 +365,7 @@ margaret_views_codegen = { path = "margaret_views_codegen", version = "0.5.0" }
 margaret_websocket = { path = "margaret_websocket", version = "0.5.0" }
 margaret_websocket_codegen = { path = "margaret_websocket_codegen", version = "0.5.0" }
 margaret_websocket_session = { path = "margaret_websocket_session", version = "0.5.0" }
+margaret_zeroizing_base64 = { path = "margaret_zeroizing_base64", version = "0.5.0" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

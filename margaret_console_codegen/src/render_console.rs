@@ -11,7 +11,6 @@ use crate::serve_dispatch::ServeDispatch;
 pub fn render_console(
     plan: &ConsolePlan,
     serve: &ServeDispatch,
-    has_models: bool,
     http_servers: &[HttpServer],
     serve_inputs: &[SlottedServeInput],
     bindings: &ContainerBindings,
@@ -19,8 +18,8 @@ pub fn render_console(
     ConsoleArtifacts {
         modules: render(
             &plan.commands,
+            &plan.framework_commands,
             serve,
-            has_models,
             http_servers,
             serve_inputs,
             bindings,

@@ -1,4 +1,5 @@
 use thiserror::Error;
+use url::ParseError;
 
 use margaret_accepted_clients::accepted_clients_error::AcceptedClientsError;
 use margaret_authorization_grants::authorization_grants_error::AuthorizationGrantsError;
@@ -13,6 +14,16 @@ pub enum ProviderError {
 
     #[error("the provider could not authenticate the client: {0}")]
     ClientAuthentication(#[source] AcceptedClientsError),
+
+    #[error(
+        "the client '{client_id}' registers the redirect uri '{redirect_uri}', which is not a url: {source}"
+    )]
+    RegisteredRedirectUri {
+        client_id: &'static str,
+        redirect_uri: String,
+        #[source]
+        source: ParseError,
+    },
 
     #[error("the provider could not sign a token: {0}")]
     Signing(#[source] JwksSecretStoreError),

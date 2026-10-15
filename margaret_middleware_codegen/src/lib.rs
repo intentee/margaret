@@ -718,7 +718,18 @@ impl Guard {
             plans_rejection_for(&guard_processing(
                 "fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation<PublicForwardTarget>>",
             )),
-            MiddlewareCodegenError::MiddlewareTargetUnresolved { middleware } if middleware == "crate::Guard"
+            MiddlewareCodegenError::MiddlewareNextWithoutTypeArgument { middleware } if middleware == "crate::Guard"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_non_generic_middleware_whose_next_handler_names_an_unresolved_forward_target() {
+        assert!(matches!(
+            plans_rejection_for(&guard_processing(
+                "fn process(&self, next: Next<UnknownForwardTarget>) -> anyhow::Result<ResponseContinuation<UnknownForwardTarget>>",
+            )),
+            MiddlewareCodegenError::MiddlewareTargetUnresolved { middleware, target }
+                if middleware == "crate::Guard" && target == "UnknownForwardTarget"
         ));
     }
 }

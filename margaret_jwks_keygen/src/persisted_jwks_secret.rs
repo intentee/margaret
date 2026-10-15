@@ -7,6 +7,7 @@ use zeroize::Zeroizing;
 use margaret_jws_verification::jwk::Jwk;
 use margaret_jws_verification::key_id::KeyId;
 use margaret_registered_claims::numeric_date::NumericDate;
+use margaret_zeroizing_base64::zeroizing_base64_decoded::zeroizing_base64_decoded;
 
 use crate::ec_signing_key::EcSigningKey;
 use crate::jwk_pair::JwkPair;
@@ -23,10 +24,6 @@ use crate::signing_keys_generation::SigningKeysGeneration;
 
 fn encoded_pkcs8(pkcs8: &[u8]) -> Zeroizing<String> {
     Zeroizing::new(Base64::encode_string(pkcs8))
-}
-
-fn decoded_pkcs8(encoded: &str) -> Result<Zeroizing<Vec<u8>>, base64ct::Error> {
-    Base64::decode_vec(encoded).map(Zeroizing::new)
 }
 
 fn persisted_retired(retired: &[RetiredKey]) -> Vec<PersistedRetiredKey> {
@@ -65,7 +62,8 @@ impl PersistedEcKey {
 
     fn restore(self) -> Result<JwkPair, JwksKeyError> {
         let Self { crv, kid, pkcs8 } = self;
-        let pkcs8 = decoded_pkcs8(&pkcs8).map_err(|source| JwksKeyError::EcKeyBase64 { source })?;
+        let pkcs8 = zeroizing_base64_decoded(&pkcs8)
+            .map_err(|source| JwksKeyError::EcKeyBase64 { source })?;
 
         JwkPair::new(kid, EcSigningKey::from_pkcs8(crv, pkcs8)?)
     }
@@ -88,8 +86,8 @@ impl PersistedRsaKey {
 
     fn restore(self) -> Result<RsaJwkPair, JwksKeyError> {
         let Self { kid, pkcs8 } = self;
-        let pkcs8 =
-            decoded_pkcs8(&pkcs8).map_err(|source| JwksKeyError::RsaKeyBase64 { source })?;
+        let pkcs8 = zeroizing_base64_decoded(&pkcs8)
+            .map_err(|source| JwksKeyError::RsaKeyBase64 { source })?;
 
         RsaSigningKey::from_pkcs8(pkcs8).and_then(|signing_key| RsaJwkPair::new(kid, signing_key))
     }

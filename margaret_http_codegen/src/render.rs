@@ -31,7 +31,6 @@ use margaret_request_binding_codegen::render_route_inputs::render_route_inputs;
 use margaret_request_binding_codegen::render_session_user_inference::render_session_user_inference;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 use margaret_request_binding_codegen::session_user_parameter::session_user_parameter;
-use margaret_route_method::route_method::RouteMethod;
 
 use crate::application_responder::ApplicationResponder;
 use crate::constants::ROUTE_METHODS;
@@ -449,15 +448,13 @@ fn render_handler(
     RenderedHandler { function, tokens }
 }
 
-fn handler_call(route: &HttpRoute, call: TokenStream) -> HandlerCall {
-    match &route.name {
-        Some(name) if matches!(route.handling(), RouteHandling::Head(RouteMethod::Get)) => {
-            HandlerCall::ForwardTarget {
-                call,
-                field: format_ident!("{name}"),
-            }
-        }
-        Some(_) | None => HandlerCall::Direct(call),
+fn handler_call(layout: &ServerLayout<'_>, route: &HttpRoute, call: TokenStream) -> HandlerCall {
+    match layout.forward_target_field(route) {
+        Some(field) => HandlerCall::ForwardTarget {
+            call,
+            field: field.clone(),
+        },
+        None => HandlerCall::Direct(call),
     }
 }
 
@@ -616,6 +613,7 @@ fn server_module(
         .zip(&rendered_handlers)
         .map(|(route, RenderedHandler { function, .. })| {
             handler_call(
+                layout,
                 route,
                 quote! { #function(container, #routes_param, #views_argument) },
             )
