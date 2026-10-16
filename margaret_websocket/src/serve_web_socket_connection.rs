@@ -42,7 +42,11 @@ async fn drain_outbound<Io>(
     Io: AsyncRead + AsyncWrite + Unpin,
 {
     while let Some(message) = outbound.recv().await {
-        if sink.send(message).await.is_err() {
+        if let Err(error) = sink.send(message).await {
+            report_diagnostic(format_args!(
+                "margaret_websocket: unable to write a websocket frame to the connection: {error}"
+            ));
+
             return;
         }
     }
@@ -140,9 +144,22 @@ async fn run_source<Io, Session>(
                         )
                             .await;
                     }
-                    Err(_) => break,
+                    Err(error) => {
+                        report_diagnostic(format_args!(
+                            "margaret_websocket: the client sent a frame that breaks the message protocol: {error}"
+                        ));
+
+                        break;
+                    }
                 },
-                Some(Ok(Message::Close(_)) | Err(_)) | None => break,
+                Some(Ok(Message::Close(_))) | None => break,
+                Some(Err(error)) => {
+                    report_diagnostic(format_args!(
+                        "margaret_websocket: unable to read a websocket frame from the connection: {error}"
+                    ));
+
+                    break;
+                }
                 Some(Ok(_)) => {}
             },
         }
