@@ -1,4 +1,5 @@
 use std::env;
+use std::io;
 use std::path::Path;
 
 use margaret_sql_identifier::table_namespace::TableNamespace;
@@ -9,7 +10,9 @@ use crate::generate_into::generate_into;
 pub(crate) fn generate_from_environment(namespace: TableNamespace) -> Result<(), CodegenError> {
     env::var("CARGO_MANIFEST_DIR")
         .map_err(|source| CodegenError::ManifestDirectory { source })
-        .and_then(|manifest_directory| generate_into(Path::new(&manifest_directory), namespace))
+        .and_then(|manifest_directory| {
+            generate_into(Path::new(&manifest_directory), namespace, &mut io::stdout())
+        })
 }
 
 #[cfg(test)]

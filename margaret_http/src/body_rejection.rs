@@ -6,6 +6,8 @@ use std::fmt::Result;
 use mime::FromStrError;
 use mime::Mime;
 
+use margaret_diagnostic::report_diagnostic::report_diagnostic;
+
 use crate::response::Response;
 
 #[derive(Debug)]
@@ -50,7 +52,9 @@ pub enum BodyRejection {
 impl BodyRejection {
     #[must_use]
     pub fn into_response(self) -> Response {
-        eprintln!("margaret_http: the request body was rejected: {self}");
+        report_diagnostic(format_args!(
+            "margaret_http: the request body was rejected: {self}"
+        ));
 
         match self {
             Self::PayloadTooLarge { .. } => Response::text(413, "Payload Too Large"),

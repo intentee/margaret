@@ -7,20 +7,6 @@ pub enum CommandOutcome {
     Failed,
 }
 
-impl CommandOutcome {
-    #[must_use]
-    pub fn from_user_result(result: anyhow::Result<Self>) -> Self {
-        match result {
-            Ok(outcome) => outcome,
-            Err(error) => {
-                eprintln!("{error:#}");
-
-                Self::Failed
-            }
-        }
-    }
-}
-
 impl Termination for CommandOutcome {
     fn report(self) -> ExitCode {
         match self {
@@ -45,21 +31,5 @@ mod tests {
     #[test]
     fn reports_failure_exit_code_for_a_failed_outcome() {
         assert_eq!(CommandOutcome::Failed.report(), ExitCode::FAILURE);
-    }
-
-    #[test]
-    fn preserves_a_successful_user_result_so_the_process_exits_successfully() {
-        assert_eq!(
-            CommandOutcome::from_user_result(Ok(CommandOutcome::Succeeded)),
-            CommandOutcome::Succeeded
-        );
-    }
-
-    #[test]
-    fn turns_a_failed_user_result_into_a_failed_outcome() {
-        assert_eq!(
-            CommandOutcome::from_user_result(Err(anyhow::anyhow!("database unavailable"))),
-            CommandOutcome::Failed
-        );
     }
 }

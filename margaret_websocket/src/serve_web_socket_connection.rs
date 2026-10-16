@@ -17,6 +17,8 @@ use tokio_tungstenite::tungstenite::Error;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
+use margaret_diagnostic::report_diagnostic::report_diagnostic;
+
 use crate::envelope_error_code::EnvelopeErrorCode;
 use crate::inbound_frame::InboundFrame;
 use crate::report_send_failure::report_send_failure;
@@ -27,7 +29,9 @@ const OUTBOUND_BUFFER_CAPACITY: usize = 1;
 
 fn report_close_failure(outcome: Result<(), Error>) {
     if let Err(error) = outcome {
-        eprintln!("margaret_websocket: unable to close a websocket connection: {error}");
+        report_diagnostic(format_args!(
+            "margaret_websocket: unable to close a websocket connection: {error}"
+        ));
     }
 }
 

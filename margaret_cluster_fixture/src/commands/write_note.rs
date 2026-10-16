@@ -1,3 +1,5 @@
+use std::io;
+use std::io::Write;
 use std::sync::Arc;
 
 use margaret::framework::active_record::creatable::Creatable;
@@ -40,7 +42,7 @@ impl WriteNote {
         .run(self.database.as_ref())
         .await?;
 
-        println!("{}", note.id);
+        writeln!(io::stdout(), "{}", note.id)?;
 
         Ok(CommandOutcome::Succeeded)
     }

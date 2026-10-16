@@ -2386,6 +2386,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "margaret_diagnostic",
+ "thiserror 2.0.18",
  "tokio",
 ]
 
@@ -2610,6 +2612,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_diagnostic"
+version = "0.1.0"
+
+[[package]]
 name = "margaret_environment_variable"
 version = "0.1.0"
 dependencies = [
@@ -2708,6 +2714,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "margaret_diagnostic",
  "margaret_handler_error",
  "margaret_http_uploaded_file",
  "margaret_peer_identity",
@@ -4513,6 +4520,7 @@ dependencies = [
  "http",
  "hyper",
  "hyper-util",
+ "margaret_diagnostic",
  "margaret_http",
  "margaret_route_parameter_binding",
  "margaret_validation",

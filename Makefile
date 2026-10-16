@@ -41,6 +41,7 @@ COVERAGE_REPORTED_PACKAGES := \
 	-p margaret_database_tests \
 	-p margaret_deadline \
 	-p margaret_declaration_anchor \
+	-p margaret_diagnostic \
 	-p margaret_environment_variable \
 	-p margaret_environment_variable_codegen \
 	-p margaret_generated_module \
@@ -206,6 +207,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_database_codegen \
 	-p margaret_deadline \
 	-p margaret_declaration_anchor \
+	-p margaret_diagnostic \
 	-p margaret_environment_variable \
 	-p margaret_environment_variable_codegen \
 	-p margaret_generated_module \
@@ -295,6 +297,8 @@ RUNTIME_LINTS := \
 	-D clippy::expect-used \
 	-D clippy::mem-forget \
 	-D clippy::panic \
+	-D clippy::print_stderr \
+	-D clippy::print_stdout \
 	-D clippy::todo \
 	-D clippy::unimplemented \
 	-D clippy::unwrap-used
@@ -433,6 +437,7 @@ coverage: node_modules openid-conformance-images
 		--gated margaret_database_tests=100 \
 		--gated margaret_deadline=100 \
 		--gated margaret_declaration_anchor=100 \
+		--gated margaret_diagnostic=100 \
 		--gated margaret_environment_variable=100 \
 		--gated margaret_environment_variable_codegen=100 \
 		--gated margaret_generated_module=100 \

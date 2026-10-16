@@ -1,11 +1,15 @@
 mod argument_lookup;
 pub mod command_future;
 pub mod command_outcome;
+mod console_output_error;
 pub mod flag_argument;
+mod from_user_result;
 mod missing_argument;
 pub mod optional_argument;
 mod outcome_for_clap_error;
 pub mod parsed_arguments;
 pub mod print_help;
+pub mod print_output;
 pub mod report_failure;
 pub mod required_argument;
+mod write_standard_output;

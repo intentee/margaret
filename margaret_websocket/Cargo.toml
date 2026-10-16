@@ -16,6 +16,7 @@ futures-util = { workspace = true }
 http = { workspace = true }
 hyper = { workspace = true, features = ["http1"] }
 hyper-util = { workspace = true, features = ["tokio"] }
+margaret_diagnostic = { workspace = true }
 margaret_http = { workspace = true }
 margaret_route_parameter_binding = { workspace = true }
 margaret_validation = { workspace = true }

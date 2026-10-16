@@ -24,6 +24,7 @@ use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
 use tokio_util::sync::CancellationToken;
 
+use margaret_diagnostic::report_diagnostic::report_diagnostic;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::constants::CLIENT_HEAD_TIMEOUT;
@@ -65,7 +66,7 @@ where
     match accepted {
         Ok(connection) => accept(connection),
         Err(error) => {
-            eprintln!("margaret_http: accept error: {error}");
+            report_diagnostic(format_args!("margaret_http: accept error: {error}"));
         }
     }
 }
@@ -85,18 +86,22 @@ fn peer_identity_from_tls_stream(
 
 fn report_connection_outcome<TError: Display>(outcome: Result<(), TError>) {
     if let Err(error) = outcome {
-        eprintln!("margaret_http: connection error: {error}");
+        report_diagnostic(format_args!("margaret_http: connection error: {error}"));
     }
 }
 
 fn report_connection_task_outcome(outcome: Result<(), JoinError>) {
     if let Err(error) = outcome {
-        eprintln!("margaret_http: connection task failed: {error}");
+        report_diagnostic(format_args!(
+            "margaret_http: connection task failed: {error}"
+        ));
     }
 }
 
 fn rejection_response(rejection: &RequestRejection) -> Response {
-    eprintln!("margaret_http: the request was rejected: {rejection}");
+    report_diagnostic(format_args!(
+        "margaret_http: the request was rejected: {rejection}"
+    ));
 
     Response::text(400, "Bad Request")
 }
@@ -321,21 +326,24 @@ impl BoundServer {
                     .await;
                 }
                 BoundTransport::MutualTls { acceptor } => {
-                    let tls_stream = match timeout(CLIENT_HEAD_TIMEOUT, acceptor.accept(stream))
-                        .await
-                    {
-                        Ok(Ok(tls_stream)) => tls_stream,
-                        Ok(Err(error)) => {
-                            eprintln!("margaret_http: tls handshake error: {error}");
+                    let tls_stream =
+                        match timeout(CLIENT_HEAD_TIMEOUT, acceptor.accept(stream)).await {
+                            Ok(Ok(tls_stream)) => tls_stream,
+                            Ok(Err(error)) => {
+                                report_diagnostic(format_args!(
+                                    "margaret_http: tls handshake error: {error}"
+                                ));
 
-                            return;
-                        }
-                        Err(elapsed) => {
-                            eprintln!("margaret_http: tls handshake did not complete: {elapsed}");
+                                return;
+                            }
+                            Err(elapsed) => {
+                                report_diagnostic(format_args!(
+                                    "margaret_http: tls handshake did not complete: {elapsed}"
+                                ));
 
-                            return;
-                        }
-                    };
+                                return;
+                            }
+                        };
                     let peer_identity = Arc::new(peer_identity_from_tls_stream(&tls_stream));
 
                     serve_connection(

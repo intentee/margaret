@@ -1,17 +1,15 @@
 use clap::Error;
 
 use crate::command_outcome::CommandOutcome;
+use crate::print_output::print_output;
+use crate::report_failure::report_failure;
 
 #[must_use]
 pub(crate) fn outcome_for_clap_error(error: &Error) -> CommandOutcome {
     if error.use_stderr() {
-        eprintln!("{}", error.render());
-
-        CommandOutcome::Failed
+        report_failure(error.render())
     } else {
-        println!("{}", error.render());
-
-        CommandOutcome::Succeeded
+        print_output(error.render())
     }
 }
 

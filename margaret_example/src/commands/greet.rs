@@ -1,3 +1,5 @@
+use std::io;
+use std::io::Write;
 use std::sync::Arc;
 
 use margaret::framework::console::command_outcome::CommandOutcome;
@@ -44,13 +46,14 @@ impl Greet {
     #[process]
     pub fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok({
-            println!(
+            writeln!(
+                io::stdout(),
                 "{}, {} (salutation: {:?}, loud: {})",
                 self.greeter.greet(),
                 self.name,
                 self.salutation,
                 self.loud
-            );
+            )?;
 
             CommandOutcome::Succeeded
         })

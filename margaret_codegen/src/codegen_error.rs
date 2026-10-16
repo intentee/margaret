@@ -231,4 +231,7 @@ pub enum CodegenError {
 
     #[error("failed to remove the stale generated entry '{path}': {source}")]
     RemoveEntry { path: PathBuf, source: io::Error },
+
+    #[error("failed to write the cargo rerun directive for '{path}': {source}")]
+    WriteRerunDirective { path: PathBuf, source: io::Error },
 }

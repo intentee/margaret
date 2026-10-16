@@ -1,3 +1,5 @@
+use std::io;
+use std::io::Write;
 use std::sync::Arc;
 
 use margaret::framework::console::command_outcome::CommandOutcome;
@@ -42,13 +44,14 @@ impl ReportDeployment {
     #[process]
     pub fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok({
-            println!(
+            writeln!(
+                io::stdout(),
                 "{} {} {} {}",
                 self.deployment.database_url,
                 self.deployment.upload_root.display(),
                 self.worker_count,
                 self.verbose.unwrap_or(false)
-            );
+            )?;
 
             CommandOutcome::Succeeded
         })

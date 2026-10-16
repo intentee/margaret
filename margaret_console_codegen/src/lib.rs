@@ -407,8 +407,9 @@ impl Farewell {
 
         assert!(source.contains(r#"clap::Command::new("schema")"#));
         assert!(source.contains(r#"Some(("schema",_matches))=>{"#));
-        assert!(source.contains("render_postgres(&super::schema::SCHEMA)"));
-        assert!(source.contains("CommandOutcome::Succeeded"));
+        assert!(source.contains(
+            "margaret::framework::console::print_output::print_output(margaret::framework::model::render_postgres::render_postgres(&super::schema::SCHEMA,),)"
+        ));
         assert!(source.contains("run<Arguments,Argument>(args:Arguments,)"));
     }
 
