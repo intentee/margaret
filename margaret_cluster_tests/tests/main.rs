@@ -93,6 +93,7 @@ mod fails_patching_a_note_the_database_refuses;
 mod fails_reading_a_note_the_database_refuses;
 #[cfg(feature = "tests_that_use_cluster")]
 mod fails_viewing_a_note_the_database_refuses;
+mod fails_when_the_schema_cannot_be_written;
 #[cfg(feature = "tests_that_use_cluster")]
 mod instances_started_on_overdue_keys_roll_once;
 #[cfg(feature = "tests_that_use_cluster")]

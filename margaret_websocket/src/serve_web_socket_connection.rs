@@ -17,6 +17,8 @@ use tokio_tungstenite::tungstenite::Error;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
+use margaret_diagnostic::report_diagnostic::report_diagnostic;
+
 use crate::envelope_error_code::EnvelopeErrorCode;
 use crate::inbound_frame::InboundFrame;
 use crate::report_send_failure::report_send_failure;
@@ -27,7 +29,9 @@ const OUTBOUND_BUFFER_CAPACITY: usize = 1;
 
 fn report_close_failure(outcome: Result<(), Error>) {
     if let Err(error) = outcome {
-        eprintln!("margaret_websocket: unable to close a websocket connection: {error}");
+        report_diagnostic(format_args!(
+            "margaret_websocket: unable to close a websocket connection: {error}"
+        ));
     }
 }
 
@@ -38,7 +42,11 @@ async fn drain_outbound<Io>(
     Io: AsyncRead + AsyncWrite + Unpin,
 {
     while let Some(message) = outbound.recv().await {
-        if sink.send(message).await.is_err() {
+        if let Err(error) = sink.send(message).await {
+            report_diagnostic(format_args!(
+                "margaret_websocket: unable to write a websocket frame to the connection: {error}"
+            ));
+
             return;
         }
     }
@@ -136,9 +144,22 @@ async fn run_source<Io, Session>(
                         )
                             .await;
                     }
-                    Err(_) => break,
+                    Err(error) => {
+                        report_diagnostic(format_args!(
+                            "margaret_websocket: the client sent a frame that breaks the message protocol: {error}"
+                        ));
+
+                        break;
+                    }
                 },
-                Some(Ok(Message::Close(_)) | Err(_)) | None => break,
+                Some(Ok(Message::Close(_))) | None => break,
+                Some(Err(error)) => {
+                    report_diagnostic(format_args!(
+                        "margaret_websocket: unable to read a websocket frame from the connection: {error}"
+                    ));
+
+                    break;
+                }
                 Some(Ok(_)) => {}
             },
         }

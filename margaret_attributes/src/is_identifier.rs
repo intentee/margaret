@@ -2,8 +2,12 @@ use syn::Ident;
 
 use crate::is_identifier_text::is_identifier_text;
 
+const RUST_2024_RESERVED_KEYWORD: &str = "gen";
+
 pub(crate) fn is_identifier(name: &str) -> bool {
-    is_identifier_text(name) && syn::parse_str::<Ident>(name).is_ok()
+    is_identifier_text(name)
+        && name != RUST_2024_RESERVED_KEYWORD
+        && syn::parse_str::<Ident>(name).is_ok()
 }
 
 #[cfg(test)]
@@ -28,5 +32,10 @@ mod tests {
     #[test]
     fn rejects_a_keyword_because_generated_code_cannot_name_an_item_with_it() {
         assert!(!is_identifier("match"));
+    }
+
+    #[test]
+    fn rejects_the_gen_keyword_that_the_2024_edition_reserves() {
+        assert!(!is_identifier("gen"));
     }
 }

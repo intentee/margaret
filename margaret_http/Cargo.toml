@@ -21,6 +21,7 @@ http-body = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["tokio"] }
+margaret_diagnostic = { workspace = true }
 margaret_handler_error = { workspace = true }
 margaret_http_uploaded_file = { workspace = true }
 margaret_peer_identity = { workspace = true }

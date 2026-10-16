@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use margaret_attributes::crate_root::CrateRoot;
 use margaret_codegen::build::build;
+use margaret_codegen::build_output::BuildOutput;
 use margaret_codegen::codegen_error::CodegenError;
 use margaret_codegen::generated_code::GeneratedCode;
 use margaret_sql_identifier::table_namespace::TableNamespace;
@@ -22,4 +23,5 @@ pub fn generate_fixture(name: &str) -> Result<GeneratedCode, CodegenError> {
         &assets_directory,
         TableNamespace::Application,
     )
+    .map(|BuildOutput { code, .. }| code)
 }

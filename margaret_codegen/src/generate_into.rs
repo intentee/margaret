@@ -1,5 +1,7 @@
 use std::fs;
 use std::io::ErrorKind;
+use std::io::Write;
+use std::iter;
 use std::path::Path;
 
 use margaret_attributes::crate_root::CrateRoot;
@@ -7,6 +9,7 @@ use margaret_sql_identifier::table_namespace::TableNamespace;
 use margaret_umbrella_path::constants::UMBRELLA_MODULE_NAME;
 
 use crate::build::build;
+use crate::build_output::BuildOutput;
 use crate::codegen_error::CodegenError;
 use crate::constants::ASSETS_DIRECTORY_NAME;
 
@@ -21,9 +24,19 @@ fn read_metafile(metafile_path: &Path) -> Result<Option<String>, CodegenError> {
     }
 }
 
+fn write_rerun_directive(directives: &mut impl Write, path: &Path) -> Result<(), CodegenError> {
+    writeln!(directives, "cargo:rerun-if-changed={}", path.display()).map_err(|source| {
+        CodegenError::WriteRerunDirective {
+            path: path.to_path_buf(),
+            source,
+        }
+    })
+}
+
 pub(crate) fn generate_into(
     manifest_directory: &Path,
     namespace: TableNamespace,
+    directives: &mut impl Write,
 ) -> Result<(), CodegenError> {
     let host_source = manifest_directory.join("src");
     let generated_directory = manifest_directory.join(UMBRELLA_MODULE_NAME);
@@ -37,28 +50,27 @@ pub(crate) fn generate_into(
     })?;
 
     let metafile_contents = read_metafile(&metafile_path)?;
-
-    build(
+    let BuildOutput {
+        asset_bag_inputs,
+        code,
+    } = build(
         &crate_root,
         metafile_contents.as_deref(),
         &assets_directory,
         namespace,
-    )?
-    .write_to(&generated_directory)?;
+    )?;
 
-    println!(
-        "cargo:rerun-if-changed={}",
-        crate_root.source_directory.display()
-    );
-    println!("cargo:rerun-if-changed={}", metafile_path.display());
-    println!("cargo:rerun-if-changed={}", assets_directory.display());
+    code.write_to(&generated_directory)?;
 
-    Ok(())
+    iter::once(crate_root.source_directory.as_path())
+        .chain(asset_bag_inputs.read_paths(&metafile_path, &assets_directory))
+        .try_for_each(|path| write_rerun_directive(directives, path))
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::fs::OpenOptions;
     use std::path::Path;
     use std::path::PathBuf;
 
@@ -129,7 +141,20 @@ struct Config {
         r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#;
 
     fn generated(host: &SourceCrate) -> Result<(), CodegenError> {
-        generate_into(host.root(), TableNamespace::Application)
+        generate_into(host.root(), TableNamespace::Application, &mut Vec::new())
+    }
+
+    fn rerun_directives(host: &SourceCrate) -> String {
+        let mut directives = Vec::new();
+
+        generate_into(host.root(), TableNamespace::Application, &mut directives)
+            .expect("the crate generates");
+
+        String::from_utf8(directives).expect("the directives are text")
+    }
+
+    fn rerun_directive(path: &Path) -> String {
+        format!("cargo:rerun-if-changed={}\n", path.display())
     }
 
     fn generated_path(host: &SourceCrate, name: &str) -> PathBuf {
@@ -187,6 +212,68 @@ struct Config {
         assert!(responder.contains("\"no-cache\""));
         assert!(responder.contains("\"app_ABC.js\" =>"));
         assert!(responder.contains("public, max-age=31536000, immutable"));
+    }
+
+    #[test]
+    fn watches_only_the_sources_of_a_crate_without_an_asset_bag() {
+        let host = SourceCrate::new(HOST_CRATE);
+
+        assert_eq!(
+            rerun_directives(&host),
+            rerun_directive(&host.root().join("src"))
+        );
+    }
+
+    #[test]
+    fn watches_the_metafile_of_a_crate_importing_the_asset_macro() {
+        let host = SourceCrate::new(ASSET_MACRO_HOST);
+
+        write_metafile(host.root());
+
+        assert_eq!(
+            rerun_directives(&host),
+            [
+                rerun_directive(&host.root().join("src")),
+                rerun_directive(&host.root().join("esbuild-meta.json")),
+            ]
+            .concat()
+        );
+    }
+
+    #[test]
+    fn watches_the_metafile_and_the_assets_of_a_crate_serving_them() {
+        let host = SourceCrate::new(ASSET_RESPONDER_HOST);
+
+        let assets = host.root().join("assets");
+
+        write_metafile(host.root());
+        fs::create_dir(&assets).expect("the assets directory exists");
+        fs::write(assets.join("app_ABC.js"), "console.log(1)")
+            .expect("the fingerprinted asset exists");
+
+        assert_eq!(
+            rerun_directives(&host),
+            [
+                rerun_directive(&host.root().join("src")),
+                rerun_directive(&host.root().join("esbuild-meta.json")),
+                rerun_directive(&assets),
+            ]
+            .concat()
+        );
+    }
+
+    #[test]
+    fn reports_a_rerun_directive_that_cannot_be_written() {
+        let host = SourceCrate::new(HOST_CRATE);
+        let mut directives = OpenOptions::new()
+            .write(true)
+            .open("/dev/full")
+            .expect("/dev/full opens for writing");
+
+        assert!(matches!(
+            generate_into(host.root(), TableNamespace::Application, &mut directives),
+            Err(CodegenError::WriteRerunDirective { path, .. }) if path == host.root().join("src")
+        ));
     }
 
     #[test]

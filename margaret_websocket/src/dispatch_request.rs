@@ -5,6 +5,7 @@ use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 use validator::Validate;
 
+use margaret_diagnostic::report_diagnostic::report_diagnostic;
 use margaret_validation::validate_json::validate_json;
 use margaret_validation::validation_result::ValidationResult;
 
@@ -17,7 +18,9 @@ use crate::web_socket_request_message::WebSocketRequestMessage;
 
 async fn report_request_result(result: anyhow::Result<()>, socket: WebSocket, id: RequestId) {
     if let Err(error) = result {
-        eprintln!("margaret_websocket: request handler failed: {error:#}");
+        report_diagnostic(format_args!(
+            "margaret_websocket: request handler failed: {error:#}"
+        ));
         report_send_failure(
             socket
                 .send_error(

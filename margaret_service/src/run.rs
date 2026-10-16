@@ -3,6 +3,7 @@ use trzcina::ServiceManager;
 use trzcina::ServiceShutdownOptions;
 
 use margaret_console::command_outcome::CommandOutcome;
+use margaret_console::report_failure::report_failure;
 
 pub async fn run(
     manager: ServiceManager,
@@ -16,10 +17,6 @@ pub async fn run(
         .into_result()
     {
         Ok(()) => CommandOutcome::Succeeded,
-        Err(error) => {
-            eprintln!("{error}");
-
-            CommandOutcome::Failed
-        }
+        Err(error) => report_failure(error),
     }
 }

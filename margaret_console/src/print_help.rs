@@ -1,11 +1,15 @@
 use clap::Command;
 
 use crate::command_outcome::CommandOutcome;
+use crate::console_output_error::ConsoleOutputError;
+use crate::report_failure::report_failure;
+use crate::write_standard_output::write_standard_output;
 
 pub fn print_help(command: &mut Command) -> CommandOutcome {
-    println!("{}", command.render_help());
-
-    CommandOutcome::Failed
+    match write_standard_output(command.render_help()) {
+        Ok(()) => CommandOutcome::Failed,
+        Err(source) => report_failure(ConsoleOutputError::Help { source }),
+    }
 }
 
 #[cfg(test)]

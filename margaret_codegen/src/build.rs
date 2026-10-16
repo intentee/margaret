@@ -79,12 +79,14 @@ use margaret_websocket_codegen::web_socket_artifacts::WebSocketArtifacts;
 use margaret_websocket_codegen::web_socket_plan::WebSocketPlan;
 
 use crate::accepted_client_framework_providers::accepted_client_framework_providers;
-use crate::asset_bag_modules::asset_bag_modules;
+use crate::asset_bag_artifacts::AssetBagArtifacts;
 use crate::asset_responder_canonical_path::asset_responder_canonical_path;
 use crate::binding_declarations::BindingDeclarations;
+use crate::build_asset_bag_artifacts::build_asset_bag_artifacts;
 use crate::build_jwks_artifacts::build_jwks_artifacts;
 use crate::build_oauth_client_artifacts::build_oauth_client_artifacts;
 use crate::build_oidc_provider_artifacts::build_oidc_provider_artifacts;
+use crate::build_output::BuildOutput;
 use crate::build_trusted_issuer_artifacts::build_trusted_issuer_artifacts;
 use crate::codegen_error::CodegenError;
 use crate::database_providers::database_providers;
@@ -118,6 +120,13 @@ use crate::sessions_framework_providers::sessions_framework_providers;
 use crate::trusted_issuer_framework_providers::trusted_issuer_framework_providers;
 use crate::umbrella::umbrella;
 use crate::wrapper_modules::WrapperModules;
+
+fn crate_index(crate_root: &CrateRoot) -> Result<AttributeIndex, CodegenError> {
+    Ok(AttributeIndexBuilder::new()
+        .exclude_root_module(UMBRELLA_MODULE_NAME)
+        .index_crate(crate_root)?
+        .build())
+}
 
 /// # Errors
 ///
@@ -646,11 +655,8 @@ pub fn build(
     metafile_contents: Option<&str>,
     assets_directory: &Path,
     namespace: TableNamespace,
-) -> Result<GeneratedCode, CodegenError> {
-    let index = AttributeIndexBuilder::new()
-        .exclude_root_module(UMBRELLA_MODULE_NAME)
-        .index_crate(crate_root)?
-        .build();
+) -> Result<BuildOutput, CodegenError> {
+    let index = crate_index(crate_root)?;
     let models = models(&index, namespace)?;
     let shapes = collect_shapes(&index, &models)?;
     let mut features = GeneratedFeatures::from_index(&index);
@@ -705,8 +711,10 @@ pub fn build(
         &identity.token_issuance,
     )?;
     let bindings = planned_container.bindings();
-    let mut module_tokens =
-        asset_bag_modules(&index, metafile_contents, bindings, assets_directory)?;
+    let AssetBagArtifacts {
+        inputs: asset_bag_inputs,
+        modules: mut module_tokens,
+    } = build_asset_bag_artifacts(&index, metafile_contents, bindings, assets_directory)?;
     features.enable_if(GeneratedFeature::AssetBag, !module_tokens.is_empty());
     module_tokens.extend(model_modules(
         &models,
@@ -745,7 +753,10 @@ pub fn build(
             )
         })?;
 
-    rendered(planned_container, served, module_tokens, features)
+    rendered(planned_container, served, module_tokens, features).map(|code| BuildOutput {
+        asset_bag_inputs,
+        code,
+    })
 }
 
 #[cfg(test)]
@@ -768,6 +779,7 @@ mod tests {
     use margaret_umbrella_path::constants::UMBRELLA_MODULE_NAME;
 
     use super::build;
+    use crate::build_output::BuildOutput;
     use crate::codegen_error::CodegenError;
     use crate::generated_code::GeneratedCode;
 
@@ -903,6 +915,7 @@ struct Room;
             &source_crate.root().join("assets"),
             TableNamespace::Application,
         )
+        .map(|BuildOutput { code, .. }| code)
     }
 
     fn generate_from_source(source: &Path) -> GeneratedCode {
@@ -913,6 +926,7 @@ struct Room;
             TableNamespace::Application,
         )
         .expect("the crate generates")
+        .code
     }
 
     fn module<'code>(code: &'code GeneratedCode, name: &str) -> &'code str {
@@ -984,7 +998,8 @@ struct Room;
             &source_crate.root().join("assets"),
             TableNamespace::Application,
         )
-        .expect("the build succeeds");
+        .expect("the build succeeds")
+        .code;
 
         assert!(!module(&code, "mod").contains("pub mod asset_bag;"));
         assert!(!has_module(&code, "asset_bag"));
@@ -1021,7 +1036,8 @@ impl Config {
             &source_crate.root().join("assets"),
             TableNamespace::Application,
         )
-        .expect("the build succeeds");
+        .expect("the build succeeds")
+        .code;
 
         assert!(module(&code, "mod").contains("pub mod asset_bag;"));
         assert!(module(&code, "asset_bag").contains("macro_rules! asset"));
@@ -1069,7 +1085,8 @@ impl AssetRoute {
             &assets,
             TableNamespace::Application,
         )
-        .expect("the build succeeds");
+        .expect("the build succeeds")
+        .code;
 
         let responder = module(&code, "asset_bag/asset_responder");
 
@@ -1101,7 +1118,8 @@ impl AssetRoute {
             &assets,
             TableNamespace::Application,
         )
-        .expect("the build succeeds");
+        .expect("the build succeeds")
+        .code;
         let asset_bag = module(&code, "asset_bag");
 
         assert!(asset_bag.contains("pub mod asset_responder;"));

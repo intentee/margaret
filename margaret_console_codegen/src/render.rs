@@ -239,12 +239,9 @@ fn schema_tokens(has_models: bool, dispatch: InvocationDispatch) -> SchemaTokens
     }
 
     let run = dispatch.run(&quote! {
-        println!(
-            "{}",
+        margaret::framework::console::print_output::print_output(
             margaret::framework::model::render_postgres::render_postgres(&super::schema::SCHEMA)
-        );
-
-        margaret::framework::console::command_outcome::CommandOutcome::Succeeded
+        )
     });
 
     SchemaTokens {

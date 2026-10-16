@@ -10,6 +10,7 @@ use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
 use tokio_tungstenite::tungstenite::protocol::Role;
 use tokio_util::sync::CancellationToken;
 
+use margaret_diagnostic::report_diagnostic::report_diagnostic;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
@@ -35,7 +36,9 @@ async fn drive_web_socket_upgrade<Session>(
     let upgraded = match on_upgrade.await {
         Ok(upgraded) => upgraded,
         Err(error) => {
-            eprintln!("margaret_websocket: protocol upgrade failed: {error}");
+            report_diagnostic(format_args!(
+                "margaret_websocket: protocol upgrade failed: {error}"
+            ));
 
             return;
         }
@@ -101,7 +104,9 @@ where
             Ok(WebSocketSessionCreationOutcome::Created(created)) => created,
             Ok(WebSocketSessionCreationOutcome::Interrupted(continuation)) => return continuation,
             Err(error) => {
-                eprintln!("margaret_websocket: session creation failed: {error:#}");
+                report_diagnostic(format_args!(
+                    "margaret_websocket: session creation failed: {error:#}"
+                ));
 
                 return ResponseContinuation::from(Response::text(500, "Internal Server Error"));
             }

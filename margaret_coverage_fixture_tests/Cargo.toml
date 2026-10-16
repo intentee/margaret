@@ -5,6 +5,10 @@ edition = "2024"
 publish = false
 autotests = false
 
+[[bin]]
+name = "margaret_coverage_fixture_cli"
+path = "src/main.rs"
+
 [dependencies]
 margaret_coverage_fixture = { path = "../margaret_coverage_fixture" }
 margaret_local_server_tests = { path = "../margaret_local_server_tests" }

@@ -1,13 +1,16 @@
 mod accepted_client_framework_providers;
-mod asset_bag_modules;
+mod asset_bag_artifacts;
+pub mod asset_bag_inputs;
 mod asset_macro_canonical_path;
 mod asset_responder_canonical_path;
 mod authorization_grants_tables_canonical_path;
 mod binding_declarations;
 pub mod build;
+mod build_asset_bag_artifacts;
 mod build_jwks_artifacts;
 mod build_oauth_client_artifacts;
 mod build_oidc_provider_artifacts;
+pub mod build_output;
 mod build_trusted_issuer_artifacts;
 mod client_assertions_tables_canonical_path;
 pub mod codegen_error;

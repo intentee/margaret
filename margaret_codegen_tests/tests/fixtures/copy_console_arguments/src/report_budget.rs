@@ -1,3 +1,5 @@
+use std::io;
+use std::io::Write;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
@@ -44,13 +46,14 @@ impl ReportBudget {
     #[process]
     pub fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok({
-            println!(
+            writeln!(
+                io::stdout(),
                 "{} {} {} {}",
                 self.budget.0,
                 self.limits.budget.0,
                 self.max_connections,
                 self.spare_connections.map_or(0, NonZeroU32::get)
-            );
+            )?;
 
             CommandOutcome::Succeeded
         })

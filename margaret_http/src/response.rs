@@ -17,6 +17,8 @@ use http_body_util::combinators::UnsyncBoxBody;
 use maud::Markup;
 use serde::Serialize;
 
+use margaret_diagnostic::report_diagnostic::report_diagnostic;
+
 use crate::header::Header;
 
 fn buffered(body: Bytes) -> UnsyncBoxBody<Bytes, io::Error> {
@@ -68,7 +70,9 @@ impl Response {
         match serialized {
             Ok(body) => Self::bytes(status, "application/json", body),
             Err(error) => {
-                eprintln!("margaret_http: response serialization failed: {error}");
+                report_diagnostic(format_args!(
+                    "margaret_http: response serialization failed: {error}"
+                ));
 
                 Self::text(500, "Internal Server Error")
             }
@@ -164,9 +168,9 @@ impl Response {
         match builder.body(self.body) {
             Ok(response) => response,
             Err(error) => {
-                eprintln!(
+                report_diagnostic(format_args!(
                     "margaret_http: the responder produced a response that is not a valid HTTP response (status `{status}`): {error}"
-                );
+                ));
 
                 internal_server_error()
             }

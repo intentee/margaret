@@ -1,9 +1,11 @@
 use std::fmt::Display;
 
+use margaret_diagnostic::report_diagnostic::report_diagnostic;
+
 use crate::command_outcome::CommandOutcome;
 
 pub fn report_failure(error: impl Display) -> CommandOutcome {
-    eprintln!("{error}");
+    report_diagnostic(error);
 
     CommandOutcome::Failed
 }

@@ -1,3 +1,5 @@
+use std::io;
+use std::io::Write;
 use std::sync::Arc;
 
 use chrono::DateTime;
@@ -128,7 +130,7 @@ impl Seed {
             self.sessions.start(reader.id, self.clock.now()).await?;
 
         for cookie in &cookie_changes.cookies {
-            println!("{}={}", cookie.name(), cookie.value());
+            writeln!(io::stdout(), "{}={}", cookie.name(), cookie.value())?;
         }
 
         Ok(CommandOutcome::Succeeded)

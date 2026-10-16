@@ -12,6 +12,8 @@ publish.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
+margaret_diagnostic = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }

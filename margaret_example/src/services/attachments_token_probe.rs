@@ -1,3 +1,5 @@
+use std::io;
+use std::io::Write;
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
@@ -28,13 +30,22 @@ impl AttachmentsTokenProbe {
     pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         match self.credentials.access_token().await {
             AcquiredToken::Acquired(_) => {
-                println!("the blog acquired an access token for its attachments");
+                writeln!(
+                    io::stdout(),
+                    "the blog acquired an access token for its attachments"
+                )?;
             }
             AcquiredToken::Refused(refusal) => {
-                println!("the identity server refused an attachments token: {refusal}");
+                writeln!(
+                    io::stdout(),
+                    "the identity server refused an attachments token: {refusal}"
+                )?;
             }
             AcquiredToken::Unavailable(unavailability) => {
-                println!("the identity server is unavailable: {unavailability}");
+                writeln!(
+                    io::stdout(),
+                    "the identity server is unavailable: {unavailability}"
+                )?;
             }
         }
 
